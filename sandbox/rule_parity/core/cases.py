@@ -155,7 +155,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     for name, calls in [("self",{"run":("run",)}),("mutual",{"run":("helper",),"helper":("run",)})]:
         emit("implementation.recursion." + name, "Node helper递归 " + name, "implementation.node",
             lambda calls=calls: evaluate_node_implementation(ImplementationMetrics(call_chain=analyze_call_graph(calls, entry="run")),ImplementationLimits()),
-            codes(("NODE.MAINTAINABILITY.RECURSIVE_CALL_CHAIN","error")), evidence=implementation_evidence)
+            codes(*(("NODE.MAINTAINABILITY.RECURSIVE_CALL_CHAIN","error"),) if variant == "baseline" else ()), evidence=implementation_evidence)
     for field, limit, diagnostic in [("source_lines",500,"BASE_LIB.SOURCE.MAX_LINES"),("source_bytes",60000,"BASE_LIB.SOURCE.MAX_BYTES")]:
         for amount in (limit,limit+1):
             emit(f"implementation.library.{field}.{amount}", f"BaseLib {field}={amount}", "implementation.base_lib",
@@ -490,7 +490,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         rules,sets=builtin_rule_resources()
         for selected,phase,count in [("vibeflow.workflow","import",0),("vibeflow.workflow","static",1),("vibeflow.workflow","run",1),
             ("vibeflow.quality.project","import",0),("vibeflow.quality.project","static",4),("vibeflow.quality.project","run",0),
-            ("vibeflow.process","import",1),("vibeflow.process","static",3),("vibeflow.process","run",3)]:
+            ("vibeflow.process","import",1),("vibeflow.process","static",5),("vibeflow.process","run",5)]:
             def inspect_plan(selected=selected,phase=phase):
                 plan=compile_ruleset(selected,rules={r.id:r for r in rules},rulesets={s.id:s for s in sets},entrypoint=phase)
                 return {"status":"PASS","codes":[],"positions":[],"metrics":{"invocation_count":len(plan.invocations),"rules":[item.rule.id for item in plan.invocations]},"message":"No business Node was imported or executed."}

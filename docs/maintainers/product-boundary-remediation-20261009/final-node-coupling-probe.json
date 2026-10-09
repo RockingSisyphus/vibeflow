@@ -1,0 +1,33 @@
+[
+  {
+    "name": "invalid:inspect_node:NodeImportNode",
+    "status": "PASS",
+    "payload": {
+      "rules": [
+        "NODE.METADATA.NODE_IMPORT"
+      ]
+    }
+  },
+  {
+    "name": "invalid:inspect_node:DirectNodeCallNode",
+    "status": "PASS",
+    "payload": {
+      "rules": [
+        "VF_IMPORT_LAYER",
+        "NODE.METADATA.NODE_IMPORT",
+        "NODE.METADATA.NODE_DIRECT_CALL"
+      ]
+    }
+  },
+  {
+    "name": "invalid:inspect_node:NodeInternalReadNode",
+    "status": "PASS",
+    "payload": {
+      "rules": [
+        "VF_IMPORT_LAYER",
+        "NODE.METADATA.NODE_IMPORT",
+        "NODE.METADATA.NODE_INTERNAL_READ"
+      ]
+    }
+  }
+]

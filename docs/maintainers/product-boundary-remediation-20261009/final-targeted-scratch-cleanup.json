@@ -1,0 +1,14 @@
+[
+  {
+    "path": "/var/tmp/vfp-coupling-probe-20261009",
+    "allocated_bytes": 1097728
+  },
+  {
+    "path": "/var/tmp/vfp-coupling-tests-20261009",
+    "allocated_bytes": 43704320
+  },
+  {
+    "path": "/var/tmp/vfp-shared-node-runtime-20261009",
+    "allocated_bytes": 229376
+  }
+]

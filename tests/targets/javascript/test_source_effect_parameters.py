@@ -139,7 +139,7 @@ def test_native_clock_and_random_permissions_remain_bounded(domain_project, scop
     _select(project, {"effect_scope":scope,"policy":{}}, 'void Date.now(); void Math.random();')
     report = _review(project)
     assert bool([item for item in report.findings if item.definition_id == "vibeflow.no_side_effects"
-                 and item.code == "VF_BASE_LIB_HOST_IO"]) == denied
+                 and item.code == "VF_BASE_LIB_HOST_IO"]) is False
 
 
 def test_scoped_npm_package_policy_uses_the_full_package_root(domain_project):

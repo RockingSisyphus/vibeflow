@@ -1,0 +1,93 @@
+{
+  "steps": [
+    {
+      "step": "repository-quality",
+      "status": "passed",
+      "seconds": 4.621010114031378
+    },
+    {
+      "step": "compileall",
+      "status": "passed",
+      "seconds": 0.7664317919989116
+    },
+    {
+      "step": "pytest",
+      "status": "passed",
+      "seconds": 155.42060996301007
+    },
+    {
+      "step": "python-sandbox",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/python/integration/run_all.py')' returned non-zero exit status 1.",
+      "seconds": 301.5846399239963
+    },
+    {
+      "step": "javascript-minimal",
+      "status": "passed",
+      "seconds": 9.51718875800725
+    },
+    {
+      "step": "javascript-integration",
+      "status": "passed",
+      "seconds": 110.36537527805194
+    },
+    {
+      "step": "rule-regression-sandboxes",
+      "status": "passed",
+      "seconds": 699.6371462889947
+    },
+    {
+      "step": "runtime-observation-browser",
+      "status": "passed",
+      "seconds": 2.1621083759819157
+    },
+    {
+      "step": "review-layout-sandbox",
+      "status": "passed",
+      "seconds": 15.379269916040357
+    },
+    {
+      "step": "resource-sections-sandbox",
+      "status": "passed",
+      "seconds": 52.76016059302492
+    },
+    {
+      "step": "review-performance-sandbox",
+      "status": "passed",
+      "seconds": 54.9838470799732
+    },
+    {
+      "step": "adaptation-regression-sandbox",
+      "status": "passed",
+      "seconds": 77.53043670597253
+    },
+    {
+      "step": "wheel-isolation",
+      "status": "passed",
+      "seconds": 5.401542888022959
+    },
+    {
+      "step": "generated-artifact-cleanup",
+      "status": "passed",
+      "seconds": 0.08020453195786104
+    },
+    {
+      "step": "distribution",
+      "status": "passed",
+      "seconds": 15.30130273103714
+    },
+    {
+      "step": "repository-quality-final",
+      "status": "passed",
+      "seconds": 5.047401663963683
+    },
+    {
+      "step": "clean-tree",
+      "status": "passed",
+      "seconds": 0.08182603702880442
+    }
+  ],
+  "failures": [
+    "python-sandbox failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/python/integration/run_all.py')' returned non-zero exit status 1."
+  ]
+}

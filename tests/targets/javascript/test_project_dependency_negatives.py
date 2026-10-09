@@ -65,7 +65,7 @@ def _project(tmp_path: Path) -> Path:
 
 def _plan(entry: Path, *, entry_mode: str, completion: str) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "workflow_id": "test.project-negative",
         "entry_mode": entry_mode,
         "inputs": [],
@@ -187,18 +187,6 @@ CASES = (
         ),
     ),
     NegativeCase(
-        name="dynamic-code",
-        code="VF_IMPORT_DYNAMIC_CODE",
-        diagnostic_file="entry.ts",
-        marker="eval",
-        sources={
-            "entry.ts": 'export function run() { return eval("1"); }\n',
-        },
-        owners=(
-            {"path": "entry.ts", "kind": "node", "id": "test.entry"},
-        ),
-    ),
-    NegativeCase(
         name="module-promise",
         code="VF_IMPORT_SIDE_EFFECT",
         diagnostic_file="entry.ts",
@@ -273,7 +261,7 @@ def test_project_dependency_negative_has_precise_diagnostic(
         for owner in case.owners
     )
     entry = project / "entry.ts"
-    checked = run_rule_check_driver({"typecheckFiles": [str(entry)], "ruleTopics": ["imports", "purity", "completion", "module_state"], "importPolicy": {"owners": owners, "node_base_libs": case.node_base_libs or {}, "base_lib_dependencies": {"test.base": []}}}, package_root=project)
+    checked = run_rule_check_driver({"typecheckFiles": [str(entry)], "ruleTopics": ["architecture", "imports", "purity", "completion", "module_state"], "importPolicy": {"owners": owners, "node_base_libs": case.node_base_libs or {}, "base_lib_dependencies": {"test.base": []}}}, package_root=project)
     matching = [item for item in checked.findings if item.get("code") == case.code]
     assert matching, [item.get("code") for item in checked.findings]
     diagnostic = matching[0]
@@ -294,6 +282,19 @@ def test_project_dependency_negative_has_precise_diagnostic(
             ).resolve()
         ),
     }
+
+
+def test_project_string_evaluation_is_not_a_security_policy(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    entry = project / "entry.ts"
+    entry.write_text('export function run() { return {result: eval("1")}; }\n')
+    checked = run_rule_check_driver({
+        "typecheckFiles": [str(entry)],
+        "ruleTopics": ["architecture", "imports", "purity", "completion", "module_state"],
+        "importPolicy": {"owners": [{"path": str(entry), "kind": "node", "id": "test.entry",
+                                    "export": "run", "completion": "immediate"}]},
+    }, package_root=project)
+    assert checked.findings == ()
 
 
 def test_failed_replace_preserves_every_existing_output_byte(tmp_path: Path) -> None:

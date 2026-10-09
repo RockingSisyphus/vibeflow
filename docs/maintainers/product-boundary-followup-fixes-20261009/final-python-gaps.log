@@ -1,0 +1,13 @@
+python: 11 observations
+{
+  "cases": 11,
+  "matched": 11,
+  "unmatched": 0,
+  "process_errors": 0,
+  "families": {
+    "node-import-isolation": 3,
+    "planned-helper-closure": 4,
+    "helper-ownership": 4
+  }
+}
+report: /home/rockingsisyphus/projects/VibeFlow/docs/maintainers/product-boundary-followup-fixes-20261009/final-python-gaps.json

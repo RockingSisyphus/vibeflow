@@ -1,6 +1,6 @@
 # 0.16 统一资源与旧 API 退役
 
-自 0.15.0 起，VibeFlow 使用代码插件声明资源。升级时将旧登记转换为所属语言的 SDK 声明和 workflow 插件选择。公开契约为 Rule ABI v1、Plugin ABI v3、Workflow ABI v4；原生数据路由、Nodeset、Loop 和业务执行协议保持原有语义。
+自 0.15.0 起，VibeFlow 使用代码插件声明资源。升级时将旧登记转换为所属语言的 SDK 声明和 workflow 插件选择。公开契约为 Rule ABI v1、Plugin ABI v3、Workflow ABI v5；原生数据路由、Nodeset、Loop 和业务执行协议保持原有语义。
 
 0.16 完成内部迁移，直接移除旧公开 API。默认资源由自动接入的内置插件贡献，无需在 Config 中声明；内置和外部插件共用贡献校验、来源、冲突处理和实现绑定。资源进入 Catalog 不表示选中了它的规则，显式空 Ruleset 仍只提供资料。
 
@@ -87,13 +87,13 @@ BaseLib、Plugin、HostExtension 通过 `rulesets` 选择审查，插件包声�
 
 `vibeflow.no_side_effects` 在两个 Target 都消费有效 `effect_scope`、`policy` 参数。Python 的 Node、BaseLib、Plugin 和普通源码共用效果遍历；可解析 helper 按真实函数体判断，纯函数改名为 write/read/close 不改变结果。资源仍独立选择规则，BaseLib 保留自身顶层结构与显式支撑文件检查，不继承调用者权限。
 
-普通项目源码的效果审查默认使用 `none`；`terminal` 仅允许终端效果，`python_io` 允许相应一般 I/O，`global_state` 允许资源或模块状态但不允许修改 builtin、原型及宿主关键状态。`trusted` 不提供额外豁免。scope 不解除显式导入禁止、资源依赖或硬性效果限制。参数细则见[效果与导入参数](rules-and-nodes.md#效果与导入参数)。
+普通项目源码的效果审查默认使用 `none`；`terminal` 仅允许终端效果，`python_io` 允许相应一般 I/O，`global_state` 允许共享或模块状态但不允许修改 builtin、原型及宿主关键状态。`trusted` 不提供额外豁免。scope 不解除显式导入禁止、资源依赖或硬性效果限制。参数细则见[效果与导入参数](rules-and-nodes.md#效果与导入参数)。
 
-迁移旧 policy 时，区分导入禁止与效果分类：Python effects 自身默认禁止 importlib；imports-only 默认四个政策数组为空。旧模板中用于表示一般 I/O 分类的 banned_roots 不应继续作为显式禁令，真正需要禁止的模块则继续明确列出。显式空数组会生效，不回退旧禁用表；effects/imports 不接受指标政策，指标规则也不再记录未消费的导入参数。
+迁移旧 policy 时，区分导入禁止与效果分类：Python effects 默认 banned_roots 为空，不再默认禁止 importlib；imports-only 默认四个政策数组为空。旧模板中用于表示一般 I/O 分类的 banned_roots 不应继续作为显式禁令，项目确需禁止的模块则继续明确列出。显式空数组会生效，不回退旧禁用表；effects/imports 不接受指标政策，指标规则也不再记录未消费的导入参数。
 
 所有活动 workflow、Nodeset body、Loop body 和 SDK 输入都必须明确填写布尔 required；必需输入写 true，可缺省输入写 false。运行时先拒绝未声明键再检查必填键，空 inputs 只接受 `{}`。值为 null 仍算键存在，不能用它恢复旧的整组免检行为。低层 portable supplied 输入不得改变原声明的 key、type、required 或顺序。
 
-默认规则检查 Decision 路由输出、契约重叠、examples 形状、公开 callable、decorator 和模块结构。声明模型接受 `examples.outputs`；Python 默认接口 Rule 禁止该字段，JS 默认 Rule 接受合法输出示例。Python 默认导入 Rule 拒绝模块级 `try/match`，需要放宽时替换该 Rule。
+接口规则检查实际入口 ABI、公开 callable 与声明形状；正常嵌套生成器 helper 不改变 run_pure 的接口，真正含 yield 的入口仍被拒绝。输入类型名与输出键可以重叠，Decision 端口无需固定命名，Python/JS 均接受合法 `examples.outputs`。真实路由及运行输出协议继续由声明、编译和 Runtime 检查，不静态证明返回值构造。Python 默认导入 Rule 保留有限 decorator 和模块结构政策，包括模块级 `try/match`；需要放宽时替换该 Rule。
 
 规则审查源码与架构健康度。项目的类型检查和业务测试负责业务类型及结果；JS AOT 使用原有 TypeScript 转译流程。解析、实现绑定、原生 ABI 与执行结果按各阶段事实报告。
 

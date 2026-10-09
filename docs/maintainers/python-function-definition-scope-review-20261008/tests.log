@@ -1,0 +1,22 @@
+
+added 4 packages, and audited 5 packages in 2s
+
+found 0 vulnerabilities
+$ /home/rockingsisyphus/miniforge3/bin/python -m pytest -q -p no:cacheprovider -p pytest_workdirs -p xdist.plugin -n 4 --dist loadfile /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_source_effect_parameters.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_source_false_positives.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/strict_effect_scopes.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_source_ast_reuse.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_runtime_leaves.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_plugins_policy.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_code_plugins.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/strict_node_purity.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/strict_plugins.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_bindings.py
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  7%]
+........................................................................ [ 15%]
+........................................................................ [ 23%]
+........................................................................ [ 31%]
+........................................................................ [ 39%]
+........................................................................ [ 47%]
+........................................................................ [ 55%]
+........................................................................ [ 63%]
+........................................................................ [ 71%]
+........................................................................ [ 79%]
+.............................ss......................................... [ 87%]
+........................................................................ [ 95%]
+........................................                                 [100%]
+902 passed, 2 skipped in 14.40s

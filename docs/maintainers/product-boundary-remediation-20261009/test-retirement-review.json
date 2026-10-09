@@ -1,0 +1,61 @@
+{
+  "tests/targets/python/test_input_exception_states.py": [
+    "test_original_exception_review_keeps_input_identity",
+    "test_call_arguments_capture_intermediate_exception_state",
+    "test_nested_exception_regions_keep_execution_and_clearing_boundaries",
+    "test_catchall_handler_clearing_is_a_precise_negative_control"
+  ],
+  "tests/targets/python/test_source_parameter_facts.py": [
+    "test_cross_file_forwarding_keeps_input_and_dictionary_facts_distinct",
+    "test_dictionary_proof_requires_every_actual_argument",
+    "test_literal_default_and_keyword_forwarding_are_actual_dictionary_inputs",
+    "test_exception_builtin_proof_honors_declared_binding_owner",
+    "test_lambda_and_comprehension_builtin_proof_is_lexical",
+    "test_exception_controls_use_evaluation_and_binding_facts",
+    "test_deleted_and_rebound_callees_keep_exception_evaluation_order",
+    "test_local_name_loads_use_actual_binding_before_argument_clear",
+    "test_nested_actual_call_keeps_captured_parameter_provenance",
+    "test_captured_dictionary_proof_requires_stable_actual_binding"
+  ],
+  "tests/targets/python/test_input_declared_bindings.py": [
+    "test_declared_input_binding_owner_reaches_helper_without_tainting_other_bindings",
+    "test_selected_function_root_keeps_external_nonlocal_cell_separate_from_module_global",
+    "test_invalid_nonlocal_binders_are_syntax_controls_not_permission_exceptions"
+  ],
+  "tests/targets/python/test_exit_stack.py": [
+    "test_formal_cli_case",
+    "test_analysis_preserves_ast_and_callback_location",
+    "test_unknown_assignments_do_not_authorize_close"
+  ],
+  "tests/targets/python/test_runtime_dispatch.py": [
+    "test_detects_direct_method_alias_attribute_subscript_and_getattr_dispatch",
+    "test_propagates_runtime_values_through_branches_closures_and_helpers",
+    "test_detects_callback_loaded_from_mutable_module_registry",
+    "test_does_not_flag_builtins_protocols_static_imports_or_mapping_reads",
+    "test_ordinary_node_warns_without_blocking_but_visible_effect_boundaries_do_not",
+    "test_compiler_fact_records_tri_state_runtime_dispatch_and_effect_scope",
+    "test_training_sandbox_declares_runtime_model_and_optimizer_calls_as_global_state",
+    "test_source_dispatch_reuses_target_trees_and_preserves_public_ast_isolation",
+    "test_unlocked_global_state_health_warning_is_advisory",
+    "test_effective_named_lock_suppresses_global_state_coordination_warning"
+  ],
+  "tests/targets/python/test_input_writeback.py": [
+    "test_direct_writeback_reference_facts_keep_real_binding_and_call_parameters",
+    "test_formal_effects_direct_input_writeback_uses_shared_reference_facts",
+    "test_all_direct_mutation_consumers_use_owned_expression_sites",
+    "test_argument_and_reference_outputs_are_recomputed_at_steady_state",
+    "test_nested_actual_parameter_seeds_do_not_taint_same_named_unrelated_function",
+    "test_comprehension_outer_iterable_walrus_is_invalid_python_not_a_scope_exception",
+    "test_supported_expression_values_capture_receiver_and_arguments_before_later_writes"
+  ],
+  "tests/targets/python/test_source_control_definitions.py": [
+    "test_control_suites_provide_same_scope_function_ast_and_call",
+    "test_deeper_typed_control_suites_keep_the_actual_nested_function_target",
+    "test_same_named_control_definitions_preserve_independent_lexical_identity",
+    "test_child_function_body_references_are_not_reported_as_parent_calls",
+    "test_module_control_definitions_keep_import_and_global_structure",
+    "test_same_scope_branch_redefinitions_keep_existing_qualified_identity_convention",
+    "test_pure_close_declared_in_try_uses_its_resolved_body_in_formal_effects",
+    "test_unrelated_object_close_is_not_resolved_by_the_helpers_name"
+  ]
+}

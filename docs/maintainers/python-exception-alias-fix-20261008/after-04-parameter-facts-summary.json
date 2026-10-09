@@ -1,0 +1,37 @@
+{
+  "kind": "formal-targeted-tests",
+  "launcher": "tools/run_tests.py",
+  "scratch": "/home/rockingsisyphus/.cache/vibeflow-input-exception-20261008/parameter-facts-after-04",
+  "total": 467,
+  "passed": 467,
+  "failed": 0,
+  "errors": 0,
+  "skipped": 0,
+  "groups": {
+    "original_exception_tests": 112,
+    "existing_input_writeback_tests": 293,
+    "new_parameter_and_binding_controls": 62
+  },
+  "log": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/after-04-parameter-facts.log",
+  "xml": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/after-04-parameter-facts.xml",
+  "hashes_captured_after_batch": {
+    "src/vibeflow/targets/python/quality/source_analysis/parameter_facts.py": "bbf19e97307a71d5121057b536e0644456aa891a0f4043bd7b9720c56fd0976f",
+    "src/vibeflow/targets/python/quality/source_analysis/input_tracking.py": "ad2ab0532bea6147b7bee65bfc5b628bf61d3d7738b27115e5e033edec8f1893",
+    "src/vibeflow/targets/python/quality/source_analysis/bindings.py": "f012cb2ac445f48608d134b302f6c2432e681b40c000f063e0b19407ae6482b5",
+    "src/vibeflow/targets/python/quality/source_analysis/visitors.py": "f457db35cfd1000304d2a1e64b3ea50321716dc97241a877cde810adef5d20b5",
+    "src/vibeflow/targets/python/quality/rules/effects.py": "73984a4c2948a7308277f39a409da65ac12d60e2d8c2419a6529b245c020c72b",
+    "tests/targets/python/test_input_exception_states.py": "1e0ab9102039851f1b080e3264c72278df2b963a33b6fb7e1084b7a54e540846",
+    "tests/targets/python/test_input_writeback.py": "03403fedf79d996c40447b871e5d083b811e4d26a27a511f4e34925d88dd83a5",
+    "tests/targets/python/test_source_parameter_facts.py": "c9a5b62bb70d2aa8469e26ac1c8764621f3ff46d77c5ba63980c0ef4acc12a93"
+  },
+  "old_test_sha_unchanged": {
+    "tests/targets/python/test_input_exception_states.py": true,
+    "tests/targets/python/test_input_writeback.py": true
+  },
+  "fixed_readonly_probe_before": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/nested-capture-dict-before.json",
+  "notes": [
+    "FnAST containment roots preserve captured dictionary facts without inventing independent unknown caller paths.",
+    "This targeted batch covers rebound arbitrary params before nested definition; the separate late rebind-after-definition counterexample remains pending collector repair.",
+    "Do not use this targeted result as full repository or generated-product validation."
+  ]
+}

@@ -1,0 +1,46 @@
+bringing up nodes...
+bringing up nodes...
+
+..........F..........                                                    [100%]
+=================================== FAILURES ===================================
+________ test_distribution_renderer_reviews_minimal_javascript_workflow ________
+[gw0] linux -- Python 3.13.13 /home/rockingsisyphus/miniforge3/bin/python
+
+tmp_path = PosixPath('/tmp/vfp-review-fixes-full/temporary/pytest-of-rockingsisyphus/pytest-3/popen-gw0/test_distribution_renderer_rev0')
+
+    def test_distribution_renderer_reviews_minimal_javascript_workflow(
+        tmp_path: Path,
+    ) -> None:
+        distribution = distribution_builder.build_distribution(
+            tmp_path / "distribution",
+            run_self_check=False,
+        )
+        for relative in (
+            "javascript_project",
+            "kernel/tools/mermaid-renderer",
+        ):
+            completed = subprocess.run(
+                ["npm", "ci"],
+                cwd=distribution / relative,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+>           assert completed.returncode == 0, completed.stderr or completed.stdout
+E           AssertionError: npm error code EROFS
+E             npm error syscall open
+E             npm error path /home/rockingsisyphus/.npm/_cacache/tmp/5a353636
+E             npm error errno EROFS
+E             npm error rofs Invalid response body while trying to fetch https://registry.npmjs.org/zod: EROFS: read-only file system, open '/home/rockingsisyphus/.npm/_cacache/tmp/5a353636'
+E             npm error rofs Often virtualized file systems, or other file systems
+E             npm error rofs that don't support symlinks, give this error.
+E             npm error Log files were not written due to an error writing to the directory: /home/rockingsisyphus/.npm/_logs
+E             npm error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal
+E             
+E           assert 1 == 0
+E            +  where 1 = CompletedProcess(args=['npm', 'ci'], returncode=1, stdout='', stderr="npm error code EROFS\nnpm error syscall open\nnp...sisyphus/.npm/_logs\nnpm error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal\n").returncode
+
+/home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_release.py:177: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_release.py::test_distribution_renderer_reviews_minimal_javascript_workflow
+1 failed, 20 passed in 19.18s

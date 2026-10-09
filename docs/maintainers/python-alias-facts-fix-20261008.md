@@ -1,0 +1,49 @@
+# Python 别名事实与输入突变统一
+
+本记录跟进[推导式修复独立审核](python-comprehension-scope-review-20261008.md)中的 F03/F04。两项是既有遗漏：局部推导式目标通过赋值别名外逸后可能冒认宿主对象；嵌套函数的 global/nonlocal 输入写入已参与 helper 参数传播，却没有参与直接突变检查。原审计、独立脚本与上一轮修复记录保持原来的观察。
+
+后续[独立审核](python-alias-facts-review-20261008.md)确认上述具体案例已修复，同时发现 F05：after-source-03 遗漏表达式中途抛错时的输入别名。下文 full-03 及包级结果是此前批次的真实历史记录，不能证明 F05 已关闭，也不能据此认定整体无回归。后续整改及新验收另见[异常出口修复记录](python-exception-alias-fix-20261008.md)。
+
+本轮以本地提交 `5b9f9763ab7051fc964a4d83a1419d87a621b4c9` 为基线。产品基线从 Git 对象固定，不使用修改中的工作区作为修前证据；完整产品清单与受保护原始审计哈希见[基线记录](python-alias-facts-fix-20261008/before-source-and-audits.json)。
+
+## 行为合同
+
+`[(alias := sys) for sys in objects]` 中的 sys 是推导式局部目标，alias 指向该局部对象，后续 alias.argv 不应被识别成宿主 sys.argv。目标改名为 item 不改变判断；真正来自导入 sys 的别名仍接受宿主策略检查。局部对象的方法名仍参与现有未知 I/O 的保守检查，实际可解析 helper 继续根据函数体判断。
+
+嵌套函数通过 nonlocal 或 global 写入实际输入后，读取同一声明归属的 alias 时，直接方法突变、下标赋值和删除与 helper 实参传播使用同一输入事实。global_state 允许模块状态，不取消业务输入不可突变合同。不同作用域的同名局部字典、参数和推导式目标保持独立；明确覆盖为局部值的直接使用不得新被误判为输入。
+
+## 实现与保留边界
+
+共享效果 visitor 为真实局部对象的别名保留内部来源标记，并在每个分支的别名视图中独立检查身份。局部名字即使叫 sys、os、builtins 或 importlib，也不成为导入的宿主对象。标记采用不可能作为 Python 模块根的形式，避免真实模块命名碰撞；诊断显示源码中的 alias.write 等调用，不泄漏内部标记。普通未知方法的 close/read/write 等保守效果检查继续生效，可解析 helper 仍根据实际函数体判断。
+
+输入检查只保留一个事实采集器：helper 的实参传播和直接突变都读取相同的声明归属、分支状态与表达式事实。原 visitor 中独立维护的输入别名集合已移除。实际解析到的函数 AST 作为参数种子和调用目标，避免同名但无关的 helper 共享输入身份。
+
+同一选定函数 AST 内，嵌套函数的 global/nonlocal 写入随已解析调用参与事实合并；仅遍历到函数定义不等于它已经执行。当前函数体中的明确赋值会清除当前路径的输入身份，可能执行的条件、短路、循环、异常和 match 分支保留相应可能性。闭包的后续写入只归属于其真实声明，不能污染别处同名变量。
+
+独立基线复核又确认了本轮暂态写入的新误报：内层 bind 先把 alias 赋成 inputs，再无条件改成字典，当前调用后不应留下输入身份。同一 AST 内的写入结果按函数结束时的可能值收敛，同时保留 return、raise、实际调用及属性／下标查询的异常出口；写入后提前退出或调用失败的情形不能被随后未必执行的清除掩盖。内层真正使用输入的站点事实独立保留，清除后不会回写抹去先前的突变诊断。
+
+只执行 clear() 把原输入别名赋成字典后，外层仍被保守识别成输入，是 5b9 基线也存在的误报。本轮不新增通用 callee 确定清除摘要；新独立 clear3 矩阵保留该原期待与不匹配，并单独标注既有边界。
+
+冻结后的只读复核还发现表达式求值顺序漏检：alias.get((alias := 'seed'), {}) 会先取到原输入的 get，再覆盖变量。输入事实需要在各表达式真正被求值时保存，赋值和调用不能在整个右侧结束后重新猜测接收者或先前实参的身份。此项在统一完整验收前修正，前两份 after-source 快照只保留为中间证据，最终产品来源固定为 after-source-03。
+
+本轮保持资源权限、有效 Rule 参数、诊断等级与 canonical 合同。不引入动态反射解释、跨选定 AST 的独立 callee 写回权威或完整运行时实参绑定器；global/nonlocal 的实际调用事实仍来自现有 SourceContext。普通源码、BaseLib 和 Plugin 不因拥有共享 visitor 而获得业务输入种子。
+
+## 验证记录
+
+原审计脚本和历史期待保持原样。新的独立矩阵同时检查局部属性身份和未知普通 I/O，避免把 alias.write 在 none 下的正确拒绝写成身份误报。原36项中四种资源的 alias.write 原期待无 finding；整改后应记录其普通 I/O finding，并确认没有宿主冒认或内部标记，不把这四项改写成原期待匹配。
+
+详细命令与逐案证据见[独立重放说明](python-alias-facts-fix-20261008/README.md)。最终源码 after-source-03 的 17 文件定向批次为 2,287 passed；源码独立矩阵共 669 次检查，原36脚本另计36次观察并保留历史期待。新128正式矩阵、103输入写回／求值矩阵、12求值顺序及3／5出口控制与原 F01/F02、声明归属对照符合要求，详见 source03-summary.json。clear3 的一项既有保守边界及原36的四项普通 I/O 差异均单列，不计作原期待全部匹配。
+
+第一轮完整批次 full-01 跑完17阶段（5通过、12失败），2,336个源码／测试／工具／配置输入前后未改变。pytest 为4,018 passed、312 failed；269个失败栈直接包含 EDQUOT，43个二级断言失败需环境复验。/tmp 的 tmpfs 挂载启用了 usrquota，不能由总剩余空间推断当前用户可继续写入；第一份环境复验先使用项目磁盘 dist/t，真实浏览器检查通过，但发行测试临时输出仍被仓库内路径边界拒绝。最终临时目录改为仓库外的 /home/rockingsisyphus/.cache/vf-p2/t，完整 scratch 同样放在仓库外，不删除无关临时数据。完整记录见 full-01-result.json。
+
+完整批次还揭示一项已过时的活动期待：conditional_alias 在 choose=True 的分支取到输入列表再 append，真实修改原输入。隔离5b9与当前版本对照确认旧版漏检、当前按输入不可突变合同拒绝。只迁移活动 current-only 矩阵的该项期待，保留原 sourcebody、旧baseline接受结果和历史审计；不改产品逻辑来恢复旧漏检。性能矩阵56项全部 matched，阶段错误来自实际浏览器检查；规则缺口批次的209个失败最终分为202个明文配额错误和7个浏览器启动错误；pytest的二级失败由对应完整文件环境复验确认，不凭断言文本推测。发行阶段另因第一批 scratch 在仓库内部，被既有 builder 路径规则拒绝，后两批均使用仓库外新目录。
+
+Python current-only 规则矩阵迁移后为291/291 matched、0进程错误，保留 baseline 和 original_current 的旧接受观察。外部临时目录下，原失败对应的25个完整测试文件为570 passed。第二批 full-02 跑完17阶段，16项通过，唯一失败是开头质量检查发现 tools/__pycache__；第14阶段删除此缓存，第16及17阶段均通过。原始退出码1及失败保存在 full-02-result.json，不重写为成功。
+
+清理后第三批正式运行 `python -B tools/verify_project.py --full`，17/17通过、退出码0，2,336个源码／测试／工具／配置输入前后全部未变，详见[完整验收结果](python-alias-facts-fix-20261008/full-03-result.json)。其中 pytest 为4,330 passed，规则对照1,219/1,219与规则缺口680/680均匹配、0进程错误；真实浏览器、布局、资源区块、性能／缓存、适配、wheel隔离和两种发行profile均通过。独立标准库 quality/test.py 为49/49。
+
+从 full-03 的新 wheel、collaborative kernel、autonomous kernel 实际重放新旧矩阵。每种产品执行254次新检查、1341次旧回归，共4785次检查；另保留原36脚本的108次观察。三产品新128正式矩阵均128/128匹配，所有探针组成功退出。原36在每种产品仍有4项普通未知 write 的原期待差异，其他语义差异为0；clear3各保留1项既有清除误报，新增回归差异为0。全部检查的逐案、来源与历史边界分类见[包级验收摘要](python-alias-facts-fix-20261008/packaged-validation-summary.json)。
+
+冻结快照、wheel安装目录、whl、两份直接kernel与两份发行ZIP内嵌kernel，共7份文件集合各334文件，重放前后均与 after-source-03 清单逐字节匹配，包含JS driver及非Python资源。安装产生的pyc单列排除；发行profile、版本、kernel与元数据SHA均核对，见[前置字节证明](python-alias-facts-fix-20261008/product-byte-proof-before.json)和[重放后字节证明](python-alias-facts-fix-20261008/product-byte-proof-after.json)。原审核与持久保存脚本保持原样；扩充为103项的ignored临时探针路径与保存的原91副本明确分开。正式发布、默认发行目录覆盖和推送未包含在本轮操作中，本轮修改尚未提交。
+
+文档收尾后通过正式launcher的活动Markdown索引测试（1 passed），以及 quality/run.py --profile all（0错误、0警告、0提示）；git diff --check通过。包重放与索引检查后2,336个验收输入仍未变，见[收尾检查记录](python-alias-facts-fix-20261008/final-docs-and-source-check.json)。

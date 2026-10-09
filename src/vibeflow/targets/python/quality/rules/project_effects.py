@@ -13,8 +13,8 @@ class _SourceEffectVisitor(ModulePurityVisitor):
     def __init__(self, source, *, policy, effect_scope, resolved_calls):
         super().__init__(policy=policy,
             source=_SourceInfo(source.source_path, None, 1, source.text),
-            node_class_name="", known_node_modules=(), effect_scope=effect_scope,
-            audit_all_definitions=True, input_parameters={}, resolved_calls=resolved_calls)
+            node_class_name="", effect_scope=effect_scope,
+            audit_all_definitions=True, resolved_calls=resolved_calls)
         self.ordinary_source = source
         self.findings = {}
 

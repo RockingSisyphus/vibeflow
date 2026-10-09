@@ -121,7 +121,7 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
     assert b'FLOW_KIND_GLOBAL_STATE = "global_state"' in constants
     assert b'EFFECT_SCOPE_GLOBAL_STATE = "global_state"' in constants
     assert b"class ExecutionLockSpec" in flow
-    assert b'WORKFLOW_ABI_VERSION = "vibeflow.workflow.v4"' in workflow_model
+    assert b'WORKFLOW_ABI_VERSION = "vibeflow.workflow.v5"' in workflow_model
 
     with zipfile.ZipFile(first.archive) as archive:
         names = archive.namelist()

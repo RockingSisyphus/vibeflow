@@ -1,0 +1,248 @@
+[
+  {
+    "case": "global_read_in_lambda",
+    "kind": "node",
+    "body": "global VERSION\nvalue = lambda VERSION: VERSION\nreturn {}",
+    "expected_rejected": false,
+    "codes": [],
+    "matches": true
+  },
+  {
+    "case": "global_read_in_lambda",
+    "kind": "base_lib",
+    "body": "global VERSION\nvalue = lambda VERSION: VERSION\nreturn {}",
+    "expected_rejected": false,
+    "codes": [],
+    "matches": true
+  },
+  {
+    "case": "global_read_in_lambda",
+    "kind": "plugin",
+    "body": "global VERSION\nvalue = lambda VERSION: VERSION\nreturn {}",
+    "expected_rejected": false,
+    "codes": [],
+    "matches": true
+  },
+  {
+    "case": "global_read_in_lambda",
+    "kind": "python_source",
+    "body": "global VERSION\nvalue = lambda VERSION: VERSION\nreturn {}",
+    "expected_rejected": false,
+    "codes": [],
+    "matches": true
+  },
+  {
+    "case": "global_read_in_default",
+    "kind": "node",
+    "body": "global VERSION\ndef helper(value=VERSION):\n    return value\nreturn {}",
+    "expected_rejected": false,
+    "codes": [],
+    "matches": true
+  },
+  {
+    "case": "global_read_in_default",
+    "kind": "base_lib",
+    "body": "global VERSION\ndef helper(value=VERSION):\n    return value\nreturn {}",
+    "expected_rejected": false,
+    "codes": [],
+    "matches": true
+  },
+  {
+    "case": "global_read_in_default",
+    "kind": "plugin",
+    "body": "global VERSION\ndef helper(value=VERSION):\n    return value\nreturn {}",
+    "expected_rejected": false,
+    "codes": [],
+    "matches": true
+  },
+  {
+    "case": "global_read_in_default",
+    "kind": "python_source",
+    "body": "global VERSION\ndef helper(value=VERSION):\n    return value\nreturn {}",
+    "expected_rejected": false,
+    "codes": [],
+    "matches": true
+  },
+  {
+    "case": "class_local_binding",
+    "kind": "node",
+    "body": "global VERSION\nclass Local:\n    for VERSION in [2]:\n        pass\nreturn {}",
+    "expected_rejected": false,
+    "codes": [],
+    "matches": true
+  },
+  {
+    "case": "class_local_binding",
+    "kind": "base_lib",
+    "body": "global VERSION\nclass Local:\n    for VERSION in [2]:\n        pass\nreturn {}",
+    "expected_rejected": false,
+    "codes": [],
+    "matches": true
+  },
+  {
+    "case": "class_local_binding",
+    "kind": "plugin",
+    "body": "global VERSION\nclass Local:\n    for VERSION in [2]:\n        pass\nreturn {}",
+    "expected_rejected": false,
+    "codes": [],
+    "matches": true
+  },
+  {
+    "case": "class_local_binding",
+    "kind": "python_source",
+    "body": "global VERSION\nclass Local:\n    for VERSION in [2]:\n        pass\nreturn {}",
+    "expected_rejected": false,
+    "codes": [],
+    "matches": true
+  },
+  {
+    "case": "class_global_binding",
+    "kind": "node",
+    "body": "class Local:\n    global VERSION\n    for VERSION in [2]:\n        pass\nreturn {}",
+    "expected_rejected": true,
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ],
+    "matches": true
+  },
+  {
+    "case": "class_global_binding",
+    "kind": "base_lib",
+    "body": "class Local:\n    global VERSION\n    for VERSION in [2]:\n        pass\nreturn {}",
+    "expected_rejected": true,
+    "codes": [
+      "BASE_LIB.GLOBAL_STATE"
+    ],
+    "matches": true
+  },
+  {
+    "case": "class_global_binding",
+    "kind": "plugin",
+    "body": "class Local:\n    global VERSION\n    for VERSION in [2]:\n        pass\nreturn {}",
+    "expected_rejected": true,
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ],
+    "matches": true
+  },
+  {
+    "case": "class_global_binding",
+    "kind": "python_source",
+    "body": "class Local:\n    global VERSION\n    for VERSION in [2]:\n        pass\nreturn {}",
+    "expected_rejected": true,
+    "codes": [
+      "QUALITY.SIDE_EFFECT.CALL"
+    ],
+    "matches": true
+  },
+  {
+    "case": "global_in_comprehension_filter",
+    "kind": "node",
+    "body": "global VERSION\nvalue = [item for item in [1] if (VERSION := item)]\nreturn {}",
+    "expected_rejected": true,
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ],
+    "matches": true
+  },
+  {
+    "case": "global_in_comprehension_filter",
+    "kind": "base_lib",
+    "body": "global VERSION\nvalue = [item for item in [1] if (VERSION := item)]\nreturn {}",
+    "expected_rejected": true,
+    "codes": [
+      "BASE_LIB.GLOBAL_STATE"
+    ],
+    "matches": true
+  },
+  {
+    "case": "global_in_comprehension_filter",
+    "kind": "plugin",
+    "body": "global VERSION\nvalue = [item for item in [1] if (VERSION := item)]\nreturn {}",
+    "expected_rejected": true,
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ],
+    "matches": true
+  },
+  {
+    "case": "global_in_comprehension_filter",
+    "kind": "python_source",
+    "body": "global VERSION\nvalue = [item for item in [1] if (VERSION := item)]\nreturn {}",
+    "expected_rejected": true,
+    "codes": [
+      "QUALITY.SIDE_EFFECT.CALL"
+    ],
+    "matches": true
+  },
+  {
+    "case": "global_annotation_read",
+    "kind": "node",
+    "body": "global VERSION\nvalue: int = VERSION\nreturn {}",
+    "expected_rejected": false,
+    "codes": [],
+    "matches": true
+  },
+  {
+    "case": "global_annotation_read",
+    "kind": "base_lib",
+    "body": "global VERSION\nvalue: int = VERSION\nreturn {}",
+    "expected_rejected": false,
+    "codes": [],
+    "matches": true
+  },
+  {
+    "case": "global_annotation_read",
+    "kind": "plugin",
+    "body": "global VERSION\nvalue: int = VERSION\nreturn {}",
+    "expected_rejected": false,
+    "codes": [],
+    "matches": true
+  },
+  {
+    "case": "global_annotation_read",
+    "kind": "python_source",
+    "body": "global VERSION\nvalue: int = VERSION\nreturn {}",
+    "expected_rejected": false,
+    "codes": [],
+    "matches": true
+  },
+  {
+    "case": "alias_created_by_condition",
+    "kind": "input",
+    "body": "if (alias := inputs):\n    alias[\"x\"] = 1\nreturn {}",
+    "expected_rejected": true,
+    "codes": [
+      "NODE.PURITY.INPUT_MUTATION"
+    ],
+    "matches": true
+  },
+  {
+    "case": "nested_else_direct_write",
+    "kind": "input",
+    "body": "if params:\n    inputs = {}\nelif params is None:\n    inputs = {}\nelse:\n    inputs[\"x\"] = 1\nreturn {}",
+    "expected_rejected": true,
+    "codes": [
+      "NODE.PURITY.INPUT_MUTATION"
+    ],
+    "matches": true
+  },
+  {
+    "case": "conditional_local_input",
+    "kind": "input",
+    "body": "if (inputs := {}):\n    inputs[\"x\"] = 1\nelse:\n    inputs[\"x\"] = 2\nreturn {}",
+    "expected_rejected": false,
+    "codes": [],
+    "matches": true
+  },
+  {
+    "case": "local_branch_then_alias_else",
+    "kind": "input",
+    "body": "alias=inputs\nif params:\n    alias={}\nelse:\n    alias.update(x=1)\nreturn {}",
+    "expected_rejected": true,
+    "codes": [
+      "NODE.PURITY.INPUT_MUTATION"
+    ],
+    "matches": true
+  }
+]

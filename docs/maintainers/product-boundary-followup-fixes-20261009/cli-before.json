@@ -1,0 +1,191 @@
+[
+  {
+    "case": "global_for",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "global_for_unpack",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "global_with",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "global_import",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "global_from_import",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "global_definition",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "global_async_definition",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "global_class",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "global_except",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "global_match",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "global_comprehension_walrus",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "if_else_original_input",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "if_else_original_alias",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "expression_else_original_input",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "match_original_input",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "except_original_input",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "global_comprehension_local",
+    "expected_rejected": false,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "global_readonly",
+    "expected_rejected": false,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "local_definition",
+    "expected_rejected": false,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "condition_rebind_both_branches",
+    "expected_rejected": false,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  },
+  {
+    "case": "conditional_rebind_unknown_afterwards",
+    "expected_rejected": false,
+    "exit": 1,
+    "status": "ERROR",
+    "codes": [
+      "WORKSPACE.PROJECT_CONFIG.MISSING"
+    ]
+  }
+]

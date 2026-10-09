@@ -25,7 +25,6 @@ class ImplementationFact:
     type_key: str
     flow_kind: str = ""
     effect_scope: str = ""
-    runtime_dispatch: bool | None = None
     requires: tuple[DataRequirement, ...] = ()
     provides: tuple[DataProvider, ...] = ()
     completion: str = "immediate"
@@ -51,12 +50,6 @@ class ImplementationFact:
         )
         if not all(isinstance(value, str) for value in text_fields):
             raise ValueError("implementation facts must contain only strings")
-        if self.runtime_dispatch is not None and not isinstance(
-            self.runtime_dispatch, bool
-        ):
-            raise ValueError(
-                "implementation runtime_dispatch must be true, false, or null"
-            )
         requires = tuple(self.requires)
         provides = tuple(self.provides)
         if not all(isinstance(item, DataRequirement) for item in requires):
@@ -93,7 +86,7 @@ class ImplementationFact:
             "type_key": self.type_key,
             "flow_kind": self.flow_kind,
             "effect_scope": self.effect_scope,
-            "runtime_dispatch": self.runtime_dispatch,
+
             "requires": [item.to_dict() for item in self.requires],
             "provides": [item.to_dict() for item in self.provides],
             "completion": self.completion,

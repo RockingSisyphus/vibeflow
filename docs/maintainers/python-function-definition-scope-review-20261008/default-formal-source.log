@@ -1,0 +1,1 @@
+{"expected_state": "fixed", "expected_state_observed": true, "summary": {"cases": 72, "semantic_matches": 72, "semantic_mismatches": 0, "unequal_alias_pairs": 0, "unequal_parameter_pairs": 0, "original_matrix_cases": 48, "renamed_parameter_cases": 24}, "probe_error": null}

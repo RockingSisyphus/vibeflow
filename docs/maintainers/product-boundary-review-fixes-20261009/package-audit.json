@@ -1,0 +1,44 @@
+{
+  "status": "PASS",
+  "source_files": 335,
+  "wheel_byte_parity": true,
+  "profiles": [
+    {
+      "archive": "vibeflow-distribution-0.17.0.zip",
+      "kernel_source_files": 335,
+      "manuals_verified": [
+        "docs/user/rules-and-nodes.md",
+        "docs/user/rule-system-migration.md",
+        "docs/user/workflow-and-config.md",
+        "docs/user/product-check-boundaries.md"
+      ]
+    },
+    {
+      "archive": "vibeflow-distribution-autonomous-0.17.0.zip",
+      "kernel_source_files": 335,
+      "manuals_verified": [
+        "docs/user/rules-and-nodes.md",
+        "docs/user/rule-system-migration.md",
+        "docs/user/workflow-and-config.md",
+        "docs/user/product-check-boundaries.md"
+      ]
+    }
+  ],
+  "saved_artifacts": [
+    {
+      "path": "docs/maintainers/product-boundary-review-fixes-20261009/local-distributions/vibeflow-0.17.0-py3-none-any.whl",
+      "sha256": "f409e22e154135c347d1a4f5f5291dd8c9137d234897d2fa05ae72b298b47f2a",
+      "bytes": 717242
+    },
+    {
+      "path": "docs/maintainers/product-boundary-review-fixes-20261009/local-distributions/vibeflow-distribution-0.17.0.zip",
+      "sha256": "fba38142c4a6b4e4ef5fe1d9f2325023038c803caff32a3838decb37a47b032d",
+      "bytes": 770711
+    },
+    {
+      "path": "docs/maintainers/product-boundary-review-fixes-20261009/local-distributions/vibeflow-distribution-autonomous-0.17.0.zip",
+      "sha256": "0b374a310362ee639b3a5933e9f943cbb0ab6de90e4a4c43536876ce6513483a",
+      "bytes": 769983
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "driver_cases": [
+    {
+      "case": "math_static_control",
+      "scope": "none",
+      "findings": [],
+      "source": "export function run(inputs: object, params: any){const value = Math.max(1, 2);return {}; }\n"
+    },
+    {
+      "case": "math_computed_member",
+      "scope": "none",
+      "findings": [],
+      "source": "export function run(inputs: object, params: any){const value = Math[params.operation](1, 2);return {}; }\n"
+    },
+    {
+      "case": "current_time",
+      "scope": "none",
+      "findings": [],
+      "source": "export function run(inputs: object, params: any){const value = Date.now();return {}; }\n"
+    },
+    {
+      "case": "current_time_io_control",
+      "scope": "python_io",
+      "findings": [],
+      "source": "export function run(inputs: object, params: any){const value = Date.now();return {}; }\n"
+    },
+    {
+      "case": "random",
+      "scope": "none",
+      "findings": [],
+      "source": "export function run(inputs: object, params: any){const value = Math.random();return {}; }\n"
+    }
+  ],
+  "lock_api_cases": [
+    {
+      "case": "no_lock",
+      "code": "VF_TOOLCHAIN_MISSING",
+      "message": "Node.js executable was not found: vibeflow-boundary-probe-no-such-node"
+    },
+    {
+      "case": "yarn_lock",
+      "code": "VF_TOOLCHAIN_MISSING",
+      "message": "Node.js executable was not found: vibeflow-boundary-probe-no-such-node"
+    },
+    {
+      "case": "two_locks",
+      "code": "VF_TOOLCHAIN_MISSING",
+      "message": "Node.js executable was not found: vibeflow-boundary-probe-no-such-node"
+    }
+  ],
+  "scope": "Native Rule driver only; lock cases invoke API before real toolchain. No JS business function executed."
+}

@@ -1,0 +1,103 @@
+{
+  "driver_cases": [
+    {
+      "case": "math_static_control",
+      "scope": "none",
+      "findings": [],
+      "source": "export function run(inputs: object, params: any){const value = Math.max(1, 2);return {}; }\n"
+    },
+    {
+      "case": "math_computed_member",
+      "scope": "none",
+      "findings": [
+        {
+          "code": "VF_BASE_LIB_HOST_IO",
+          "message": "node 'probe.task' cannot access nondeterministic host primitive 'Math[computed]' under effect_scope 'none'",
+          "file": "/home/rockingsisyphus/projects/VibeFlow/dist/product-boundary-audit-20261009/javascript-final/math_computed_member/node.ts",
+          "line": 1,
+          "column": 64,
+          "owner": {
+            "path": "/home/rockingsisyphus/projects/VibeFlow/dist/product-boundary-audit-20261009/javascript-final/math_computed_member/node.ts",
+            "realPath": "/home/rockingsisyphus/projects/VibeFlow/dist/product-boundary-audit-20261009/javascript-final/math_computed_member/node.ts",
+            "kind": "node",
+            "id": "probe.task",
+            "export": "run",
+            "role": "entry",
+            "completion": "immediate"
+          }
+        }
+      ],
+      "source": "export function run(inputs: object, params: any){const value = Math[params.operation](1, 2);return {}; }\n"
+    },
+    {
+      "case": "current_time",
+      "scope": "none",
+      "findings": [
+        {
+          "code": "VF_BASE_LIB_HOST_IO",
+          "message": "node 'probe.task' cannot access nondeterministic host primitive 'Date' under effect_scope 'none'",
+          "file": "/home/rockingsisyphus/projects/VibeFlow/dist/product-boundary-audit-20261009/javascript-final/current_time/node.ts",
+          "line": 1,
+          "column": 64,
+          "owner": {
+            "path": "/home/rockingsisyphus/projects/VibeFlow/dist/product-boundary-audit-20261009/javascript-final/current_time/node.ts",
+            "realPath": "/home/rockingsisyphus/projects/VibeFlow/dist/product-boundary-audit-20261009/javascript-final/current_time/node.ts",
+            "kind": "node",
+            "id": "probe.task",
+            "export": "run",
+            "role": "entry",
+            "completion": "immediate"
+          }
+        }
+      ],
+      "source": "export function run(inputs: object, params: any){const value = Date.now();return {}; }\n"
+    },
+    {
+      "case": "current_time_io_control",
+      "scope": "python_io",
+      "findings": [],
+      "source": "export function run(inputs: object, params: any){const value = Date.now();return {}; }\n"
+    },
+    {
+      "case": "random",
+      "scope": "none",
+      "findings": [
+        {
+          "code": "VF_BASE_LIB_HOST_IO",
+          "message": "node 'probe.task' cannot access nondeterministic host primitive 'Math.random' under effect_scope 'none'",
+          "file": "/home/rockingsisyphus/projects/VibeFlow/dist/product-boundary-audit-20261009/javascript-final/random/node.ts",
+          "line": 1,
+          "column": 64,
+          "owner": {
+            "path": "/home/rockingsisyphus/projects/VibeFlow/dist/product-boundary-audit-20261009/javascript-final/random/node.ts",
+            "realPath": "/home/rockingsisyphus/projects/VibeFlow/dist/product-boundary-audit-20261009/javascript-final/random/node.ts",
+            "kind": "node",
+            "id": "probe.task",
+            "export": "run",
+            "role": "entry",
+            "completion": "immediate"
+          }
+        }
+      ],
+      "source": "export function run(inputs: object, params: any){const value = Math.random();return {}; }\n"
+    }
+  ],
+  "lock_api_cases": [
+    {
+      "case": "no_lock",
+      "code": "VF_TOOLCHAIN_MISSING",
+      "message": "JavaScript package_root must contain package-lock.json"
+    },
+    {
+      "case": "yarn_lock",
+      "code": "VF_TOOLCHAIN_LOCK",
+      "message": "yarn.lock cannot yet be verified against installed TypeScript/esbuild versions; use package-lock.json"
+    },
+    {
+      "case": "two_locks",
+      "code": "VF_TOOLCHAIN_LOCK",
+      "message": "JavaScript package_root must contain exactly one supported lockfile, found ['package-lock.json', 'yarn.lock']"
+    }
+  ],
+  "scope": "Native Rule driver only; lock cases invoke API before real toolchain. No JS business function executed."
+}

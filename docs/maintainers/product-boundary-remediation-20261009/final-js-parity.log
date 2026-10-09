@@ -1,0 +1,5 @@
+usage: run_all.py [-h] [--workers WORKERS]
+                  [--target {core,tooling,python,javascript}]
+                  [--baseline BASELINE] [--current-only]
+                  [--toolchain TOOLCHAIN] [--report REPORT] [--work WORK]
+run_all.py: error: unrecognized arguments: --groups javascript

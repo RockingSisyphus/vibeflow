@@ -9,6 +9,9 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 RETIRED_FILES = (
+    'targets/python/quality/source_analysis/runtime_dispatch.py',
+    'targets/python/quality/source_analysis/parameter_facts.py',
+    'targets/python/quality/source_analysis/exit_stacks.py',
     'core/descriptors/rule_catalogs.py', 'core/descriptors/rule_models.py',
     'core/quality/workflow_rules/rule_catalog.py',
     'targets/javascript/build/nodeset_limits.py',
@@ -35,7 +38,9 @@ MOVED_FILES = ('core/rules/builtin/__init__.py', 'core/rules/builtin/effects.py'
     'core/rules/builtin/implementation.py', 'core/rules/builtin/project_quality.py',
     'core/rules/builtin/workflow.py')
 RETIRED_PACKAGE_DIRS = ('core/rules/builtin',)
-RETIRED_SYMBOLS = frozenset({'NodeInfo', 'NodeContract', 'RegistryBase', 'BaseLibInfo',
+RETIRED_SYMBOLS = frozenset({'RuntimeDispatchSite', 'RuntimeDispatchAnalysis',
+    'analyze_runtime_dispatch', 'analyze_source_runtime_dispatch',
+    '_RuntimeDispatchAnalyzer', '_SourceDispatchAnalyzer','NodeInfo', 'NodeContract', 'RegistryBase', 'BaseLibInfo',
     'BaseLibRegistry', 'PluginInfo', 'PluginResourceRegistry', 'ConfigResources',
     'WorkflowSpec', 'adapt_base_lib_registry', 'base_lib_descriptor_from_registry',
     'normalize_plugin_info', 'normalize_base_lib_info', 'scan_base_lib', 'analyze_base_lib',

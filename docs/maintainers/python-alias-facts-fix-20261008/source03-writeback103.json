@@ -1,0 +1,3912 @@
+{
+  "script_sha256": "30ccab12f6d7e37d8b1cfe10c890415ac21dca6445fa225a9ca3aeaf67e5f711",
+  "observations": [
+    {
+      "case": "nonlocal_assign",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        bind()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "nonlocal_walrus",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            (alias := inputs)\n        bind()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "nonlocal_get",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs.get('nested')\n        bind()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "nonlocal_multilevel",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def middle():\n            def bind():\n                nonlocal alias\n                alias = inputs\n            bind()\n        middle()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 13,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.middle.bind": [],
+        "/virtual/input_writeback.py:Task.run_pure.middle": []
+      }
+    },
+    {
+      "case": "nonlocal_nearest_local",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def middle():\n            alias = {}\n            def bind():\n                nonlocal alias\n                alias = inputs\n            bind()\n        middle()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.middle.bind": [],
+        "/virtual/input_writeback.py:Task.run_pure.middle": []
+      }
+    },
+    {
+      "case": "global_assign",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        def bind():\n            global alias\n            alias = inputs\n        bind()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 10,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "global_walrus",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        def bind():\n            global alias\n            (alias := inputs)\n        bind()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 10,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "global_caller_local",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            global alias\n            alias = inputs\n        bind()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "global_outer_closure",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        global alias\n        alias = inputs\n        def mutate():\n            alias.pop('seed', None)\n        mutate()\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 9,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.mutate": []
+      }
+    },
+    {
+      "case": "global_middle_closure",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def middle():\n            global alias\n            alias = inputs\n            def mutate():\n                alias.pop('seed', None)\n            mutate()\n        middle()\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 17
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.middle.mutate": [],
+        "/virtual/input_writeback.py:Task.run_pure.middle": []
+      }
+    },
+    {
+      "case": "ordinary_child_local",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            alias = inputs\n        bind()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "lambda_body_local",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        fn = lambda: (alias := inputs)\n        fn()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "lambda_parameter",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        (lambda inputs: inputs.pop('seed', None))({})\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "lambda_closure",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        (lambda: inputs.pop('seed', None))()\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 6,
+            "column": 18
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "function_default_walrus",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        def bind(value=(alias := inputs)):\n            return value\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 8,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "lambda_default_walrus",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        fn = lambda value=(alias := inputs): value\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 7,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "comp_default_walrus",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        values = [lambda value=(alias := inputs): value for item in (0,)]\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 7,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "comp_local_input_control",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        values = [lambda value=(alias := inputs): value for inputs in ({},)]\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "nonlocal_comp",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            list(alias := inputs for item in (0,))\n        bind()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "global_comp",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        def bind():\n            global alias\n            values = [alias := inputs for item in (0,)]\n        bind()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 10,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "nested_parameter_direct",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        def mutate(payload):\n            payload.pop('seed', None)\n        mutate(inputs)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 7,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        },
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 7,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "module helper must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.mutate": [
+          "payload"
+        ]
+      }
+    },
+    {
+      "case": "nested_parameter_local_control",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        def mutate(payload):\n            payload.pop('seed', None)\n        mutate({})\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.mutate": []
+      }
+    },
+    {
+      "case": "nested_parameter_nonlocal_write",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind(payload):\n            nonlocal alias\n            alias = payload\n        bind(inputs)\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": [
+          "payload"
+        ]
+      }
+    },
+    {
+      "case": "nested_parameter_keyword_write",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind(*, payload):\n            nonlocal alias\n            alias = payload\n        bind(payload=inputs)\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": [
+          "payload"
+        ]
+      }
+    },
+    {
+      "case": "nested_parameter_global_write",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        def bind(payload):\n            global alias\n            alias = payload\n        bind(inputs)\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 10,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": [
+          "payload"
+        ]
+      }
+    },
+    {
+      "case": "nested_parameter_fake_write",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind(payload):\n            nonlocal alias\n            alias = payload\n        bind({})\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "straight_overwrite",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        alias = {}\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "annotated_overwrite",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        alias: dict = {}\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "walrus_overwrite",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        (alias := {})\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "nonlocal_caller_overwrite",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        bind()\n        alias = {}\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "global_caller_overwrite",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        global alias\n        def bind():\n            global alias\n            alias = inputs\n        bind()\n        alias = {}\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "constant_false",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        if False:\n            alias = inputs\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "constant_false_else_owned",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        if False:\n            alias = {}\n        else:\n            alias = inputs\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "constant_true_else_dead",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        if True:\n            alias = {}\n        else:\n            alias = inputs\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "branch_owned_first",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        if params['flag']:\n            alias = inputs\n        else:\n            alias = {}\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 10,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "branch_owned_else",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        if params['flag']:\n            alias = {}\n        else:\n            alias = inputs\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 10,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "branch_both_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        if params['flag']:\n            alias = {}\n        else:\n            alias = {}\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "loop_possible_write",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        for item in ():\n            alias = inputs\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 9,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "loop_clear_keeps_zero_iterations",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        for item in ():\n            alias = {}\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 9,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "while_false",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        while False:\n            alias = inputs\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INTERNAL_LOOP",
+          "rule_id": "NODE.PURITY.INTERNAL_LOOP",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 7,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "run_pure must not use while loops; model repeated execution with topology loops",
+          "suggested_fix_type": "fix_config",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "loop_next_iteration",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        for item in params['items']:\n            alias.pop('seed', None)\n            alias = inputs\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 8,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "comp_clear_keeps_zero_iterations",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        values = [(alias := {}) for item in ()]\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 8,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "comp_next_iteration",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        values = [(alias.pop('seed', None), (alias := inputs)) for item in params['items']]\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 7,
+            "column": 20
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "late_closure",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def mutate():\n            alias.pop('seed', None)\n        alias = inputs\n        mutate()\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 8,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.mutate": []
+      }
+    },
+    {
+      "case": "closure_after_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        alias = {}\n        def mutate():\n            alias.pop('seed', None)\n        mutate()\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.mutate": []
+      }
+    },
+    {
+      "case": "global_closure_after_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        global alias\n        alias = inputs\n        alias = {}\n        def mutate():\n            alias.pop('seed', None)\n        mutate()\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.mutate": []
+      }
+    },
+    {
+      "case": "late_bind_call",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        alias = {}\n        def mutate():\n            alias.pop('seed', None)\n        bind()\n        mutate()\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 12,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": [],
+        "/virtual/input_writeback.py:Task.run_pure.mutate": []
+      }
+    },
+    {
+      "case": "noncalled_binding_does_not_write",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "dead_binding_call_does_not_write",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        if False:\n            bind()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "noncalled_global_binding_does_not_write",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        def bind():\n            global alias\n            alias = inputs\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "late_bind_wrapper",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        def middle():\n            bind()\n        alias = {}\n        def mutate():\n            alias.pop('seed', None)\n        middle()\n        mutate()\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 14,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": [],
+        "/virtual/input_writeback.py:Task.run_pure.middle": [],
+        "/virtual/input_writeback.py:Task.run_pure.mutate": []
+      }
+    },
+    {
+      "case": "late_bind_mutual_definition",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def first():\n            second()\n        def second():\n            nonlocal alias\n            alias = inputs\n        alias = {}\n        def mutate():\n            alias.pop('seed', None)\n        first()\n        mutate()\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 14,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.second": [],
+        "/virtual/input_writeback.py:Task.run_pure.first": [],
+        "/virtual/input_writeback.py:Task.run_pure.mutate": []
+      }
+    },
+    {
+      "case": "possible_bind_branch",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        if params['flag']:\n            bind()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 12,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "possible_bind_reverse_branch",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        if params['flag']:\n            pass\n        else:\n            bind()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 14,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "bind_branch_both_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        bind()\n        if params['flag']:\n            alias = {}\n        else:\n            alias = {}\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "late_global_bind",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        def bind():\n            global alias\n            alias = inputs\n        global alias\n        alias = {}\n        def mutate():\n            alias.pop('seed', None)\n        bind()\n        mutate()\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 12,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": [],
+        "/virtual/input_writeback.py:Task.run_pure.mutate": []
+      }
+    },
+    {
+      "case": "ifexp_owned_first",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        (alias := inputs) if params['flag'] else (alias := {})\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 8,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "ifexp_owned_else",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        (alias := {}) if params['flag'] else (alias := inputs)\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 8,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "ifexp_both_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        (alias := {}) if params['flag'] else (alias := {})\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "and_optional_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        params['flag'] and (alias := {})\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 8,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "or_optional_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        params['flag'] or (alias := {})\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 8,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "boolean_first_clear_executes",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        (alias := {}) and params['flag']\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "try_handler_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        try:\n            params['flag']\n        except KeyError:\n            alias = {}\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "try_normal_clear_handler_preserves",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        try:\n            params['flag']\n            alias = {}\n        except KeyError:\n            pass\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 12,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "try_both_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        try:\n            params['flag']\n            alias = {}\n        except KeyError:\n            alias = {}\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "try_late_handler_owned",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        try:\n            params['flag']\n        except KeyError:\n            alias = inputs\n        except ValueError:\n            alias = {}\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 13,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "try_finally_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        try:\n            params['flag']\n        finally:\n            alias = {}\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "try_body_intermediate_owned",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        try:\n            alias = inputs\n            params['flag']\n            alias = {}\n        except KeyError:\n            alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 12,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "match_optional_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        match params['flag']:\n            case True:\n                alias = {}\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 10,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "match_owned_first",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        match params['flag']:\n            case True:\n                alias = inputs\n            case False:\n                alias = {}\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 12,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "match_owned_last",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        match params['flag']:\n            case True:\n                alias = {}\n            case False:\n                alias = inputs\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 12,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "match_unconditional_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        match params['flag']:\n            case _:\n                alias = {}\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "match_guard_write_reaches_later_case",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        match params['flag']:\n            case True if (alias := inputs) and False:\n                pass\n            case _:\n                alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 17
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "captured_get_owned_receiver",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        borrowed = alias.get((alias := 'seed'), {})\n        borrowed.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 8,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "captured_get_local_receiver",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        borrowed = alias.get((alias := inputs) and 'seed', {})\n        borrowed.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "captured_get_actual_argument",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        def mutate(payload):\n            payload.pop('seed', None)\n        alias = inputs\n        mutate(alias.get((alias := 'seed'), {}))\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 7,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        },
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 7,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "module helper must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.mutate": [
+          "payload"
+        ]
+      }
+    },
+    {
+      "case": "nonlocal_write_then_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n            alias = {}\n        bind()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "global_write_then_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        def bind():\n            global alias\n            alias = inputs\n            alias = {}\n        bind()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "nonlocal_write_then_clear_helper",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        def mutate(payload):\n            payload.pop('seed', None)\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n            alias = {}\n        bind()\n        mutate(alias)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": [],
+        "/virtual/input_writeback.py:Task.run_pure.mutate": []
+      }
+    },
+    {
+      "case": "global_write_then_clear_helper",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        def mutate(payload):\n            payload.pop('seed', None)\n        def bind():\n            global alias\n            alias = inputs\n            alias = {}\n        bind()\n        mutate(alias)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": [],
+        "/virtual/input_writeback.py:Task.run_pure.mutate": []
+      }
+    },
+    {
+      "case": "nonlocal_mixed_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n            if params['flag']:\n                alias = {}\n        bind()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 13,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "nonlocal_both_branch_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind(flag):\n            nonlocal alias\n            alias = inputs\n            if flag:\n                alias = {}\n            else:\n                alias = {}\n        bind(params['flag'])\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": false,
+      "actual_mutation": false,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "body_mutation_before_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n            alias.pop('seed', None)\n            alias = {}\n        bind()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 10,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        },
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 13,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "return_before_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n            return\n            alias = {}\n        bind()\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 13,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "raise_before_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n            raise KeyError('seed')\n            alias = {}\n        try:\n            bind()\n        except KeyError:\n            alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 15,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "fallible_call_before_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n            fallible()\n            alias = {}\n        try:\n            bind()\n        except Exception:\n            alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 15,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "subscript_before_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n            params['flag']\n            alias = {}\n        try:\n            bind()\n        except KeyError:\n            alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 15,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "attribute_before_clear",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n            params.missing\n            alias = {}\n        try:\n            bind()\n        except AttributeError:\n            alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 15,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "noncalled_clear_does_not_erase",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = inputs\n        def clear():\n            nonlocal alias\n            alias = {}\n        alias.pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 10,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ]
+      }
+    },
+    {
+      "case": "mutation_form_0",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        bind()\n        alias['seed'] = 1\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "mutation_form_1",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        bind()\n        alias.seed = 1\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        },
+        {
+          "code": "NODE.PURITY.MONKEY_PATCH",
+          "rule_id": "NODE.PURITY.MONKEY_PATCH",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "assigning to external object attributes is forbidden",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "mutation_form_2",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        bind()\n        del alias['seed']\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "mutation_form_3",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        bind()\n        del alias.seed\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        },
+        {
+          "code": "NODE.PURITY.MONKEY_PATCH",
+          "rule_id": "NODE.PURITY.MONKEY_PATCH",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "assigning to external object attributes is forbidden",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "mutation_form_4",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        bind()\n        alias['seed'] += 1\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "mutation_form_5",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        bind()\n        alias.seed += 1\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        },
+        {
+          "code": "NODE.PURITY.MONKEY_PATCH",
+          "rule_id": "NODE.PURITY.MONKEY_PATCH",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "assigning to external object attributes is forbidden",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "mutation_form_6",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        bind()\n        alias.update({})\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via update",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "mutation_form_7",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        bind()\n        alias.clear()\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via clear",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "mutation_form_8",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        bind()\n        [item for alias['seed'] in (0,)]\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 19
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "must not mutate inputs in comprehension target",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "mutation_form_9",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        bind()\n        {item for alias['seed'] in (0,)}\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 19
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "must not mutate inputs in comprehension target",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "mutation_form_10",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        bind()\n        {item: item for alias['seed'] in (0,)}\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 25
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "must not mutate inputs in comprehension target",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "mutation_form_11",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        bind()\n        list(item for alias['seed'] in (0,))\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 23
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "must not mutate inputs in comprehension target",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "mutation_form_12",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        def bind():\n            nonlocal alias\n            alias = inputs\n        bind()\n        (alias := inputs).pop('seed', None)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:Task.run_pure.bind": []
+      }
+    },
+    {
+      "case": "try_prefix_helper",
+      "source": "alias = None\ndef sink(payload):\n    return payload.pop(\"seed\", None)\nclass Task:\n    def run_pure(self, inputs, params):\n        alias = {}\n        try:\n            alias = inputs\n            fallible()\n            alias = {}\n        except Exception:\n            sink(alias)\n        return {}\n",
+      "expected_mutation": true,
+      "actual_mutation": true,
+      "matched": true,
+      "result_state": "completed",
+      "effect_policy": {
+        "effect_scope": "global_state",
+        "source": "vibeflow.no_side_effects"
+      },
+      "ast_unchanged": true,
+      "module_globals": [
+        "alias"
+      ],
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/input_writeback.py",
+            "line": 3,
+            "column": 12
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "module helper must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {},
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "formal_input_parameters": {
+        "/virtual/input_writeback.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/input_writeback.py:sink": [
+          "payload"
+        ]
+      }
+    }
+  ],
+  "probe_error": null,
+  "product": {
+    "kind": "source_snapshot",
+    "path": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03"
+  },
+  "input_tracking": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/source_analysis/input_tracking.py",
+  "input_tracking_sha256": "7052c4ba7c3b3001cae25686327f5aadd80513113c2a3f416352c8325b7c9a03",
+  "loaded_product_modules": {
+    "vibeflow": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/__init__.py",
+    "vibeflow.core.algorithms": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/algorithms.py",
+    "vibeflow.core.constants": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/constants.py",
+    "vibeflow.core.contracts": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/contracts.py",
+    "vibeflow.core.planned": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/planned.py",
+    "vibeflow.core.flow": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/flow.py",
+    "vibeflow.core.mainline": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/mainline.py",
+    "vibeflow.core.models": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/models.py",
+    "vibeflow.core.compiler": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/compiler.py",
+    "vibeflow.core.config.edge": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/config/edge.py",
+    "vibeflow.core.style": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/style.py",
+    "vibeflow.core.config.graph": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/config/graph.py",
+    "vibeflow.core.config.node": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/config/node.py",
+    "vibeflow.core.config.scope": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/config/scope.py",
+    "vibeflow.core.config": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/config/__init__.py",
+    "vibeflow.core.findings": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/findings.py",
+    "vibeflow.core.result_scope": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/result_scope.py",
+    "vibeflow.core.nodeset_dependencies": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/nodeset_dependencies.py",
+    "vibeflow.core.quality.models": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/quality/models.py",
+    "vibeflow.core.quality.evaluator": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/quality/evaluator.py",
+    "vibeflow.core.quality.nodesets": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/quality/nodesets.py",
+    "vibeflow.core.quality.workflow": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/quality/workflow.py",
+    "vibeflow.core.quality.workflow_rules.duplicates": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/quality/workflow_rules/duplicates.py",
+    "vibeflow.core.quality.workflow_rules.helpers": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/quality/workflow_rules/helpers.py",
+    "vibeflow.core.quality.workflow_rules.flow_data": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/quality/workflow_rules/flow_data.py",
+    "vibeflow.core.quality.workflow_rules.join_exclusivity": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/quality/workflow_rules/join_exclusivity.py",
+    "vibeflow.core.quality.workflow_rules.flow": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/quality/workflow_rules/flow.py",
+    "vibeflow.core.quality.workflow_rules.schema_findings": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/quality/workflow_rules/schema_findings.py",
+    "vibeflow.core.quality.workflow_rules": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/quality/workflow_rules/__init__.py",
+    "vibeflow.core.quality": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/quality/__init__.py",
+    "vibeflow.core": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/__init__.py",
+    "vibeflow.core.descriptors._resource_models": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/descriptors/_resource_models.py",
+    "vibeflow.core.descriptors.models": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/descriptors/models.py",
+    "vibeflow.core.descriptors.catalogs": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/descriptors/catalogs.py",
+    "vibeflow.core.descriptors.contributions": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/descriptors/contributions.py",
+    "vibeflow.core.descriptors.plugin_selection": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/descriptors/plugin_selection.py",
+    "vibeflow.core.descriptors": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/descriptors/__init__.py",
+    "vibeflow.core.rules.models": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/rules/models.py",
+    "vibeflow.core.rules.graph": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/rules/graph.py",
+    "vibeflow.core.rules.fingerprint": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/rules/fingerprint.py",
+    "vibeflow.core.rules.execution": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/rules/execution.py",
+    "vibeflow.core.rules": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/rules/__init__.py",
+    "vibeflow.targets": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/__init__.py",
+    "vibeflow.targets.python": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/__init__.py",
+    "vibeflow.core.descriptors.values": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/descriptors/values.py",
+    "vibeflow.core.descriptors.decode": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/descriptors/decode.py",
+    "vibeflow.targets.python.sdk.resources": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/sdk/resources.py",
+    "vibeflow.targets.python.sdk.plugin": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/sdk/plugin.py",
+    "vibeflow.targets.python.runtime": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/runtime/__init__.py",
+    "vibeflow.core.run_status": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/run_status.py",
+    "vibeflow.targets.python.runtime.observation": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/runtime/observation.py",
+    "vibeflow.targets.python.sdk": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/sdk/__init__.py",
+    "vibeflow.targets.python.quality": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/__init__.py",
+    "vibeflow.builtin.import_policy": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/builtin/import_policy.py",
+    "vibeflow.builtin.effects": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/builtin/effects.py",
+    "vibeflow.core.quality.implementation": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/quality/implementation.py",
+    "vibeflow.builtin.implementation": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/builtin/implementation.py",
+    "vibeflow.builtin.project_quality": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/builtin/project_quality.py",
+    "vibeflow.builtin.workflow": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/builtin/workflow.py",
+    "vibeflow.builtin": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/builtin/__init__.py",
+    "vibeflow.core.quality.policy_data": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/quality/policy_data.py",
+    "vibeflow.targets.python.quality.source_analysis.types": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/source_analysis/types.py",
+    "vibeflow.targets.python.quality.source_analysis.ast_rules": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/source_analysis/ast_rules.py",
+    "vibeflow.targets.python.project": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/project/__init__.py",
+    "vibeflow.targets.python.project.node": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/project/node.py",
+    "vibeflow.targets.python.quality.source_analysis.helpers": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/source_analysis/helpers.py",
+    "vibeflow.targets.python.quality.source_analysis.effects": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/source_analysis/effects.py",
+    "vibeflow.targets.python.quality.source_analysis.bindings": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/source_analysis/bindings.py",
+    "vibeflow.targets.python.quality.source_analysis.input_tracking": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/source_analysis/input_tracking.py",
+    "vibeflow.targets.python.quality.source_analysis.visitors": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/source_analysis/visitors.py",
+    "vibeflow.targets.python.quality.source_analysis.source": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/source_analysis/source.py",
+    "vibeflow.targets.python.quality.source_analysis.runtime_dispatch": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/source_analysis/runtime_dispatch.py",
+    "vibeflow.targets.python.quality.source_analysis": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/source_analysis/__init__.py",
+    "vibeflow.targets.python.quality.policy_parameters": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/policy_parameters.py",
+    "vibeflow.targets.python.quality.source_context": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/source_context.py",
+    "vibeflow.targets.shared": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/shared/__init__.py",
+    "vibeflow.targets.shared.bindings": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/shared/bindings.py",
+    "vibeflow.tooling": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/tooling/__init__.py",
+    "vibeflow.tooling.project": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/tooling/project/__init__.py",
+    "vibeflow.tooling.project.document_kinds": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/tooling/project/document_kinds.py",
+    "vibeflow.tooling.project.architecture_types": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/tooling/project/architecture_types.py",
+    "vibeflow.tooling.project.paths": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/tooling/project/paths.py",
+    "vibeflow.tooling.project.workspace_model": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/tooling/project/workspace_model.py",
+    "vibeflow.tooling.project.config_loader": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/tooling/project/config_loader.py",
+    "vibeflow.tooling.project.descriptor_loader": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/tooling/project/descriptor_loader.py",
+    "vibeflow.tooling.application": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/tooling/application/__init__.py",
+    "vibeflow.tooling.application.plugin_definitions": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/tooling/application/plugin_definitions.py",
+    "vibeflow.targets.python.quality.builtin_plugin": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/builtin_plugin.py",
+    "vibeflow.builtin.plugin": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/builtin/plugin.py",
+    "vibeflow.targets.python.quality.rules": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/rules/__init__.py",
+    "vibeflow.targets.python.quality.rules.helpers": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/rules/helpers.py",
+    "vibeflow.targets.python.quality.rules.effects": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/rules/effects.py",
+    "vibeflow.targets.python.quality.rules.import_side_effects": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/rules/import_side_effects.py",
+    "vibeflow.targets.python.quality.source_analysis.metrics": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/source_analysis/metrics.py",
+    "vibeflow.targets.python.quality.analysis_metrics": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/analysis_metrics.py",
+    "vibeflow.targets.python.quality.rules.maintainability": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/rules/maintainability.py",
+    "vibeflow.targets.python.quality.rules.node_interface": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/rules/node_interface.py",
+    "vibeflow.targets.python.quality.rules.workflow": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/rules/workflow.py",
+    "vibeflow.targets.python.quality.rules.definition_review": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/rules/definition_review.py",
+    "vibeflow.core.descriptors.presentation": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/descriptors/presentation.py",
+    "vibeflow.core.descriptors.source_bundle": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/descriptors/source_bundle.py",
+    "vibeflow.tooling.application.python": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/tooling/application/python/__init__.py",
+    "vibeflow.targets.python.sdk.loading": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/sdk/loading.py",
+    "vibeflow.tooling.application.python.plugin_definitions": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/tooling/application/python/plugin_definitions.py",
+    "vibeflow.core.descriptors.rule_decode": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/core/descriptors/rule_decode.py",
+    "vibeflow.targets.python.quality.source_analysis.class_members": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/source_analysis/class_members.py",
+    "vibeflow.targets.python.quality.source_analysis.exit_stacks": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/source_analysis/exit_stacks.py",
+    "vibeflow.targets.python.quality.source_analysis.sdk_declarations": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-03/vibeflow/targets/python/quality/source_analysis/sdk_declarations.py"
+  },
+  "loaded_module_count": 108,
+  "foreign_product_modules": {},
+  "case_count": 103,
+  "matching_count": 103,
+  "pass": true
+}

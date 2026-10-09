@@ -1,0 +1,951 @@
+{
+  "recorded_utc": "2026-10-08T13:50:58.924653+00:00",
+  "final_gate": "/home/rockingsisyphus/.cache/vibeflow-alias-facts-20261008/full-03",
+  "full_gate": {
+    "exit": 0,
+    "passed_stages": 17,
+    "total_stages": 17,
+    "raw_failures": [],
+    "pytest_passed": 4330,
+    "frozen_validation_input_count": 2336,
+    "changed_frozen_validation_inputs": [],
+    "report": "full-03-result.json",
+    "sha256": "67df7018bbbde57bee1cac86c3399968900e3ed2c2710810bf0f581bca0aaf89"
+  },
+  "regression_checks": 4785,
+  "regression_check_mismatches": 0,
+  "raw_original36_observations": 108,
+  "raw_original36_expectation_mismatches": 12,
+  "retained_clear3_raw_boundary_mismatches": 3,
+  "new_checks_per_product": 254,
+  "old_checks_per_product": 1341,
+  "probe_groups": 45,
+  "probe_exit_statuses": [
+    {
+      "group": "formal-wheel",
+      "exit": 0
+    },
+    {
+      "group": "legacy36-wheel",
+      "exit": 0
+    },
+    {
+      "group": "writeback103-wheel",
+      "exit": 0
+    },
+    {
+      "group": "evaluation12-wheel",
+      "exit": 0
+    },
+    {
+      "group": "nested_clear3-wheel",
+      "exit": 0
+    },
+    {
+      "group": "writeback_exits3-wheel",
+      "exit": 0
+    },
+    {
+      "group": "writeback_exits5-wheel",
+      "exit": 0
+    },
+    {
+      "group": "formal-collaborative",
+      "exit": 0
+    },
+    {
+      "group": "legacy36-collaborative",
+      "exit": 0
+    },
+    {
+      "group": "writeback103-collaborative",
+      "exit": 0
+    },
+    {
+      "group": "evaluation12-collaborative",
+      "exit": 0
+    },
+    {
+      "group": "nested_clear3-collaborative",
+      "exit": 0
+    },
+    {
+      "group": "writeback_exits3-collaborative",
+      "exit": 0
+    },
+    {
+      "group": "writeback_exits5-collaborative",
+      "exit": 0
+    },
+    {
+      "group": "formal-autonomous",
+      "exit": 0
+    },
+    {
+      "group": "legacy36-autonomous",
+      "exit": 0
+    },
+    {
+      "group": "writeback103-autonomous",
+      "exit": 0
+    },
+    {
+      "group": "evaluation12-autonomous",
+      "exit": 0
+    },
+    {
+      "group": "nested_clear3-autonomous",
+      "exit": 0
+    },
+    {
+      "group": "writeback_exits3-autonomous",
+      "exit": 0
+    },
+    {
+      "group": "writeback_exits5-autonomous",
+      "exit": 0
+    },
+    {
+      "group": "F01-original40-wheel",
+      "exit": 0
+    },
+    {
+      "group": "F02-original180-wheel",
+      "exit": 0
+    },
+    {
+      "group": "F01-formal72-wheel",
+      "exit": 0
+    },
+    {
+      "group": "F02-formal89-wheel",
+      "exit": 0
+    },
+    {
+      "group": "declared34-wheel",
+      "exit": 0
+    },
+    {
+      "group": "effects873-wheel",
+      "exit": 0
+    },
+    {
+      "group": "inputs20-wheel",
+      "exit": 0
+    },
+    {
+      "group": "javascript33-wheel",
+      "exit": 0
+    },
+    {
+      "group": "F01-original40-collaborative",
+      "exit": 0
+    },
+    {
+      "group": "F02-original180-collaborative",
+      "exit": 0
+    },
+    {
+      "group": "F01-formal72-collaborative",
+      "exit": 0
+    },
+    {
+      "group": "F02-formal89-collaborative",
+      "exit": 0
+    },
+    {
+      "group": "declared34-collaborative",
+      "exit": 0
+    },
+    {
+      "group": "effects873-collaborative",
+      "exit": 0
+    },
+    {
+      "group": "inputs20-collaborative",
+      "exit": 0
+    },
+    {
+      "group": "javascript33-collaborative",
+      "exit": 0
+    },
+    {
+      "group": "F01-original40-autonomous",
+      "exit": 0
+    },
+    {
+      "group": "F02-original180-autonomous",
+      "exit": 0
+    },
+    {
+      "group": "F01-formal72-autonomous",
+      "exit": 0
+    },
+    {
+      "group": "F02-formal89-autonomous",
+      "exit": 0
+    },
+    {
+      "group": "declared34-autonomous",
+      "exit": 0
+    },
+    {
+      "group": "effects873-autonomous",
+      "exit": 0
+    },
+    {
+      "group": "inputs20-autonomous",
+      "exit": 0
+    },
+    {
+      "group": "javascript33-autonomous",
+      "exit": 0
+    }
+  ],
+  "products": {
+    "wheel": {
+      "origin": "/home/rockingsisyphus/.cache/vibeflow-alias-facts-20261008/full-03/wheel-venv/lib/python3.13/site-packages/vibeflow/__init__.py",
+      "expected_origin_prefix": "/home/rockingsisyphus/.cache/vibeflow-alias-facts-20261008/full-03/wheel-venv/lib/python3.13/site-packages/vibeflow/",
+      "foreign_product_modules": {},
+      "groups": {
+        "formal128": {
+          "cases": 128,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "packaged-wheel.json",
+          "sha256": "235e9b6ddb3f7cacfa2215569f764c25de00a5d0b24fc2b18abc686fa190a548"
+        },
+        "writeback103": {
+          "cases": 103,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "writeback103-wheel.json",
+          "sha256": "104d065aefbd722527aa983e628ddd40638c355d378e9880ce09fb0e78e5e22a"
+        },
+        "evaluation12": {
+          "cases": 12,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "evaluation12-wheel.json",
+          "sha256": "3f8a0e8a46838f77d686ab1d61a93ec741962617433d3c4274b970519935bae5"
+        },
+        "nested_clear3": {
+          "cases": 3,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 1,
+          "report": "nested_clear3-wheel.json",
+          "sha256": "da4046f7d8ddda2ee45bfd48b6df00763dbfaabe0c3aeaac6106aa9778af52c9"
+        },
+        "writeback_exits3": {
+          "cases": 3,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "writeback_exits3-wheel.json",
+          "sha256": "c4faf0a4157ddc698d697689063598a67c2a45c39b634b996d061dd763bd1bbf"
+        },
+        "writeback_exits5": {
+          "cases": 5,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "writeback_exits5-wheel.json",
+          "sha256": "24af3d55f1f7a9503792c176d766ed110f68064124bd27394bd14cdcefb34faf"
+        },
+        "F01-original40": {
+          "cases": 40,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "F01-original40-wheel.json",
+          "sha256": "833660ceb03622dd4b3363955598d983c0a130ece5889faf0bf3dcc49afff072"
+        },
+        "F02-original180": {
+          "cases": 180,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "F02-original180-wheel.json",
+          "sha256": "81ec4cab3b8d9a897c5613a18e59967f8cb82ed5131e2c6bd0e4480e3a264183"
+        },
+        "F01-formal72": {
+          "cases": 72,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "F01-formal72-wheel.json",
+          "sha256": "a6e8e2294c8f78b46f318e89b6be6d1991ad236d0b21817621755a6dc6098d76"
+        },
+        "F02-formal89": {
+          "cases": 89,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "F02-formal89-wheel.json",
+          "sha256": "0e53e737c0c3911f06f7613506464abb51b45fcacf2727a8f35ad4c05fb6f06e"
+        },
+        "declared34": {
+          "cases": 34,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "declared34-wheel.json",
+          "sha256": "46cd106cfc0349b0af99c414e9d5874a5bd86e406daaded720af78dc6b1b0361"
+        },
+        "effects873": {
+          "cases": 873,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "effects873-wheel.json",
+          "sha256": "ed0a9e2354a60784d075da20885c3d576e246951a4f4d58b8bc3dd17ca38b2de"
+        },
+        "inputs20": {
+          "cases": 20,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "inputs20-wheel.json",
+          "sha256": "5b34c9407b8acf995793c3ffc35241f1278252989edbbd7f594c0779ded9b0da"
+        },
+        "javascript33": {
+          "cases": 33,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "javascript33-wheel.json",
+          "sha256": "15c6d755ecff51dafea84415cd336672c981bb18a2d288e9cdbf6d5942e2a0b3"
+        }
+      },
+      "regression_checks": 1595,
+      "regression_check_mismatches": 0,
+      "raw36": {
+        "count": 36,
+        "raw_original_expectation_mismatches": 4,
+        "ordinary_unknown_write_io_only": 4,
+        "other_semantic_mismatches": 0,
+        "original_expectations_modified": false,
+        "report": "legacy36-wheel.json",
+        "origin_report": "legacy36-wheel-origin.json"
+      },
+      "retained_clear3_raw_boundary_mismatches": 1,
+      "origin_checks": {
+        "formal128": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 102,
+          "loaded_module_origins_checked": 109
+        },
+        "writeback103": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 108
+        },
+        "evaluation12": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 76
+        },
+        "nested_clear3": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 76
+        },
+        "writeback_exits3": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 76
+        },
+        "writeback_exits5": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 76
+        },
+        "F01-original40": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 83
+        },
+        "F02-original180": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 83
+        },
+        "F01-formal72": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 55,
+          "loaded_module_origins_checked": 0
+        },
+        "F02-formal89": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 89,
+          "loaded_module_origins_checked": 0
+        },
+        "declared34": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 108
+        },
+        "effects873": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 114
+        },
+        "inputs20": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 0
+        },
+        "javascript33": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 118
+        },
+        "raw36": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 83
+        }
+      },
+      "input_execution": {
+        "parser_rejections": 8,
+        "runtime_accepting": 6,
+        "runtime_rejecting": 6,
+        "rejected_python_and_javascript_node_executions": 0,
+        "rejected_python_trace_steps": 0
+      },
+      "javascript": {
+        "selected_packaged_driver_sha256": "8b7c48ec197886d5555f10ccaf87e89145e9af7f59966375c805929d95fbec58",
+        "expected_driver_sha256": "8b7c48ec197886d5555f10ccaf87e89145e9af7f59966375c805929d95fbec58",
+        "driver_sha256_matches_frozen_manifest": true,
+        "executed_materialized_driver_path": "/home/rockingsisyphus/.cache/vibeflow-alias-facts-20261008/full-03/wheel-venv/lib/python3.13/site-packages/vibeflow/targets/javascript/resources/toolchain_driver.mjs",
+        "materialized_driver_exists_after_replay": true,
+        "materialized_driver_sha256_after_replay": "8b7c48ec197886d5555f10ccaf87e89145e9af7f59966375c805929d95fbec58",
+        "temporary_resource_lifecycle": "ZIP resources were materialized inside materialized_resources(), used by native driver calls, and removed when the context exited. The packaged resource SHA was recorded before materialization.",
+        "parameter_switch_sequence": [
+          {
+            "ruleset": "probe.cache_a",
+            "denied": true,
+            "cache_entries": 2,
+            "new_native_requests": 2
+          },
+          {
+            "ruleset": "probe.cache_b",
+            "denied": false,
+            "cache_entries": 4,
+            "new_native_requests": 2
+          },
+          {
+            "ruleset": "probe.cache_a",
+            "denied": true,
+            "cache_entries": 4,
+            "new_native_requests": 0
+          },
+          {
+            "ruleset": "probe.cache_c",
+            "denied": true,
+            "cache_entries": 5,
+            "new_native_requests": 1
+          },
+          {
+            "ruleset": "probe.cache_b",
+            "denied": false,
+            "cache_entries": 5,
+            "new_native_requests": 0
+          }
+        ],
+        "native_requests": 87
+      }
+    },
+    "collaborative": {
+      "origin": "/home/rockingsisyphus/.cache/vibeflow-alias-facts-20261008/full-03/distribution/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+      "expected_origin_prefix": "/home/rockingsisyphus/.cache/vibeflow-alias-facts-20261008/full-03/distribution/kernel/vibeflow-kernel.zip/vibeflow/",
+      "foreign_product_modules": {},
+      "groups": {
+        "formal128": {
+          "cases": 128,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "packaged-collaborative.json",
+          "sha256": "10947e4b02a93f7af138cf12ed9d7bed745c6388bf7004b2841d53850cb4dc60"
+        },
+        "writeback103": {
+          "cases": 103,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "writeback103-collaborative.json",
+          "sha256": "96ddb121d4911e23729f14d91819e4f9ca6b1b0117b3eb2f455bf2f994353c73"
+        },
+        "evaluation12": {
+          "cases": 12,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "evaluation12-collaborative.json",
+          "sha256": "0c967027a4299a9797e7b3c026607e7919d200a49127d950e820f8b2dd969f40"
+        },
+        "nested_clear3": {
+          "cases": 3,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 1,
+          "report": "nested_clear3-collaborative.json",
+          "sha256": "43f7a0a849feccf157cf636bebfc8e15fcaba72dff03f8bec617debc1bb0c210"
+        },
+        "writeback_exits3": {
+          "cases": 3,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "writeback_exits3-collaborative.json",
+          "sha256": "728ece0ca62fd9933917f159bd0c8170c2e3ebaa5fa63b4e4cff63b9a40bed57"
+        },
+        "writeback_exits5": {
+          "cases": 5,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "writeback_exits5-collaborative.json",
+          "sha256": "2cd4534401739b22d62eb64f5edf69f7d5d7cb072add0d3a4bb7fe9f5ea89966"
+        },
+        "F01-original40": {
+          "cases": 40,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "F01-original40-collaborative.json",
+          "sha256": "fc21e33ceb2a23f93f0713b49242df4f0cb1cbd58a43aa39fd13732501faf0da"
+        },
+        "F02-original180": {
+          "cases": 180,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "F02-original180-collaborative.json",
+          "sha256": "62d623d64a1a84fb7f3270d4b71a943aa228f4c343871a4be946c8f2ec5dd6da"
+        },
+        "F01-formal72": {
+          "cases": 72,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "F01-formal72-collaborative.json",
+          "sha256": "86792146d9a2788e09dd7e7764da4e33175f1fb07ce17c27e5282f8f64274f47"
+        },
+        "F02-formal89": {
+          "cases": 89,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "F02-formal89-collaborative.json",
+          "sha256": "53a009df3ab07b77345312ab380078a576ff39a33568fd865c7cfb321560d9de"
+        },
+        "declared34": {
+          "cases": 34,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "declared34-collaborative.json",
+          "sha256": "0b7771389e6b2aad39ba66731713865f690f2294c559e48d2bdce0dfb2ebf9b7"
+        },
+        "effects873": {
+          "cases": 873,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "effects873-collaborative.json",
+          "sha256": "bd7e60201e67060a89d05652b4237613ad699c4aff1c98cc051d691e62dbd327"
+        },
+        "inputs20": {
+          "cases": 20,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "inputs20-collaborative.json",
+          "sha256": "931e4dd406290b5eb7b10951da32d90b3bccbb3e8c8b4a43bfbe8f6ecfa42f79"
+        },
+        "javascript33": {
+          "cases": 33,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "javascript33-collaborative.json",
+          "sha256": "c2c4c18db4645b9b6e8464fea68355d3cdf5a2fa9443facfc931a62335c9dee8"
+        }
+      },
+      "regression_checks": 1595,
+      "regression_check_mismatches": 0,
+      "raw36": {
+        "count": 36,
+        "raw_original_expectation_mismatches": 4,
+        "ordinary_unknown_write_io_only": 4,
+        "other_semantic_mismatches": 0,
+        "original_expectations_modified": false,
+        "report": "legacy36-collaborative.json",
+        "origin_report": "legacy36-collaborative-origin.json"
+      },
+      "retained_clear3_raw_boundary_mismatches": 1,
+      "origin_checks": {
+        "formal128": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 102,
+          "loaded_module_origins_checked": 109
+        },
+        "writeback103": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 108
+        },
+        "evaluation12": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 76
+        },
+        "nested_clear3": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 76
+        },
+        "writeback_exits3": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 76
+        },
+        "writeback_exits5": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 76
+        },
+        "F01-original40": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 83
+        },
+        "F02-original180": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 83
+        },
+        "F01-formal72": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 55,
+          "loaded_module_origins_checked": 0
+        },
+        "F02-formal89": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 89,
+          "loaded_module_origins_checked": 0
+        },
+        "declared34": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 108
+        },
+        "effects873": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 114
+        },
+        "inputs20": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 0
+        },
+        "javascript33": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 118
+        },
+        "raw36": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 83
+        }
+      },
+      "input_execution": {
+        "parser_rejections": 8,
+        "runtime_accepting": 6,
+        "runtime_rejecting": 6,
+        "rejected_python_and_javascript_node_executions": 0,
+        "rejected_python_trace_steps": 0
+      },
+      "javascript": {
+        "selected_packaged_driver_sha256": "8b7c48ec197886d5555f10ccaf87e89145e9af7f59966375c805929d95fbec58",
+        "expected_driver_sha256": "8b7c48ec197886d5555f10ccaf87e89145e9af7f59966375c805929d95fbec58",
+        "driver_sha256_matches_frozen_manifest": true,
+        "executed_materialized_driver_path": "/home/rockingsisyphus/.cache/vf-p2/t/vibeflow-js-resources-igw679ym/toolchain_driver.mjs",
+        "materialized_driver_exists_after_replay": false,
+        "materialized_driver_sha256_after_replay": null,
+        "temporary_resource_lifecycle": "ZIP resources were materialized inside materialized_resources(), used by native driver calls, and removed when the context exited. The packaged resource SHA was recorded before materialization.",
+        "parameter_switch_sequence": [
+          {
+            "ruleset": "probe.cache_a",
+            "denied": true,
+            "cache_entries": 2,
+            "new_native_requests": 2
+          },
+          {
+            "ruleset": "probe.cache_b",
+            "denied": false,
+            "cache_entries": 4,
+            "new_native_requests": 2
+          },
+          {
+            "ruleset": "probe.cache_a",
+            "denied": true,
+            "cache_entries": 4,
+            "new_native_requests": 0
+          },
+          {
+            "ruleset": "probe.cache_c",
+            "denied": true,
+            "cache_entries": 5,
+            "new_native_requests": 1
+          },
+          {
+            "ruleset": "probe.cache_b",
+            "denied": false,
+            "cache_entries": 5,
+            "new_native_requests": 0
+          }
+        ],
+        "native_requests": 87
+      }
+    },
+    "autonomous": {
+      "origin": "/home/rockingsisyphus/.cache/vibeflow-alias-facts-20261008/full-03/distribution-autonomous/kernel/vibeflow-kernel.zip/vibeflow/__init__.py",
+      "expected_origin_prefix": "/home/rockingsisyphus/.cache/vibeflow-alias-facts-20261008/full-03/distribution-autonomous/kernel/vibeflow-kernel.zip/vibeflow/",
+      "foreign_product_modules": {},
+      "groups": {
+        "formal128": {
+          "cases": 128,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "packaged-autonomous.json",
+          "sha256": "631effcdb94f77e99ab962b3c722012b32fdd536cfa54d293c752c9a18937a94"
+        },
+        "writeback103": {
+          "cases": 103,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "writeback103-autonomous.json",
+          "sha256": "f54b72dfac9e7837717a0e2c74c13acc747653a3a57713348d930ffa0af59723"
+        },
+        "evaluation12": {
+          "cases": 12,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "evaluation12-autonomous.json",
+          "sha256": "e161783cc6bba10f6ea650249dc150237e31c85912fc9edee510dcd4604b5c77"
+        },
+        "nested_clear3": {
+          "cases": 3,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 1,
+          "report": "nested_clear3-autonomous.json",
+          "sha256": "06e7f3c245094ab387a12565851a0f61ed0bbf88f0f15087e8370493e03b92c0"
+        },
+        "writeback_exits3": {
+          "cases": 3,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "writeback_exits3-autonomous.json",
+          "sha256": "87852242c6c14c1f04434ec62ad680c40dbabc8e496522be09a3ca0c96408e55"
+        },
+        "writeback_exits5": {
+          "cases": 5,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "writeback_exits5-autonomous.json",
+          "sha256": "19273ce107ca21561fd0b4e20d48c30139b8327ffa854e29345b063871beef73"
+        },
+        "F01-original40": {
+          "cases": 40,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "F01-original40-autonomous.json",
+          "sha256": "8811d3f6a9e2cba09f350d42c7748dc56cc98825235524f5193f5c38756ec96d"
+        },
+        "F02-original180": {
+          "cases": 180,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "F02-original180-autonomous.json",
+          "sha256": "bc9615419d40f038dd73c14c95c496ae82e60bd99bf960994d18aeef71e05375"
+        },
+        "F01-formal72": {
+          "cases": 72,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "F01-formal72-autonomous.json",
+          "sha256": "15625a43e08dc17a9336e055755c82234590257515b55f31b449144bb4675af9"
+        },
+        "F02-formal89": {
+          "cases": 89,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "F02-formal89-autonomous.json",
+          "sha256": "39ec77858f730c7eb7a283057494fee63aa8c51e82b2e4c34e9bc4e2172f0cc9"
+        },
+        "declared34": {
+          "cases": 34,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "declared34-autonomous.json",
+          "sha256": "b6f4927939faefd9a2a2004c1e0e9c9c9079829b576d62690a32eba60c328db2"
+        },
+        "effects873": {
+          "cases": 873,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "effects873-autonomous.json",
+          "sha256": "a1ad8c2fa5b5e3bd11f045ddf0ff1c71189fe382ce0747897d74187bd57881b7"
+        },
+        "inputs20": {
+          "cases": 20,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "inputs20-autonomous.json",
+          "sha256": "ce0247942a3cc95e3a511162831037948154cb2afd6b7c0543ce94ff6167358c"
+        },
+        "javascript33": {
+          "cases": 33,
+          "regression_check_mismatches": 0,
+          "raw_expectation_mismatches": 0,
+          "report": "javascript33-autonomous.json",
+          "sha256": "da56469ad414a42492fbdc5482e03cfd89a1b77e23d28bb0240070bc84b209d5"
+        }
+      },
+      "regression_checks": 1595,
+      "regression_check_mismatches": 0,
+      "raw36": {
+        "count": 36,
+        "raw_original_expectation_mismatches": 4,
+        "ordinary_unknown_write_io_only": 4,
+        "other_semantic_mismatches": 0,
+        "original_expectations_modified": false,
+        "report": "legacy36-autonomous.json",
+        "origin_report": "legacy36-autonomous-origin.json"
+      },
+      "retained_clear3_raw_boundary_mismatches": 1,
+      "origin_checks": {
+        "formal128": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 102,
+          "loaded_module_origins_checked": 109
+        },
+        "writeback103": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 108
+        },
+        "evaluation12": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 76
+        },
+        "nested_clear3": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 76
+        },
+        "writeback_exits3": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 76
+        },
+        "writeback_exits5": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 76
+        },
+        "F01-original40": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 83
+        },
+        "F02-original180": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 83
+        },
+        "F01-formal72": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 55,
+          "loaded_module_origins_checked": 0
+        },
+        "F02-formal89": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 89,
+          "loaded_module_origins_checked": 0
+        },
+        "declared34": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 108
+        },
+        "effects873": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 114
+        },
+        "inputs20": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 0
+        },
+        "javascript33": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 118
+        },
+        "raw36": {
+          "foreign_product_modules": {},
+          "foreign_audit_records": 1,
+          "loaded_module_origins_checked": 83
+        }
+      },
+      "input_execution": {
+        "parser_rejections": 8,
+        "runtime_accepting": 6,
+        "runtime_rejecting": 6,
+        "rejected_python_and_javascript_node_executions": 0,
+        "rejected_python_trace_steps": 0
+      },
+      "javascript": {
+        "selected_packaged_driver_sha256": "8b7c48ec197886d5555f10ccaf87e89145e9af7f59966375c805929d95fbec58",
+        "expected_driver_sha256": "8b7c48ec197886d5555f10ccaf87e89145e9af7f59966375c805929d95fbec58",
+        "driver_sha256_matches_frozen_manifest": true,
+        "executed_materialized_driver_path": "/home/rockingsisyphus/.cache/vf-p2/t/vibeflow-js-resources-g2bspsm4/toolchain_driver.mjs",
+        "materialized_driver_exists_after_replay": false,
+        "materialized_driver_sha256_after_replay": null,
+        "temporary_resource_lifecycle": "ZIP resources were materialized inside materialized_resources(), used by native driver calls, and removed when the context exited. The packaged resource SHA was recorded before materialization.",
+        "parameter_switch_sequence": [
+          {
+            "ruleset": "probe.cache_a",
+            "denied": true,
+            "cache_entries": 2,
+            "new_native_requests": 2
+          },
+          {
+            "ruleset": "probe.cache_b",
+            "denied": false,
+            "cache_entries": 4,
+            "new_native_requests": 2
+          },
+          {
+            "ruleset": "probe.cache_a",
+            "denied": true,
+            "cache_entries": 4,
+            "new_native_requests": 0
+          },
+          {
+            "ruleset": "probe.cache_c",
+            "denied": true,
+            "cache_entries": 5,
+            "new_native_requests": 1
+          },
+          {
+            "ruleset": "probe.cache_b",
+            "denied": false,
+            "cache_entries": 5,
+            "new_native_requests": 0
+          }
+        ],
+        "native_requests": 87
+      }
+    }
+  },
+  "all_product_bytes_unchanged": true,
+  "original_audit_and_persistent_preserved_scripts_unchanged": true,
+  "historical_ignored_authoring_source_path_changes": [
+    {
+      "original_source_path": "dist/python-input-writeback-validation-20261008/packaged_writeback_probe.py",
+      "recorded_historical_sha256": "001d85b428aef572b2249698535051121bad2922cd6a07e2b78f322930b15194",
+      "current_source_path_sha256": "30ccab12f6d7e37d8b1cfe10c890415ac21dca6445fa225a9ca3aeaf67e5f711",
+      "preserved_historical_path": "docs/maintainers/python-alias-facts-fix-20261008/packaged_writeback_probe.py",
+      "preserved_historical_sha256": "001d85b428aef572b2249698535051121bad2922cd6a07e2b78f322930b15194",
+      "explanation": "Ignored authoring path was reused for the expanded103 probe; immutable docs copy retains original91 bytes."
+    }
+  ],
+  "artifact_proof": "final-artifacts.json",
+  "failures": [],
+  "pass": true
+}

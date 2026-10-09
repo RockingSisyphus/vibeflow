@@ -1,0 +1,64 @@
+[all] FAIL (31 error, 0 warning, 0 info)
+ERROR GENERATED_ARTIFACT src/vibeflow/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/block_compiler/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/core/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/core/config/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/core/descriptors/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/core/quality/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/core/quality/workflow_rules/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/core/rules/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/core/rules/builtin/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/targets/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/targets/python/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/targets/python/project/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/targets/python/quality/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/targets/python/quality/rules/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/targets/python/quality/source_analysis/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/targets/python/quality/workflow/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/targets/python/runtime/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/targets/python/runtime/support/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/targets/python/sdk/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/tooling/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/tooling/application/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/tooling/application/cli/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/tooling/application/python/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/tooling/application/python/cli/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/tooling/application/python/presentation/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/tooling/application/python/presentation/ascii_flowchart/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/tooling/application/python/presentation/mermaid/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/tooling/application/python/project/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/tooling/presentation/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT src/vibeflow/tooling/project/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+ERROR GENERATED_ARTIFACT tools/__pycache__:1:0 Generated or temporary content is present in the source repository.
+  fix: Remove it with the repository cleanup command; rebuild only in a temporary output directory.
+refusing to build distribution because kernel self-check failed: /home/rockingsisyphus/miniforge3/bin/python quality/run.py --profile all

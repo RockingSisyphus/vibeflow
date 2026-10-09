@@ -16,12 +16,12 @@ CASES = (
     ("nested", "from typing import Iterable, Mapping", "inputs: Iterable[Mapping[str, object]]", "", True),
     ("return", "from typing import Mapping", "inputs", " -> Mapping[str, object]", True),
     ("future", "from __future__ import annotations\nfrom typing import Iterable", "inputs: Iterable[object]", "", True),
-    ("namespace", "import typing", "inputs", "", False),
-    ("module_dict", "import typing", "inputs", "", False),
-    ("shadow", "import typing\nfrom typing import Iterable", "inputs", "", False),
+    ("namespace", "import typing", "inputs", "", True),
+    ("module_dict", "import typing", "inputs", "", True),
+    ("shadow", "import typing\nfrom typing import Iterable", "inputs", "", True),
     ("helper", "", "inputs", "", True),
-    ("helper_namespace", "", "inputs", "", False),
-    ("annotation_call", "from typing import Iterable", "inputs", "", False),
+    ("helper_namespace", "", "inputs", "", True),
+    ("annotation_call", "from typing import Iterable", "inputs", "", True),
 )
 
 

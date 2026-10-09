@@ -1,0 +1,29 @@
+{
+  "frozen_validation_input_count": 2336,
+  "changed_frozen_validation_inputs_after_package_replays_and_docs_test": [],
+  "document_index_test": {
+    "command": "python -B tools/run_tests.py --workers 1 --scratch /home/rockingsisyphus/.cache/vibeflow-alias-facts-20261008/docs-final -- /home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_review_docs.py::test_document_index_covers_every_active_markdown",
+    "exit_code": 0,
+    "passed": 1,
+    "log": "dist/python-alias-facts-validation-20261008/docs-final.log"
+  },
+  "final_repository_quality": {
+    "command": "python -B quality/run.py --profile all",
+    "exit_code": 0,
+    "errors": 0,
+    "warnings": 0,
+    "info": 0,
+    "log": "dist/python-alias-facts-validation-20261008/final-quality.log"
+  },
+  "git_diff_check": {
+    "exit_code": 0
+  },
+  "package_validation": {
+    "summary": "packaged-validation-summary.json",
+    "regression_checks": 4785,
+    "regression_check_mismatches": 0,
+    "raw_original36_observations": 108,
+    "raw_original36_expectation_mismatches": 12,
+    "retained_clear3_raw_boundary_mismatches": 3
+  }
+}

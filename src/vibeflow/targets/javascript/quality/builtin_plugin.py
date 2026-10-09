@@ -3,6 +3,7 @@ from dataclasses import replace
 from functools import wraps
 from typing import Any, Mapping
 from vibeflow.core.rules import RuleContext, RuleRecord, RuleResult
+from vibeflow.core.rules.models import RuleCall
 from vibeflow.builtin.workflow import workflow_rule_checks, workflow_topic_handlers
 from vibeflow.builtin.project_quality import project_quality_handlers
 from vibeflow.builtin.import_policy import normalized_import_policy
@@ -33,6 +34,10 @@ def javascript_rule_bindings() -> Mapping[str, Any]:
         findings = _source_check(context, ("module_state", "host_io", "effect_imports"), "vibeflow.no_side_effects", params=params)
         allowed = {"none": [], "terminal": ["terminal"], "python_io": ["python_io"], "global_state": ["global_state"], "trusted": []}[scope]
         return RuleResult(records={"effect_policy": RuleRecord("vibeflow.effect_policy.v1", {"effect_scope": scope, "allowed_effects": allowed})}, findings=findings)
+    def architecture(context, inputs, params):
+        return RuleResult(findings=_source_check(context, ("architecture",), "vibeflow.node_architecture"))
+    def input_writes(context, inputs, params):
+        return RuleResult(state="unavailable")
     def interface(context: RuleContext, inputs: Mapping[str, RuleRecord], params: Mapping[str, Any]) -> RuleResult:
         return RuleResult(findings=_source_check(context, ("completion",), "vibeflow.node_interface"))
     def imports(context: RuleContext, inputs: Mapping[str, RuleRecord], params: Mapping[str, Any]) -> RuleResult:
@@ -58,6 +63,7 @@ def javascript_rule_bindings() -> Mapping[str, Any]:
             return RuleResult({"diagnostics": RuleRecord("vibeflow.implementation_diagnostics.v1", records)}, tuple(found))
         return check
     return {"vibeflow.no_side_effects": effects, "vibeflow.node_interface": interface,
+            "vibeflow.node_architecture": architecture, "vibeflow.input_writes": input_writes,
             "vibeflow.import_side_effects": imports, "vibeflow.maintainability": maintainability,
             **{"vibeflow.implementation." + topic: implementation(topic) for topic in ("node", "base_lib", "dependency_chain")},
             "vibeflow.workflow": workflow_rule_checks, **workflow_topic_handlers(),
@@ -69,4 +75,26 @@ def builtin_plugin():
     from vibeflow.builtin import builtin_rule_resources, builtin_declaration_origins
     from vibeflow.builtin.plugin import make_builtin_plugin
     rules, rulesets = builtin_rule_resources()
+    # The finite input rule describes Python syntax, so JavaScript's default
+    # selections omit it. An explicit selection still reports unavailable.
+    rulesets = tuple(replace(item,
+        calls=tuple(call for call in item.calls if call.rule_id != "vibeflow.input_writes"),
+        entrypoints={phase: tuple(name for name in names if name != "inputs")
+                     for phase, names in item.entrypoints.items()}) for item in rulesets)
+    # Module ownership is an independent selected architecture policy for
+    # native JS libraries, plugins and host extensions as well as Nodes.
+    rulesets = tuple(replace(item,
+        calls=(*item.calls, RuleCall("architecture", rule_id="vibeflow.node_architecture")),
+        entrypoints={phase: (*names, "architecture") if phase in {"static", "run"} else names
+                     for phase, names in item.entrypoints.items()})
+        if item.id in {"vibeflow.base_lib", "vibeflow.plugin", "vibeflow.host_extension"}
+        else item for item in rulesets)
+    # Check selected ownership before import purity can stop project binding.
+    # Reuse the architecture Rule and the same native fact session.
+    rulesets = tuple(replace(item,
+        entrypoints={phase: (*names, "architecture")
+                     if phase == "import" and "architecture" not in names else names
+                     for phase, names in item.entrypoints.items()})
+        if any(call.id == "architecture" for call in item.calls) else item
+        for item in rulesets)
     return make_builtin_plugin(rules, rulesets, javascript_rule_bindings(), declaration_origins=builtin_declaration_origins())

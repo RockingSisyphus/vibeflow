@@ -10,6 +10,11 @@ def builtin_effect_resources() -> tuple[tuple[RuleDescriptor, ...], tuple[Rulese
         RuleDescriptor("vibeflow.no_side_effects", description="Check the explicitly selected effect policy.",
                        outputs={"effect_policy": EFFECT_POLICY_TYPE}, params_schema=scope_schema,
                        params_defaults={"effect_scope": "none", "policy": {}}, handler="vibeflow.no_side_effects", scope="source"),
+        RuleDescriptor("vibeflow.node_architecture", description="Check statically resolved Node resource relations.", handler="vibeflow.node_architecture", scope="source"),
+        RuleDescriptor("vibeflow.input_writes", description="Check finite direct Python entry input writes and simple local aliases.",
+                       handler="vibeflow.input_writes", scope="source",
+                       params_schema={"mutating_methods": {"type":"array", "items":{"type":"string"}}},
+                       params_defaults={"mutating_methods":["append", "clear", "extend", "insert", "pop", "popitem", "remove", "setdefault", "sort", "update"]}),
         RuleDescriptor("vibeflow.node_interface", description="Check implementation-facing Node interface.", handler="vibeflow.node_interface", scope="source",
                        params_schema={"allowed_methods": {"type": "array", "items": {"type": "string"}}}, params_defaults={"allowed_methods": []}),
         RuleDescriptor("vibeflow.maintainability", description="Check source and helper maintainability.",
@@ -30,7 +35,10 @@ def builtin_effect_resources() -> tuple[tuple[RuleDescriptor, ...], tuple[Rulese
                  RuleCall("interface", rule_id="vibeflow.node_interface"),
                  RuleCall("maintainability", rule_id="vibeflow.maintainability"),
                  RuleCall("imports", rule_id="vibeflow.import_side_effects", params={"effect_scope": scope}))
-        review_calls = ("effects", "maintainability") if name == "base_lib" else ("effects", "interface", "maintainability")
+        if name != "base_lib":
+            calls += (RuleCall("architecture", rule_id="vibeflow.node_architecture"),
+                      RuleCall("inputs", rule_id="vibeflow.input_writes"))
+        review_calls = ("effects", "maintainability") if name == "base_lib" else ("effects", "architecture", "inputs", "interface", "maintainability")
         rulesets.append(RulesetDescriptor("vibeflow." + name, calls=calls,
                         entrypoints={"static": review_calls, "run": review_calls, "import": ("imports",)}))
     rulesets.append(RulesetDescriptor("vibeflow.workflow", calls=(RuleCall("workflow", rule_id="vibeflow.workflow"),),

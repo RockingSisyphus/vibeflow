@@ -1,0 +1,19 @@
+bringing up nodes...
+bringing up nodes...
+
+.....................................................................F   [100%]
+=================================== FAILURES ===================================
+______ test_nonlocal_alias_to_known_module_still_reports_actual_mutation _______
+[gw0] linux -- Python 3.13.13 /home/rockingsisyphus/miniforge3/bin/python
+
+    def test_nonlocal_alias_to_known_module_still_reports_actual_mutation():
+        body = 'shared = sys\ndef helper():\n    nonlocal shared\n    shared.path = []\nhelper()\nreturn {}'
+        result = no_side_effects(effect_context('node', body, 'import sys\n'), {}, {'effect_scope': 'none'})
+>       assert any(f.code == 'NODE.PURITY.EFFECT_CALL' for f in result.findings)
+E       assert False
+E        +  where False = any(<generator object test_nonlocal_alias_to_known_module_still_reports_actual_mutation.<locals>.<genexpr> at 0x784b69f89e50>)
+
+/home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_boundary_review_regressions.py:108: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_boundary_review_regressions.py::test_nonlocal_alias_to_known_module_still_reports_actual_mutation
+1 failed, 69 passed in 0.44s

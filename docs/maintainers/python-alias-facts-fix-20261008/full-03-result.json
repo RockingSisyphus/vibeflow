@@ -1,0 +1,96 @@
+{
+  "official_command": "PYTHONDONTWRITEBYTECODE=1 TMPDIR=/home/rockingsisyphus/.cache/vf-p2/t python -B tools/verify_project.py --full --scratch /home/rockingsisyphus/.cache/vibeflow-alias-facts-20261008/full-03",
+  "official_exit_code": 0,
+  "raw_verification": {
+    "steps": [
+      {
+        "step": "repository-quality",
+        "status": "passed",
+        "seconds": 5.187203919980675
+      },
+      {
+        "step": "compileall",
+        "status": "passed",
+        "seconds": 0.817561907984782
+      },
+      {
+        "step": "pytest",
+        "status": "passed",
+        "seconds": 146.626997356012
+      },
+      {
+        "step": "python-sandbox",
+        "status": "passed",
+        "seconds": 342.29829742602305
+      },
+      {
+        "step": "javascript-minimal",
+        "status": "passed",
+        "seconds": 10.799825434980448
+      },
+      {
+        "step": "javascript-integration",
+        "status": "passed",
+        "seconds": 124.32898656796897
+      },
+      {
+        "step": "rule-regression-sandboxes",
+        "status": "passed",
+        "seconds": 899.0793231499847
+      },
+      {
+        "step": "runtime-observation-browser",
+        "status": "passed",
+        "seconds": 2.9417211589752696
+      },
+      {
+        "step": "review-layout-sandbox",
+        "status": "passed",
+        "seconds": 17.272235642012674
+      },
+      {
+        "step": "resource-sections-sandbox",
+        "status": "passed",
+        "seconds": 64.50375072099268
+      },
+      {
+        "step": "review-performance-sandbox",
+        "status": "passed",
+        "seconds": 82.02160973194987
+      },
+      {
+        "step": "adaptation-regression-sandbox",
+        "status": "passed",
+        "seconds": 93.59935577498982
+      },
+      {
+        "step": "wheel-isolation",
+        "status": "passed",
+        "seconds": 7.366343803005293
+      },
+      {
+        "step": "generated-artifact-cleanup",
+        "status": "passed",
+        "seconds": 0.07768402498913929
+      },
+      {
+        "step": "distribution",
+        "status": "passed",
+        "seconds": 15.0361111050006
+      },
+      {
+        "step": "repository-quality-final",
+        "status": "passed",
+        "seconds": 5.793079182039946
+      },
+      {
+        "step": "clean-tree",
+        "status": "passed",
+        "seconds": 0.08267735003028065
+      }
+    ],
+    "failures": []
+  },
+  "frozen_validation_input_count": 2336,
+  "changed_frozen_validation_inputs": []
+}

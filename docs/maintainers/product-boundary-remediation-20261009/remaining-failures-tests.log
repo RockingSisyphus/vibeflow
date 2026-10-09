@@ -1,0 +1,51 @@
+
+added 4 packages, and audited 5 packages in 859ms
+
+found 0 vulnerabilities
+$ /home/rockingsisyphus/miniforge3/bin/python -m pytest -q -p no:cacheprovider -p pytest_workdirs -p xdist.plugin -n 4 --dist loadfile /home/rockingsisyphus/projects/VibeFlow/tests/tooling/strict_mermaid_cli.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_quality_sandbox.py /home/rockingsisyphus/projects/VibeFlow/tests/integration/test_javascript_sandbox.py /home/rockingsisyphus/projects/VibeFlow/tests/tooling/strict_base_config_examples.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_source_false_positives.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_run_observation.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/strict_runtime.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_quality_workspace_sandbox.py /home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_release.py /home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_delegate_cli.py /home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_review_docs.py /home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_profiles.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_code_plugins.py
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 19%]
+........................................................................ [ 38%]
+........................................................................ [ 57%]
+.............................................................s.......... [ 76%]
+.......................................................F................ [ 96%]
+...............                                                          [100%]
+=================================== FAILURES ===================================
+________ test_distribution_composes_collaborative_prompt_and_documents _________
+[gw0] linux -- Python 3.13.13 /home/rockingsisyphus/miniforge3/bin/python
+
+built_distribution = PosixPath('/var/tmp/pytest-of-rockingsisyphus/pytest-16/popen-gw0/review-docs0/distribution')
+
+    def test_distribution_composes_collaborative_prompt_and_documents(
+        built_distribution: Path,
+    ) -> None:
+        profile = load_distribution_profiles(
+            REPOSITORY_ROOT / "distribution" / "profiles.jsonc"
+        )["collaborative"]
+        expected_prompt = "\n\n".join(
+            path.read_text(encoding="utf-8").rstrip()
+            for path in profile.prompt_fragments
+        ) + "\n"
+        assert (built_distribution / "AGENTS.md").read_text(encoding="utf-8") == expected_prompt
+    
+        docs_root = built_distribution / "kernel" / "docs"
+        docs = sorted(path for path in docs_root.rglob("*.md") if path.name != "README.md")
+        assert len(docs) == len(profile.documents)
+        assert "人机协同" in (docs_root / "user/profiles/collaborative.md").read_text(encoding="utf-8")
+        combined = "\n".join(path.read_text(encoding="utf-8") for path in docs)
+        for marker in (
+            "vibeflow.workflow.v5",
+            "global_state",
+            "execution_lock",
+            "工作流执行探针",
+            "业务结果正确性",
+        ):
+>           assert marker in combined
+E           AssertionError: assert 'vibeflow.workflow.v5' in '# VibeFlow 项目概览\n\nVibeFlow 把 AI 参与开发的程序组织成一张可执行、可检查、可生成架构视图的显式流程图。业务逻辑位于小型 Node 中，Config 声明控制流，端口契约声明数据流，Core 在运行或构建...onfigs/main.jsonc --output <root>/ARCHITECTURE.jsonc\npython run.py validate --config <root>/configs/main.jsonc\n```\n'
+
+/home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_review_docs.py:55: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_review_docs.py::test_distribution_composes_collaborative_prompt_and_documents
+1 failed, 373 passed, 1 skipped in 67.12s (0:01:07)

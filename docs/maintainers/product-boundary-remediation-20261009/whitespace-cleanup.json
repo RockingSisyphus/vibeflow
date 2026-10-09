@@ -1,0 +1,18 @@
+{
+  "files": [
+    "src/vibeflow/block_compiler/compiler.py",
+    "src/vibeflow/block_compiler/model.py",
+    "src/vibeflow/core/compiler.py",
+    "src/vibeflow/core/inspection/architecture.py",
+    "src/vibeflow/core/models.py",
+    "src/vibeflow/targets/javascript/frontend/facts.py",
+    "src/vibeflow/targets/python/project/compiler.py",
+    "src/vibeflow/targets/python/quality/rules/effects.py",
+    "src/vibeflow/targets/python/quality/source_analysis/types.py",
+    "src/vibeflow/targets/python/runtime/support/portable_adapter.py",
+    "src/vibeflow/tooling/application/javascript/audit.py",
+    "src/vibeflow/tooling/application/python/presentation/architecture_document.py",
+    "src/vibeflow/tooling/application/python/presentation/mermaid/__init__.py"
+  ],
+  "python_ast_unchanged": true
+}

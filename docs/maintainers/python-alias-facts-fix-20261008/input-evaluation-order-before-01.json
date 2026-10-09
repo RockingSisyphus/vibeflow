@@ -1,0 +1,292 @@
+{
+  "count": 12,
+  "mismatches": 6,
+  "hashes": {
+    "src/vibeflow/targets/python/quality/source_analysis/input_tracking.py": "1a773f1be5f3f00616626f2d0d1440ffe53d30c5cf556a6c3e0d17c2a77ce013",
+    "src/vibeflow/targets/python/quality/source_analysis/visitors.py": "3d68e34f2f914fa0fd872d0140af95546996321a4619e8754dfcb1142814637e",
+    "src/vibeflow/targets/python/quality/rules/effects.py": "8a51d19dd07ee0c2212d10e2a1c689c0b96068122ea90e7b1e9f09fdea031155"
+  },
+  "changed_during_probe": [],
+  "rows": [
+    {
+      "case": "get_receiver_owned_to_local",
+      "expected": true,
+      "actual": false,
+      "matched": false,
+      "source": "def sink(payload,other=None):\n    payload.pop('seed',None)\nclass Task:\n    def run_pure(self,inputs,params):\n        alias=inputs\n        borrowed=alias.get((alias := 'seed'), {})\n        borrowed.pop('seed',None)\n        return {}\n",
+      "parameter_seeds": {
+        "/virtual/evaluation_order.py:Task.run_pure": [
+          "inputs"
+        ]
+      },
+      "findings": []
+    },
+    {
+      "case": "get_receiver_local_to_owned",
+      "expected": false,
+      "actual": true,
+      "matched": false,
+      "source": "def sink(payload,other=None):\n    payload.pop('seed',None)\nclass Task:\n    def run_pure(self,inputs,params):\n        alias={'seed':{}}\n        borrowed=alias.get((alias := inputs) and 'seed', {})\n        borrowed.pop('seed',None)\n        return {}\n",
+      "parameter_seeds": {
+        "/virtual/evaluation_order.py:Task.run_pure": [
+          "inputs"
+        ]
+      },
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/evaluation_order.py",
+            "line": 7,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "subscript_receiver_owned_to_local",
+      "expected": true,
+      "actual": false,
+      "matched": false,
+      "source": "def sink(payload,other=None):\n    payload.pop('seed',None)\nclass Task:\n    def run_pure(self,inputs,params):\n        alias=inputs\n        borrowed=alias[(alias := 'seed')]\n        borrowed.pop('seed',None)\n        return {}\n",
+      "parameter_seeds": {
+        "/virtual/evaluation_order.py:Task.run_pure": [
+          "inputs"
+        ]
+      },
+      "findings": []
+    },
+    {
+      "case": "subscript_receiver_local_to_owned",
+      "expected": false,
+      "actual": true,
+      "matched": false,
+      "source": "def sink(payload,other=None):\n    payload.pop('seed',None)\nclass Task:\n    def run_pure(self,inputs,params):\n        alias={'seed':{}}\n        borrowed=alias[(alias := inputs) and 'seed']\n        borrowed.pop('seed',None)\n        return {}\n",
+      "parameter_seeds": {
+        "/virtual/evaluation_order.py:Task.run_pure": [
+          "inputs"
+        ]
+      },
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/evaluation_order.py",
+            "line": 7,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "direct_pop_receiver_owned_to_local",
+      "expected": true,
+      "actual": true,
+      "matched": true,
+      "source": "def sink(payload,other=None):\n    payload.pop('seed',None)\nclass Task:\n    def run_pure(self,inputs,params):\n        alias=inputs\n        alias.pop((alias := 'seed'),None)\n        return {}\n",
+      "parameter_seeds": {
+        "/virtual/evaluation_order.py:Task.run_pure": [
+          "inputs"
+        ]
+      },
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/evaluation_order.py",
+            "line": 6,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "direct_pop_receiver_local_to_owned",
+      "expected": false,
+      "actual": false,
+      "matched": true,
+      "source": "def sink(payload,other=None):\n    payload.pop('seed',None)\nclass Task:\n    def run_pure(self,inputs,params):\n        alias={}\n        alias.pop((alias := inputs) and 'seed',None)\n        return {}\n",
+      "parameter_seeds": {
+        "/virtual/evaluation_order.py:Task.run_pure": [
+          "inputs"
+        ]
+      },
+      "findings": []
+    },
+    {
+      "case": "helper_get_receiver_owned_to_local",
+      "expected": true,
+      "actual": false,
+      "matched": false,
+      "source": "def sink(payload,other=None):\n    payload.pop('seed',None)\nclass Task:\n    def run_pure(self,inputs,params):\n        alias=inputs\n        sink(alias.get((alias := 'seed'), {}))\n        return {}\n",
+      "parameter_seeds": {
+        "/virtual/evaluation_order.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/evaluation_order.py:sink": []
+      },
+      "findings": []
+    },
+    {
+      "case": "helper_get_receiver_local_to_owned",
+      "expected": false,
+      "actual": true,
+      "matched": false,
+      "source": "def sink(payload,other=None):\n    payload.pop('seed',None)\nclass Task:\n    def run_pure(self,inputs,params):\n        alias={'seed':{}}\n        sink(alias.get((alias := inputs) and 'seed', {}))\n        return {}\n",
+      "parameter_seeds": {
+        "/virtual/evaluation_order.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/evaluation_order.py:sink": [
+          "payload"
+        ]
+      },
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/evaluation_order.py",
+            "line": 2,
+            "column": 5
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "module helper must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "helper_first_arg_keeps_earlier_owned_value",
+      "expected": true,
+      "actual": true,
+      "matched": true,
+      "source": "def sink(payload,other=None):\n    payload.pop('seed',None)\nclass Task:\n    def run_pure(self,inputs,params):\n        alias=inputs\n        sink(alias,(alias := {}))\n        return {}\n",
+      "parameter_seeds": {
+        "/virtual/evaluation_order.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/evaluation_order.py:sink": [
+          "payload"
+        ]
+      },
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/evaluation_order.py",
+            "line": 2,
+            "column": 5
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "module helper must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "helper_first_arg_keeps_earlier_local_value",
+      "expected": false,
+      "actual": false,
+      "matched": true,
+      "source": "def sink(payload,other=None):\n    payload.pop('seed',None)\nclass Task:\n    def run_pure(self,inputs,params):\n        alias={}\n        sink(alias,(alias := inputs))\n        return {}\n",
+      "parameter_seeds": {
+        "/virtual/evaluation_order.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/evaluation_order.py:sink": [
+          "other"
+        ]
+      },
+      "findings": []
+    },
+    {
+      "case": "keyword_first_arg_keeps_earlier_owned_value",
+      "expected": true,
+      "actual": true,
+      "matched": true,
+      "source": "def sink(payload,other=None):\n    payload.pop('seed',None)\nclass Task:\n    def run_pure(self,inputs,params):\n        alias=inputs\n        sink(payload=alias,other=(alias := {}))\n        return {}\n",
+      "parameter_seeds": {
+        "/virtual/evaluation_order.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/evaluation_order.py:sink": [
+          "payload"
+        ]
+      },
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/evaluation_order.py",
+            "line": 2,
+            "column": 5
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "module helper must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "keyword_first_arg_keeps_earlier_local_value",
+      "expected": false,
+      "actual": false,
+      "matched": true,
+      "source": "def sink(payload,other=None):\n    payload.pop('seed',None)\nclass Task:\n    def run_pure(self,inputs,params):\n        alias={}\n        sink(payload=alias,other=(alias := inputs))\n        return {}\n",
+      "parameter_seeds": {
+        "/virtual/evaluation_order.py:Task.run_pure": [
+          "inputs"
+        ],
+        "/virtual/evaluation_order.py:sink": [
+          "other"
+        ]
+      },
+      "findings": []
+    }
+  ]
+}

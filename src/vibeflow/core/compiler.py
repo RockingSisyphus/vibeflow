@@ -41,7 +41,6 @@ class CompiledGraph:
     consumers: dict[str, tuple[str, ...]]
     flow_kinds: dict[str, str]
     effect_scopes: dict[str, str] = field(default_factory=dict)
-    runtime_dispatches: dict[str, bool | None] = field(default_factory=dict)
     contains_global_state: bool = False
     mainline_edges: tuple[EdgeSpec, ...] = ()
     data_bypass_edges: tuple[EdgeSpec, ...] = ()
@@ -129,11 +128,6 @@ def compile_core(request: CoreCompileRequest) -> CoreCompilation:
         implementations=implementations,
         nodesets=nodesets,
     )
-    runtime_dispatches = _node_runtime_dispatches(
-        nodes_by_name,
-        implementations=implementations,
-        nodesets=nodesets,
-    )
     implemented_global_state_locks = _implemented_global_state_lock_keys(
         graph,
         implementations=implementations,
@@ -202,7 +196,7 @@ def compile_core(request: CoreCompileRequest) -> CoreCompilation:
         consumers=consumers,
         flow_kinds=flow_kinds,
         effect_scopes=effect_scopes,
-        runtime_dispatches=runtime_dispatches,
+
         contains_global_state=contains_global_state,
         mainline_edges=mainline.mainline_edges,
         data_bypass_edges=mainline.data_bypass_edges,
@@ -824,29 +818,6 @@ def _node_effect_scopes(
     return scopes
 
 
-def _node_runtime_dispatches(
-    nodes_by_name: dict[str, NodeSpec],
-    *,
-    implementations: ImplementationFacts,
-    nodesets: set[str],
-) -> dict[str, bool | None]:
-    dispatches: dict[str, bool | None] = {}
-    for node_id, spec in nodes_by_name.items():
-        if (
-            spec.status == STATUS_PLANNED
-            or spec.type_used in LOOP_NODE_TYPES
-            or spec.type_used == IO_NODE_TYPE
-            or spec.type_used in nodesets
-        ):
-            dispatches[node_id] = None
-            continue
-        implementation = implementations.get(spec.type_used)
-        dispatches[node_id] = (
-            implementation.runtime_dispatch
-            if implementation is not None
-            else None
-        )
-    return dispatches
 
 
 def _uncoordinated_global_state_findings(

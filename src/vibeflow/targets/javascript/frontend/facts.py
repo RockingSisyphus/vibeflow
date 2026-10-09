@@ -91,7 +91,7 @@ def implementation_facts_from_catalog(
                 type_key=descriptor.type_key,
                 flow_kind=descriptor.flow_kind,
                 effect_scope=_effect_scope((effect_policies or {}).get(descriptor.type_key)),
-                runtime_dispatch=None,
+
                 requires=descriptor.contract.requires,
                 provides=descriptor.contract.provides,
                 completion=completion,
@@ -144,7 +144,7 @@ def target_neutral_implementation_facts_from_catalog(
                 type_key=descriptor.type_key,
                 flow_kind=descriptor.flow_kind,
                 effect_scope=_effect_scope((effect_policies or {}).get(descriptor.type_key)),
-                runtime_dispatch=None,
+
                 requires=descriptor.contract.requires,
                 provides=descriptor.contract.provides,
                 completion=completion,

@@ -417,7 +417,7 @@ class _PlannerState:
             io_operation=spec.io.operation,
             io_port=spec.io.port if spec.io.operation else "",
             effect_scope=effect_scope,
-            runtime_dispatch=compiled.runtime_dispatches.get(spec.id),
+
             execution_lock=_execution_lock_plan(
                 spec.execution_lock,
                 scope="block" if is_nodeset or is_loop else "node",

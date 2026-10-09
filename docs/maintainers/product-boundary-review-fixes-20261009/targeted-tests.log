@@ -1,0 +1,48 @@
+
+added 4 packages, and audited 5 packages in 1s
+
+found 0 vulnerabilities
+$ /home/rockingsisyphus/miniforge3/bin/python -m pytest -q -p no:cacheprovider -p pytest_workdirs -p xdist.plugin -n 4 --dist loadfile /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_boundary_review_regressions.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_input_writeback.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_source_effect_parameters.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_effect_alias_scopes.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_comprehension_scopes.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_source_control_definitions.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/strict_effect_scopes.py
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  3%]
+........................................................................ [  7%]
+........................................................................ [ 11%]
+........................................................................ [ 15%]
+........................................................................ [ 19%]
+........................................................................ [ 23%]
+........................................................................ [ 27%]
+........................................................................ [ 30%]
+........................................................................ [ 34%]
+........................................................................ [ 38%]
+........................................................................ [ 42%]
+........................................................................ [ 46%]
+........................................................................ [ 50%]
+........................................................................ [ 54%]
+........................................................................ [ 58%]
+........................................................................ [ 61%]
+........................................................................ [ 65%]
+........................................................................ [ 69%]
+........................................................................ [ 73%]
+........................................................................ [ 77%]
+........................................................................ [ 81%]
+........................................................................ [ 85%]
+........................................................................ [ 89%]
+........................................................................ [ 92%]
+........................................................................ [ 96%]
+............................................................             [100%]
+==================================== ERRORS ====================================
+__ ERROR collecting tests/targets/python/test_boundary_review_regressions.py ___
+ImportError while importing test module '/home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_boundary_review_regressions.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/home/rockingsisyphus/miniforge3/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_boundary_review_regressions.py:11: in <module>
+    from vibeflow.targets.python.project.source_files import PythonSource
+E   ModuleNotFoundError: No module named 'vibeflow.targets.python.project.source_files'
+=========================== short test summary info ============================
+ERROR ../../../home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_boundary_review_regressions.py
+1860 passed, 1 error in 5.50s

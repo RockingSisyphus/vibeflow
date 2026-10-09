@@ -205,7 +205,7 @@ def test_global_state_requires_target_feature_without_implicit_effect_permission
     )
     compiled = compilation.graph
     assert compiled.effect_scopes == {"state": "unconstrained"}
-    assert compiled.runtime_dispatches == {"state": None}
+    assert not hasattr(compiled, "runtime_dispatches")
     assert compiled.contains_global_state is True
     assert [item.rule_id for item in compilation.findings] == [
         "GRAPH.EXECUTION_LOCK.GLOBAL_STATE_UNCOORDINATED"

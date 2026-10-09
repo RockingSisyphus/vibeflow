@@ -310,6 +310,8 @@ def run_variants(work_root: Path, variant: str, toolchain: Path, *, fixture: Any
         else:
             actual = fixture._observe(case, root, workspace, config, source, variant=variant)
         code = case.current_code if variant == 'current' and case.current_code is not None else case.code
+        if variant == 'current' and case.id in {'js.variant.base.host-date', 'js.variant.base.host-performance', 'js.variant.base.host-math-computed', 'js.variant.base.host-math-escape'}:
+            code = ''  # B07: clock reads are computation, not host I/O.
         expected = {'should_accept': not code or item.severity == 'warning', 'codes': [{'code': code, 'severity': item.severity}] if code else [], 'metrics': dict(case.metrics)}
         if variant == 'current' and 'source_files' in expected['metrics']:
             # The selected code-plugin declaration is now a recorded source.

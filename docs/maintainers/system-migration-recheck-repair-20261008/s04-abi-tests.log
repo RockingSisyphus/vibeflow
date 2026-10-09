@@ -1,0 +1,11 @@
+
+added 4 packages, and audited 5 packages in 2s
+
+found 0 vulnerabilities
+$ /home/rockingsisyphus/miniforge3/bin/python -m pytest -q -p no:cacheprovider -p pytest_workdirs -p xdist.plugin -n 4 --dist loadfile /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/strict_node_purity.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_source_effect_parameters.py
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 98%]
+.                                                                        [100%]
+73 passed in 2.18s

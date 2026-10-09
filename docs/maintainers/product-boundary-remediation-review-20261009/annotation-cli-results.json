@@ -1,0 +1,137 @@
+{
+  "count": 3,
+  "rows": [
+    {
+      "case": "annotation_without_value",
+      "source": "from vibeflow.targets.python.sdk import node\n@node(type_key=\"probe.task\", rulesets=[\"probe.selected\"], contract={})\nclass Task:\n    def run_pure(self, inputs, params):\n        inputs['x']: int\n        return {}\n@node(type_key=\"probe.start\", flow_kind=\"terminal\", rulesets=[], contract={})\nclass Start:\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "rule": "vibeflow.input_writes",
+      "scope": "none",
+      "status": "FAIL",
+      "exit": 1,
+      "errors": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/annotation-cli/annotation_without_value/node_resource.py",
+            "line": 5,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "selected input-write policy forbids a direct write to entry inputs or a simple local alias",
+          "suggested_fix_type": "fix_node",
+          "details": {
+            "node_type": "probe.task",
+            "calls": [
+              {
+                "owner": "pipeline",
+                "node": "task"
+              }
+            ]
+          },
+          "root_id": "probe",
+          "source_path": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/annotation-cli/annotation_without_value/node_resource.py",
+          "definition_id": "vibeflow.input_writes"
+        }
+      ],
+      "warnings": [],
+      "origin": {
+        "origin": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/__init__.py",
+        "foreign": {}
+      },
+      "project": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/annotation-cli/annotation_without_value"
+    },
+    {
+      "case": "annotation_with_value_control",
+      "source": "from vibeflow.targets.python.sdk import node\n@node(type_key=\"probe.task\", rulesets=[\"probe.selected\"], contract={})\nclass Task:\n    def run_pure(self, inputs, params):\n        inputs['x']: int = 1\n        return {}\n@node(type_key=\"probe.start\", flow_kind=\"terminal\", rulesets=[], contract={})\nclass Start:\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "rule": "vibeflow.input_writes",
+      "scope": "none",
+      "status": "FAIL",
+      "exit": 1,
+      "errors": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/annotation-cli/annotation_with_value_control/node_resource.py",
+            "line": 5,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "selected input-write policy forbids a direct write to entry inputs or a simple local alias",
+          "suggested_fix_type": "fix_node",
+          "details": {
+            "node_type": "probe.task",
+            "calls": [
+              {
+                "owner": "pipeline",
+                "node": "task"
+              }
+            ]
+          },
+          "root_id": "probe",
+          "source_path": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/annotation-cli/annotation_with_value_control/node_resource.py",
+          "definition_id": "vibeflow.input_writes"
+        }
+      ],
+      "warnings": [],
+      "origin": {
+        "origin": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/__init__.py",
+        "foreign": {}
+      },
+      "project": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/annotation-cli/annotation_with_value_control"
+    },
+    {
+      "case": "read_only_nonlocal",
+      "source": "from vibeflow.targets.python.sdk import node\n@node(type_key=\"probe.task\", rulesets=[\"probe.selected\"], contract={})\nclass Task:\n    def run_pure(self, inputs, params):\n        value=1\n        def helper():\n            nonlocal value\n            return value\n        answer=helper()\n        return {}\n@node(type_key=\"probe.start\", flow_kind=\"terminal\", rulesets=[], contract={})\nclass Start:\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "rule": "vibeflow.no_side_effects",
+      "scope": "none",
+      "status": "FAIL",
+      "exit": 1,
+      "errors": [
+        {
+          "code": "NODE.PURITY.GLOBAL_STATE",
+          "rule_id": "NODE.PURITY.GLOBAL_STATE",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/annotation-cli/read_only_nonlocal/node_resource.py",
+            "line": 7,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "nonlocal mutation is forbidden",
+          "suggested_fix_type": "configure_effect_rules",
+          "details": {
+            "node_type": "probe.task",
+            "calls": [
+              {
+                "owner": "pipeline",
+                "node": "task"
+              }
+            ]
+          },
+          "root_id": "probe",
+          "source_path": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/annotation-cli/read_only_nonlocal/node_resource.py",
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "warnings": [],
+      "origin": {
+        "origin": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/__init__.py",
+        "foreign": {}
+      },
+      "project": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/annotation-cli/read_only_nonlocal"
+    }
+  ]
+}

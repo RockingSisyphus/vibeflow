@@ -1,0 +1,157 @@
+{
+  "captured_utc": "2026-10-08T16:20:33.396260+00:00",
+  "task_started_local_date": "2026-10-08",
+  "scope": "F05 exception-expression intermediate input-alias states; prior F03/F04 regressions retained",
+  "final_acceptance": true,
+  "product_file_count": 335,
+  "source_manifest": {
+    "path": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/after-F05-02-source-manifest.json",
+    "sha256": "1044a149439865320d9dd3e015afcc171466b397e9bd9cdb422c6730c541825e"
+  },
+  "targeted_regressions": {
+    "passed": 475,
+    "components": {
+      "exception_states": 112,
+      "writeback": 293,
+      "parameter_facts": 70
+    },
+    "evidence": {
+      "path": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/targeted-convergence-summary.json",
+      "sha256": "bccc1c3fdaefabd3ecb50a386f342dd6562dd3c8f361eb1d705f551bfeb41c89"
+    }
+  },
+  "frozen_source_replay": {
+    "regression_checks": 865,
+    "mismatches": 0,
+    "evidence": {
+      "path": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/source-fixed-02-summary.json",
+      "sha256": "ee3c71a4c3ba298e0d0c9d4760682e42a7f00757e5381514966010c362646f66"
+    },
+    "source_only_report_historical_flags_preserved": true
+  },
+  "official_full_verification": {
+    "stages_passed": 17,
+    "exit_code": 0,
+    "pytest_passed": 4534,
+    "evidence": {
+      "path": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/full-01-result.json",
+      "sha256": "2b40444cbc18c7e7ba84faa600b483146897719daf021d1cd58b24e6b0fe088a"
+    }
+  },
+  "fresh_three_product_behavior": {
+    "products": 3,
+    "groups_per_product": 18,
+    "groups_total": 54,
+    "all_probe_exit_codes_zero": true,
+    "regression_checks": 5373,
+    "regression_check_mismatches": 0,
+    "raw36_observations": 108,
+    "raw36_original_expectation_mismatches": 12,
+    "raw36_unknown_receiver_write_only": 12,
+    "raw36_other_semantic_mismatches": 0,
+    "clear3_checks_in_regression_total": 9,
+    "clear3_preserved_raw_original_expectation_mismatches": 3,
+    "clear3_regression_check_mismatches": 0,
+    "evidence": {
+      "path": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/packaged-validation-summary.json",
+      "sha256": "6a277730d607be1e8a0ac6045b64ad135c7d78f7dc95e39b38368f6689d29be8"
+    },
+    "commands": {
+      "path": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/packaged-execution-commands.json",
+      "sha256": "ca38d81d0120f2bca0d68b21b1e148049b6b9c8af53bfff369665b4bbac4c546"
+    }
+  },
+  "whole_product_bytes": {
+    "product_sets": 7,
+    "files_per_set": 335,
+    "before_after_equal": true,
+    "evidence": {
+      "path": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/final-artifacts.json",
+      "sha256": "ba659c04fd9db1330b1550c6d6ae1a7530b284786ae515e97bbc9029b7867cb2"
+    },
+    "before": {
+      "path": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/product-byte-proof-before.json",
+      "sha256": "d99b5c00cc6b84da462d98045fe1fb0ab12e7e7e5a3a3dbcb4276becd409af39"
+    },
+    "after": {
+      "path": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/product-byte-proof-after.json",
+      "sha256": "d99b5c00cc6b84da462d98045fe1fb0ab12e7e7e5a3a3dbcb4276becd409af39"
+    }
+  },
+  "post_document_checks": {
+    "quality_all": {
+      "exit_code": 0,
+      "errors": 0,
+      "warnings": 0,
+      "info": 0,
+      "log": {
+        "path": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/quality-after-docs.log",
+        "sha256": "6e43b0b50425e96a222464de0acd0c8e7f069740beba6d06252a51e218e36e10"
+      }
+    },
+    "quality_selftests": {
+      "passed": 49,
+      "log": {
+        "path": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/quality-selftest.log",
+        "sha256": "44641b54207ceace9be9a5ac9efd8bf5e5ad9b1c8d698e8eaa7cede879b509a1"
+      }
+    },
+    "documentation_index": {
+      "exit_code": 0,
+      "passed": 1,
+      "log": {
+        "path": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/docs-index-final-02.log",
+        "sha256": "bbfe375f966b303ef8e72e725bd71a776e9a3f92fb7707ede7cc32ba822e1bde"
+      },
+      "preserved_initial_command_error": {
+        "exit_code": 4,
+        "cause": "Relative file::test selector was not resolved from the isolated working directory; zero tests collected; corrected absolute selector in a fresh scratch directory.",
+        "log": {
+          "path": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/docs-index-final.log",
+          "sha256": "ef55ef0fe56b681abf2954939a80f87777bba5d19986845b2882e0406d1c5268"
+        }
+      }
+    },
+    "git_diff_check_exit_code": 0
+  },
+  "final_inputs": {
+    "file_count": 2355,
+    "matches_pre_full_reference": true,
+    "missing": [],
+    "added": [],
+    "changed": {},
+    "evidence": {
+      "path": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/final-inputs-after-docs.json",
+      "sha256": "fecbf13029d03052c781e32b54c01a5d600af358a7c5632e9907b94dae129a2c"
+    }
+  },
+  "original_F05_audit_and_two_scripts": [
+    {
+      "path": "docs/maintainers/python-alias-facts-review-20261008.md",
+      "size": 9801,
+      "sha256": "1775ad2f5d228e3907e0b0a0f266d561c50095a577c653203729b2488c0df687"
+    },
+    {
+      "path": "docs/maintainers/python-alias-facts-review-20261008/reproduce_exception_alias.py",
+      "size": 3449,
+      "sha256": "b656c46594a64946ec2ef4372cdc1882109cfefb7d95e9f7301abd02713899c5"
+    },
+    {
+      "path": "docs/maintainers/python-alias-facts-review-20261008/reproduce_exception_cli.py",
+      "size": 4729,
+      "sha256": "86bcbad4cda9e85683a8fd4beca28e2110de070a32f5c5b9eb5aa50fbb2c5070"
+    }
+  ],
+  "protected_evidence_unchanged": true,
+  "preserved_boundaries": {
+    "raw36": "Four ordinary unknown-receiver write() I/O findings per product remain under scope none; original expectations retained. No other semantic mismatch.",
+    "clear3": "One conservative general nested clear() finding per product remains the previous boundary; regression checks match and original expectations retained."
+  },
+  "raw_original_expectations_all_match": false,
+  "previous_commit": "5b9f9763ab7051fc964a4d83a1419d87a621b4c9",
+  "current_fixes_committed": false,
+  "published": false,
+  "default_distribution_overwritten": false,
+  "failures": [],
+  "pass": true
+}

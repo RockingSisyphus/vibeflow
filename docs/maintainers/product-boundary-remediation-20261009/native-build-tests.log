@@ -1,0 +1,231 @@
+
+added 4 packages, and audited 5 packages in 780ms
+
+found 0 vulnerabilities
+$ /home/rockingsisyphus/miniforge3/bin/python -m pytest -q -p no:cacheprovider -p pytest_workdirs -p xdist.plugin -n 4 --dist loadfile /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_effect_alias_scopes.py /home/rockingsisyphus/projects/VibeFlow/tests/core/strict_complexity_nodesets.py /home/rockingsisyphus/projects/VibeFlow/tests/core/test_result_scope.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_aot_core.py::test_actual_aot_build_and_replace_need_no_npm_lock /home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_aot_core.py::test_real_typescript_allows_computation_but_retains_process_observation
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 15%]
+........................................................................ [ 30%]
+.......................F................................................ [ 45%]
+........................................................................ [ 60%]
+........................................................F............... [ 75%]
+........................................................................ [ 90%]
+....................................F.........                           [100%]
+=================================== FAILURES ===================================
+___________ test_actual_aot_build_and_replace_need_no_npm_lock[None] ___________
+[gw2] linux -- Python 3.13.13 /home/rockingsisyphus/miniforge3/bin/python
+
+tmp_path = PosixPath('/home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl0')
+lock_name = None
+
+    @pytest.mark.parametrize('lock_name', (None, 'yarn.lock', 'pnpm-lock.yaml'))
+    def test_actual_aot_build_and_replace_need_no_npm_lock(tmp_path, lock_name):
+        from vibeflow.targets.javascript.build.publish import validate_owned_build_directory
+        project = _real_toolchain_project(tmp_path)
+        (project / 'package-lock.json').unlink()
+        if lock_name:
+            (project / lock_name).write_text('package-manager-owned metadata\n')
+        module = project / 'node.ts'
+        module.write_text('export function run() { return {}; }\n')
+        request = fixture_build_request(plan=_empty_real_plan(module), project_root=project,
+            package_root=project, out_dir=project/'dist', target='node', profile='single-esm')
+        built = build_aot(request)
+        manifest = validate_owned_build_directory(built.out_dir, manifest_format='vibeflow.aot-build.v2')
+        assert set(manifest['toolchain']) == {'node','typescript','esbuild'}
+        assert manifest['abi_version'] == 'vibeflow.workflow.v5'
+>       assert _run_esm(built.entry, 'await workflow.runWorkflow({}); console.log(JSON.stringify({ok:true}));') == {'ok':True}
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_aot_core.py:2936: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+workflow = PosixPath('/home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl0/real-toolchain/dist/index.js')
+body = 'await workflow.runWorkflow({}); console.log(JSON.stringify({ok:true}));'
+
+    def _run_esm(workflow: Path, body: str) -> object:
+        script = f"""
+    import {{ pathToFileURL }} from "node:url";
+    globalThis.__vfCalls = [];
+    const workflow = await import(pathToFileURL({json.dumps(str(workflow))}).href);
+    {body}
+    """
+        completed = subprocess.run(
+            ["node", "--input-type=module", "--eval", script],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=10,
+        )
+>       assert completed.returncode == 0, completed.stderr
+E       AssertionError: file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl0/real-toolchain/dist/index.js:141
+E           return new VibeFlowWorkflowError(code, message, {
+E                  ^
+E         
+E         VibeFlowWorkflowError: generated workflow ABI 'vibeflow.workflow.v5' is unsupported
+E             at vfError (file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl0/real-toolchain/dist/index.js:141:10)
+E             at assertWorkflowAbi (file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl0/real-toolchain/dist/index.js:969:11)
+E             at createStaticWorkflowSync (file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl0/real-toolchain/dist/index.js:982:3)
+E             at file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl0/real-toolchain/dist/index.js:1251:26
+E             at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+E             at async node:internal/modules/esm/loader:643:26
+E             at async file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/boundary-tests-6/work/gw2/[eval1]:4:18 {
+E           code: 'VF_INTERNAL',
+E           workflowId: 'test.import-policy',
+E           nodePath: '',
+E           blockPath: ''
+E         }
+E         
+E         Node.js v24.18.0
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['node', '--input-type=module', '--eval', '\nimport { pathToFileURL } from "node:url";\nglobalTh... code: 'VF_INTERNAL',\n  workflowId: 'test.import-policy',\n  nodePath: '',\n  blockPath: ''\n}\n\nNode.js v24.18.0\n").returncode
+
+/home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_aot_core.py:209: AssertionError
+________ test_actual_aot_build_and_replace_need_no_npm_lock[yarn.lock] _________
+[gw2] linux -- Python 3.13.13 /home/rockingsisyphus/miniforge3/bin/python
+
+tmp_path = PosixPath('/home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl1')
+lock_name = 'yarn.lock'
+
+    @pytest.mark.parametrize('lock_name', (None, 'yarn.lock', 'pnpm-lock.yaml'))
+    def test_actual_aot_build_and_replace_need_no_npm_lock(tmp_path, lock_name):
+        from vibeflow.targets.javascript.build.publish import validate_owned_build_directory
+        project = _real_toolchain_project(tmp_path)
+        (project / 'package-lock.json').unlink()
+        if lock_name:
+            (project / lock_name).write_text('package-manager-owned metadata\n')
+        module = project / 'node.ts'
+        module.write_text('export function run() { return {}; }\n')
+        request = fixture_build_request(plan=_empty_real_plan(module), project_root=project,
+            package_root=project, out_dir=project/'dist', target='node', profile='single-esm')
+        built = build_aot(request)
+        manifest = validate_owned_build_directory(built.out_dir, manifest_format='vibeflow.aot-build.v2')
+        assert set(manifest['toolchain']) == {'node','typescript','esbuild'}
+        assert manifest['abi_version'] == 'vibeflow.workflow.v5'
+>       assert _run_esm(built.entry, 'await workflow.runWorkflow({}); console.log(JSON.stringify({ok:true}));') == {'ok':True}
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_aot_core.py:2936: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+workflow = PosixPath('/home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl1/real-toolchain/dist/index.js')
+body = 'await workflow.runWorkflow({}); console.log(JSON.stringify({ok:true}));'
+
+    def _run_esm(workflow: Path, body: str) -> object:
+        script = f"""
+    import {{ pathToFileURL }} from "node:url";
+    globalThis.__vfCalls = [];
+    const workflow = await import(pathToFileURL({json.dumps(str(workflow))}).href);
+    {body}
+    """
+        completed = subprocess.run(
+            ["node", "--input-type=module", "--eval", script],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=10,
+        )
+>       assert completed.returncode == 0, completed.stderr
+E       AssertionError: file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl1/real-toolchain/dist/index.js:141
+E           return new VibeFlowWorkflowError(code, message, {
+E                  ^
+E         
+E         VibeFlowWorkflowError: generated workflow ABI 'vibeflow.workflow.v5' is unsupported
+E             at vfError (file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl1/real-toolchain/dist/index.js:141:10)
+E             at assertWorkflowAbi (file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl1/real-toolchain/dist/index.js:969:11)
+E             at createStaticWorkflowSync (file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl1/real-toolchain/dist/index.js:982:3)
+E             at file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl1/real-toolchain/dist/index.js:1251:26
+E             at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+E             at async node:internal/modules/esm/loader:643:26
+E             at async file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/boundary-tests-6/work/gw2/[eval1]:4:18 {
+E           code: 'VF_INTERNAL',
+E           workflowId: 'test.import-policy',
+E           nodePath: '',
+E           blockPath: ''
+E         }
+E         
+E         Node.js v24.18.0
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['node', '--input-type=module', '--eval', '\nimport { pathToFileURL } from "node:url";\nglobalTh... code: 'VF_INTERNAL',\n  workflowId: 'test.import-policy',\n  nodePath: '',\n  blockPath: ''\n}\n\nNode.js v24.18.0\n").returncode
+
+/home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_aot_core.py:209: AssertionError
+______ test_actual_aot_build_and_replace_need_no_npm_lock[pnpm-lock.yaml] ______
+[gw2] linux -- Python 3.13.13 /home/rockingsisyphus/miniforge3/bin/python
+
+tmp_path = PosixPath('/home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl2')
+lock_name = 'pnpm-lock.yaml'
+
+    @pytest.mark.parametrize('lock_name', (None, 'yarn.lock', 'pnpm-lock.yaml'))
+    def test_actual_aot_build_and_replace_need_no_npm_lock(tmp_path, lock_name):
+        from vibeflow.targets.javascript.build.publish import validate_owned_build_directory
+        project = _real_toolchain_project(tmp_path)
+        (project / 'package-lock.json').unlink()
+        if lock_name:
+            (project / lock_name).write_text('package-manager-owned metadata\n')
+        module = project / 'node.ts'
+        module.write_text('export function run() { return {}; }\n')
+        request = fixture_build_request(plan=_empty_real_plan(module), project_root=project,
+            package_root=project, out_dir=project/'dist', target='node', profile='single-esm')
+        built = build_aot(request)
+        manifest = validate_owned_build_directory(built.out_dir, manifest_format='vibeflow.aot-build.v2')
+        assert set(manifest['toolchain']) == {'node','typescript','esbuild'}
+        assert manifest['abi_version'] == 'vibeflow.workflow.v5'
+>       assert _run_esm(built.entry, 'await workflow.runWorkflow({}); console.log(JSON.stringify({ok:true}));') == {'ok':True}
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_aot_core.py:2936: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+workflow = PosixPath('/home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl2/real-toolchain/dist/index.js')
+body = 'await workflow.runWorkflow({}); console.log(JSON.stringify({ok:true}));'
+
+    def _run_esm(workflow: Path, body: str) -> object:
+        script = f"""
+    import {{ pathToFileURL }} from "node:url";
+    globalThis.__vfCalls = [];
+    const workflow = await import(pathToFileURL({json.dumps(str(workflow))}).href);
+    {body}
+    """
+        completed = subprocess.run(
+            ["node", "--input-type=module", "--eval", script],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=10,
+        )
+>       assert completed.returncode == 0, completed.stderr
+E       AssertionError: file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl2/real-toolchain/dist/index.js:141
+E           return new VibeFlowWorkflowError(code, message, {
+E                  ^
+E         
+E         VibeFlowWorkflowError: generated workflow ABI 'vibeflow.workflow.v5' is unsupported
+E             at vfError (file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl2/real-toolchain/dist/index.js:141:10)
+E             at assertWorkflowAbi (file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl2/real-toolchain/dist/index.js:969:11)
+E             at createStaticWorkflowSync (file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl2/real-toolchain/dist/index.js:982:3)
+E             at file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/product-boundary-tmp/pytest-of-rockingsisyphus/pytest-6/popen-gw2/test_actual_aot_build_and_repl2/real-toolchain/dist/index.js:1251:26
+E             at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+E             at async node:internal/modules/esm/loader:643:26
+E             at async file:///home/rockingsisyphus/projects/VibeFlow/.artifacts/boundary-tests-6/work/gw2/[eval1]:4:18 {
+E           code: 'VF_INTERNAL',
+E           workflowId: 'test.import-policy',
+E           nodePath: '',
+E           blockPath: ''
+E         }
+E         
+E         Node.js v24.18.0
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['node', '--input-type=module', '--eval', '\nimport { pathToFileURL } from "node:url";\nglobalTh... code: 'VF_INTERNAL',\n  workflowId: 'test.import-policy',\n  nodePath: '',\n  blockPath: ''\n}\n\nNode.js v24.18.0\n").returncode
+
+/home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_aot_core.py:209: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../tests/targets/javascript/test_aot_core.py::test_actual_aot_build_and_replace_need_no_npm_lock[None]
+FAILED ../../../tests/targets/javascript/test_aot_core.py::test_actual_aot_build_and_replace_need_no_npm_lock[yarn.lock]
+FAILED ../../../tests/targets/javascript/test_aot_core.py::test_actual_aot_build_and_replace_need_no_npm_lock[pnpm-lock.yaml]
+3 failed, 475 passed in 3.68s

@@ -1,0 +1,19 @@
+[
+  {
+    "original": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-alias-facts-review-20261008/reproduce_exception_alias.py",
+    "preserved": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/reproduce_exception_alias.py",
+    "sha256": "b656c46594a64946ec2ef4372cdc1882109cfefb7d95e9f7301abd02713899c5",
+    "byte_identical": true
+  },
+  {
+    "original": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-alias-facts-review-20261008/reproduce_exception_cli.py",
+    "preserved": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/reproduce_exception_cli.py",
+    "sha256": "86bcbad4cda9e85683a8fd4beca28e2110de070a32f5c5b9eb5aa50fbb2c5070",
+    "byte_identical": true
+  },
+  {
+    "wrapper": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/replay_exception_review.py",
+    "sha256": "3c085a32b87af7900d4c313dedf515455db0bb8a778612d78f1169ada757be51",
+    "original_matrix_and_expectations_modified": false
+  }
+]

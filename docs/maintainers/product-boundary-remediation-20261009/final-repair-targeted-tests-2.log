@@ -1,0 +1,13 @@
+
+added 4 packages, and audited 5 packages in 782ms
+
+found 0 vulnerabilities
+$ /home/rockingsisyphus/miniforge3/bin/python -m pytest -q -p no:cacheprovider -p pytest_workdirs -p xdist.plugin -n 4 --dist loadfile /home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_aot_core.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_project_dependency_negatives.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_codegen.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_analysis_session.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_source_effect_parameters.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/test_quality_sandbox.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/test_product_boundary.py
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 27%]
+........................................................................ [ 54%]
+........................................................................ [ 81%]
+.................................................                        [100%]
+265 passed in 64.63s (0:01:04)

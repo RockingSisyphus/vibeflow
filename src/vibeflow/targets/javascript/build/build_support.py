@@ -17,7 +17,7 @@ from vibeflow.targets.javascript.build.publish import (
 from vibeflow.targets.javascript.build.toolchain import DriverBuildResult
 
 
-BUILD_MANIFEST_FORMAT = "vibeflow.aot-build.v1"
+BUILD_MANIFEST_FORMAT = "vibeflow.aot-build.v2"
 WEB_APP_MARKER = "<!-- VIBEFLOW_APP_ENTRY -->"
 SOURCEMAP_MODES = frozenset({"none", "external", "inline"})
 

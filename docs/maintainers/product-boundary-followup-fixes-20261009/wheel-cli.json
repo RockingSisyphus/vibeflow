@@ -1,0 +1,195 @@
+[
+  {
+    "case": "global_for",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "global_for_unpack",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "global_with",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "global_import",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "global_from_import",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "global_definition",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "global_async_definition",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "global_class",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "global_except",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "global_match",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "global_comprehension_walrus",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "if_else_original_input",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.INPUT_MUTATION"
+    ]
+  },
+  {
+    "case": "if_else_original_alias",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.INPUT_MUTATION"
+    ]
+  },
+  {
+    "case": "expression_else_original_input",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.INPUT_MUTATION"
+    ]
+  },
+  {
+    "case": "match_original_input",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.INPUT_MUTATION"
+    ]
+  },
+  {
+    "case": "except_original_input",
+    "expected_rejected": true,
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.INPUT_MUTATION"
+    ]
+  },
+  {
+    "case": "global_comprehension_local",
+    "expected_rejected": false,
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "global_readonly",
+    "expected_rejected": false,
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "local_definition",
+    "expected_rejected": false,
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "condition_rebind_both_branches",
+    "expected_rejected": false,
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "conditional_rebind_unknown_afterwards",
+    "expected_rejected": false,
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "match_guard_rebind",
+    "expected_rejected": false,
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "exception_type_rebind",
+    "expected_rejected": false,
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  }
+]

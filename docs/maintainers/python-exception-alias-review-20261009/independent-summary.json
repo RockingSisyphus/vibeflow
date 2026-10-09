@@ -1,0 +1,92 @@
+{
+  "original_F05_fixed": true,
+  "finding": "F06",
+  "priority": 2,
+  "classification": "new_regression",
+  "new_cases_per_product": 20,
+  "introduced": [
+    {
+      "case": "set_single_unhashable",
+      "via_helper": false
+    },
+    {
+      "case": "set_single_unhashable",
+      "via_helper": true
+    },
+    {
+      "case": "set_comp_unhashable",
+      "via_helper": false
+    },
+    {
+      "case": "set_comp_unhashable",
+      "via_helper": true
+    },
+    {
+      "case": "dict_comp_unhashable",
+      "via_helper": false
+    },
+    {
+      "case": "dict_comp_unhashable",
+      "via_helper": true
+    },
+    {
+      "case": "unpack_failure",
+      "via_helper": false
+    },
+    {
+      "case": "unpack_failure",
+      "via_helper": true
+    },
+    {
+      "case": "assertion_failure",
+      "via_helper": false
+    },
+    {
+      "case": "assertion_failure",
+      "via_helper": true
+    },
+    {
+      "case": "delete_unbound",
+      "via_helper": false
+    },
+    {
+      "case": "delete_unbound",
+      "via_helper": true
+    }
+  ],
+  "improved": [
+    {
+      "case": "straight_clear_safe_set",
+      "via_helper": false
+    },
+    {
+      "case": "straight_clear_safe_set",
+      "via_helper": true
+    }
+  ],
+  "retained_mismatches": [],
+  "product_files": 335,
+  "product_unchanged_during_review": true,
+  "original_F05_static": {
+    "count": 48,
+    "mismatches": 0
+  },
+  "original_F05_cli": {
+    "count": 32,
+    "mismatches": 0
+  },
+  "developer_controls164": {
+    "count": 328,
+    "mismatches": 0
+  },
+  "original_F01_F02_source": {
+    "count": 220,
+    "mismatches": 0
+  },
+  "pytest_passed": 2416,
+  "quality_selftest_passed": 49,
+  "full_regression_reexecuted": false,
+  "product_code_modified_by_review": false,
+  "standalone_source_probe_initial_attempt": "rejected direct repo/src by probe; successful frozen-source and kernel reruns recorded",
+  "set_element_order_control": "final expectation confirmed by Python language proof; no original scripts changed"
+}

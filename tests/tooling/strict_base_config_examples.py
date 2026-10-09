@@ -38,6 +38,9 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
         if case.get("kind") == "node_mutual_call":
             additional = (node_document(type_key="demo.other", class_name="OtherNode", contract={"provides": [{"key": "other.out", "type": "other.out", "display_name": "Other"}], "output_semantics": {"other.out": ["other result"]}}),)
         code, payload = _inspect_node_source(tmp_path / str(case["name"]), capsys, _failure_case_source(case), additional_nodes=additional)
+        if case.get("expected_allowed"):
+            assert code == 0, payload
+            continue
         assert code == 1
         codes = {finding["code"] for finding in (*payload["health"]["errors"], *payload["health"]["warnings"])}
         expected = str(case["expected_code"])
@@ -141,7 +144,6 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
 
     assert {
         "NODE.PURITY.SOURCE_TOO_LARGE",
-        "NODE.PURITY.BANNED_CALL",
         "NODE.EFFECT.CALL_FORBIDDEN",
         "NODE.METADATA.NODE_DIRECT_CALL",
         "NODE.IMPORT.SIDE_EFFECT",

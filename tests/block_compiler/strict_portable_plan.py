@@ -244,7 +244,7 @@ def test_python_execution_plan_adapter_preserves_global_state_and_locks() -> Non
     root = plan.block(plan.entry_block)
     state = root.node("state")
 
-    assert plan.abi_version == "vibeflow.workflow.v4"
+    assert plan.abi_version == "vibeflow.workflow.v5"
     assert plan.contains_global_state is True
     assert "root_exclusive" not in plan.to_dict()
     assert plan.execution_lock.to_dict() == {
@@ -254,7 +254,7 @@ def test_python_execution_plan_adapter_preserves_global_state_and_locks() -> Non
     assert root.contains_global_state is True
     assert "root_exclusive" not in root.to_dict()
     assert state.effect_scope == "global_state"
-    assert state.runtime_dispatch is False
+    assert "runtime_dispatch" not in state.to_dict()
     assert state.contains_global_state is True
     assert state.execution_lock.to_dict() == {
         "key": "trainer",

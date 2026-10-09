@@ -51,10 +51,14 @@ def case_specs():
     ])
     for spec in cases:
         name=spec["id"].removeprefix("python.variant.ownership.")
-        if name in {"augmented_alias","conditional_alias"}:
+        if name == "augmented_alias":
             spec["expected"]={"should_accept":True,"codes":[],"forbidden_codes":["NODE.PURITY.INPUT_MUTATION"]}
             spec["classification"]="baseline_limitation"
             spec["notes"]="Both kernels actually miss this concrete input ownership path; it is an original limit, not a loss inferred from the word mutation."
+        if name == "conditional_alias":
+            spec["expected"]["variants"]={"baseline":{"should_accept":True,"codes":[],"forbidden_codes":["NODE.PURITY.INPUT_MUTATION"]}}
+            spec["classification"]="new_feature"
+            spec["notes"]="Frozen kernels missed the borrowed value on the true branch. The current branch join retains possible input ownership and rejects append."
         if name in {"class_helper_position","class_helper_keyword"}:
             spec["expected"]["variants"]={"baseline":{"should_accept":True,"codes":[],"forbidden_codes":["NODE.PURITY.INPUT_MUTATION"]}}
             spec["classification"]="new_feature"

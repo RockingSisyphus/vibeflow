@@ -7,6 +7,8 @@ def python_rule_bindings():
     from vibeflow.targets.python.quality.rules.maintainability import maintainability, source_implementation_handlers
     from vibeflow.targets.python.quality.analysis_metrics import PythonSourceAnalysis
     from vibeflow.targets.python.quality.rules.node_interface import node_interface
+    from vibeflow.targets.python.quality.rules.node_architecture import node_architecture
+    from vibeflow.targets.python.quality.rules.input_writes import input_writes
     from vibeflow.targets.python.quality.rules.workflow import workflow
     from vibeflow.builtin import project_quality_handlers, workflow_topic_handlers
     from vibeflow.targets.python.quality.rules.definition_review import DefinitionReviewCache
@@ -20,6 +22,8 @@ def python_rule_bindings():
         "vibeflow.no_side_effects": source_policy_consumer(no_side_effects, sections=("imports",), effect_defaults=True),
         "vibeflow.import_side_effects": source_policy_consumer(import_side_effects, sections=("imports",)),
         "vibeflow.node_interface": node_interface,
+        "vibeflow.node_architecture": node_architecture,
+        "vibeflow.input_writes": input_writes,
         "vibeflow.maintainability": source_policy_consumer(lambda context, inputs, params: maintainability(context, inputs, params, analysis=analysis)),
     }
 

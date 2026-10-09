@@ -956,7 +956,7 @@ def test_javascript_planned_global_state_renders_as_cloud_path() -> None:
     assert "status: planned blocking" in mermaid
     assert "flow_kind: global_state" in mermaid
     assert "effect_scope: unavailable" in mermaid
-    assert "runtime_dispatch: unknown" in mermaid
+    assert "runtime_dispatch" not in mermaid
     assert "execution_lock: none" in mermaid
 
 
@@ -1222,8 +1222,6 @@ def test_build_project_aot_forwards_prepared_request(
             node="22.12.0",
             typescript="7.0.0",
             esbuild="0.28.0",
-            lock_sha256="lock",
-            lock_files=("package-lock.json",),
         ),
         files=("index.html",),
     )

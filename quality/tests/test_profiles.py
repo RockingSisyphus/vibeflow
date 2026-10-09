@@ -318,6 +318,17 @@ def load():
             {"DOCUMENT_LINK_MISSING"},
         )
 
+    def test_document_links_support_line_numbers_and_ignore_inline_code(self) -> None:
+        self.fixture.write("docs/source.py", "value = 1\n")
+        self.fixture.write("docs/guide.md", "[source](source.py:1) and `[x](1,2)`\n")
+        self.assertNotIn("DOCUMENT_LINK_MISSING", self.codes("base"))
+
+    def test_aot_manifest_name_does_not_match_removed_module(self) -> None:
+        self.fixture.write("docs/guide.md", "vibeflow.aot-build.v2\n")
+        self.assertNotIn("STALE_DOCUMENTATION", self.codes("base"))
+        self.fixture.write("docs/guide.md", "vibeflow.aot.compiler\n")
+        self.assertIn("STALE_DOCUMENTATION", self.codes("base"))
+
     def test_base_current_development_version_uses_project_metadata(self) -> None:
         for text in (
             "当前开发版本为 `0.16.0`，Workflow ABI 为 v4。\n",

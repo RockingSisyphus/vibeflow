@@ -1,0 +1,4 @@
+# Preserve raw acceptance output and captured diffs without whitespace cleanup.
+docs/maintainers/**/*.log -whitespace
+docs/maintainers/**/*.patch -whitespace
+docs/maintainers/**/reproduce_cli.py -whitespace

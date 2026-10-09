@@ -1,0 +1,529 @@
+{
+  "origin": "/home/rockingsisyphus/projects/VibeFlow/dist/python-exception-alias-validation-20261008/after-F05-02/vibeflow/__init__.py",
+  "count": 36,
+  "mismatches": 4,
+  "rows": [
+    {
+      "case": "local_sys_escape",
+      "kind": "python_source",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(alias := sys) for sys in objects]\n    return alias.argv\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_escape",
+      "kind": "node",
+      "source": "import sys\nimport sys as process\nclass Task:\n    def run_pure(self, inputs, params):\n        objects = params[\"objects\"]\n        [(alias := sys) for sys in objects]\n        alias.argv\n        return {}\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_escape",
+      "kind": "base_lib",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(alias := sys) for sys in objects]\n    return alias.argv\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_escape",
+      "kind": "plugin",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(alias := sys) for sys in objects]\n    return alias.argv\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_renamed",
+      "kind": "python_source",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(alias := item) for item in objects]\n    return alias.argv\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_renamed",
+      "kind": "node",
+      "source": "import sys\nimport sys as process\nclass Task:\n    def run_pure(self, inputs, params):\n        objects = params[\"objects\"]\n        [(alias := item) for item in objects]\n        alias.argv\n        return {}\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_renamed",
+      "kind": "base_lib",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(alias := item) for item in objects]\n    return alias.argv\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_renamed",
+      "kind": "plugin",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(alias := item) for item in objects]\n    return alias.argv\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_attribute",
+      "kind": "python_source",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write(\"a\")\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "alias_escape.py",
+          "source_location": {
+            "path": "/virtual/alias_escape.py",
+            "line": 5,
+            "column": 12
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned call: alias.write",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "local_sys_attribute",
+      "kind": "node",
+      "source": "import sys\nimport sys as process\nclass Task:\n    def run_pure(self, inputs, params):\n        objects = params[\"objects\"]\n        [(alias := sys.stdout) for sys in objects]\n        alias.write(\"a\")\n        return {}\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/alias_escape.py",
+            "line": 7,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned call: alias.write",
+          "suggested_fix_type": "configure_effect_rules",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "local_sys_attribute",
+      "kind": "base_lib",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write(\"a\")\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/alias_escape.py",
+            "line": 5,
+            "column": 12
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned call: alias.write",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "local_sys_attribute",
+      "kind": "plugin",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write(\"a\")\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": false,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/alias_escape.py",
+            "line": 5,
+            "column": 12
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned call: alias.write",
+          "suggested_fix_type": "configure_effect_rules",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "real_sys_escape",
+      "kind": "python_source",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(alias := sys) for item in objects]\n    return alias.argv\n",
+      "expected_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "QUALITY.SIDE_EFFECT.CALL",
+          "rule_id": "QUALITY.SIDE_EFFECT.CALL",
+          "severity": "warning",
+          "object_type": "file",
+          "object_id": "alias_escape.py",
+          "source_location": {
+            "path": "/virtual/alias_escape.py",
+            "line": 5,
+            "column": 12
+          },
+          "rule_source": "kernel.default_policy",
+          "failure_layer": "",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "isolate_side_effect",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "real_sys_escape",
+      "kind": "node",
+      "source": "import sys\nimport sys as process\nclass Task:\n    def run_pure(self, inputs, params):\n        objects = params[\"objects\"]\n        [(alias := sys) for item in objects]\n        alias.argv\n        return {}\n",
+      "expected_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/alias_escape.py",
+            "line": 7,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "real_sys_escape",
+      "kind": "base_lib",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(alias := sys) for item in objects]\n    return alias.argv\n",
+      "expected_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "BASE_LIB.SIDE_EFFECT_CALL",
+          "rule_id": "BASE_LIB.SIDE_EFFECT_CALL",
+          "severity": "error",
+          "object_type": "base_lib",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/alias_escape.py",
+            "line": 5,
+            "column": 12
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "real_sys_escape",
+      "kind": "plugin",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(alias := sys) for item in objects]\n    return alias.argv\n",
+      "expected_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.EFFECT.CALL_FORBIDDEN",
+          "rule_id": "NODE.EFFECT.CALL_FORBIDDEN",
+          "severity": "error",
+          "object_type": "plugin",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/alias_escape.py",
+            "line": 5,
+            "column": 12
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "banned process argument access: sys.argv; use the declared cli.argv input",
+          "suggested_fix_type": "fix_contract",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "local_sys_nested_lambda",
+      "kind": "python_source",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(lambda value=(alias := sys): value) for sys in objects]\n    return alias.argv\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_nested_lambda",
+      "kind": "node",
+      "source": "import sys\nimport sys as process\nclass Task:\n    def run_pure(self, inputs, params):\n        objects = params[\"objects\"]\n        [(lambda value=(alias := sys): value) for sys in objects]\n        alias.argv\n        return {}\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_nested_lambda",
+      "kind": "base_lib",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(lambda value=(alias := sys): value) for sys in objects]\n    return alias.argv\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_nested_lambda",
+      "kind": "plugin",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(lambda value=(alias := sys): value) for sys in objects]\n    return alias.argv\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_nested_comp",
+      "kind": "python_source",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [[(alias := sys) for sys in objects] for item in objects]\n    return alias.argv\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_nested_comp",
+      "kind": "node",
+      "source": "import sys\nimport sys as process\nclass Task:\n    def run_pure(self, inputs, params):\n        objects = params[\"objects\"]\n        [[(alias := sys) for sys in objects] for item in objects]\n        alias.argv\n        return {}\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_nested_comp",
+      "kind": "base_lib",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [[(alias := sys) for sys in objects] for item in objects]\n    return alias.argv\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_nested_comp",
+      "kind": "plugin",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [[(alias := sys) for sys in objects] for item in objects]\n    return alias.argv\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_import_as",
+      "kind": "python_source",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(alias := process) for process in objects]\n    return alias.argv\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_import_as",
+      "kind": "node",
+      "source": "import sys\nimport sys as process\nclass Task:\n    def run_pure(self, inputs, params):\n        objects = params[\"objects\"]\n        [(alias := process) for process in objects]\n        alias.argv\n        return {}\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_import_as",
+      "kind": "base_lib",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(alias := process) for process in objects]\n    return alias.argv\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_import_as",
+      "kind": "plugin",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    [(alias := process) for process in objects]\n    return alias.argv\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_direct_control",
+      "kind": "python_source",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    return [sys.argv for sys in objects]\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_direct_control",
+      "kind": "node",
+      "source": "import sys\nimport sys as process\nclass Task:\n    def run_pure(self, inputs, params):\n        objects = params[\"objects\"]\n        [sys.argv for sys in objects]\n        return {}\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_direct_control",
+      "kind": "base_lib",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    return [sys.argv for sys in objects]\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_sys_direct_control",
+      "kind": "plugin",
+      "source": "import sys\nimport sys as process\ndef task(objects):\n    return [sys.argv for sys in objects]\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "local_inputs_escape",
+      "kind": "node",
+      "source": "import sys\nimport sys as process\nclass Task:\n    def run_pure(self, inputs, params):\n        objects = params[\"objects\"]\n        [(alias := inputs) for inputs in objects]\n        alias.pop(\"seed\", None)\n        return {}\n",
+      "expected_findings": false,
+      "state": "completed",
+      "matched": true,
+      "findings": []
+    },
+    {
+      "case": "real_inputs_escape",
+      "kind": "node",
+      "source": "import sys\nimport sys as process\nclass Task:\n    def run_pure(self, inputs, params):\n        objects = params[\"objects\"]\n        [(alias := inputs) for item in objects]\n        alias.pop(\"seed\", None)\n        return {}\n",
+      "expected_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/alias_escape.py",
+            "line": 7,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "nonlocal_inputs_direct",
+      "kind": "node",
+      "source": "import sys\nimport sys as process\nclass Task:\n    def run_pure(self, inputs, params):\n        objects = params[\"objects\"]\n        alias = {}\n        def inner():\n            nonlocal alias\n            alias = inputs\n        inner()\n        alias.pop(\"seed\", None)\n        return {}\n",
+      "expected_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/alias_escape.py",
+            "line": 11,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "global_inputs_direct",
+      "kind": "node",
+      "source": "import sys\nimport sys as process\nclass Task:\n    def run_pure(self, inputs, params):\n        objects = params[\"objects\"]\n        def inner():\n            global alias\n            alias = inputs\n        inner()\n        alias.pop(\"seed\", None)\n        return {}\n",
+      "expected_findings": true,
+      "state": "completed",
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/alias_escape.py",
+            "line": 10,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ]
+    }
+  ]
+}

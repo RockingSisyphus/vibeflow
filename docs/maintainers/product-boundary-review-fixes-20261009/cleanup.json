@@ -1,0 +1,42 @@
+{
+  "created": "2026-10-09 14:55:46",
+  "selected": [
+    {
+      "path": "/tmp/vfp-review-fixes-full",
+      "allocated_bytes": 1944580096
+    },
+    {
+      "path": "/tmp/vfp-review-fixes-targeted",
+      "allocated_bytes": 43532288
+    },
+    {
+      "path": "/tmp/vfp-review-fixes-npm-cache",
+      "allocated_bytes": 161632256
+    },
+    {
+      "path": "/tmp/vfp-review-pack-audit.py",
+      "allocated_bytes": 4096
+    },
+    {
+      "path": "/tmp/vfp-review-save-clean.py",
+      "allocated_bytes": 4096
+    }
+  ],
+  "references": {
+    "/tmp/vfp-review-fixes-full": [],
+    "/tmp/vfp-review-fixes-targeted": [],
+    "/tmp/vfp-review-fixes-npm-cache": [],
+    "/tmp/vfp-review-pack-audit.py": [],
+    "/tmp/vfp-review-save-clean.py": []
+  },
+  "archived_files": 5760,
+  "archive_bytes": 37197600,
+  "allocated_bytes": 2149752832,
+  "removed": [
+    "/tmp/vfp-review-fixes-full",
+    "/tmp/vfp-review-fixes-targeted",
+    "/tmp/vfp-review-fixes-npm-cache",
+    "/tmp/vfp-review-pack-audit.py",
+    "/tmp/vfp-review-save-clean.py"
+  ]
+}

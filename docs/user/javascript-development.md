@@ -1,6 +1,6 @@
 # JavaScript/TypeScript 资源与 AOT
 
-用户资源从 `@vibeflow/plugin` 的 SDK 定义。声明与执行代码可以放在一起；workflow 显式选择固定插件对象。JS/TS 属于同一执行族，生成物继续是普通 ESM，使用原生 Workflow ABI v4。
+用户资源从 `@vibeflow/plugin` 的 SDK 定义。声明与执行代码可以放在一起；workflow 显式选择固定插件对象。JS/TS 属于同一执行族，生成物继续是普通 ESM，使用原生 Workflow ABI v5。
 
 ## Node 与固定插件
 

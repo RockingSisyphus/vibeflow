@@ -1,0 +1,118 @@
+{
+  "full_gate": "full-01",
+  "input_file_count": 2336,
+  "changed_inputs": [],
+  "steps": [
+    {
+      "step": "repository-quality",
+      "status": "passed",
+      "seconds": 10.570239931053948
+    },
+    {
+      "step": "compileall",
+      "status": "passed",
+      "seconds": 1.489930399984587
+    },
+    {
+      "step": "pytest",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'tools/run_tests.py', '--workers', '8', '--scratch', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/pytest', '--', '/home/rockingsisyphus/projects/VibeFlow/tests/core', '/home/rockingsisyphus/projects/VibeFlow/tests/block_compiler', '/home/rockingsisyphus/projects/VibeFlow/tests/targets', '/home/rockingsisyphus/projects/VibeFlow/tests/tooling', '/home/rockingsisyphus/projects/VibeFlow/tests/conformance', '/home/rockingsisyphus/projects/VibeFlow/tests/integration')' returned non-zero exit status 1.",
+      "seconds": 207.03081210597884
+    },
+    {
+      "step": "python-sandbox",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/python/integration/run_all.py')' returned non-zero exit status 2.",
+      "seconds": 0.16338692599674687
+    },
+    {
+      "step": "javascript-minimal",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/javascript/minimal/run_e2e.py')' returned non-zero exit status 1.",
+      "seconds": 0.4449103589868173
+    },
+    {
+      "step": "javascript-integration",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/javascript/integration/run_all.py', '--puppeteer-root', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/puppeteer')' returned non-zero exit status 1.",
+      "seconds": 0.11415972298709676
+    },
+    {
+      "step": "rule-regression-sandboxes",
+      "status": "failed",
+      "error": "rule sandbox failures: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/rule_parity/run_all.py', '--workers', '8', '--current-only', '--toolchain', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/pytest/javascript-toolchain', '--work', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/rule-parity', '--report', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/rule-parity.json')' returned non-zero exit status 1.; Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/rule_gaps/run_all.py', '--workers', '8', '--toolchain', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/pytest/javascript-toolchain', '--renderer', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/puppeteer', '--work', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/rule-gaps', '--report', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/rule-gaps.json')' returned non-zero exit status 2.",
+      "seconds": 963.1597305360483
+    },
+    {
+      "step": "runtime-observation-browser",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', '-c', \"\\nimport json\\nfrom pathlib import Path\\nimport sys\\nfrom sandbox.javascript.runtime_observation.probe import observe_browser\\nwork, toolchain, renderer, report = map(Path, sys.argv[1:])\\nwork.mkdir(parents=True, exist_ok=True)\\nresult = observe_browser(work, toolchain, renderer)\\nreport.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\\\\n')\\nif not result['matched']:\\n    raise SystemExit('browser runtime observation mismatch')\\n\", '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/runtime-observation-browser', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/pytest/javascript-toolchain', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/puppeteer', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/runtime-observation-browser.json')' returned non-zero exit status 1.",
+      "seconds": 0.6592976590036415
+    },
+    {
+      "step": "review-layout-sandbox",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/python/review_layout/run_all.py', '--work', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/review-layout', '--report', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/review-layout.json', '--renderer', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/puppeteer')' returned non-zero exit status 1.",
+      "seconds": 32.72334530297667
+    },
+    {
+      "step": "resource-sections-sandbox",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/python/resource_sections/run_all.py', '--work', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/python-resource-sections', '--report', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/python-resource-sections.json', '--renderer', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/puppeteer')' returned non-zero exit status 1.",
+      "seconds": 58.2960475020227
+    },
+    {
+      "step": "review-performance-sandbox",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/python/review_performance/run_all.py', '--work', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/review-performance', '--report', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/review-performance.json', '--renderer', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/puppeteer')' returned non-zero exit status 1.",
+      "seconds": 167.31198171299184
+    },
+    {
+      "step": "adaptation-regression-sandbox",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/adaptation_regressions/run_all.py', '--workers', '8', '--toolchain', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/pytest/javascript-toolchain', '--renderer', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/puppeteer', '--work', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/adaptation-regressions', '--report', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/adaptation-regressions.json')' returned non-zero exit status 1.",
+      "seconds": 102.98512216901872
+    },
+    {
+      "step": "wheel-isolation",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/wheel-venv/bin/python', '-c', '\\nimport importlib.abc\\nimport sys\\n\\nBLOCKED_PREFIXES = (\\'vibeflow.targets.python\\', \\'vibeflow.tooling.application.python\\')\\n\\nclass BlockedTargetFinder(importlib.abc.MetaPathFinder):\\n    def find_spec(self, fullname, path=None, target=None):\\n        if any(\\n            fullname == prefix or fullname.startswith(prefix + \".\")\\n            for prefix in BLOCKED_PREFIXES\\n        ):\\n            raise ModuleNotFoundError(\\n                f\"target isolation blocked {fullname}\",\\n                name=fullname,\\n            )\\n        return None\\n\\nsys.meta_path.insert(0, BlockedTargetFinder())\\n\\nimport os\\nfrom pathlib import Path\\nimport sys\\n\\nfrom vibeflow.tooling.application.cli import main\\n\\nout_dir = Path(os.environ[\"VF_ISOLATION_JS_OUT\"])\\nstatus = main([\\n    \"build\",\\n    \"--workspace\", os.environ[\"VF_ISOLATION_JS_WORKSPACE\"],\\n    \"--config\", os.environ[\"VF_ISOLATION_JS_CONFIG\"],\\n    \"--target\", \"node\",\\n    \"--profile\", \"single-esm\",\\n    \"--out-dir\", str(out_dir),\\n])\\nassert status == 0, status\\nassert (out_dir / \"index.js\").is_file()\\nassert (out_dir / \"vibeflow-build.json\").is_file()\\nassert not [\\n    name for name in sys.modules\\n    if any(\\n        name == prefix or name.startswith(prefix + \".\")\\n        for prefix in BLOCKED_PREFIXES\\n    )\\n]\\n')' returned non-zero exit status 1.",
+      "seconds": 10.83456979400944
+    },
+    {
+      "step": "generated-artifact-cleanup",
+      "status": "passed",
+      "seconds": 0.16215876798378304
+    },
+    {
+      "step": "distribution",
+      "status": "failed",
+      "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'distribution/build.py', '--output-dir', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/distribution', '--autonomous-output-dir', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/distribution-autonomous', '--archive-dir', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/archives')' returned non-zero exit status 1.",
+      "seconds": 0.128050321014598
+    },
+    {
+      "step": "repository-quality-final",
+      "status": "passed",
+      "seconds": 11.896149929030798
+    },
+    {
+      "step": "clean-tree",
+      "status": "passed",
+      "seconds": 0.1972197979921475
+    }
+  ],
+  "failures": [
+    "pytest failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'tools/run_tests.py', '--workers', '8', '--scratch', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/pytest', '--', '/home/rockingsisyphus/projects/VibeFlow/tests/core', '/home/rockingsisyphus/projects/VibeFlow/tests/block_compiler', '/home/rockingsisyphus/projects/VibeFlow/tests/targets', '/home/rockingsisyphus/projects/VibeFlow/tests/tooling', '/home/rockingsisyphus/projects/VibeFlow/tests/conformance', '/home/rockingsisyphus/projects/VibeFlow/tests/integration')' returned non-zero exit status 1.",
+    "python-sandbox failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/python/integration/run_all.py')' returned non-zero exit status 2.",
+    "javascript-minimal failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/javascript/minimal/run_e2e.py')' returned non-zero exit status 1.",
+    "javascript-integration failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/javascript/integration/run_all.py', '--puppeteer-root', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/puppeteer')' returned non-zero exit status 1.",
+    "rule-regression-sandboxes failed: rule sandbox failures: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/rule_parity/run_all.py', '--workers', '8', '--current-only', '--toolchain', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/pytest/javascript-toolchain', '--work', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/rule-parity', '--report', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/rule-parity.json')' returned non-zero exit status 1.; Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/rule_gaps/run_all.py', '--workers', '8', '--toolchain', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/pytest/javascript-toolchain', '--renderer', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/puppeteer', '--work', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/rule-gaps', '--report', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/rule-gaps.json')' returned non-zero exit status 2.",
+    "runtime-observation-browser failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', '-c', \"\\nimport json\\nfrom pathlib import Path\\nimport sys\\nfrom sandbox.javascript.runtime_observation.probe import observe_browser\\nwork, toolchain, renderer, report = map(Path, sys.argv[1:])\\nwork.mkdir(parents=True, exist_ok=True)\\nresult = observe_browser(work, toolchain, renderer)\\nreport.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\\\\n')\\nif not result['matched']:\\n    raise SystemExit('browser runtime observation mismatch')\\n\", '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/runtime-observation-browser', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/pytest/javascript-toolchain', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/puppeteer', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/runtime-observation-browser.json')' returned non-zero exit status 1.",
+    "review-layout-sandbox failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/python/review_layout/run_all.py', '--work', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/review-layout', '--report', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/review-layout.json', '--renderer', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/puppeteer')' returned non-zero exit status 1.",
+    "resource-sections-sandbox failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/python/resource_sections/run_all.py', '--work', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/python-resource-sections', '--report', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/python-resource-sections.json', '--renderer', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/puppeteer')' returned non-zero exit status 1.",
+    "review-performance-sandbox failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/python/review_performance/run_all.py', '--work', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/review-performance', '--report', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/review-performance.json', '--renderer', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/puppeteer')' returned non-zero exit status 1.",
+    "adaptation-regression-sandbox failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'sandbox/adaptation_regressions/run_all.py', '--workers', '8', '--toolchain', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/pytest/javascript-toolchain', '--renderer', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/puppeteer', '--work', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/adaptation-regressions', '--report', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/adaptation-regressions.json')' returned non-zero exit status 1.",
+    "wheel-isolation failed: Command '('/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/wheel-venv/bin/python', '-c', '\\nimport importlib.abc\\nimport sys\\n\\nBLOCKED_PREFIXES = (\\'vibeflow.targets.python\\', \\'vibeflow.tooling.application.python\\')\\n\\nclass BlockedTargetFinder(importlib.abc.MetaPathFinder):\\n    def find_spec(self, fullname, path=None, target=None):\\n        if any(\\n            fullname == prefix or fullname.startswith(prefix + \".\")\\n            for prefix in BLOCKED_PREFIXES\\n        ):\\n            raise ModuleNotFoundError(\\n                f\"target isolation blocked {fullname}\",\\n                name=fullname,\\n            )\\n        return None\\n\\nsys.meta_path.insert(0, BlockedTargetFinder())\\n\\nimport os\\nfrom pathlib import Path\\nimport sys\\n\\nfrom vibeflow.tooling.application.cli import main\\n\\nout_dir = Path(os.environ[\"VF_ISOLATION_JS_OUT\"])\\nstatus = main([\\n    \"build\",\\n    \"--workspace\", os.environ[\"VF_ISOLATION_JS_WORKSPACE\"],\\n    \"--config\", os.environ[\"VF_ISOLATION_JS_CONFIG\"],\\n    \"--target\", \"node\",\\n    \"--profile\", \"single-esm\",\\n    \"--out-dir\", str(out_dir),\\n])\\nassert status == 0, status\\nassert (out_dir / \"index.js\").is_file()\\nassert (out_dir / \"vibeflow-build.json\").is_file()\\nassert not [\\n    name for name in sys.modules\\n    if any(\\n        name == prefix or name.startswith(prefix + \".\")\\n        for prefix in BLOCKED_PREFIXES\\n    )\\n]\\n')' returned non-zero exit status 1.",
+    "distribution failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'distribution/build.py', '--output-dir', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/distribution', '--autonomous-output-dir', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/distribution-autonomous', '--archive-dir', '/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/full-01/archives')' returned non-zero exit status 1."
+  ]
+}

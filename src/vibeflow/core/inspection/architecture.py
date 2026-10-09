@@ -60,7 +60,7 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
                 "type_used": node.type_used,
                 "flow_kind": _effective_flow_kind(node, compiled),
                 "effect_scope": _effective_effect_scope(node, compiled),
-                "runtime_dispatch": _runtime_dispatch_label(node, compiled),
+
                 "execution_lock": (
                     _execution_lock_payload(
                         node.execution_lock,
@@ -124,18 +124,6 @@ def _node_lock_scope(node: NodeSpec, graph: GraphConfig) -> str:
     )
 
 
-def _runtime_dispatch_label(
-    node: NodeSpec,
-    compiled: CompiledGraph | None,
-) -> str:
-    if node.status == STATUS_PLANNED or compiled is None:
-        return "unknown"
-    value = getattr(compiled, "runtime_dispatches", {}).get(node.id)
-    if value is True:
-        return "detected"
-    if value is False:
-        return "none"
-    return "unknown"
 
 
 def _effective_flow_kind(node: object, compiled: CompiledGraph | None) -> str:

@@ -1,0 +1,818 @@
+
+added 4 packages, and audited 5 packages in 1s
+
+found 0 vulnerabilities
+$ /home/rockingsisyphus/miniforge3/bin/python -m pytest -q -p no:cacheprovider -p pytest_workdirs -p xdist.plugin -n 8 --dist loadfile /home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_release.py /home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_profiles.py /home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_review_docs.py /home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_delegate_cli.py
+bringing up nodes...
+bringing up nodes...
+
+......................F.F........FFFF.F                                  [100%]
+=================================== FAILURES ===================================
+___________ test_release_set_publication_rolls_back_all_four_targets ___________
+[gw3] linux -- Python 3.13.13 /home/rockingsisyphus/miniforge3/bin/python
+
+tmp_path = PosixPath('/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw3/test_release_set_publication_r0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77d8a3c18fc0>
+
+    def test_release_set_publication_rolls_back_all_four_targets(
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        outputs = (tmp_path / "collaborative", tmp_path / "autonomous")
+        archives = (
+            tmp_path / "archive" / distribution_builder.ARCHIVE_NAME,
+            tmp_path / "archive" / distribution_builder.AUTONOMOUS_ARCHIVE_NAME,
+        )
+        for path, content in zip(outputs, ("old collaborative", "old autonomous"), strict=True):
+            path.mkdir(parents=True)
+            (path / "marker").write_text(content, encoding="utf-8")
+        for path, content in zip(archives, (b"old collaborative zip", b"old autonomous zip"), strict=True):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+    
+        real_replace = os.replace
+        publication_count = 0
+    
+        def fail_during_publication(source, target):
+            nonlocal publication_count
+            source_path = Path(source)
+            if source_path.name in {"payload", *[path.name for path in archives]}:
+                publication_count += 1
+                if publication_count == 3:
+                    raise OSError("injected release-set publication failure")
+            return real_replace(source, target)
+    
+        monkeypatch.setattr(distribution_builder.os, "replace", fail_during_publication)
+>       with pytest.raises(OSError, match="injected"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: Regex pattern did not match.
+E         Expected regex: 'injected'
+E         Actual message: '[Errno 122] Disk quota exceeded'
+
+/home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_profiles.py:189: AssertionError
+________ test_distribution_renderer_reviews_minimal_javascript_workflow ________
+[gw0] linux -- Python 3.13.13 /home/rockingsisyphus/miniforge3/bin/python
+
+source = PosixPath('/home/rockingsisyphus/projects/VibeFlow/src/vibeflow')
+target = PosixPath('/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw0/test_distribution_renderer_rev0/.distribution.vibeflow-build-ibt0efwy/payload/kernel/vibeflow-kernel.zip')
+
+    def _write_kernel_archive(source: Path, target: Path) -> None:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+            for path in sorted(source.rglob("*"), key=lambda item: item.relative_to(source).as_posix()):
+                relative_to_package = path.relative_to(source)
+                if path.is_dir() or _ignored(relative_to_package):
+                    continue
+                archive_relative = Path("vibeflow") / relative_to_package
+                info = zipfile.ZipInfo(archive_relative.as_posix())
+                info.date_time = (1980, 1, 1, 0, 0, 0)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = 0o644 << 16
+>               archive.writestr(info, path.read_bytes())
+
+/home/rockingsisyphus/projects/VibeFlow/distribution/build.py:781: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:1961: in writestr
+    with self.open(zinfo, mode='w') as dest:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <zipfile._ZipWriteFile object at 0x7796c449fca0>
+
+    def close(self):
+        if self.closed:
+            return
+        try:
+            super().close()
+            # Flush any data from the compressor, and update header info
+            if self._compressor:
+                buf = self._compressor.flush()
+                self._compress_size += len(buf)
+                self._fileobj.write(buf)
+                self._zinfo.compress_size = self._compress_size
+            else:
+                self._zinfo.compress_size = self._file_size
+            self._zinfo.CRC = self._crc
+            self._zinfo.file_size = self._file_size
+    
+            if not self._zip64:
+                if self._file_size > ZIP64_LIMIT:
+                    raise RuntimeError("File size too large, try using force_zip64")
+                if self._compress_size > ZIP64_LIMIT:
+                    raise RuntimeError("Compressed size too large, try using force_zip64")
+    
+            # Write updated header info
+            if self._zinfo.flag_bits & _MASK_USE_DATA_DESCRIPTOR:
+                # Write CRC and file sizes after the file data
+                fmt = '<LLQQ' if self._zip64 else '<LLLL'
+                self._fileobj.write(struct.pack(fmt, _DD_SIGNATURE, self._zinfo.CRC,
+                    self._zinfo.compress_size, self._zinfo.file_size))
+                self._zipfile.start_dir = self._fileobj.tell()
+            else:
+                # Seek backwards and write file header (which will now include
+                # correct CRC and file sizes)
+    
+                # Preserve current position in file
+                self._zipfile.start_dir = self._fileobj.tell()
+>               self._fileobj.seek(self._zinfo.header_offset)
+E               OSError: [Errno 122] Disk quota exceeded
+
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:1306: OSError
+
+During handling of the above exception, another exception occurred:
+
+self = <zipfile.ZipFile [closed]>
+
+    def close(self):
+        """Close the file, and for mode 'w', 'x' and 'a' write the ending
+        records."""
+        if self.fp is None:
+            return
+    
+        if self._writing:
+            raise ValueError("Can't close the ZIP file while there is "
+                             "an open writing handle on it. "
+                             "Close the writing handle before closing the zip.")
+    
+        try:
+            if self.mode in ('w', 'x', 'a') and self._didModify: # write ending records
+                with self._lock:
+                    if self._seekable:
+>                       self.fp.seek(self.start_dir)
+E                       OSError: [Errno 122] Disk quota exceeded
+
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:2018: OSError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw0/test_distribution_renderer_rev0')
+
+    def test_distribution_renderer_reviews_minimal_javascript_workflow(
+        tmp_path: Path,
+    ) -> None:
+>       distribution = distribution_builder.build_distribution(
+            tmp_path / "distribution",
+            run_self_check=False,
+        )
+
+/home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_release.py:162: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/rockingsisyphus/projects/VibeFlow/distribution/build.py:286: in build_distribution
+    _populate_distribution(staged_output, profile=selected)
+/home/rockingsisyphus/projects/VibeFlow/distribution/build.py:388: in _populate_distribution
+    _write_kernel_archive(ROOT / "src" / "vibeflow", output / KERNEL_ZIP_RELATIVE)
+/home/rockingsisyphus/projects/VibeFlow/distribution/build.py:771: in _write_kernel_archive
+    with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:1444: in __exit__
+    self.close()
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:2023: in close
+    self._fpclose(fp)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <zipfile.ZipFile [closed]>
+fp = <_io.BufferedRandom name='/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw0/test_distribution_renderer_rev0/.distribution.vibeflow-build-ibt0efwy/payload/kernel/vibeflow-kernel.zip'>
+
+    def _fpclose(self, fp):
+        assert self._fileRefCnt > 0
+        self._fileRefCnt -= 1
+        if not self._fileRefCnt and not self._filePassed:
+>           fp.close()
+E           OSError: [Errno 122] Disk quota exceeded
+
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:2123: OSError
+________ test_built_launcher_loads_kernel_before_a_root_shadow_package _________
+[gw0] linux -- Python 3.13.13 /home/rockingsisyphus/miniforge3/bin/python
+
+source = PosixPath('/home/rockingsisyphus/projects/VibeFlow/src/vibeflow')
+target = PosixPath('/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw0/test_built_launcher_loads_kern0/.distribution.vibeflow-build-ecibgvoy/payload/kernel/vibeflow-kernel.zip')
+
+    def _write_kernel_archive(source: Path, target: Path) -> None:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+            for path in sorted(source.rglob("*"), key=lambda item: item.relative_to(source).as_posix()):
+                relative_to_package = path.relative_to(source)
+                if path.is_dir() or _ignored(relative_to_package):
+                    continue
+                archive_relative = Path("vibeflow") / relative_to_package
+                info = zipfile.ZipInfo(archive_relative.as_posix())
+                info.date_time = (1980, 1, 1, 0, 0, 0)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = 0o644 << 16
+>               archive.writestr(info, path.read_bytes())
+
+/home/rockingsisyphus/projects/VibeFlow/distribution/build.py:781: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:1961: in writestr
+    with self.open(zinfo, mode='w') as dest:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <zipfile._ZipWriteFile object at 0x7796c4492440>
+
+    def close(self):
+        if self.closed:
+            return
+        try:
+            super().close()
+            # Flush any data from the compressor, and update header info
+            if self._compressor:
+                buf = self._compressor.flush()
+                self._compress_size += len(buf)
+                self._fileobj.write(buf)
+                self._zinfo.compress_size = self._compress_size
+            else:
+                self._zinfo.compress_size = self._file_size
+            self._zinfo.CRC = self._crc
+            self._zinfo.file_size = self._file_size
+    
+            if not self._zip64:
+                if self._file_size > ZIP64_LIMIT:
+                    raise RuntimeError("File size too large, try using force_zip64")
+                if self._compress_size > ZIP64_LIMIT:
+                    raise RuntimeError("Compressed size too large, try using force_zip64")
+    
+            # Write updated header info
+            if self._zinfo.flag_bits & _MASK_USE_DATA_DESCRIPTOR:
+                # Write CRC and file sizes after the file data
+                fmt = '<LLQQ' if self._zip64 else '<LLLL'
+                self._fileobj.write(struct.pack(fmt, _DD_SIGNATURE, self._zinfo.CRC,
+                    self._zinfo.compress_size, self._zinfo.file_size))
+                self._zipfile.start_dir = self._fileobj.tell()
+            else:
+                # Seek backwards and write file header (which will now include
+                # correct CRC and file sizes)
+    
+                # Preserve current position in file
+                self._zipfile.start_dir = self._fileobj.tell()
+>               self._fileobj.seek(self._zinfo.header_offset)
+E               OSError: [Errno 122] Disk quota exceeded
+
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:1306: OSError
+
+During handling of the above exception, another exception occurred:
+
+self = <zipfile.ZipFile [closed]>
+
+    def close(self):
+        """Close the file, and for mode 'w', 'x' and 'a' write the ending
+        records."""
+        if self.fp is None:
+            return
+    
+        if self._writing:
+            raise ValueError("Can't close the ZIP file while there is "
+                             "an open writing handle on it. "
+                             "Close the writing handle before closing the zip.")
+    
+        try:
+            if self.mode in ('w', 'x', 'a') and self._didModify: # write ending records
+                with self._lock:
+                    if self._seekable:
+>                       self.fp.seek(self.start_dir)
+E                       OSError: [Errno 122] Disk quota exceeded
+
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:2018: OSError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw0/test_built_launcher_loads_kern0')
+
+    def test_built_launcher_loads_kernel_before_a_root_shadow_package(
+        tmp_path: Path,
+    ) -> None:
+        output = tmp_path / "distribution"
+>       distribution_builder.build_distribution(output, run_self_check=False)
+
+/home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_release.py:341: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/rockingsisyphus/projects/VibeFlow/distribution/build.py:286: in build_distribution
+    _populate_distribution(staged_output, profile=selected)
+/home/rockingsisyphus/projects/VibeFlow/distribution/build.py:388: in _populate_distribution
+    _write_kernel_archive(ROOT / "src" / "vibeflow", output / KERNEL_ZIP_RELATIVE)
+/home/rockingsisyphus/projects/VibeFlow/distribution/build.py:771: in _write_kernel_archive
+    with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:1444: in __exit__
+    self.close()
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:2023: in close
+    self._fpclose(fp)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <zipfile.ZipFile [closed]>
+fp = <_io.BufferedRandom name='/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw0/test_built_launcher_loads_kern0/.distribution.vibeflow-build-ecibgvoy/payload/kernel/vibeflow-kernel.zip'>
+
+    def _fpclose(self, fp):
+        assert self._fileRefCnt > 0
+        self._fileRefCnt -= 1
+        if not self._fileRefCnt and not self._filePassed:
+>           fp.close()
+E           OSError: [Errno 122] Disk quota exceeded
+
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:2123: OSError
+________ test_staged_validation_failure_preserves_existing_release_pair ________
+[gw0] linux -- Python 3.13.13 /home/rockingsisyphus/miniforge3/bin/python
+
+source = PosixPath('/home/rockingsisyphus/projects/VibeFlow/src/vibeflow')
+target = PosixPath('/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw0/test_staged_validation_failure0/.distribution.vibeflow-build-fv8fub6o/payload/kernel/vibeflow-kernel.zip')
+
+    def _write_kernel_archive(source: Path, target: Path) -> None:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+            for path in sorted(source.rglob("*"), key=lambda item: item.relative_to(source).as_posix()):
+                relative_to_package = path.relative_to(source)
+                if path.is_dir() or _ignored(relative_to_package):
+                    continue
+                archive_relative = Path("vibeflow") / relative_to_package
+                info = zipfile.ZipInfo(archive_relative.as_posix())
+                info.date_time = (1980, 1, 1, 0, 0, 0)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = 0o644 << 16
+>               archive.writestr(info, path.read_bytes())
+
+/home/rockingsisyphus/projects/VibeFlow/distribution/build.py:781: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:1961: in writestr
+    with self.open(zinfo, mode='w') as dest:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <zipfile._ZipWriteFile object at 0x7796c44923b0>
+
+    def close(self):
+        if self.closed:
+            return
+        try:
+            super().close()
+            # Flush any data from the compressor, and update header info
+            if self._compressor:
+                buf = self._compressor.flush()
+                self._compress_size += len(buf)
+                self._fileobj.write(buf)
+                self._zinfo.compress_size = self._compress_size
+            else:
+                self._zinfo.compress_size = self._file_size
+            self._zinfo.CRC = self._crc
+            self._zinfo.file_size = self._file_size
+    
+            if not self._zip64:
+                if self._file_size > ZIP64_LIMIT:
+                    raise RuntimeError("File size too large, try using force_zip64")
+                if self._compress_size > ZIP64_LIMIT:
+                    raise RuntimeError("Compressed size too large, try using force_zip64")
+    
+            # Write updated header info
+            if self._zinfo.flag_bits & _MASK_USE_DATA_DESCRIPTOR:
+                # Write CRC and file sizes after the file data
+                fmt = '<LLQQ' if self._zip64 else '<LLLL'
+                self._fileobj.write(struct.pack(fmt, _DD_SIGNATURE, self._zinfo.CRC,
+                    self._zinfo.compress_size, self._zinfo.file_size))
+                self._zipfile.start_dir = self._fileobj.tell()
+            else:
+                # Seek backwards and write file header (which will now include
+                # correct CRC and file sizes)
+    
+                # Preserve current position in file
+                self._zipfile.start_dir = self._fileobj.tell()
+>               self._fileobj.seek(self._zinfo.header_offset)
+E               OSError: [Errno 122] Disk quota exceeded
+
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:1306: OSError
+
+During handling of the above exception, another exception occurred:
+
+self = <zipfile.ZipFile [closed]>
+
+    def close(self):
+        """Close the file, and for mode 'w', 'x' and 'a' write the ending
+        records."""
+        if self.fp is None:
+            return
+    
+        if self._writing:
+            raise ValueError("Can't close the ZIP file while there is "
+                             "an open writing handle on it. "
+                             "Close the writing handle before closing the zip.")
+    
+        try:
+            if self.mode in ('w', 'x', 'a') and self._didModify: # write ending records
+                with self._lock:
+                    if self._seekable:
+>                       self.fp.seek(self.start_dir)
+E                       OSError: [Errno 122] Disk quota exceeded
+
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:2018: OSError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw0/test_staged_validation_failure0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7796c42d2990>
+
+    def test_staged_validation_failure_preserves_existing_release_pair(
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        output = tmp_path / "distribution"
+        archive_dir = tmp_path / "archives"
+        archive_dir.mkdir()
+        archive = archive_dir / distribution_builder.ARCHIVE_NAME
+        output.mkdir()
+        (output / "marker.txt").write_text("old-directory", encoding="utf-8")
+        archive.write_bytes(b"old-archive")
+    
+        def fail_validation(_output: Path) -> None:
+            raise distribution_builder.BuildDistributionError("injected staged failure")
+    
+        monkeypatch.setattr(
+            distribution_builder,
+            "_verify_staged_distribution",
+            fail_validation,
+        )
+    
+        with pytest.raises(
+            distribution_builder.BuildDistributionError,
+            match="injected staged failure",
+        ):
+>           distribution_builder.build_release(
+                output,
+                archive_dir=archive_dir,
+                run_self_check=False,
+            )
+
+/home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_release.py:390: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/rockingsisyphus/projects/VibeFlow/distribution/build.py:183: in build_release
+    _populate_distribution(staged_output, profile=selected)
+/home/rockingsisyphus/projects/VibeFlow/distribution/build.py:388: in _populate_distribution
+    _write_kernel_archive(ROOT / "src" / "vibeflow", output / KERNEL_ZIP_RELATIVE)
+/home/rockingsisyphus/projects/VibeFlow/distribution/build.py:771: in _write_kernel_archive
+    with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:1444: in __exit__
+    self.close()
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:2023: in close
+    self._fpclose(fp)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <zipfile.ZipFile [closed]>
+fp = <_io.BufferedRandom name='/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw0/test_staged_validation_failure0/.distribution.vibeflow-build-fv8fub6o/payload/kernel/vibeflow-kernel.zip'>
+
+    def _fpclose(self, fp):
+        assert self._fileRefCnt > 0
+        self._fileRefCnt -= 1
+        if not self._fileRefCnt and not self._filePassed:
+>           fp.close()
+E           OSError: [Errno 122] Disk quota exceeded
+
+/home/rockingsisyphus/miniforge3/lib/python3.13/zipfile/__init__.py:2123: OSError
+_______ test_built_run_keeps_javascript_roots_out_of_lazy_python_imports _______
+[gw1] linux -- Python 3.13.13 /home/rockingsisyphus/miniforge3/bin/python
+
+tmp_path = PosixPath('/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw1/test_built_run_keeps_javascrip0')
+
+    def test_built_run_keeps_javascript_roots_out_of_lazy_python_imports(
+        tmp_path: Path,
+    ) -> None:
+        distribution = tmp_path / "distribution"
+>       build_distribution(distribution, run_self_check=False)
+
+/home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_delegate_cli.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/rockingsisyphus/projects/VibeFlow/distribution/build.py:287: in build_distribution
+    _verify_staged_distribution(staged_output)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+output = PosixPath('/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw1/test_built_run_keeps_javascrip0/.distribution.vibeflow-build-1pze9pdv/payload')
+
+    def _verify_staged_distribution(output: Path) -> None:
+        """Exercise the staged launcher without importing from the source tree."""
+    
+        _verify_profile_assets(output)
+    
+        environment = os.environ.copy()
+        environment["PYTHONDONTWRITEBYTECODE"] = "1"
+        environment.pop("PYTHONPATH", None)
+        checks = (
+            ("kernel integrity", [sys.executable, "run.py", "verify-kernel"]),
+            (
+                "Python minimal project validation",
+                [
+                    sys.executable,
+                    "run.py",
+                    "validate",
+                    "--config",
+                    "python_project/configs/main.jsonc",
+                ],
+            ),
+            (
+                "Python workflow execution probe",
+                [
+                    sys.executable,
+                    "run.py",
+                    "run",
+                    "--config",
+                    "python_project/configs/main.jsonc",
+                    "--input",
+                    "python_project/probe_input.json",
+                    "--run-root",
+                    str(output.parent / "probe-runs"),
+                    "--run-id",
+                    "distribution-probe",
+                ],
+            ),
+        )
+        for label, command in checks:
+            completed = subprocess.run(
+                command,
+                cwd=output,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            if completed.returncode == 0:
+                continue
+            diagnostic = completed.stderr.strip() or completed.stdout.strip()
+>           raise BuildDistributionError(
+                f"staged distribution {label} failed"
+                + (f": {diagnostic}" if diagnostic else "")
+            )
+E           distribution.build.BuildDistributionError: staged distribution Python workflow execution probe failed: Traceback (most recent call last):
+E             File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw1/test_built_run_keeps_javascrip0/.distribution.vibeflow-build-1pze9pdv/payload/run.py", line 248, in <module>
+E               raise SystemExit(main())
+E                                ~~~~^^
+E             File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw1/test_built_run_keeps_javascrip0/.distribution.vibeflow-build-1pze9pdv/payload/run.py", line 189, in main
+E               return kernel_cli_main(kernel_args)
+E             File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw1/test_built_run_keeps_javascrip0/.distribution.vibeflow-build-1pze9pdv/payload/kernel/vibeflow-kernel.zip/vibeflow/tooling/application/cli/__init__.py", line 96, in main
+E               return target_main(raw_args)
+E             File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw1/test_built_run_keeps_javascrip0/.distribution.vibeflow-build-1pze9pdv/payload/kernel/vibeflow-kernel.zip/vibeflow/tooling/application/python/cli/__init__.py", line 165, in main
+E               return handler(args)
+E             File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw1/test_built_run_keeps_javascrip0/.distribution.vibeflow-build-1pze9pdv/payload/kernel/vibeflow-kernel.zip/vibeflow/tooling/application/python/run_observation.py", line 95, in observed
+E               code = function(args)
+E             File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw1/test_built_run_keeps_javascrip0/.distribution.vibeflow-build-1pze9pdv/payload/kernel/vibeflow-kernel.zip/vibeflow/tooling/application/python/cli/__init__.py", line 293, in _handle_run
+E               result = run_workspace_checked(
+E                   Path(args.config),
+E               ...<5 lines>...
+E                   _prepared_run_dir=getattr(args, "_prepared_run_dir", None),
+E               )
+E             File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw1/test_built_run_keeps_javascrip0/.distribution.vibeflow-build-1pze9pdv/payload/kernel/vibeflow-kernel.zip/vibeflow/tooling/application/python/run_observation.py", line 39, in observed
+E               return function(*args, **kwargs)
+E             File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw1/test_built_run_keeps_javascrip0/.distribution.vibeflow-build-1pze9pdv/payload/kernel/vibeflow-kernel.zip/vibeflow/tooling/application/python/workspace_service.py", line 175, in run_workspace_checked
+E               _write_preflight_artifacts(run_dir, graph, compiled, health, registry=env.registry, resources=resources, prepared=presentation)
+E               ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E             File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw1/test_built_run_keeps_javascrip0/.distribution.vibeflow-build-1pze9pdv/payload/kernel/vibeflow-kernel.zip/vibeflow/tooling/application/python/runner.py", line 333, in _write_preflight_artifacts
+E               render_mermaid_svg(mermaid_text, run_dir / "graph.svg")
+E               ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E             File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw1/test_built_run_keeps_javascrip0/.distribution.vibeflow-build-1pze9pdv/payload/kernel/vibeflow-kernel.zip/vibeflow/tooling/presentation/mermaid.py", line 89, in render_mermaid_svg
+E               completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout_seconds)
+E             File "/home/rockingsisyphus/miniforge3/lib/python3.13/subprocess.py", line 556, in run
+E               stdout, stderr = process.communicate(input, timeout=timeout)
+E                                ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+E             File "/home/rockingsisyphus/miniforge3/lib/python3.13/subprocess.py", line 1222, in communicate
+E               stdout, stderr = self._communicate(input, endtime, timeout)
+E                                ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+E             File "/home/rockingsisyphus/miniforge3/lib/python3.13/subprocess.py", line 2155, in _communicate
+E               self._check_timeout(endtime, orig_timeout, stdout, stderr)
+E               ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E             File "/home/rockingsisyphus/miniforge3/lib/python3.13/subprocess.py", line 1269, in _check_timeout
+E               raise TimeoutExpired(
+E               ...<2 lines>...
+E                       stderr=b''.join(stderr_seq) if stderr_seq else None)
+E           subprocess.TimeoutExpired: Command '['/tmp/vf-adaptation-full-accepted/puppeteer/node_modules/.bin/mmdc', '--input', '/tmp/vibeflow-mermaid-9yxsslsg/graph.mmd', '--output', '/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw1/test_built_run_keeps_javascrip0/.distribution.vibeflow-build-1pze9pdv/probe-runs/distribution-probe/graph.svg', '--theme', 'default', '--backgroundColor', 'transparent', '--configFile', '/tmp/vibeflow-mermaid-9yxsslsg/mermaid.json', '--puppeteerConfigFile', '/tmp/vibeflow-mermaid-9yxsslsg/puppeteer.json']' timed out after 60 seconds
+
+/home/rockingsisyphus/projects/VibeFlow/distribution/build.py:633: BuildDistributionError
+________ test_minimal_projects_validate_and_python_probe_reports_scope _________
+[gw2] linux -- Python 3.13.13 /home/rockingsisyphus/miniforge3/bin/python
+
+built_distribution = PosixPath('/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw2/review-docs0/distribution')
+
+    def test_minimal_projects_validate_and_python_probe_reports_scope(
+        built_distribution: Path,
+    ) -> None:
+        for config in (
+            "python_project/configs/main.jsonc",
+            "javascript_project/configs/main.jsonc",
+        ):
+            completed = subprocess.run(
+                [sys.executable, "run.py", "validate", "--config", config, "--json"],
+                cwd=built_distribution,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            if config.startswith("javascript") and "VF_TOOLCHAIN_MISSING" in completed.stdout:
+                continue
+            assert completed.returncode == 0, completed.stderr or completed.stdout
+            payload = json.loads(completed.stdout)
+            assert payload["status"] in {"PASS", "CONCERNS"}
+            assert payload["result_code"].startswith("VIBEFLOW_STRUCTURE_")
+    
+        run_root = built_distribution.parent / "probe-runs"
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "run.py",
+                "run",
+                "--config",
+                "python_project/configs/main.jsonc",
+                "--input",
+                "python_project/probe_input.json",
+                "--run-root",
+                str(run_root),
+                "--run-id",
+                "acceptance-probe",
+            ],
+            cwd=built_distribution,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+>       assert completed.returncode == 0, completed.stderr or completed.stdout
+E       AssertionError: Traceback (most recent call last):
+E           File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw2/review-docs0/distribution/run.py", line 248, in <module>
+E             raise SystemExit(main())
+E                              ~~~~^^
+E           File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw2/review-docs0/distribution/run.py", line 189, in main
+E             return kernel_cli_main(kernel_args)
+E           File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw2/review-docs0/distribution/kernel/vibeflow-kernel.zip/vibeflow/tooling/application/cli/__init__.py", line 96, in main
+E             return target_main(raw_args)
+E           File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw2/review-docs0/distribution/kernel/vibeflow-kernel.zip/vibeflow/tooling/application/python/cli/__init__.py", line 165, in main
+E             return handler(args)
+E           File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw2/review-docs0/distribution/kernel/vibeflow-kernel.zip/vibeflow/tooling/application/python/run_observation.py", line 95, in observed
+E             code = function(args)
+E           File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw2/review-docs0/distribution/kernel/vibeflow-kernel.zip/vibeflow/tooling/application/python/cli/__init__.py", line 293, in _handle_run
+E             result = run_workspace_checked(
+E                 Path(args.config),
+E             ...<5 lines>...
+E                 _prepared_run_dir=getattr(args, "_prepared_run_dir", None),
+E             )
+E           File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw2/review-docs0/distribution/kernel/vibeflow-kernel.zip/vibeflow/tooling/application/python/run_observation.py", line 39, in observed
+E             return function(*args, **kwargs)
+E           File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw2/review-docs0/distribution/kernel/vibeflow-kernel.zip/vibeflow/tooling/application/python/workspace_service.py", line 175, in run_workspace_checked
+E             _write_preflight_artifacts(run_dir, graph, compiled, health, registry=env.registry, resources=resources, prepared=presentation)
+E             ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw2/review-docs0/distribution/kernel/vibeflow-kernel.zip/vibeflow/tooling/application/python/runner.py", line 333, in _write_preflight_artifacts
+E             render_mermaid_svg(mermaid_text, run_dir / "graph.svg")
+E             ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw2/review-docs0/distribution/kernel/vibeflow-kernel.zip/vibeflow/tooling/presentation/mermaid.py", line 89, in render_mermaid_svg
+E             completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout_seconds)
+E           File "/home/rockingsisyphus/miniforge3/lib/python3.13/subprocess.py", line 556, in run
+E             stdout, stderr = process.communicate(input, timeout=timeout)
+E                              ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/home/rockingsisyphus/miniforge3/lib/python3.13/subprocess.py", line 1222, in communicate
+E             stdout, stderr = self._communicate(input, endtime, timeout)
+E                              ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/home/rockingsisyphus/miniforge3/lib/python3.13/subprocess.py", line 2155, in _communicate
+E             self._check_timeout(endtime, orig_timeout, stdout, stderr)
+E             ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/home/rockingsisyphus/miniforge3/lib/python3.13/subprocess.py", line 1269, in _check_timeout
+E             raise TimeoutExpired(
+E             ...<2 lines>...
+E                     stderr=b''.join(stderr_seq) if stderr_seq else None)
+E         subprocess.TimeoutExpired: Command '['/tmp/vf-adaptation-full-accepted/puppeteer/node_modules/.bin/mmdc', '--input', '/tmp/vibeflow-mermaid-yzx3m5t9/graph.mmd', '--output', '/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw2/review-docs0/probe-runs/acceptance-probe/graph.svg', '--theme', 'default', '--backgroundColor', 'transparent', '--configFile', '/tmp/vibeflow-mermaid-yzx3m5t9/mermaid.json', '--puppeteerConfigFile', '/tmp/vibeflow-mermaid-yzx3m5t9/puppeteer.json']' timed out after 60 seconds
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/home/rockingsisyphus/miniforge3/bin/python', 'run.py', 'run', '--config', 'python_project/con....json\', \'--puppeteerConfigFile\', \'/tmp/vibeflow-mermaid-yzx3m5t9/puppeteer.json\']\' timed out after 60 seconds\n').returncode
+
+/home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_review_docs.py:231: AssertionError
+_ test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_core_trace _
+[gw1] linux -- Python 3.13.13 /home/rockingsisyphus/miniforge3/bin/python
+
+tmp_path = PosixPath('/tmp/pytest-of-rockingsisyphus/pytest-311/popen-gw1/test_built_delegate_cli_uses_e0')
+
+    def test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_core_trace(
+        tmp_path: Path,
+    ) -> None:
+        distribution = tmp_path / "distribution"
+        build_distribution(distribution, run_self_check=False)
+        (distribution / "python_project" / "lazy_helper.py").write_text("CODE = 7\n", encoding="utf-8")
+    
+        custom = tmp_path / "custom"
+        project = custom / "project"
+        nodes = project / "nodes"
+        nodes.mkdir(parents=True)
+        (nodes / "__init__.py").write_text("", encoding="utf-8")
+        (project / "lazy_helper.py").write_text("CODE = 13\n", encoding="utf-8")
+        (custom / "vibeflow_config.jsonc").write_text(
+            json.dumps(
+                {
+                    "policy": {},
+                    "roots": [{"id": "custom", "path": "project"}],
+                }
+            ),
+            encoding="utf-8",
+        )
+        (project / "vibeflow_project.jsonc").write_text(
+            json.dumps(
+                {
+                    "project_target": "python",
+                    "descriptors": {"nodes": ["manifests/nodes"]},
+                    "quality_enabled": False,
+                }
+            ),
+            encoding="utf-8",
+        )
+        (nodes / "cli_nodes.py").write_text(
+            textwrap.dedent(
+                """
+                class StartNode:
+                    def run_pure(self, inputs, params):
+                        return {}
+    
+                class ExitNode:
+                    def run_pure(self, inputs, params):
+                        import lazy_helper
+                        print(lazy_helper.__file__)
+                        return {"cli.exit_code": lazy_helper.CODE}
+    
+                class EndNode:
+                    def run_pure(self, inputs, params):
+                        return {}
+                """
+            ).lstrip(),
+            encoding="utf-8",
+        )
+        _write_node_declarations(project, "nodes/cli_nodes.py", (
+            ("custom.start", "StartNode", "terminal", {"examples": [{"inputs": {}, "params": {}}]}, ["vibeflow.process"]),
+            ("custom.exit", "ExitNode", "io", {
+                "requires": [_required("cli.argv")], "provides": [_provided("cli.exit_code")],
+                "input_semantics": {"cli.argv": ["business argv"]},
+                "output_semantics": {"cli.exit_code": ["business exit"]},
+                "examples": [_example("cli.argv", [])],
+            }, ["vibeflow.io"]),
+            ("custom.end", "EndNode", "terminal", {
+                "requires": [_required("cli.exit_code")],
+                "input_semantics": {"cli.exit_code": ["business exit"]},
+                "examples": [_example("cli.exit_code", 0)],
+            }, ["vibeflow.process"]),
+        ))
+        config = project / "main.jsonc"
+        config.write_text(
+            json.dumps(
+                {
+                    "pipeline": {
+                        "inputs": [{"key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
+                        "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit"}],
+                        "nodes": [
+                            {"id": "start", "type_used": "custom.start", "display_name": "Start", "description": "Starts the custom delegated CLI workflow."},
+                            {
+                                "id": "exit",
+                                "type_used": "custom.exit",
+                                "display_name": "Exit",
+                                "description": "Loads the custom project helper and returns its exit code.",
+                            },
+                            {
+                                "id": "end",
+                                "type_used": "custom.end",
+                                "display_name": "End",
+                                "description": "Consumes the delegated CLI exit code.",
+                            },
+                        ],
+                        "edges": [["start", "exit"], ["exit", "end"]],
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        run_root = tmp_path / "runs"
+        env = dict(os.environ)
+        env["VIBEFLOW_CONFIG_TRACE"] = "1"
+    
+        from tests.fixtures.support.code_plugins import prepare_config_fixture
+        prepare_config_fixture(config)
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(distribution / "run.py"),
+                "delegate-cli",
+                "--workspace",
+                str(custom / "vibeflow_config.jsonc"),
+                "--config",
+                str(config),
+                "--run-root",
+                str(run_root),
+                "--run-id",
+                "custom-workspace",
+                "--",
+            ],
+            cwd=distribution,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    
+>       assert completed.returncode == 13
+E       assert 1 == 13
+E        +  where 1 = CompletedProcess(args=['/home/rockingsisyphus/miniforge3/bin/python', '/tmp/pytest-of-rockingsisyphus/pytest-311/popen...servation.py", line 188, in close\n    stream.close()\n    ~~~~~~~~~~~~^^\nOSError: [Errno 122] Disk quota exceeded\n').returncode
+
+/home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_delegate_cli.py:471: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_profiles.py::test_release_set_publication_rolls_back_all_four_targets
+FAILED ../../../home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_release.py::test_distribution_renderer_reviews_minimal_javascript_workflow
+FAILED ../../../home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_release.py::test_built_launcher_loads_kernel_before_a_root_shadow_package
+FAILED ../../../home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_release.py::test_staged_validation_failure_preserves_existing_release_pair
+FAILED ../../../home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_delegate_cli.py::test_built_run_keeps_javascript_roots_out_of_lazy_python_imports
+FAILED ../../../home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_review_docs.py::test_minimal_projects_validate_and_python_probe_reports_scope
+FAILED ../../../home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_delegate_cli.py::test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_core_trace
+7 failed, 32 passed in 76.61s (0:01:16)

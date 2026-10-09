@@ -1,0 +1,11 @@
+
+added 4 packages, and audited 5 packages in 1s
+
+found 0 vulnerabilities
+$ /home/rockingsisyphus/miniforge3/bin/python -m pytest -q -p no:cacheprovider -p pytest_workdirs -p xdist.plugin -n 4 --dist loadfile /home/rockingsisyphus/projects/VibeFlow/tests/block_compiler/strict_portable_plan.py /home/rockingsisyphus/projects/VibeFlow/tests/conformance/test_portable_conformance.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/python/strict_graph_runtime_guardrails.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/strict_aot_interfaces.py /home/rockingsisyphus/projects/VibeFlow/tests/targets/javascript/strict_aot_project_build.py
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 77%]
+.............s.......                                                    [100%]
+92 passed, 1 skipped in 9.87s

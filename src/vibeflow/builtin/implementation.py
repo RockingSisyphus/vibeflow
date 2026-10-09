@@ -83,8 +83,6 @@ def check_node_implementation(
         key = {"max_functions": "function_count", "max_branches": "branch_count", "max_nesting_depth": "max_nesting_depth", "max_params": "param_count", "max_contract_keys": "contract_key_count"}[name]
         findings.append(_node_finding(f"complexity_{name}", "error", f"node {key} is {actual} > policy limit {limit}", fix_type, {key: actual, "limit": limit, "metrics": dict(metrics.report_metrics)}))
     chain = metrics.call_chain
-    for path in chain.recursive_paths:
-        findings.append(_node_finding("recursive_call_chain", "error", "node internal helper calls must not be recursive: " + " -> ".join(path), "split_node", {"path": list(path), "metrics": dict(metrics.report_metrics)}))
     if chain.length > limits.max_call_chain_length:
         findings.append(_node_finding("call_chain_too_deep", "error", f"node internal call chain length is {chain.length} > {limits.max_call_chain_length}", "split_node", {"length": chain.length, "limit": limits.max_call_chain_length, "path": list(chain.path)}))
     elif chain.length >= limits.warn_call_chain_length:
@@ -145,7 +143,7 @@ def _node_finding(
     code: str, severity: str, message: str, suggested_fix_type: str,
     details: Mapping[str, object],
 ) -> ImplementationFinding:
-    prefix = "NODE.MAINTAINABILITY" if code.startswith("complexity_") or code in {"call_chain_too_deep", "recursive_call_chain"} else "NODE.PURITY"
+    prefix = "NODE.MAINTAINABILITY" if code.startswith("complexity_") or code == "call_chain_too_deep" else "NODE.PURITY"
     return ImplementationFinding(code, f"{prefix}.{code.upper()}", severity, message, suggested_fix_type, details)
 
 

@@ -251,20 +251,18 @@ print(json.dumps(sorted(
     assert json.loads(completed.stdout) == []
 
 
-def test_abi_v4_serializes_runtime_dispatch_global_state_and_locks() -> None:
+def test_abi_v5_serializes_global_state_and_locks_without_dispatch() -> None:
     facts = ImplementationFacts(
         (
             ImplementationFact(
                 "fixture.state",
                 flow_kind=FLOW_KIND_GLOBAL_STATE,
                 effect_scope=EFFECT_SCOPE_GLOBAL_STATE,
-                runtime_dispatch=True,
             ),
             ImplementationFact(
                 "fixture.step",
                 flow_kind="process",
                 effect_scope="none",
-                runtime_dispatch=False,
             ),
         ),
         strict=True,
@@ -286,7 +284,7 @@ def test_abi_v4_serializes_runtime_dispatch_global_state_and_locks() -> None:
     payload = plan.to_dict()
     root = plan.block(plan.entry_block)
 
-    assert plan.abi_version == WORKFLOW_ABI_VERSION == "vibeflow.workflow.v4"
+    assert plan.abi_version == WORKFLOW_ABI_VERSION == "vibeflow.workflow.v5"
     assert plan.contains_global_state is True
     assert "root_exclusive" not in payload
     assert payload["execution_lock"] == {"key": "trainer", "scope": "root"}
@@ -294,9 +292,9 @@ def test_abi_v4_serializes_runtime_dispatch_global_state_and_locks() -> None:
     assert "root_exclusive" not in root.to_dict()
     state = root.node("state")
     assert state.effect_scope == EFFECT_SCOPE_GLOBAL_STATE
-    assert state.runtime_dispatch is True
+    assert "runtime_dispatch" not in state.to_dict()
     assert state.contains_global_state is True
-    assert root.node("step").runtime_dispatch is False
+    assert "runtime_dispatch" not in root.node("step").to_dict()
     assert root.node("step").execution_lock.to_dict() == {
         "key": "trainer",
         "scope": "node",

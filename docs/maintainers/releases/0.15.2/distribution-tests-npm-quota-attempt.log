@@ -1,0 +1,47 @@
+
+added 4 packages, and audited 5 packages in 1s
+
+found 0 vulnerabilities
+$ /home/rockingsisyphus/miniforge3/bin/python -m pytest -q -p no:cacheprovider -p pytest_workdirs -p xdist.plugin -n 8 --dist loadfile /home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_release.py /home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_profiles.py /home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_review_docs.py /home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_delegate_cli.py
+bringing up nodes...
+bringing up nodes...
+
+............................F..........                                  [100%]
+=================================== FAILURES ===================================
+________ test_distribution_renderer_reviews_minimal_javascript_workflow ________
+[gw0] linux -- Python 3.13.13 /home/rockingsisyphus/miniforge3/bin/python
+
+tmp_path = PosixPath('/home/rockingsisyphus/.cache/vf/0152tmp/pytest-of-rockingsisyphus/pytest-0/popen-gw0/test_distribution_renderer_rev0')
+
+    def test_distribution_renderer_reviews_minimal_javascript_workflow(
+        tmp_path: Path,
+    ) -> None:
+        distribution = distribution_builder.build_distribution(
+            tmp_path / "distribution",
+            run_self_check=False,
+        )
+        for relative in (
+            "javascript_project",
+            "kernel/tools/mermaid-renderer",
+        ):
+            completed = subprocess.run(
+                ["npm", "ci"],
+                cwd=distribution / relative,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+>           assert completed.returncode == 0, completed.stderr or completed.stdout
+E           AssertionError: npm error code Unknown system error -122
+E             npm error syscall write
+E             npm error errno -122
+E             npm error Unknown system error -122: Unknown system error -122, write
+E             npm error A complete log of this run can be found in: /tmp/vibeflow-npm-cache/_logs/2026-10-06T07_25_56_967Z-debug-0.log
+E             
+E           assert 134 == 0
+E            +  where 134 = CompletedProcess(args=['npm', 'ci'], returncode=134, stdout='', stderr='npm error code Unknown system error -122\nnpm ...rror A complete log of this run can be found in: /tmp/vibeflow-npm-cache/_logs/2026-10-06T07_25_56_967Z-debug-0.log\n').returncode
+
+/home/rockingsisyphus/projects/VibeFlow/tests/integration/strict_distribution_release.py:177: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../projects/VibeFlow/tests/integration/strict_distribution_release.py::test_distribution_renderer_reviews_minimal_javascript_workflow
+1 failed, 38 passed in 28.41s

@@ -1,0 +1,18 @@
+{
+  "recorded_utc": "2026-10-08T15:01:03.534325+00:00",
+  "status": "intermediate_observation_not_final_acceptance",
+  "snapshot": "after-F05",
+  "tag": "source-fixed",
+  "observed_summary": "source-fixed-summary.json",
+  "observed_summary_sha256": "126026cb870c2fe31e594c977e0c7c11294e0a89bf981349cd9cf23d0e4b0bdb",
+  "successful_replay_history_modified": false,
+  "observed_regression_checks": 701,
+  "observed_regression_check_mismatches": 0,
+  "observed_raw36_count": 36,
+  "observed_raw36_expectation_mismatches": 4,
+  "observed_clear3_existing_boundary_mismatches": 1,
+  "blocking_new_counterexample": "Root confirmed public closure false rejection from repeated parameter-facts collection of nested functions. Outermost function root selection and controls are being repaired separately.",
+  "final_acceptance": false,
+  "packaged_replay_started": false,
+  "next_snapshot_and_tag": "A separately authorized after-F05-02 snapshot and source-fixed-02 tag; never overwrite the first snapshot/reports."
+}

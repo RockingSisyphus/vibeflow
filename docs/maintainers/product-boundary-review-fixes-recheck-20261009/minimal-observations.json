@@ -1,0 +1,56 @@
+[
+  {
+    "case": "global_for_target",
+    "before_global": "1",
+    "after_global": "2",
+    "global_changed": true
+  },
+  {
+    "case": "global_function_binding",
+    "before_global": "1",
+    "after_global": "<function VERSION at 0x7ebc27f27240>",
+    "global_changed": true
+  },
+  {
+    "case": "global_import_binding",
+    "before_global": "1",
+    "after_global": "<module 'math' from '/home/rockingsisyphus/miniforge3/lib/python3.13/lib-dynload/math.cpython-313-x86_64-linux-gnu.so'>",
+    "global_changed": true
+  },
+  {
+    "case": "global_class_binding",
+    "before_global": "1",
+    "after_global": "<class 'VERSION'>",
+    "global_changed": true
+  },
+  {
+    "case": "global_with_target",
+    "before_global": "1",
+    "after_global": "2",
+    "global_changed": true
+  },
+  {
+    "case": "global_explicit_assignment_control",
+    "before_global": "1",
+    "after_global": "2",
+    "global_changed": true
+  },
+  {
+    "case": "local_for_target_control",
+    "before_global": "1",
+    "after_global": "1",
+    "global_changed": false
+  },
+  {
+    "case": "readonly_global_control",
+    "before_global": "1",
+    "after_global": "1",
+    "global_changed": false
+  },
+  {
+    "case": "alternate_branch_rebind",
+    "original_inputs_after_else": {
+      "x": 1
+    }
+  }
+]

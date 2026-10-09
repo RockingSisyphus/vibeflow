@@ -1,0 +1,379 @@
+{
+  "status": "PASS",
+  "errors": [],
+  "warnings": [],
+  "skipped": [],
+  "info": {
+    "explicit_edges": [
+      [
+        "start",
+        "task"
+      ],
+      [
+        "task",
+        "end"
+      ]
+    ],
+    "data_edges": [],
+    "effective_edges": [
+      [
+        "start",
+        "task"
+      ],
+      [
+        "task",
+        "end"
+      ]
+    ],
+    "mainline": {
+      "pipeline": {
+        "owner": "pipeline",
+        "mainline_edges": [
+          {
+            "from": "start",
+            "to": "task"
+          },
+          {
+            "from": "task",
+            "to": "end"
+          }
+        ],
+        "data_bypass_edges": [],
+        "async_edges": [],
+        "schedule_edges": [
+          {
+            "from": "start",
+            "to": "task"
+          },
+          {
+            "from": "task",
+            "to": "end"
+          }
+        ],
+        "transfer_edges": [
+          {
+            "from": "start",
+            "to": "task"
+          },
+          {
+            "from": "task",
+            "to": "end"
+          }
+        ],
+        "mainline_nodes": [
+          "start",
+          "task",
+          "end"
+        ],
+        "async_nodes": [],
+        "findings": []
+      }
+    },
+    "node_metrics": {},
+    "node_effect_scopes": {
+      "start": "unconstrained",
+      "task": "unconstrained",
+      "end": "unconstrained"
+    },
+    "call_effect_policies": [],
+    "nodeset_findings": {},
+    "plugins": {
+      "plugins": []
+    },
+    "planned": [],
+    "production_ready": true,
+    "rule_executions": [
+      {
+        "status": "PASS",
+        "plan": {
+          "ruleset_id": "probe.selected",
+          "entrypoint": "static",
+          "order": [
+            "selected"
+          ],
+          "calls": [
+            {
+              "id": "selected",
+              "rule_id": "vibeflow.input_writes",
+              "original_rule_id": "vibeflow.input_writes",
+              "params": {
+                "mutating_methods": [
+                  "append",
+                  "clear",
+                  "extend",
+                  "insert",
+                  "pop",
+                  "popitem",
+                  "remove",
+                  "setdefault",
+                  "sort",
+                  "update"
+                ]
+              },
+              "dependencies": [],
+              "inputs": {},
+              "origins": [
+                "probe.selected"
+              ],
+              "parameter_sources": {
+                "mutating_methods": "default:vibeflow.input_writes"
+              }
+            }
+          ],
+          "relations": []
+        },
+        "results": {
+          "selected": {
+            "state": "completed",
+            "records": {},
+            "findings": []
+          }
+        },
+        "findings": [],
+        "executed": [
+          "selected"
+        ],
+        "aliases": {}
+      },
+      {
+        "status": "PASS",
+        "plan": {
+          "ruleset_id": "vibeflow.workflow",
+          "entrypoint": "static",
+          "order": [
+            "workflow"
+          ],
+          "calls": [
+            {
+              "id": "workflow",
+              "rule_id": "vibeflow.workflow",
+              "original_rule_id": "vibeflow.workflow",
+              "params": {
+                "nodeset_max_depth": 4,
+                "nodeset_warn_width": 10
+              },
+              "dependencies": [],
+              "inputs": {},
+              "origins": [
+                "vibeflow.workflow"
+              ],
+              "parameter_sources": {
+                "nodeset_max_depth": "default:vibeflow.workflow",
+                "nodeset_warn_width": "default:vibeflow.workflow"
+              }
+            }
+          ],
+          "relations": []
+        },
+        "results": {
+          "workflow": {
+            "state": "completed",
+            "records": {
+              "planned_events": {
+                "type_id": "vibeflow.planned_events.v1",
+                "value": []
+              },
+              "workflow_review": {
+                "type_id": "vibeflow.workflow_review.v1",
+                "value": {
+                  "mainline": {
+                    "pipeline": {
+                      "owner": "pipeline",
+                      "mainline_edges": [
+                        {
+                          "from": "start",
+                          "to": "task"
+                        },
+                        {
+                          "from": "task",
+                          "to": "end"
+                        }
+                      ],
+                      "data_bypass_edges": [],
+                      "async_edges": [],
+                      "schedule_edges": [
+                        {
+                          "from": "start",
+                          "to": "task"
+                        },
+                        {
+                          "from": "task",
+                          "to": "end"
+                        }
+                      ],
+                      "transfer_edges": [
+                        {
+                          "from": "start",
+                          "to": "task"
+                        },
+                        {
+                          "from": "task",
+                          "to": "end"
+                        }
+                      ],
+                      "mainline_nodes": [
+                        "start",
+                        "task",
+                        "end"
+                      ],
+                      "async_nodes": [],
+                      "findings": []
+                    }
+                  },
+                  "definition_review_reused": false
+                }
+              }
+            },
+            "findings": []
+          }
+        },
+        "findings": [],
+        "executed": [
+          "workflow"
+        ],
+        "aliases": {}
+      }
+    ],
+    "workflow_rulesets": [
+      "vibeflow.workflow"
+    ],
+    "nodeset_imports": [],
+    "resources": {
+      "global_config": {},
+      "base_lib": {
+        "modules": []
+      },
+      "plugins": [],
+      "host_extensions": []
+    },
+    "effective_resources": {
+      "global_config": {},
+      "base_lib": {
+        "modules": []
+      },
+      "plugins": [],
+      "host_extensions": []
+    },
+    "available_resources": {
+      "global_config": {},
+      "base_lib": {
+        "modules": []
+      },
+      "plugins": [],
+      "host_extensions": []
+    },
+    "workspace": {
+      "path": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/cli/linear_rebinding/vibeflow_config.jsonc",
+      "roots": [
+        {
+          "id": "probe",
+          "path": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/cli/linear_rebinding",
+          "config": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/cli/linear_rebinding/vibeflow_project.jsonc",
+          "project_target": "python",
+          "quality_enabled": true
+        }
+      ]
+    }
+  },
+  "effective_policy": {
+    "node_source": {
+      "max_lines": 500,
+      "max_bytes": 60000,
+      "warn_lines": 450,
+      "warn_bytes": 54000
+    },
+    "complexity": {
+      "max_functions": null,
+      "max_branches": null,
+      "max_nesting_depth": null,
+      "max_params": null,
+      "max_contract_keys": null
+    },
+    "maintainability": {
+      "warn_call_chain_length": 4,
+      "max_call_chain_length": 4,
+      "warn_dependency_chain_length": 4,
+      "max_dependency_chain_length": 6
+    },
+    "imports": {},
+    "sources": [
+      "kernel.default_policy",
+      "workspace.policy:/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/cli/linear_rebinding/vibeflow_config.jsonc"
+    ]
+  },
+  "result_code": "VIBEFLOW_STRUCTURE_PASS",
+  "validation_scope": "vibeflow_structure",
+  "summary": "VibeFlow 结构检查通过",
+  "checked": [
+    {
+      "id": "config_registration",
+      "label": "配置和登记关系"
+    },
+    {
+      "id": "node_contract_shape",
+      "label": "节点契约形状"
+    },
+    {
+      "id": "data_reachability",
+      "label": "数据可达性"
+    },
+    {
+      "id": "control_flow",
+      "label": "控制流"
+    },
+    {
+      "id": "project_structure",
+      "label": "项目结构"
+    },
+    {
+      "id": "direct_input_writes",
+      "label": "所选有限 Python 输入写入检查"
+    }
+  ],
+  "not_checked": [
+    {
+      "id": "business_correctness",
+      "label": "业务结果正确性"
+    },
+    {
+      "id": "code_security",
+      "label": "代码安全性"
+    },
+    {
+      "id": "general_execution_semantics",
+      "label": "通用业务执行语义"
+    },
+    {
+      "id": "determinism",
+      "label": "算法确定性"
+    },
+    {
+      "id": "all_side_effects",
+      "label": "全部副作用排除证明"
+    },
+    {
+      "id": "requirements_conformance",
+      "label": "项目需求符合性"
+    },
+    {
+      "id": "external_semantics",
+      "label": "外部接口业务语义"
+    },
+    {
+      "id": "domain_data_correctness",
+      "label": "领域数据正确性"
+    },
+    {
+      "id": "effect_boundaries",
+      "label": "所选效果政策的明确边界"
+    },
+    {
+      "id": "node_relationships",
+      "label": "所选 Node 源码关系检查"
+    },
+    {
+      "id": "source_quality",
+      "label": "源码质量与依赖结构"
+    }
+  ]
+}

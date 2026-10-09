@@ -1,0 +1,103 @@
+{
+  "count": 3,
+  "mismatches": 2,
+  "input_tracking_sha256": "fd3e683ca3624367d7ff594780c68ff46815238a1fc31fa3cf40b554d6f38d57",
+  "changed_during_probe": false,
+  "rows": [
+    {
+      "case": "called_nested_clear",
+      "source": "class Task:\n    def run_pure(self,inputs,params):\n        alias=inputs\n        def clear():\n            nonlocal alias\n            alias={}\n        clear()\n        alias.pop('seed',None)\n        return {}\n",
+      "expected": false,
+      "actual": true,
+      "matched": false,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/writeback_summary.py",
+            "line": 8,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ],
+      "calls": [
+        {
+          "source": "/virtual/writeback_summary.py:Task.run_pure",
+          "target": "/virtual/writeback_summary.py:Task.run_pure.clear",
+          "line": 7,
+          "column": 9
+        }
+      ]
+    },
+    {
+      "case": "nested_write_then_clear",
+      "source": "class Task:\n    def run_pure(self,inputs,params):\n        alias={}\n        def bind():\n            nonlocal alias\n            alias=inputs\n            alias={}\n        bind()\n        alias.pop('seed',None)\n        return {}\n",
+      "expected": false,
+      "actual": true,
+      "matched": false,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/writeback_summary.py",
+            "line": 9,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ],
+      "calls": [
+        {
+          "source": "/virtual/writeback_summary.py:Task.run_pure",
+          "target": "/virtual/writeback_summary.py:Task.run_pure.bind",
+          "line": 8,
+          "column": 9
+        }
+      ]
+    },
+    {
+      "case": "uncalled_nested_clear",
+      "source": "class Task:\n    def run_pure(self,inputs,params):\n        alias=inputs\n        def clear():\n            nonlocal alias\n            alias={}\n        alias.pop('seed',None)\n        return {}\n",
+      "expected": true,
+      "actual": true,
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/writeback_summary.py",
+            "line": 7,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ],
+      "calls": []
+    }
+  ]
+}

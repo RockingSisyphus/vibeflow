@@ -25,7 +25,7 @@ def test_node_base_lib_dependency_chain_warning_and_error(tmp_path, capsys, monk
     )
     descriptor, library = _chain_declarations(["a", "b", "c", "d"])
     code, payload = _inspect_node_source(tmp_path, capsys, source, descriptor=descriptor, additional_nodes=[library])
-    assert code == 0
+    assert code == 0, payload
     assert payload["health"]["status"] == "CONCERNS"
     warning = next(item for item in payload["health"]["warnings"] if item["rule_id"] == "NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP")
     assert warning["details"]["longest_chain_length"] == 5

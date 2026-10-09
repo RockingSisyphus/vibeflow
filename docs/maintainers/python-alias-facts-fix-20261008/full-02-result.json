@@ -1,0 +1,100 @@
+{
+  "raw_verification": {
+    "steps": [
+      {
+        "step": "repository-quality",
+        "status": "failed",
+        "error": "Command '('/home/rockingsisyphus/miniforge3/bin/python', 'quality/run.py', '--profile', 'all')' returned non-zero exit status 1.",
+        "seconds": 11.960692718042992
+      },
+      {
+        "step": "compileall",
+        "status": "passed",
+        "seconds": 1.98631711298367
+      },
+      {
+        "step": "pytest",
+        "status": "passed",
+        "seconds": 269.94068086205516
+      },
+      {
+        "step": "python-sandbox",
+        "status": "passed",
+        "seconds": 645.7438140480081
+      },
+      {
+        "step": "javascript-minimal",
+        "status": "passed",
+        "seconds": 13.322170123981778
+      },
+      {
+        "step": "javascript-integration",
+        "status": "passed",
+        "seconds": 150.8053820420173
+      },
+      {
+        "step": "rule-regression-sandboxes",
+        "status": "passed",
+        "seconds": 1030.2578594569932
+      },
+      {
+        "step": "runtime-observation-browser",
+        "status": "passed",
+        "seconds": 4.534368155000266
+      },
+      {
+        "step": "review-layout-sandbox",
+        "status": "passed",
+        "seconds": 29.115369184990413
+      },
+      {
+        "step": "resource-sections-sandbox",
+        "status": "passed",
+        "seconds": 82.19788005197188
+      },
+      {
+        "step": "review-performance-sandbox",
+        "status": "passed",
+        "seconds": 120.77093733201036
+      },
+      {
+        "step": "adaptation-regression-sandbox",
+        "status": "passed",
+        "seconds": 125.37647434801329
+      },
+      {
+        "step": "wheel-isolation",
+        "status": "passed",
+        "seconds": 8.671681387000717
+      },
+      {
+        "step": "generated-artifact-cleanup",
+        "status": "passed",
+        "seconds": 0.20448854297865182
+      },
+      {
+        "step": "distribution",
+        "status": "passed",
+        "seconds": 22.068260094965808
+      },
+      {
+        "step": "repository-quality-final",
+        "status": "passed",
+        "seconds": 8.45598546799738
+      },
+      {
+        "step": "clean-tree",
+        "status": "passed",
+        "seconds": 0.13652430102229118
+      }
+    ],
+    "failures": [
+      "repository-quality failed: Command '('/home/rockingsisyphus/miniforge3/bin/python', 'quality/run.py', '--profile', 'all')' returned non-zero exit status 1."
+    ]
+  },
+  "official_exit_code": 1,
+  "frozen_validation_input_count": 2336,
+  "changed_frozen_validation_inputs": [],
+  "raw_failures_preserved": true,
+  "failure_explanation": "Only initial repository-quality: tools/__pycache__. Stage14 removed it; stage16 repository-quality-final and stage17 clean-tree passed. No source/test/config change."
+}

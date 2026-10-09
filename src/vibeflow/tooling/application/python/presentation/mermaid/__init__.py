@@ -102,7 +102,7 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph, *, resou
                 "planned_behavior": node.planned_behavior.to_dict(),
                 "flow_kind": node_flow_kind(node, compiled),
                 "effect_scope": node_review_effect_scope(graph, node, None, compiled=compiled),
-                "runtime_dispatch": _runtime_dispatch_label(node, compiled),
+
                 "execution_lock": (
                     node.execution_lock.to_dict()
                     if node.execution_lock is not None
@@ -566,9 +566,7 @@ class _MermaidRenderer:
             effect_scope = node_review_effect_scope(graph, node, self.registry, compiled=compiled)
             if effect_scope != EFFECT_SCOPE_NONE:
                 call_lines.append(f"effect_scope: {effect_scope}")
-            call_lines.append(
-                f"runtime_dispatch: {_runtime_dispatch_label(node, compiled)}"
-            )
+
             call_lines.extend(
                 _execution_lock_lines(
                     effective_lock,
@@ -618,9 +616,7 @@ class _MermaidRenderer:
             effect_scope = node_review_effect_scope(graph, node, self.registry, compiled=compiled)
             if effect_scope != EFFECT_SCOPE_NONE:
                 call_lines.append(f"effect_scope: {effect_scope}")
-            call_lines.append(
-                f"runtime_dispatch: {_runtime_dispatch_label(node, compiled)}"
-            )
+
             call_lines.extend(
                 _execution_lock_lines(
                     effective_lock,
@@ -680,9 +676,7 @@ class _MermaidRenderer:
         effect_scope = node_review_effect_scope(graph, node, self.registry, compiled=compiled)
         if effect_scope != EFFECT_SCOPE_NONE:
             lines.append(f"effect_scope: {effect_scope}")
-        lines.append(
-            f"runtime_dispatch: {_runtime_dispatch_label(node, compiled)}"
-        )
+
         lines.extend(
             _execution_lock_lines(
                 effective_lock,
@@ -706,18 +700,6 @@ def _execution_lock_lines(
     return (f"execution_lock: {key} ({suffix})",)
 
 
-def _runtime_dispatch_label(
-    node: NodeSpec,
-    compiled: CompiledGraph,
-) -> str:
-    if node.status == STATUS_PLANNED:
-        return "unknown"
-    value = getattr(compiled, "runtime_dispatches", {}).get(node.id)
-    if value is True:
-        return "detected"
-    if value is False:
-        return "none"
-    return "unknown"
 
 
 def _effective_execution_lock_payload(

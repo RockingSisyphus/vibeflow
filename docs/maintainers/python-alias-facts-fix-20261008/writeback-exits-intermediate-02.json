@@ -1,0 +1,119 @@
+{
+  "origin": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-02/vibeflow/__init__.py",
+  "package_root": "/home/rockingsisyphus/projects/VibeFlow/dist/python-alias-facts-validation-20261008/after-source-02",
+  "foreign_modules": {},
+  "count": 3,
+  "mismatches": 0,
+  "input_tracking_sha256": "febe68977fa79de00219a99d8502a7aeb8fe593404ae23caf6957ba8f1b0dbab",
+  "changed_during_probe": false,
+  "rows": [
+    {
+      "case": "nested_return_before_clear",
+      "source": "class Task:\n    def run_pure(self,inputs,params):\n        alias={}\n        def bind():\n            nonlocal alias\n            alias=inputs\n            return\n            alias={}\n        bind()\n        alias.pop('seed',None)\n        return {}\n",
+      "expected": true,
+      "actual": true,
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/writeback_summary.py",
+            "line": 10,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ],
+      "calls": [
+        {
+          "source": "/virtual/writeback_summary.py:Task.run_pure",
+          "target": "/virtual/writeback_summary.py:Task.run_pure.bind",
+          "line": 9,
+          "column": 9
+        }
+      ]
+    },
+    {
+      "case": "nested_raise_before_clear",
+      "source": "class Task:\n    def run_pure(self,inputs,params):\n        alias={}\n        def bind():\n            nonlocal alias\n            alias=inputs\n            raise KeyError('seed')\n            alias={}\n        try:\n            bind()\n        except KeyError:\n            alias.pop('seed',None)\n        return {}\n",
+      "expected": true,
+      "actual": true,
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/writeback_summary.py",
+            "line": 12,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ],
+      "calls": [
+        {
+          "source": "/virtual/writeback_summary.py:Task.run_pure",
+          "target": "/virtual/writeback_summary.py:Task.run_pure.bind",
+          "line": 10,
+          "column": 13
+        }
+      ]
+    },
+    {
+      "case": "nested_call_before_clear",
+      "source": "class Task:\n    def run_pure(self,inputs,params):\n        alias={}\n        def fallible():\n            return params['flag']\n        def bind():\n            nonlocal alias\n            alias=inputs\n            fallible()\n            alias={}\n        try:\n            bind()\n        except KeyError:\n            alias.pop('seed',None)\n        return {}\n",
+      "expected": true,
+      "actual": true,
+      "matched": true,
+      "findings": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "example.task",
+          "source_location": {
+            "path": "/virtual/writeback_summary.py",
+            "line": 14,
+            "column": 13
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs via pop",
+          "suggested_fix_type": "fix_node",
+          "details": {}
+        }
+      ],
+      "calls": [
+        {
+          "source": "/virtual/writeback_summary.py:Task.run_pure",
+          "target": "/virtual/writeback_summary.py:Task.run_pure.bind",
+          "line": 12,
+          "column": 13
+        },
+        {
+          "source": "/virtual/writeback_summary.py:Task.run_pure.bind",
+          "target": "/virtual/writeback_summary.py:Task.run_pure.fallible",
+          "line": 9,
+          "column": 13
+        }
+      ]
+    }
+  ]
+}

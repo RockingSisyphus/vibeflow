@@ -252,7 +252,7 @@ def _node_document(
         "metadata": dict(descriptor.metadata) if descriptor is not None else {},
         "presentation": resolve_presentation(registry_descriptor(registry, node.type_used), flow_kind=node_flow_kind(node, compiled), native_class=("loopNode" if node.type_used in LOOP_NODE_TYPES else "nodesetNode") if invocation is not None else "", status_class="plannedNode" if planned else "", call_style=node.style).to_dict(),
         "effect_scope": node_review_effect_scope(graph, node, registry, compiled=compiled),
-        "runtime_dispatch": _runtime_dispatch_label(node, compiled),
+
         "execution_lock": (
             _execution_lock_payload(
                 node.execution_lock,
@@ -326,18 +326,6 @@ def _effective_execution_lock(
     return None
 
 
-def _runtime_dispatch_label(
-    node: NodeSpec,
-    compiled: CompiledGraph,
-) -> str:
-    if node.status == STATUS_PLANNED:
-        return "unknown"
-    value = getattr(compiled, "runtime_dispatches", {}).get(node.id)
-    if value is True:
-        return "detected"
-    if value is False:
-        return "none"
-    return "unknown"
 
 
 def _graph_contains_global_state(

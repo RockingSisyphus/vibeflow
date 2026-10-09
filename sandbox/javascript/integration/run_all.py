@@ -86,6 +86,7 @@ from sandbox_support import (
     expect_build_failure,
     prepare_temporary_puppeteer,
     run_browser,
+    run_node,
     skip_case,
     validate_environment,
     write_report,
@@ -194,11 +195,6 @@ def _manifest_case(cache: BuildCache, *, key: str, profile: str) -> dict[str, An
     manifest = json.loads(result.manifest.read_text(encoding="utf-8"))
     assert_equal(manifest["profile"], profile, label="manifest profile")
     assert_equal(manifest["target"], "node", label="manifest target")
-    lock_path = PROJECT_ROOT / "package-lock.json"
-    lock_digest = hashlib.sha256()
-    lock_digest.update(b"package-lock.json\0")
-    lock_digest.update(lock_path.read_bytes())
-    lock_digest.update(b"\0")
     installed_typescript = json.loads(
         (PROJECT_ROOT / "node_modules/typescript/package.json").read_text(
             encoding="utf-8"
@@ -220,8 +216,6 @@ def _manifest_case(cache: BuildCache, *, key: str, profile: str) -> dict[str, An
         "node": node_version,
         "typescript": installed_typescript,
         "esbuild": installed_esbuild,
-        "lock_sha256": lock_digest.hexdigest(),
-        "lock_files": ["package-lock.json"],
     }
     assert_equal(
         manifest["toolchain"],
@@ -465,7 +459,6 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
         "base_lib_reverse": "VF_IMPORT_LAYER",
         "undeclared_external": "VF_IMPORT_EXTERNAL",
         "package_root_escape": "VF_IMPORT_PACKAGE_ROOT",
-        "dynamic_code": "VF_IMPORT_DYNAMIC_CODE",
         # The helper itself is outside the declared Node/base_lib ownership
         # closure, so VibeFlow rejects that architectural violation before
         # esbuild reaches the platform-specific node:fs import.
@@ -511,12 +504,6 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
             "node",
             "negative/nodes/package_root_escape.ts",
             '"../../../outside.ts"',
-        ),
-        "dynamic_code": (
-            "sandbox.invalid.dynamic_code",
-            "node",
-            "negative/nodes/dynamic_code.ts",
-            "eval",
         ),
         "module_promise": (
             "sandbox.invalid.module_promise",
@@ -572,6 +559,9 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
                     expected_definition_id=(
                         "vibeflow.node_interface"
                         if name in {"discarded_promise", "long_lived_listener"}
+                        else "vibeflow.node_architecture"
+                        if name in {"barrel_import", "alias_import", "symlink_import",
+                                    "base_lib_reverse", "undeclared_external", "package_root_escape"}
                         else "vibeflow.import_side_effects"
                         if precise_expectation is not None
                         else None
@@ -604,6 +594,14 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
                 ),
             )
         )
+    # B06: string evaluation is not a default security policy. Validate a real
+    # generated workflow; unknown string contents are not audited or endorsed.
+    def dynamic_code_case():
+        built = cache.build("dynamic_code_allowed", "negative/dynamic_code.jsonc")
+        value = run_node(built.entry, 'const result = workflow.runWorkflow({x: 1}); console.log(JSON.stringify(result));')
+        assert_equal(value, {"result": 1}, label="dynamic code workflow output")
+        return value
+    cases.append(("run:dynamic-code", dynamic_code_case))
     return cases
 
 

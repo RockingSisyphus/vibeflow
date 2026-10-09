@@ -1,0 +1,4 @@
+layout.review.nested_repeat_loop PASS
+layout.expanded_svg.nested_repeat_loop PASS
+layout.mermaid.explicit_resources PASS
+layout.ordinary_svg.explicit_resources PASS

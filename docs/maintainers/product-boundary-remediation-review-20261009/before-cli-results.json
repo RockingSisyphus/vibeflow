@@ -1,0 +1,79 @@
+{
+  "count": 3,
+  "rows": [
+    {
+      "case": "before_truthy_predicate_rebinding",
+      "source": "from vibeflow.targets.python.sdk import node\n@node(type_key=\"probe.task\", rulesets=[\"probe.selected\"], contract={})\nclass Task:\n    def run_pure(self, inputs, params):\n        if (inputs := {'local': True}):\n            inputs['x'] = 1\n        return {}\n@node(type_key=\"probe.start\", flow_kind=\"terminal\", rulesets=[], contract={})\nclass Start:\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "rule": "vibeflow.no_side_effects",
+      "scope": "none",
+      "status": "PASS",
+      "exit": 0,
+      "errors": [],
+      "warnings": [],
+      "origin": {
+        "origin": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/before-remediation/src/vibeflow/__init__.py",
+        "foreign": {}
+      },
+      "project": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/before-cli-2/before_truthy_predicate_rebinding"
+    },
+    {
+      "case": "before_annotation_without_value",
+      "source": "from vibeflow.targets.python.sdk import node\n@node(type_key=\"probe.task\", rulesets=[\"probe.selected\"], contract={})\nclass Task:\n    def run_pure(self, inputs, params):\n        inputs['x']: int\n        return {}\n@node(type_key=\"probe.start\", flow_kind=\"terminal\", rulesets=[], contract={})\nclass Start:\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "rule": "vibeflow.no_side_effects",
+      "scope": "none",
+      "status": "FAIL",
+      "exit": 1,
+      "errors": [
+        {
+          "code": "NODE.PURITY.INPUT_MUTATION",
+          "rule_id": "NODE.PURITY.INPUT_MUTATION",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/before-cli-2/before_annotation_without_value/node_resource.py",
+            "line": 5,
+            "column": 9
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "node must not mutate inputs",
+          "suggested_fix_type": "fix_node",
+          "details": {
+            "node_type": "probe.task",
+            "calls": [
+              {
+                "owner": "pipeline",
+                "node": "task"
+              }
+            ]
+          },
+          "root_id": "probe",
+          "source_path": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/before-cli-2/before_annotation_without_value/node_resource.py",
+          "definition_id": "vibeflow.no_side_effects"
+        }
+      ],
+      "warnings": [],
+      "origin": {
+        "origin": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/before-remediation/src/vibeflow/__init__.py",
+        "foreign": {}
+      },
+      "project": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/before-cli-2/before_annotation_without_value"
+    },
+    {
+      "case": "before_nested_generator_helper",
+      "source": "from vibeflow.targets.python.sdk import node\n@node(type_key=\"probe.task\", rulesets=[\"probe.selected\"], contract={})\nclass Task:\n    def run_pure(self, inputs, params):\n        def values():\n            yield 1\n        value = list(values())\n        return {}\n@node(type_key=\"probe.start\", flow_kind=\"terminal\", rulesets=[], contract={})\nclass Start:\n    def run_pure(self, inputs, params):\n        return {}\n",
+      "rule": "vibeflow.node_interface",
+      "scope": "none",
+      "status": "PASS",
+      "exit": 0,
+      "errors": [],
+      "warnings": [],
+      "origin": {
+        "origin": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/before-remediation/src/vibeflow/__init__.py",
+        "foreign": {}
+      },
+      "project": "/tmp/vibeflow-boundary-review-20261009-7w8uzp8u/before-cli-2/before_nested_generator_helper"
+    }
+  ]
+}

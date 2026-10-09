@@ -1,0 +1,29 @@
+{
+  "before_snapshot": "/home/rockingsisyphus/projects/VibeFlow/dist/python-exception-alias-validation-20261008/before-F05",
+  "matches_prior_completed_F03_F04_source03": true,
+  "older_Git5b9_is_a_distinct_baseline": true,
+  "original_expectations_modified": false,
+  "static": {
+    "cases": 16,
+    "raw_mismatches": 12,
+    "helper_expression_false_negatives": 6,
+    "direct_expression_false_negatives": 6,
+    "origin_report": "before-static16-origin.json"
+  },
+  "cli": {
+    "cases": 16,
+    "raw_mismatches": 12,
+    "helper_expression_false_negatives": 6,
+    "direct_expression_false_negatives": 6,
+    "origin_report": "before-cli16-origin.json"
+  },
+  "routes_agree": true,
+  "replay_entrypoint": "/home/rockingsisyphus/projects/VibeFlow/docs/maintainers/python-exception-alias-fix-20261008/replay_frozen_products.py",
+  "replay_entrypoint_sha256": "60b2857a89d792637344b5c04507784dd6f6d45e49a2ef08fd53618839e19849",
+  "planned_frozen_source_regression_checks": 701,
+  "planned_source_raw36_observations": 36,
+  "planned_three_fresh_product_regression_checks": 4881,
+  "planned_three_product_raw36_observations": 108,
+  "future_products_require_fresh_F05_official_full_gate_completed": true,
+  "prior_full03_not_used_as_F05_fixed": true
+}

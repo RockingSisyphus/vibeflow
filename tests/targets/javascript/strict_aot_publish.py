@@ -13,7 +13,7 @@ from vibeflow.targets.javascript.build.publish import (
 )
 
 
-FORMAT = "vibeflow.aot-build.v1"
+FORMAT = "vibeflow.aot-build.v2"
 
 
 def _artifact(path: Path, marker: str) -> None:
@@ -21,11 +21,10 @@ def _artifact(path: Path, marker: str) -> None:
     entry = path / "index.js"
     entry.write_text(f"export default {marker!r};\n", encoding="utf-8")
     entry_hash = hashlib.sha256(entry.read_bytes()).hexdigest()
-    lock_hash = hashlib.sha256(b"lock").hexdigest()
     plan_hash = hashlib.sha256(marker.encode()).hexdigest()
     manifest = {
         "format": FORMAT,
-        "abi_version": "vibeflow.workflow.v4",
+        "abi_version": "vibeflow.workflow.v5",
         "project_target": "javascript",
         "workflow_id": "publish-test",
         "entry_mode": "sync",
@@ -37,8 +36,6 @@ def _artifact(path: Path, marker: str) -> None:
             "node": "22.12.0",
             "typescript": "7.0.2",
             "esbuild": "0.28.1",
-            "lock_sha256": lock_hash,
-            "lock_files": ["package-lock.json"],
         },
         "external_packages": [],
         "host_extensions": [],

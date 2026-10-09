@@ -171,7 +171,7 @@ def test_architecture_document_is_deterministic_and_keeps_planned_and_unused_bod
     assert loop_type["config"]["schema"]["node_field"] == "loop"
 
 
-def test_architecture_exposes_runtime_dispatch_and_effective_named_lock() -> None:
+def test_architecture_exposes_effective_named_lock_without_dispatch() -> None:
     graph = GraphConfig(
         nodes=(NodeSpec("cloud", "demo.cloud"),),
         execution_lock=ExecutionLockSpec("project.runtime"),
@@ -185,7 +185,6 @@ def test_architecture_exposes_runtime_dispatch_and_effective_named_lock() -> Non
         consumers={},
         flow_kinds={"cloud": "global_state"},
         effect_scopes={"cloud": "global_state"},
-        runtime_dispatches={"cloud": True},
         contains_global_state=True,
     )
 
@@ -201,7 +200,7 @@ def test_architecture_exposes_runtime_dispatch_and_effective_named_lock() -> Non
         "scope": "root",
     }
     assert node["effect_scope"] == "global_state"
-    assert node["runtime_dispatch"] == "detected"
+    assert "runtime_dispatch" not in node
     assert node["execution_lock"] is None
     assert node["effective_execution_lock"] == {
         "key": "project.runtime",
@@ -211,7 +210,7 @@ def test_architecture_exposes_runtime_dispatch_and_effective_named_lock() -> Non
     mermaid = export_mermaid(graph, compiled=compiled)
     assert 'cloud@{ shape: cloud' in mermaid
     assert "effect_scope: global_state" in mermaid
-    assert "runtime_dispatch: detected" in mermaid
+    assert "runtime_dispatch" not in mermaid
     assert "execution_lock: project.runtime (root, inherited)" in mermaid
 
     unlocked = export_mermaid(

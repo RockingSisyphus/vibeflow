@@ -1,0 +1,161 @@
+--- before/src/vibeflow/targets/python/quality/source_analysis/visitors.py
++++ after/src/vibeflow/targets/python/quality/source_analysis/visitors.py
+@@ -215,6 +215,7 @@
+         # assignments only bind names after entering the new function body.
+         for expression in _function_definition_expressions(node):
+             self.visit(expression)
++        self._check_global_binding(node.name, node)
+         self._visit_function_body(node)
+ 
+     def visit_Lambda(self, node):
+@@ -261,6 +262,7 @@
+     def visit_ClassDef(self, node):
+         for expression in (*node.bases, *(item.value for item in node.keywords), *node.decorator_list):
+             self.visit(expression)
++        self._check_global_binding(node.name, node)
+         previous_globals = self._current_global_names
+         bindings = _FunctionBindingCollector()
+         for statement in node.body:
+@@ -281,8 +283,10 @@
+         outer_bindings = _comprehension_outer_bindings(node)
+         previous_aliases = self._import_aliases.copy()
+         previous_locals, previous_imports = self._current_local_names, self._current_import_names
++        previous_globals = self._current_global_names
+         self._current_local_names = previous_locals | local_names
+         self._current_import_names = previous_imports - local_names
++        self._current_global_names = previous_globals - local_names
+         for name in local_names:
+             self._import_aliases.pop(name, None)
+         targets = {generator.target for generator in node.generators}
+@@ -302,6 +306,7 @@
+                     if name in self._import_aliases.alternatives:
+                         written_aliases.alternatives[name] = self._import_aliases.alternatives[name]
+             self._current_local_names, self._current_import_names = previous_locals, previous_imports
++            self._current_global_names = previous_globals
+             self._import_aliases = (_merge_branch_aliases(self, previous_aliases, written_aliases)
+                 if outer_bindings else previous_aliases)
+ 
+@@ -391,6 +396,36 @@
+         if node.value is not None:
+             self._record_effect_assignment_aliases(node)
+             self._check_ambient_assignment(node.target, node)
++            self.generic_visit(node)
++        else:
++            if not isinstance(node.target, ast.Name):
++                self.visit(node.target)
++            self.visit(node.annotation)
++
++    def _check_global_binding(self, name, node):
++        if name in self._current_global_names and self.effect_scope != EFFECT_SCOPE_GLOBAL_STATE:
++            self._add("global_state", f"must not write module global: {name}", node,
++                suggested_fix_type="configure_effect_rules")
++
++    def visit_Name(self, node):
++        if isinstance(node.ctx, (ast.Store, ast.Del)):
++            self._check_global_binding(node.id, node)
++
++    def _record_import_aliases(self, node):
++        for name in import_aliases_from_node(node):
++            self._check_global_binding(name, node)
++        super()._record_import_aliases(node)
++
++    def visit_ExceptHandler(self, node):
++        if node.name:
++            self._check_global_binding(node.name, node)
++        self.generic_visit(node)
++
++    def visit_match_case(self, node):
++        bindings = _FunctionBindingCollector()
++        bindings.visit(node.pattern)
++        for name in sorted(bindings.names):
++            self._check_global_binding(name, node.pattern)
+         self.generic_visit(node)
+ 
+     def visit_NamedExpr(self, node):
+@@ -480,11 +515,6 @@
+             return
+         if isinstance(target, ast.Starred):
+             self._check_ambient_assignment(target.value, node)
+-            return
+-        if isinstance(target, ast.Name) and target.id in self._current_global_names:
+-            if self.effect_scope != EFFECT_SCOPE_GLOBAL_STATE:
+-                self._add("global_state", f"must not write module global: {target.id}", node,
+-                    suggested_fix_type="configure_effect_rules")
+             return
+         names = self._ambient_targets(target)
+         forbidden = next((name for name in names if ambient_assignment_is_forbidden(name)), "")
+--- before/src/vibeflow/targets/python/quality/source_analysis/input_tracking.py
++++ after/src/vibeflow/targets/python/quality/source_analysis/input_tracking.py
+@@ -108,6 +108,36 @@
+     def visit_GeneratorExp(self, node):
+         # Only creation of the first iterable is immediate; no consumption proof.
+         self.visit(node.generators[0].iter)
++
++    def _fork(self, node, prefix, branches):
++        before = set(self.references)
++        try:
++            self.visit(prefix)
++            entry = set(self.references)
++            for branch in branches:
++                self.references = set(entry)
++                for item in branch:
++                    self.visit(item)
++                if isinstance(node, ast.Match):
++                    # A failed pattern/guard may bind before trying the next
++                    # case; only the case body is mutually exclusive.
++                    case = branch[0]
++                    entry.difference_update(_rebound_names(case.pattern))
++                    if case.guard is not None:
++                        entry.difference_update(_rebound_names(case.guard))
++        finally:
++            # Siblings start at the same lexical identity. Rebinding in any
++            # branch becomes unknown afterwards, without joining paths.
++            self.references = before - _rebound_names(node)
++
++    def visit_If(self, node):
++        self._fork(node, node.test, (node.body, node.orelse))
++
++    def visit_IfExp(self, node):
++        self._fork(node, node.test, ((node.body,), (node.orelse,)))
++
++    def visit_Match(self, node):
++        self._fork(node, node.subject, ((case,) for case in node.cases))
+ 
+     def _compound(self, node):
+         before = set(self.references)
+@@ -124,9 +154,16 @@
+                 if isinstance(node, ast.ExceptHandler) and node.name:
+                     self.references.discard(node.name)
+                 if isinstance(value, list):
++                    entry = set(self.references)
+                     for item in value:
+                         if isinstance(item, ast.AST):
++                            if field == "handlers":
++                                self.references = set(entry)
+                             self.visit(item)
++                            if field == "handlers" and item.type is not None:
++                                # Exception types are evaluated in order;
++                                # aliases and bodies bind only when selected.
++                                entry.difference_update(_rebound_names(item.type))
+                 elif isinstance(value, ast.AST):
+                     self.visit(value)
+                 # A later field must not resurrect a name rebound in an
+@@ -143,7 +180,6 @@
+             # available when that statement did not rebind them.
+             self.references = before - _rebound_names(node)
+ 
+-    visit_If = _compound
+     visit_For = _compound
+     visit_AsyncFor = _compound
+     visit_While = _compound
+@@ -152,10 +188,8 @@
+     visit_With = _compound
+     visit_AsyncWith = _compound
+     visit_ExceptHandler = _compound
+-    visit_Match = _compound
+     visit_match_case = _compound
+     visit_BoolOp = _compound
+-    visit_IfExp = _compound
+ 
+     def visit_Import(self, node):
+         self.references.difference_update(alias.asname or alias.name.split(".", 1)[0] for alias in node.names)

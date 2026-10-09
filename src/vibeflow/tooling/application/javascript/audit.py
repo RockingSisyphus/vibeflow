@@ -384,10 +384,7 @@ def inspect_payload(result: JavascriptAuditResult) -> dict[str, object]:
                         node.id,
                         compiled.flow_kinds.get(node.id, node.flow_kind),
                     ),
-                    "runtime_dispatch": _runtime_dispatch_label(
-                        compiled,
-                        node.id,
-                    ),
+
                     "effective_execution_lock": (
                         _effective_lock_text(graph, node) or None
                     ),
@@ -455,13 +452,6 @@ def render_review_svg(result: JavascriptAuditResult) -> str:
     return render(result)
 
 
-def _runtime_dispatch_label(compiled: CompiledGraph, node_id: str) -> str:
-    value = getattr(compiled, "runtime_dispatches", {}).get(node_id)
-    if value is True:
-        return "detected"
-    if value is False:
-        return "none"
-    return "unknown"
 
 
 def _effect_scope_label(
@@ -915,7 +905,7 @@ def _javascript_node_document(
         "contract_source": contract_source,
         "flow_kind": flow_kind,
         "effect_scope": "unavailable" if planned else _effect_scope_label(compiled, node_id, flow_kind),
-        "runtime_dispatch": _runtime_dispatch_label(compiled, node_id),
+
         "execution_lock": (
             {"key": lock.key, "scope": "block" if invokes else "node"}
             if lock is not None

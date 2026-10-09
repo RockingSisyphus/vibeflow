@@ -1,0 +1,8 @@
+
+added 4 packages, and audited 5 packages in 1s
+
+found 0 vulnerabilities
+$ /home/rockingsisyphus/miniforge3/bin/python -m pytest -q -p no:cacheprovider -p pytest_workdirs tests/integration/strict_distribution_review_docs.py::test_document_index_covers_every_active_markdown -q
+ERROR: file or directory not found: tests/integration/strict_distribution_review_docs.py::test_document_index_covers_every_active_markdown
+
+

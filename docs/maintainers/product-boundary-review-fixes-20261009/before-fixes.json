@@ -1,0 +1,9 @@
+{
+  "src/vibeflow/targets/python/quality/rules/node_interface.py": "8e355852ae26c3b23cc5167fff26338e17f8c77f64356fc9172af44e54f5689b",
+  "src/vibeflow/targets/python/quality/source_analysis/input_tracking.py": "7b9cc1e13d6956f06e25c648b655034845f4e58043b1eaf4dc001d0493651d0b",
+  "src/vibeflow/targets/python/quality/source_analysis/visitors.py": "94fc522d45634d1528cef413b5aaadafb39bf8ee74d17b3b6c7c749eb6726613",
+  "docs/user/rules-and-nodes.md": "3c9cd4c7b302373b5e35e56e8a58f938ef373292c56fcde388c94e0f281d3107",
+  "docs/user/rule-system-migration.md": "6a61070b7beec3e84b450519c825f43be43851ced2f9928e07654c27bd64127d",
+  "docs/design/execution-model.md": "553b1594d899d3a846e5d5bde2c0ca6c902459e448de82843cfa5eb39e114587",
+  "docs/maintainers/product-boundary-remediation-results-20261009.md": "19a08ed0ec13540cc6a215746d96ac387d6bc36a5fdfcfa74d03e32e119765bb"
+}

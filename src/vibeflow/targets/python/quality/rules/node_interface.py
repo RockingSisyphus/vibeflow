@@ -3,6 +3,7 @@ import ast
 from typing import Mapping
 from vibeflow.core.rules import RuleResult
 from vibeflow.targets.python.quality.rules.helpers import finding, source_subject
+from vibeflow.targets.python.quality.source_analysis.bindings import _function_definition_expressions
 
 
 def node_interface(context, inputs, params):
@@ -34,6 +35,9 @@ def node_interface(context, inputs, params):
         report("async_run_pure","run_pure must not be async",method)
     elif not _signature(method,("self","inputs","params")):
         report("run_pure_signature","run_pure must accept exactly self, inputs, params",method)
+    if method is not None and any(isinstance(item, (ast.Yield, ast.YieldFrom))
+            for item in _entry_body_nodes(method)):
+        report("generator_run_pure", "run_pure must return a mapping rather than yield", method)
     init=methods.get("__init__")
     if init is not None and (not _signature(init,("self",)) or init.args.defaults):
         report("init_signature","__init__ must accept only self",init)
@@ -58,20 +62,11 @@ def node_interface(context, inputs, params):
                 if not target.id.startswith("_") and target.id not in allowed:
                     report("public_callable", f"node must not expose public callable method: {target.id}", statement)
     contract=node.descriptor.contract
-    if set(item.type for item in contract.requires) & set(item.key for item in contract.provides):
-        report("contract_overlap", "contract.requires types and contract.provides keys must not overlap")
-    if node.descriptor.flow_kind == "decision":
-        if not any(_looks_route_key(item.key) for item in contract.provides):
-            findings.append(finding(context, "NODE.DECISION.MISSING_ROUTE_OUTPUT",
-                "decision nodes must provide a route/decision/branch output key", path=node.path, line=symbol.line))
     for index, example in enumerate(contract.examples):
         malformed = next((name for name in ("inputs", "params") if not isinstance(example.get(name), Mapping)), None)
         if malformed:
             findings.append(finding(context, "NODE.MAINTAINABILITY.EXAMPLE_SHAPE",
                 f"contract.examples[{index}].{malformed} must be a mapping", path=node.path, line=symbol.line, severity="warning"))
-        elif "outputs" in example:
-            findings.append(finding(context, "NODE.PURITY.EXAMPLE_OUTPUTS_REMOVED",
-                f"Python interface rule does not accept contract.examples[{index}].outputs; examples declare inputs and params", path=node.path, line=symbol.line))
     for label,keys,semantics in (("input_semantics",tuple(item.type for item in contract.requires),contract.input_semantics),
                                 ("output_semantics",tuple(item.key for item in contract.provides),contract.output_semantics)):
         missing=set(keys)-set(semantics)
@@ -88,6 +83,20 @@ def _signature(method,names):
     return tuple(item.arg for item in (*args.posonlyargs,*args.args)) == names and not args.vararg and not args.kwarg and not args.kwonlyargs
 
 
-def _looks_route_key(key):
-    leaf = key.rsplit(".", 1)[-1].rsplit("_", 1)[-1]
-    return key.startswith("flow.") or leaf in {"route", "decision", "branch", "selected", "done", "should_retry"} or key.endswith("selected_branch")
+
+
+def _entry_body_nodes(method):
+    def walk(node):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            for expression in _function_definition_expressions(node):
+                yield from walk(expression)
+            return
+        if isinstance(node, ast.ClassDef):
+            for expression in (*node.bases, *(item.value for item in node.keywords), *node.decorator_list):
+                yield from walk(expression)
+            return
+        yield node
+        for child in ast.iter_child_nodes(node):
+            yield from walk(child)
+    for statement in method.body:
+        yield from walk(statement)

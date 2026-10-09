@@ -1,0 +1,132 @@
+{
+  "created": "2026-10-09 13:46:28",
+  "selected": [
+    {
+      "path": "/var/tmp/vfp-full-4",
+      "allocated_bytes": 852533248
+    },
+    {
+      "path": "/var/tmp/vfp-helper-and-cache-20261009",
+      "allocated_bytes": 608198656
+    },
+    {
+      "path": "/var/tmp/pytest-of-rockingsisyphus/pytest-34",
+      "allocated_bytes": 738541568
+    },
+    {
+      "path": "/var/tmp/pytest-of-rockingsisyphus/pytest-35",
+      "allocated_bytes": 17362944
+    },
+    {
+      "path": "/var/tmp/pytest-of-rockingsisyphus/pytest-36",
+      "allocated_bytes": 5074944
+    },
+    {
+      "path": "/var/tmp/vfp-clean-edited-whitespace.py",
+      "allocated_bytes": 4096
+    },
+    {
+      "path": "/var/tmp/vfp-dynamic-code-probe.py",
+      "allocated_bytes": 4096
+    },
+    {
+      "path": "/var/tmp/vfp-dynamic-code-runtime-probe.py",
+      "allocated_bytes": 4096
+    },
+    {
+      "path": "/var/tmp/vfp-final-content-audit.py",
+      "allocated_bytes": 4096
+    },
+    {
+      "path": "/var/tmp/vfp-final-coupling-probe.py",
+      "allocated_bytes": 4096
+    },
+    {
+      "path": "/var/tmp/vfp-final-js-repair.py",
+      "allocated_bytes": 8192
+    },
+    {
+      "path": "/var/tmp/vfp-node-import-followup.py",
+      "allocated_bytes": 4096
+    },
+    {
+      "path": "/var/tmp/vfp-python-shared-repair.py",
+      "allocated_bytes": 4096
+    },
+    {
+      "path": "/var/tmp/vfp-shared-node-runtime-probe.py",
+      "allocated_bytes": 4096
+    },
+    {
+      "path": "/var/tmp/vfp-temp-cleanup-20261009.py",
+      "allocated_bytes": 4096
+    },
+    {
+      "path": "/var/tmp/vfp-trim-cache-evidence.py",
+      "allocated_bytes": 4096
+    },
+    {
+      "path": "/var/tmp/vfp-content-audit-format-probe.json",
+      "allocated_bytes": 4096
+    }
+  ],
+  "process_references": {
+    "/var/tmp/vfp-full-4": [],
+    "/var/tmp/vfp-helper-and-cache-20261009": [],
+    "/var/tmp/pytest-of-rockingsisyphus/pytest-34": [],
+    "/var/tmp/pytest-of-rockingsisyphus/pytest-35": [],
+    "/var/tmp/pytest-of-rockingsisyphus/pytest-36": [],
+    "/var/tmp/vfp-clean-edited-whitespace.py": [],
+    "/var/tmp/vfp-dynamic-code-probe.py": [],
+    "/var/tmp/vfp-dynamic-code-runtime-probe.py": [],
+    "/var/tmp/vfp-final-content-audit.py": [],
+    "/var/tmp/vfp-final-coupling-probe.py": [],
+    "/var/tmp/vfp-final-js-repair.py": [],
+    "/var/tmp/vfp-node-import-followup.py": [],
+    "/var/tmp/vfp-python-shared-repair.py": [],
+    "/var/tmp/vfp-shared-node-runtime-probe.py": [],
+    "/var/tmp/vfp-temp-cleanup-20261009.py": [],
+    "/var/tmp/vfp-trim-cache-evidence.py": [],
+    "/var/tmp/vfp-content-audit-format-probe.json": []
+  },
+  "saved_artifacts": [
+    {
+      "path": "docs/maintainers/product-boundary-remediation-20261009/local-distributions/vibeflow-distribution-0.17.0.zip",
+      "bytes": 769995,
+      "sha256": "b678592ca04d683cb90a336fdbcc78a5b81e01046c9c71b5949f3ded2f4b6f5c"
+    },
+    {
+      "path": "docs/maintainers/product-boundary-remediation-20261009/local-distributions/vibeflow-distribution-autonomous-0.17.0.zip",
+      "bytes": 769268,
+      "sha256": "b9d3dd369f591451242cd3a247d4e95f525d846fcba978df214d69fdcdf2807e"
+    },
+    {
+      "path": "docs/maintainers/product-boundary-remediation-20261009/local-distributions/vibeflow-0.17.0-py3-none-any.whl",
+      "bytes": 716890,
+      "sha256": "0635d29d1aff0f71a2b18880cf49889ce02577d2ca0f8650f2214dd90e2f69e8"
+    }
+  ],
+  "evidence_archive": "docs/maintainers/product-boundary-remediation-20261009/full-4-generated-evidence.tar.gz",
+  "archived_files": 5769,
+  "source_fingerprint_verified": 2388,
+  "removed": [
+    "/var/tmp/vfp-full-4",
+    "/var/tmp/vfp-helper-and-cache-20261009",
+    "/var/tmp/pytest-of-rockingsisyphus/pytest-34",
+    "/var/tmp/pytest-of-rockingsisyphus/pytest-35",
+    "/var/tmp/pytest-of-rockingsisyphus/pytest-36",
+    "/var/tmp/vfp-clean-edited-whitespace.py",
+    "/var/tmp/vfp-dynamic-code-probe.py",
+    "/var/tmp/vfp-dynamic-code-runtime-probe.py",
+    "/var/tmp/vfp-final-content-audit.py",
+    "/var/tmp/vfp-final-coupling-probe.py",
+    "/var/tmp/vfp-final-js-repair.py",
+    "/var/tmp/vfp-node-import-followup.py",
+    "/var/tmp/vfp-python-shared-repair.py",
+    "/var/tmp/vfp-shared-node-runtime-probe.py",
+    "/var/tmp/vfp-temp-cleanup-20261009.py",
+    "/var/tmp/vfp-trim-cache-evidence.py",
+    "/var/tmp/vfp-content-audit-format-probe.json"
+  ],
+  "allocated_bytes": 2221764608
+}

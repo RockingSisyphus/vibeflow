@@ -203,18 +203,6 @@ function auditParsedSource(ts, sourceFile, profile) {
     if (ts.isCallExpression(node)) {
       const dynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
       const requireCall = ts.isIdentifier(node.expression) && node.expression.text === "require";
-      const dynamicCodeCall = ts.isIdentifier(node.expression)
-        && new Set([
-          "eval",
-          "Function",
-          "AsyncFunction",
-          "GeneratorFunction",
-          "AsyncGeneratorFunction",
-        ]).has(node.expression.text);
-      const stringTimer = ts.isIdentifier(node.expression)
-        && new Set(["setTimeout", "setInterval"]).has(node.expression.text)
-        && node.arguments[0]
-        && isStringLiteralLike(ts, node.arguments[0]);
       if (dynamicImport || requireCall) {
         const argument = node.arguments[0];
         if (!argument || !isStringLiteralLike(ts, argument)) {
@@ -225,50 +213,6 @@ function auditParsedSource(ts, sourceFile, profile) {
             `${dynamicImport ? "dynamic import" : "require"} must use a static string literal`,
           ));
         }
-      }
-      if (dynamicCodeCall || stringTimer) {
-        findings.push(importFinding(
-          sourceFile,
-          node,
-          "VF_IMPORT_DYNAMIC_CODE",
-          "runtime string evaluation is forbidden in audited JS/TS sources",
-        ));
-      }
-    } else if (ts.isNewExpression(node)
-        && ts.isIdentifier(node.expression)
-        && new Set([
-          "Function",
-          "AsyncFunction",
-          "GeneratorFunction",
-          "AsyncGeneratorFunction",
-        ]).has(node.expression.text)) {
-      findings.push(importFinding(
-        sourceFile,
-        node,
-        "VF_IMPORT_DYNAMIC_CODE",
-        "runtime function construction is forbidden in audited JS/TS sources",
-      ));
-    } else if (ts.isIdentifier(node)
-        && new Set([
-          "eval",
-          "Function",
-          "AsyncFunction",
-          "GeneratorFunction",
-          "AsyncGeneratorFunction",
-        ]).has(node.text)
-        && identifierIsReference(ts, node)) {
-      const parent = node.parent;
-      const alreadyReported = (
-        (ts.isCallExpression(parent) || ts.isNewExpression(parent))
-        && parent.expression === node
-      );
-      if (!alreadyReported) {
-        findings.push(importFinding(
-          sourceFile,
-          node,
-          "VF_IMPORT_DYNAMIC_CODE",
-          `dynamic code primitive '${node.text}' cannot be referenced`,
-        ));
       }
     }
     visitChildren(ts, node, visit);
@@ -1832,16 +1776,9 @@ function auditHostIo(ts, sourceFile, checker, project, policy, ruleParams = {}) 
     "window", "self", "global", "globalThis", "localStorage",
     "sessionStorage", "indexedDB", "caches", "navigator", "location",
     "process", "console",
-    "Worker", "SharedWorker",
+    "Worker", "SharedWorker", "crypto", "webcrypto",
   ]);
-  const nondeterministicGlobals = new Set([
-    "Date",
-    "performance",
-    "crypto",
-    "webcrypto",
-    "process",
-  ]);
-  const mathGlobals = new Set(["Math"]);
+  const localComputationGlobals = new Set(["Date", "performance", "Math"]);
   const hostIoModules = new Set([
     "child_process", "cluster", "dgram", "dns", "fs", "http", "https",
     "net", "tls", "worker_threads",
@@ -1896,15 +1833,6 @@ function auditHostIo(ts, sourceFile, checker, project, policy, ruleParams = {}) 
     ));
   }
 
-  function reportNondeterminism(node, effect) {
-    findings.push(importFinding(
-      sourceFile,
-      node,
-      code,
-      `${owner.kind} '${owner.id}' cannot access nondeterministic host primitive '${effect}' under effect_scope '${scope}'`,
-    ));
-  }
-
   for (const imported of importSpecifiers(ts, sourceFile)) {
     const moduleName = canonicalImportSpecifier(imported.value);
     const rootName = moduleName.split("/", 1)[0];
@@ -1944,8 +1872,7 @@ function auditHostIo(ts, sourceFile, checker, project, policy, ruleParams = {}) 
     if (!ts.isIdentifier(value)) return null;
     const alias = importedPrimitives.get(checker.getSymbolAtLocation(value));
     if (alias) return alias;
-    return (isUnshadowedGlobal(value, targetGlobals) || isUnshadowedGlobal(value, nondeterministicGlobals)
-            || isUnshadowedGlobal(value, mathGlobals)) ? {primitive:value.text, members:[]} : null;
+    return isUnshadowedGlobal(value, targetGlobals) ? {primitive:value.text, members:[]} : null;
   }
 
   // Follow static primitive aliases by symbol, so permissions and hard process
@@ -1982,7 +1909,10 @@ function auditHostIo(ts, sourceFile, checker, project, policy, ruleParams = {}) 
         const namespace = namespaceGlobals.has(primitive);
         if (namespace) primitive = members.shift();
         const name = members[0];
-        if (!primitive || !(targetGlobals.has(primitive) || nondeterministicGlobals.has(primitive) || primitive === "Math")) {
+        if (localComputationGlobals.has(primitive)
+            || (["crypto", "webcrypto"].includes(primitive) && ["getRandomValues", "randomUUID"].includes(name))) {
+          // Reading time and using native math/random primitives does not grant Host I/O.
+        } else if (!primitive || !targetGlobals.has(primitive)) {
           // A static custom slot is native host/resource state. The namespace
           // value itself is a harmless read for general I/O; dynamic selection
           // stays bounded, and builtin/prototype writes are checked separately.
@@ -1991,27 +1921,10 @@ function auditHostIo(ts, sourceFile, checker, project, policy, ruleParams = {}) 
               && !(customState && ["python_io", "global_state"].includes(scope))) reportHostGlobal(node, node.text);
         } else if (primitive === "process" && hardProcessMembers.has(name)) {
           reportHostGlobal(node, `process.${name}`);
-        } else if (primitive === "Math") {
-          if (scope !== "python_io" && (!members.length || name === null || name === "random")) {
-            reportNondeterminism(node, name === "random" ? "Math.random" : "Math object escape");
-          }
         } else if (scope !== "python_io"
             && !(scope === "terminal" && primitive === "console" && terminalConsole.has(name))
             && !(scope === "terminal" && primitive === "process" && terminalMembers.has(name))) {
           reportHostGlobal(node, [primitive, ...members].filter(Boolean).join("."));
-        }
-      } else if (isUnshadowedGlobal(node, nondeterministicGlobals)) {
-        if (scope !== "python_io") reportNondeterminism(node, node.text);
-      } else if (isUnshadowedGlobal(node, mathGlobals)) {
-        const member = directMemberAccess(node);
-        if (!member && scope !== "python_io") {
-          reportNondeterminism(node, "Math object escape");
-        } else if (member) {
-          const name = memberName(member);
-          if (name === "random" && scope !== "python_io") reportNondeterminism(member, "Math.random");
-          else if (name === null && scope !== "python_io") {
-            reportNondeterminism(member, "Math[computed]");
-          }
         }
       }
     }
@@ -2407,9 +2320,10 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
       if (request.profile === "single-esm") findings.push(...auditSingleEsmConstraints(ts, sourceFile));
       if (topics.has("imports")) {
         findings.push(...auditParsedSource(ts, sourceFile, ""));
-        findings.push(...auditImportOwnership(ts, implementationFile, checker, project, policy));
+
         findings.push(...auditRuleImportPolicy(ts, sourceFile, ruleParams));
       }
+      if (topics.has("architecture")) findings.push(...auditImportOwnership(ts, implementationFile, checker, project, policy));
       if (sourceFile.isDeclarationFile) continue;
       if (topics.has("purity")) findings.push(...auditTopLevelPurity(ts, sourceFile, policy, ruleParams));
       if (topics.has("completion")) findings.push(...auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy));

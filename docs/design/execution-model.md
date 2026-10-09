@@ -20,9 +20,9 @@ TaskPlan 明确 immediate、suspend、deferred、detached 和 `result_key` 的�
 
 ## 副作用与执行锁
 
-effect scope 来自选中 Rule 的有效 `vibeflow.effect_policy.v1` 资料，不由 flow_kind、external 或插件身份推导权限。多个规则的资料分别保留；摘要出现不同约束时显示 `mixed`，调用级规则保留各实际调用的结果，未提供效果约束时显示 `unconstrained`。planned 实现没有完成源码检查，显示 `unavailable`。`global_state` 仍表达易失 ambient state 或 runtime dispatch，`external=True` 标识外部实现；这些原生身份不自动跳过选中的规则。
+effect scope 来自选中 Rule 的有效 `vibeflow.effect_policy.v1` 资料，不由 flow_kind、external 或插件身份推导权限。多个规则的资料分别保留；摘要出现不同约束时显示 `mixed`，调用级规则保留各实际调用的结果，未提供效果约束时显示 `unconstrained`。planned 实现没有完成源码检查，显示 `unavailable`。`global_state` 的原生执行类别仍表达易失共享状态，`external=True` 标识外部实现；这些身份不自动跳过选中的规则。默认规则不推断 runtime dispatch 的存在或授权。
 
-实际 Rule 参数只接受 none、terminal、python_io、global_state、trusted 五个 scope。terminal 仅允许终端效果；python_io 在各 Target 允许相应一般 I/O；global_state 允许资源或模块状态，但禁止修改 builtin、原型及宿主关键状态；trusted 不增加权限。放宽 scope 按效果类别判定，不关闭整个检查 topic。导入 policy 的显式禁止独立生效，python_io 不能覆盖它。JavaScript 保留其已有时间、随机数检查，本轮没有为 Python 增加对应禁令。
+实际 Rule 参数只接受 none、terminal、python_io、global_state、trusted 五个 scope。terminal 仅允许终端效果；python_io 在各 Target 允许相应一般 I/O；global_state 允许共享或模块状态，但禁止修改 builtin、原型及宿主关键状态；trusted 不增加权限。放宽 scope 按效果类别判定，不关闭整个检查 topic。导入 policy 的显式禁止独立生效，python_io 不能覆盖它。默认规则不禁止 JavaScript 时间、随机数操作，不承担算法确定性证明。
 
 命名 `execution_lock` 表达冲突域。Target 的 execution lease 管理等待、获取、可重入嵌套和释放；异常与取消路径通过 `try/finally` 释放。锁只协调执行，不授予副作用能力或事务恢复。
 

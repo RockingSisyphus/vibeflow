@@ -1,0 +1,98 @@
+{
+  "source_files": 335,
+  "wheel": "/var/tmp/vfp-full-4/wheel-dist/vibeflow-0.17.0-py3-none-any.whl",
+  "wheel_source_missing": [],
+  "wheel_source_extra": [],
+  "wheel_source_different": [],
+  "retired_files_absent": true,
+  "retired_token_residuals": {
+    "runtime_dispatch": [],
+    "RuntimeDispatch": [],
+    "VF_IMPORT_DYNAMIC_CODE": [],
+    "lock_sha256": [],
+    "lock_files": []
+  },
+  "profiles": {
+    "collaborative": {
+      "metadata": {
+        "agent_automation": {
+          "build": true,
+          "quality": true,
+          "refresh_architecture": true,
+          "validate": true,
+          "workflow_execution_probe": true
+        },
+        "agent_protocol": {
+          "change_inventory": "required",
+          "human_approval_gate": true,
+          "planned_review": true,
+          "required_review_artifact": "expanded_svg"
+        },
+        "development_profile": "collaborative",
+        "kernel": {
+          "archive": "kernel/vibeflow-kernel.zip",
+          "sha256": "703e6c82f6a81e3283550b084facb89802b5d8a980e2215d5364291c98f2da12"
+        },
+        "roots": [
+          {
+            "id": "python-project",
+            "path": "python_project",
+            "project_target": "python"
+          },
+          {
+            "id": "javascript-project",
+            "path": "javascript_project",
+            "project_target": "javascript"
+          }
+        ],
+        "schema": "vibeflow.distribution.v2",
+        "version": "0.17.0"
+      },
+      "kernel_source_missing": [],
+      "kernel_source_extra": [],
+      "kernel_different": [],
+      "boundary_document_included": true
+    },
+    "autonomous": {
+      "metadata": {
+        "agent_automation": {
+          "build": true,
+          "quality": true,
+          "refresh_architecture": true,
+          "validate": true,
+          "workflow_execution_probe": true
+        },
+        "agent_protocol": {
+          "change_inventory": "optional",
+          "human_approval_gate": false,
+          "planned_review": false,
+          "required_review_artifact": "on_demand"
+        },
+        "development_profile": "autonomous",
+        "kernel": {
+          "archive": "kernel/vibeflow-kernel.zip",
+          "sha256": "703e6c82f6a81e3283550b084facb89802b5d8a980e2215d5364291c98f2da12"
+        },
+        "roots": [
+          {
+            "id": "python-project",
+            "path": "python_project",
+            "project_target": "python"
+          },
+          {
+            "id": "javascript-project",
+            "path": "javascript_project",
+            "project_target": "javascript"
+          }
+        ],
+        "schema": "vibeflow.distribution.v2",
+        "version": "0.17.0"
+      },
+      "kernel_source_missing": [],
+      "kernel_source_extra": [],
+      "kernel_different": [],
+      "boundary_document_included": true
+    }
+  },
+  "status": "PASS"
+}

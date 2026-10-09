@@ -1,0 +1,79 @@
+{
+  "rows": [
+    {
+      "case": "same_input_type_and_output_key",
+      "state": "completed",
+      "findings": [
+        {
+          "code": "NODE.CONTRACT.CONTRACT_OVERLAP",
+          "rule_id": "NODE.CONTRACT.CONTRACT_OVERLAP",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/boundary_node.py",
+            "line": 1,
+            "column": 1
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "contract.requires types and contract.provides keys must not overlap",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "decision_custom_output_name",
+      "state": "completed",
+      "findings": [
+        {
+          "code": "NODE.DECISION.MISSING_ROUTE_OUTPUT",
+          "rule_id": "NODE.DECISION.MISSING_ROUTE_OUTPUT",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/boundary_node.py",
+            "line": 1,
+            "column": 1
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "decision nodes must provide a route/decision/branch output key",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "example_output_documentation",
+      "state": "completed",
+      "findings": [
+        {
+          "code": "NODE.PURITY.EXAMPLE_OUTPUTS_REMOVED",
+          "rule_id": "NODE.PURITY.EXAMPLE_OUTPUTS_REMOVED",
+          "severity": "error",
+          "object_type": "node",
+          "object_id": "probe.task",
+          "source_location": {
+            "path": "/virtual/boundary_node.py",
+            "line": 1,
+            "column": 1
+          },
+          "rule_source": "ruleset.selection",
+          "failure_layer": "implementation",
+          "message": "Python interface rule does not accept contract.examples[0].outputs; examples declare inputs and params",
+          "suggested_fix_type": "",
+          "details": {}
+        }
+      ]
+    },
+    {
+      "case": "empty_control",
+      "state": "completed",
+      "findings": []
+    }
+  ],
+  "scope": "Native interface Rule only; no workflow routing or business execution."
+}

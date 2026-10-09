@@ -64,7 +64,6 @@ def test_javascript_descriptors_supply_core_execution_facts() -> None:
         "type_key": "demo.fetch",
         "flow_kind": "terminal",
         "effect_scope": "unconstrained",
-        "runtime_dispatch": None,
         "completion": "suspend",
         "schedule": "inline",
         "executor": "event_loop",

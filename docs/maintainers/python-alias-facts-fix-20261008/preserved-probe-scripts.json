@@ -1,0 +1,43 @@
+[
+  {
+    "old_script": "dist/unification-validation-20261008/packaged_inputs_probe.py",
+    "preserved_script": "docs/maintainers/python-alias-facts-fix-20261008/packaged_inputs_probe.py",
+    "old_sha256": "6b7a06c6156db90087dac1a6e79797fadd265c70458c984c02dff4301e8001f7",
+    "preserved_sha256": "6b7a06c6156db90087dac1a6e79797fadd265c70458c984c02dff4301e8001f7",
+    "adjustment": "Byte-identical preserved copy; standalone product imports and fixtures only."
+  },
+  {
+    "old_script": "dist/unification-validation-20261008/packaged_js_probe.py",
+    "preserved_script": "docs/maintainers/python-alias-facts-fix-20261008/packaged_js_probe.py",
+    "old_sha256": "ea92bf91de878ee8c1e537b4ce60fe0520090681c2affaed6d82c13080dc2048",
+    "preserved_sha256": "742c66219b452aa5820dce2ef02dde2cf7c19d43707986e4a70ca860e167954d",
+    "adjustment": "Same 33 cases and expectations; checkout provenance guard adjusted only for the new docs directory depth."
+  },
+  {
+    "old_script": "dist/unification-validation-20261008/packaged_python_effects_probe.py",
+    "preserved_script": "docs/maintainers/python-alias-facts-fix-20261008/packaged_python_effects_probe.py",
+    "old_sha256": "afb6d125ae228ec29e282b663fc6267e19be22393e9d878718e2f309c09f7970",
+    "preserved_sha256": "afb6d125ae228ec29e282b663fc6267e19be22393e9d878718e2f309c09f7970",
+    "adjustment": "Byte-identical preserved copy; standalone product imports and fixtures only."
+  },
+  {
+    "tracked_script": "docs/maintainers/system-migration-remediation-review-20261008/reproduce_function_default_scope.py",
+    "sha256": "985f96267f72d9311aa7026c9c5b3517a69b543b189d0733da4d9ae5e31678c0"
+  },
+  {
+    "tracked_script": "docs/maintainers/python-function-definition-scope-review-20261008/reproduce_comprehension_scope.py",
+    "sha256": "3d2cbfb9201c21135a7584d0a5a776034505b33a7a0afcc83f5321a61df9eb3e"
+  },
+  {
+    "tracked_script": "docs/maintainers/python-function-definition-scope-fix-20261008/default_scope_probe.py",
+    "sha256": "ecb6c3b11fe4dc6db17cf6573b7786cf927650810bad5d3530f7ec881e1392ef"
+  },
+  {
+    "tracked_script": "docs/maintainers/python-comprehension-scope-fix-20261008/comprehension_cli_probe.py",
+    "sha256": "5ded52794f1726e958d8c5fa2170c8eff7018212a7c225b5cf6dbda1f7b7c3c8"
+  },
+  {
+    "tracked_script": "docs/maintainers/python-comprehension-scope-fix-20261008/declared_binding_probe.py",
+    "sha256": "a374be30eeadc471a2e87661a41abff4cc61dc66e18be5a40daf6b2fd634754e"
+  }
+]

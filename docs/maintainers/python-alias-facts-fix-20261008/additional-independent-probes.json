@@ -1,0 +1,123 @@
+[
+  {
+    "original": "dist/python-input-writeback-validation-20261008/packaged_writeback_probe.py",
+    "preserved": "docs/maintainers/python-alias-facts-fix-20261008/packaged_writeback_probe.py",
+    "sha256": "001d85b428aef572b2249698535051121bad2922cd6a07e2b78f322930b15194",
+    "size": 19134,
+    "byte_identical": true
+  },
+  {
+    "original": "dist/python-effect-alias-validation-20261008/review_input_evaluation_order.py",
+    "preserved": "docs/maintainers/python-alias-facts-fix-20261008/original_review_input_evaluation_order.py",
+    "sha256": "4bf7fe45cd88cb2f16fbd65b3b2673a106c6ba5242176293683871c1e5092ef0",
+    "size": 4173,
+    "byte_identical": true
+  },
+  {
+    "original": "dist/python-effect-alias-validation-20261008/input-evaluation-order-before-01.json",
+    "preserved": "docs/maintainers/python-alias-facts-fix-20261008/input-evaluation-order-before-01.json",
+    "sha256": "b873340d5aef33910cfae83a2fc5c8b099ecb5ed190f9bce405796f15b8c29fb",
+    "size": 10690,
+    "byte_identical": true
+  },
+  {
+    "original": "dist/python-effect-alias-validation-20261008/review_nested_clear.py",
+    "preserved": "docs/maintainers/python-alias-facts-fix-20261008/original_review_nested_clear.py",
+    "sha256": "30a5cb141f1e55986c0c9f43177adfd456601b061f3acda1506ee916fc438cc2",
+    "size": 3161,
+    "byte_identical": true
+  },
+  {
+    "original": "dist/python-effect-alias-validation-20261008/nested-call-clear-before-5b9f976-01.json",
+    "preserved": "docs/maintainers/python-alias-facts-fix-20261008/nested-call-clear-before-5b9f976-01.json",
+    "sha256": "198dc4acc473b3a0ceb23cdf2b018210cb66e0b53740469af4099a3523725cac",
+    "size": 3255,
+    "byte_identical": true
+  },
+  {
+    "original": "dist/python-effect-alias-validation-20261008/nested-call-clear-readonly-01.json",
+    "preserved": "docs/maintainers/python-alias-facts-fix-20261008/nested-call-clear-readonly-01.json",
+    "sha256": "17c235616c302eda57448cf405a51c581f00394312c88c22fd911646c0676cb4",
+    "size": 3567,
+    "byte_identical": true
+  },
+  {
+    "original": "dist/python-effect-alias-validation-20261008/review_writeback_exits.py",
+    "preserved": "docs/maintainers/python-alias-facts-fix-20261008/original_review_writeback_exits.py",
+    "sha256": "29e9dbac6888f81d796754cad4e45a778ffa5233d3dbea7d3244ed7ea8033848",
+    "size": 3368,
+    "byte_identical": true
+  },
+  {
+    "original": "dist/python-effect-alias-validation-20261008/writeback-exits-before-5b9f976.json",
+    "preserved": "docs/maintainers/python-alias-facts-fix-20261008/writeback-exits-before-5b9f976.json",
+    "sha256": "65ed00679a49b07b01653efcd0071990c16cc742dbd581344d750e00514112cc",
+    "size": 2803,
+    "byte_identical": true
+  },
+  {
+    "original": "dist/python-effect-alias-validation-20261008/writeback-exits-intermediate-02.json",
+    "preserved": "docs/maintainers/python-alias-facts-fix-20261008/writeback-exits-intermediate-02.json",
+    "sha256": "b431df4076185fce6f5eca1a2c15cfe6fa8a8d0ca7dd85d206ac1ca925b3e963",
+    "size": 4580,
+    "byte_identical": true
+  },
+  {
+    "original": "dist/python-effect-alias-validation-20261008/review_writeback_exits5.py",
+    "preserved": "docs/maintainers/python-alias-facts-fix-20261008/original_review_writeback_exits5.py",
+    "sha256": "8144b47591302bbf9a31611a201617ad6672df5935fd2b06fa8b90ff7372bba9",
+    "size": 3776,
+    "byte_identical": true
+  },
+  {
+    "original": "dist/python-effect-alias-validation-20261008/writeback-exits5-intermediate-02.json",
+    "preserved": "docs/maintainers/python-alias-facts-fix-20261008/writeback-exits5-intermediate-02.json",
+    "sha256": "d8fb9852abc910d22af2267d76fcb9b2e04051f9d19285a6ab4b71e318c2a979",
+    "size": 7194,
+    "byte_identical": true
+  },
+  {
+    "original": "dist/python-input-writeback-validation-20261008/packaged_writeback_probe.py",
+    "preserved": "docs/maintainers/python-alias-facts-fix-20261008/packaged_writeback103_probe.py",
+    "sha256": "30ccab12f6d7e37d8b1cfe10c890415ac21dca6445fa225a9ca3aeaf67e5f711",
+    "size": 21377,
+    "byte_identical": true,
+    "case_count": 103,
+    "preserves_original91": true
+  },
+  {
+    "original": "dist/python-input-writeback-validation-20261008/review_conditional_alias.py",
+    "preserved": "docs/maintainers/python-alias-facts-fix-20261008/review_conditional_alias.py",
+    "sha256": "6d6d7aa8da0cbacea3d996557a9b54b604d243eb8585371742d7617593ef6a35",
+    "size": 3920,
+    "byte_identical": true
+  },
+  {
+    "original": "dist/python-input-writeback-validation-20261008/conditional-alias-before-5b9.json",
+    "preserved": "docs/maintainers/python-alias-facts-fix-20261008/conditional-alias-before-5b9.json",
+    "sha256": "6cdec79fa1b0fb01effc1d02b603fd094e47c9a5691a9f536c2fb41d8b45a5cf",
+    "size": 16195,
+    "byte_identical": true
+  },
+  {
+    "original": "dist/python-input-writeback-validation-20261008/conditional-alias-current.json",
+    "preserved": "docs/maintainers/python-alias-facts-fix-20261008/conditional-alias-current.json",
+    "sha256": "e511171c1bede66a55768338f218e636763eb7548729b6662129fbe7a64cb83d",
+    "size": 12573,
+    "byte_identical": true
+  },
+  {
+    "original": "dist/python-input-writeback-validation-20261008/parity-current-02.json",
+    "preserved": "docs/maintainers/python-alias-facts-fix-20261008/python-current-parity-02.json",
+    "sha256": "966cf1d773286b115c13936f618431831229c2ac2797287e52b566c637aa2d39",
+    "size": 10598710,
+    "byte_identical": true
+  },
+  {
+    "original": "dist/python-input-writeback-validation-20261008/parity-current-02.log",
+    "preserved": "docs/maintainers/python-alias-facts-fix-20261008/python-current-parity-02.log",
+    "sha256": "95590d995bb451701938989c7d0ac660128cd0636d4ed7a97dc5549f7572265a",
+    "size": 93,
+    "byte_identical": true
+  }
+]

@@ -1,0 +1,220 @@
+[
+  {
+    "case": "global_for_target",
+    "version": "before",
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "global_for_target",
+    "version": "current",
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "global_function_binding",
+    "version": "before",
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "global_function_binding",
+    "version": "current",
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "global_import_binding",
+    "version": "before",
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "global_import_binding",
+    "version": "current",
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "global_class_binding",
+    "version": "before",
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "global_class_binding",
+    "version": "current",
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "global_with_target",
+    "version": "before",
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "global_with_target",
+    "version": "current",
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "global_explicit_assignment_control",
+    "version": "before",
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "global_explicit_assignment_control",
+    "version": "current",
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "local_for_target_control",
+    "version": "before",
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "local_for_target_control",
+    "version": "current",
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "readonly_global_control",
+    "version": "before",
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.GLOBAL_STATE"
+    ]
+  },
+  {
+    "case": "readonly_global_control",
+    "version": "current",
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "alternate_branch_rebind",
+    "version": "before",
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.INPUT_MUTATION"
+    ]
+  },
+  {
+    "case": "alternate_branch_rebind",
+    "version": "current",
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "alternate_branch_control",
+    "version": "before",
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.INPUT_MUTATION"
+    ]
+  },
+  {
+    "case": "alternate_branch_control",
+    "version": "current",
+    "exit": 1,
+    "status": "FAIL",
+    "codes": [
+      "NODE.PURITY.INPUT_MUTATION"
+    ]
+  },
+  {
+    "case": "direct_after_conditional_rebinding",
+    "version": "before",
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "direct_after_conditional_rebinding",
+    "version": "current",
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "global_for_scope_control",
+    "version": "before",
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "global_for_scope_control",
+    "version": "current",
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "global_for_target_empty",
+    "version": "before",
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "global_for_target_empty",
+    "version": "current",
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "alternate_branch_rebind_empty",
+    "version": "before",
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  },
+  {
+    "case": "alternate_branch_rebind_empty",
+    "version": "current",
+    "exit": 0,
+    "status": "PASS",
+    "codes": []
+  }
+]

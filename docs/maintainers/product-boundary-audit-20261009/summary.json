@@ -1,0 +1,13 @@
+{
+  "python_cli_cases": 13,
+  "python_cli_fail": 8,
+  "python_cli_pass": 5,
+  "js_native_rule_cases": 5,
+  "lock_api_cases": 3,
+  "interface_native_rule_cases": 4,
+  "product_files_unchanged": 335,
+  "product_code_modified": false,
+  "full_tests_rerun": false,
+  "business_nodes_executed": false,
+  "recommendations_implemented": false
+}

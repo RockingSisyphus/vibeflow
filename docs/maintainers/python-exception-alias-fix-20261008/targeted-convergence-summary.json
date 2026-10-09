@@ -1,0 +1,208 @@
+{
+  "prior_failures_are_not_final_batch_failures": true,
+  "batches": [
+    {
+      "batch": "after-01",
+      "stage": "intermediate",
+      "log": "/home/rockingsisyphus/projects/VibeFlow/dist/python-input-exception-validation-20261008/after-01.log",
+      "log_sha256": "8256a5765711c9385d1e71b96ebd2f39da526bb6a16a1a118b93bedeb5703a35",
+      "junit": "/home/rockingsisyphus/projects/VibeFlow/dist/python-input-exception-validation-20261008/after-01.xml",
+      "junit_sha256": "3e1819b980e45d4ca2d330cdbd097a6c8e9b1c7e5e2c0e0fe19bf25662476a66",
+      "summary": {
+        "exit": 1,
+        "tests": 401,
+        "failures": 11,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 390,
+        "changed_during_batch": []
+      },
+      "failed_cases": [
+        {
+          "case": "test_nested_exception_regions_keep_execution_and_clearing_boundaries[nested_inner_handler_clears-direct-method]",
+          "message": "AssertionError: ('nested_inner_handler_clears', False, 'method', (HealthFinding(code='NODE.PURITY.INPUT_MUTATION', severity='error', subject_type='node', subject_id='probe.task', message='node must not mutate inputs via pop', source_location=mappingproxy({'path': '/virtual/input_exception_states.py', 'line': 16, 'column': 13}), suggested_fix='fix_node', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='vibeflow.no_side_effects', rule_source='ruleset.selection', failure_layer='implementation'),))\nassert True == False\n +  where True = bool((HealthFinding(code='NODE.PURITY.INPUT_MUTATION', severity='error', subject_type='node', subject_id='probe.task', message='node must not mutate inputs via pop', source_location=mappingproxy({'path': '/virtual/input_exception_states.py', 'line': 16, 'column': 13}), suggested_fix='fix_node', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='vibeflow.no_side_effects', rule_source='ruleset.selection', failure_layer='implementation'),))"
+        },
+        {
+          "case": "test_nested_exception_regions_keep_execution_and_clearing_boundaries[nested_inner_handler_clears-direct-module_helper]",
+          "message": "AssertionError: ('nested_inner_handler_clears', False, 'module_helper', (HealthFinding(code='NODE.PURITY.INPUT_MUTATION', severity='error', subject_type='node', subject_id='probe.task', message='module helper must not mutate inputs via pop', source_location=mappingproxy({'path': '/virtual/input_exception_states.py', 'line': 15, 'column': 9}), suggested_fix='fix_node', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='vibeflow.no_side_effects', rule_source='ruleset.selection', failure_layer='implementation'),))\nassert True == False\n +  where True = bool((HealthFinding(code='NODE.PURITY.INPUT_MUTATION', severity='error', subject_type='node', subject_id='probe.task', message='module helper must not mutate inputs via pop', source_location=mappingproxy({'path': '/virtual/input_exception_states.py', 'line': 15, 'column': 9}), suggested_fix='fix_node', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='vibeflow.no_side_effects', rule_source='ruleset.selection', failure_layer='implementation'),))"
+        },
+        {
+          "case": "test_nested_exception_regions_keep_execution_and_clearing_boundaries[nested_inner_handler_clears-helper-method]",
+          "message": "AssertionError: ('nested_inner_handler_clears', True, 'method', (HealthFinding(code='NODE.PURITY.INPUT_MUTATION', severity='error', subject_type='node', subject_id='probe.task', message='module helper must not mutate inputs via pop', source_location=mappingproxy({'path': '/virtual/input_exception_states.py', 'line': 2, 'column': 5}), suggested_fix='fix_node', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='vibeflow.no_side_effects', rule_source='ruleset.selection', failure_layer='implementation'),))\nassert True == False\n +  where True = bool((HealthFinding(code='NODE.PURITY.INPUT_MUTATION', severity='error', subject_type='node', subject_id='probe.task', message='module helper must not mutate inputs via pop', source_location=mappingproxy({'path': '/virtual/input_exception_states.py', 'line': 2, 'column': 5}), suggested_fix='fix_node', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='vibeflow.no_side_effects', rule_source='ruleset.selection', failure_layer='implementation'),))"
+        },
+        {
+          "case": "test_nested_exception_regions_keep_execution_and_clearing_boundaries[nested_inner_handler_clears-helper-module_helper]",
+          "message": "AssertionError: ('nested_inner_handler_clears', True, 'module_helper', (HealthFinding(code='NODE.PURITY.INPUT_MUTATION', severity='error', subject_type='node', subject_id='probe.task', message='module helper must not mutate inputs via pop', source_location=mappingproxy({'path': '/virtual/input_exception_states.py', 'line': 2, 'column': 5}), suggested_fix='fix_node', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='vibeflow.no_side_effects', rule_source='ruleset.selection', failure_layer='implementation'),))\nassert True == False\n +  where True = bool((HealthFinding(code='NODE.PURITY.INPUT_MUTATION', severity='error', subject_type='node', subject_id='probe.task', message='module helper must not mutate inputs via pop', source_location=mappingproxy({'path': '/virtual/input_exception_states.py', 'line': 2, 'column': 5}), suggested_fix='fix_node', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='vibeflow.no_side_effects', rule_source='ruleset.selection', failure_layer='implementation'),))"
+        },
+        {
+          "case": "test_nested_exception_regions_keep_execution_and_clearing_boundaries[called_nested_body_writes_before_error-direct-method]",
+          "message": "AssertionError: ('called_nested_body_writes_before_error', False, 'method', ())\nassert False == True\n +  where False = bool(())"
+        },
+        {
+          "case": "test_nested_exception_regions_keep_execution_and_clearing_boundaries[called_nested_body_writes_before_error-direct-module_helper]",
+          "message": "AssertionError: ('called_nested_body_writes_before_error', False, 'module_helper', ())\nassert False == True\n +  where False = bool(())"
+        },
+        {
+          "case": "test_nested_exception_regions_keep_execution_and_clearing_boundaries[called_nested_body_writes_before_error-helper-method]",
+          "message": "AssertionError: ('called_nested_body_writes_before_error', True, 'method', ())\nassert False == True\n +  where False = bool(())"
+        },
+        {
+          "case": "test_nested_exception_regions_keep_execution_and_clearing_boundaries[called_nested_body_writes_before_error-helper-module_helper]",
+          "message": "AssertionError: ('called_nested_body_writes_before_error', True, 'module_helper', ())\nassert False == True\n +  where False = bool(())"
+        },
+        {
+          "case": "test_direct_writeback_reference_facts_keep_real_binding_and_call_parameters[nonlocal_both_branch_clear]",
+          "message": "AssertionError: nonlocal_both_branch_clear\nassert True == False\n +  where True = any(<generator object test_direct_writeback_reference_facts_keep_real_binding_and_call_parameters.<locals>.<genexpr> at 0x79b60924dcb0>)"
+        },
+        {
+          "case": "test_formal_effects_direct_input_writeback_uses_shared_reference_facts[nonlocal_both_branch_clear-global_state]",
+          "message": "AssertionError: ('nonlocal_both_branch_clear', 'global_state', (HealthFinding(code='NODE.PURITY.INPUT_MUTATION', severity='error', subject_type='node', subject_id='example.task', message='node must not mutate inputs via pop', source_location=mappingproxy({'path': '/virtual/input_writeback.py', 'line': 13, 'column': 9}), suggested_fix='fix_node', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='', rule_source='ruleset.selection', failure_layer='implementation'),))\nassert True == False\n +  where True = any(<generator object test_formal_effects_direct_input_writeback_uses_shared_reference_facts.<locals>.<genexpr> at 0x79b60911f780>)"
+        },
+        {
+          "case": "test_formal_effects_direct_input_writeback_uses_shared_reference_facts[nonlocal_both_branch_clear-python_io]",
+          "message": "AssertionError: ('nonlocal_both_branch_clear', 'python_io', (HealthFinding(code='NODE.PURITY.GLOBAL_STATE', severity='error', subject_type='node', subject_id='example.task', message='nonlocal mutation is forbidden', source_location=mappingproxy({'path': '/virtual/input_writeback.py', 'line': 6, 'column': 13}), suggested_fix='configure_effect_rules', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='', rule_source='ruleset.selection', failure_layer='implementation'), HealthFinding(code='NODE.PURITY.INPUT_MUTATION', severity='error', subject_type='node', subject_id='example.task', message='node must not mutate inputs via pop', source_location=mappingproxy({'path': '/virtual/input_writeback.py', 'line': 13, 'column': 9}), suggested_fix='fix_node', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='', rule_source='ruleset.selection', failure_layer='implementation'), HealthFinding(code='NODE.PURITY.GLOBAL_STATE', severity='error', subject_type='node', subject_id='example.task', message='nonlocal mutation is forbidden', source_location=mappingproxy({'path': '/virtual/input_writeback.py', 'line': 6, 'column': 13}), suggested_fix='configure_effect_rules', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='', rule_source='ruleset.selection', failure_layer='implementation')))\nassert True == False\n +  where True = any(<generator object test_formal_effects_direct_input_writeback_uses_shared_reference_facts.<locals>.<genexpr> at 0x79b60924f2a0>)"
+        }
+      ],
+      "raw_artifacts_modified": false
+    },
+    {
+      "batch": "after-02-parameter-facts",
+      "stage": "intermediate",
+      "log": "/home/rockingsisyphus/projects/VibeFlow/dist/python-input-exception-validation-20261008/after-02-parameter-facts.log",
+      "log_sha256": "fe0679198b77aaa4bc8522bc0a06486a4ce07e6006f65df14196ca3c5699f146",
+      "junit": "/home/rockingsisyphus/projects/VibeFlow/dist/python-input-exception-validation-20261008/after-02-parameter-facts.xml",
+      "junit_sha256": "b1c820984aaf2f1a2e56aad29cf8bce40818b9c2d0ef994623a691861b2b44bb",
+      "summary": {
+        "kind": "formal-targeted-tests",
+        "launcher": "tools/run_tests.py",
+        "scratch": "/home/rockingsisyphus/.cache/vibeflow-input-exception-20261008/parameter-facts-after-02",
+        "total": 431,
+        "passed": 428,
+        "failed": 3,
+        "errors": 0,
+        "skipped": 0,
+        "failures": [
+          {
+            "name": "test_direct_writeback_reference_facts_keep_real_binding_and_call_parameters[nonlocal_comp]",
+            "classname": "tests.targets.python.test_input_writeback",
+            "message": "AssertionError: nonlocal_comp\nassert False == True\n +  where False = any(<generator object test_direct_writeback_reference_facts_keep_real_binding_and_call_parameters.<locals>.<genexpr> at 0x7c78a77b3920>)",
+            "traceback": "../../../../projects/VibeFlow/tests/targets/python/test_input_writeback.py:137: in test_direct_writeback_reference_facts_keep_real_binding_and_call_parameters\n    assert any(receiver in references for receiver in receivers) == owned, label\nE   AssertionError: nonlocal_comp\nE   assert False == True\nE    +  where False = any(<generator object test_direct_writeback_reference_facts_keep_real_binding_and_call_parameters.<locals>.<genexpr> at 0x7c78a77b3920>)"
+          },
+          {
+            "name": "test_formal_effects_direct_input_writeback_uses_shared_reference_facts[nonlocal_comp-global_state]",
+            "classname": "tests.targets.python.test_input_writeback",
+            "message": "AssertionError: ('nonlocal_comp', 'global_state', ())\nassert False == True\n +  where False = any(<generator object test_formal_effects_direct_input_writeback_uses_shared_reference_facts.<locals>.<genexpr> at 0x7c78a77ea330>)",
+            "traceback": "../../../../projects/VibeFlow/tests/targets/python/test_input_writeback.py:150: in test_formal_effects_direct_input_writeback_uses_shared_reference_facts\n    assert any(\"mutate inputs\" in item.message for item in result.findings) == owned, (label, scope, result.findings)\nE   AssertionError: ('nonlocal_comp', 'global_state', ())\nE   assert False == True\nE    +  where False = any(<generator object test_formal_effects_direct_input_writeback_uses_shared_reference_facts.<locals>.<genexpr> at 0x7c78a77ea330>)"
+          },
+          {
+            "name": "test_formal_effects_direct_input_writeback_uses_shared_reference_facts[nonlocal_comp-python_io]",
+            "classname": "tests.targets.python.test_input_writeback",
+            "message": "AssertionError: ('nonlocal_comp', 'python_io', (HealthFinding(code='NODE.PURITY.GLOBAL_STATE', severity='error', subject_type='node', subject_id='example.task', message='nonlocal mutation is forbidden', source_location=mappingproxy({'path': '/virtual/input_writeback.py', 'line': 6, 'column': 13}), suggested_fix='configure_effect_rules', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='', rule_source='ruleset.selection', failure_layer='implementation'), HealthFinding(code='NODE.PURITY.GLOBAL_STATE', severity='error', subject_type='node', subject_id='example.task', message='nonlocal mutation is forbidden', source_location=mappingproxy({'path': '/virtual/input_writeback.py', 'line': 6, 'column': 13}), suggested_fix='configure_effect_rules', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='', rule_source='ruleset.selection', failure_layer='implementation')))\nassert False == True\n +  where False = any(<generator object test_formal_effects_direct_input_writeback_uses_shared_reference_facts.<locals>.<genexpr> at 0x7c78a766cd40>)",
+            "traceback": "../../../../projects/VibeFlow/tests/targets/python/test_input_writeback.py:150: in test_formal_effects_direct_input_writeback_uses_shared_reference_facts\n    assert any(\"mutate inputs\" in item.message for item in result.findings) == owned, (label, scope, result.findings)\nE   AssertionError: ('nonlocal_comp', 'python_io', (HealthFinding(code='NODE.PURITY.GLOBAL_STATE', severity='error', subject_type='node', subject_id='example.task', message='nonlocal mutation is forbidden', source_location=mappingproxy({'path': '/virtual/input_writeback.py', 'line': 6, 'column': 13}), suggested_fix='configure_effect_rules', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='', rule_source='ruleset.selection', failure_layer='implementation'), HealthFinding(code='NODE.PURITY.GLOBAL_STATE', severity='error', subject_type='node', subject_id='example.task', message='nonlocal mutation is forbidden', source_location=mappingproxy({'path': '/virtual/input_writeback.py', 'line': 6, 'column': 13}), suggested_fix='configure_effect_rules', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='', rule_source='ruleset.selection', failure_layer='implementation')))\nE   assert False == True\nE    +  where False = any(<generator object test_formal_effects_direct_input_writeback_uses_shared_reference_facts.<locals>.<genexpr> at 0x7c78a766cd40>)"
+          }
+        ],
+        "log": "/home/rockingsisyphus/projects/VibeFlow/dist/python-input-exception-validation-20261008/after-02-parameter-facts.log",
+        "xml": "/home/rockingsisyphus/projects/VibeFlow/dist/python-input-exception-validation-20261008/after-02-parameter-facts.xml",
+        "hashes_captured_after_batch": {
+          "src/vibeflow/targets/python/quality/source_analysis/parameter_facts.py": "1c50c9aecea2914bc630a2c0ecafa3eb8d157727b38d4decbf73eaae71a13b11",
+          "src/vibeflow/targets/python/quality/source_analysis/input_tracking.py": "191d9be0c8a803c834de823768084c2c615dcf38f107bdba9da2c4212f781238",
+          "src/vibeflow/targets/python/quality/source_analysis/visitors.py": "f457db35cfd1000304d2a1e64b3ea50321716dc97241a877cde810adef5d20b5",
+          "src/vibeflow/targets/python/quality/rules/effects.py": "73984a4c2948a7308277f39a409da65ac12d60e2d8c2419a6529b245c020c72b",
+          "tests/targets/python/test_input_exception_states.py": "1e0ab9102039851f1b080e3264c72278df2b963a33b6fb7e1084b7a54e540846",
+          "tests/targets/python/test_input_writeback.py": "03403fedf79d996c40447b871e5d083b811e4d26a27a511f4e34925d88dd83a5",
+          "tests/targets/python/test_source_parameter_facts.py": "2a2375cd33db1ab252ed64684e241b8c60c9d950f8dab7107699efe8ff97b24a"
+        }
+      },
+      "failed_cases": [
+        {
+          "case": "test_direct_writeback_reference_facts_keep_real_binding_and_call_parameters[nonlocal_comp]",
+          "message": "AssertionError: nonlocal_comp\nassert False == True\n +  where False = any(<generator object test_direct_writeback_reference_facts_keep_real_binding_and_call_parameters.<locals>.<genexpr> at 0x7c78a77b3920>)"
+        },
+        {
+          "case": "test_formal_effects_direct_input_writeback_uses_shared_reference_facts[nonlocal_comp-global_state]",
+          "message": "AssertionError: ('nonlocal_comp', 'global_state', ())\nassert False == True\n +  where False = any(<generator object test_formal_effects_direct_input_writeback_uses_shared_reference_facts.<locals>.<genexpr> at 0x7c78a77ea330>)"
+        },
+        {
+          "case": "test_formal_effects_direct_input_writeback_uses_shared_reference_facts[nonlocal_comp-python_io]",
+          "message": "AssertionError: ('nonlocal_comp', 'python_io', (HealthFinding(code='NODE.PURITY.GLOBAL_STATE', severity='error', subject_type='node', subject_id='example.task', message='nonlocal mutation is forbidden', source_location=mappingproxy({'path': '/virtual/input_writeback.py', 'line': 6, 'column': 13}), suggested_fix='configure_effect_rules', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='', rule_source='ruleset.selection', failure_layer='implementation'), HealthFinding(code='NODE.PURITY.GLOBAL_STATE', severity='error', subject_type='node', subject_id='example.task', message='nonlocal mutation is forbidden', source_location=mappingproxy({'path': '/virtual/input_writeback.py', 'line': 6, 'column': 13}), suggested_fix='configure_effect_rules', details=mappingproxy({}), root_id='', root_path='', source_path='', definition_id='', rule_source='ruleset.selection', failure_layer='implementation')))\nassert False == True\n +  where False = any(<generator object test_formal_effects_direct_input_writeback_uses_shared_reference_facts.<locals>.<genexpr> at 0x7c78a766cd40>)"
+        }
+      ],
+      "raw_artifacts_modified": false
+    },
+    {
+      "batch": "after-03-parameter-facts",
+      "stage": "final_targeted",
+      "log": "/home/rockingsisyphus/projects/VibeFlow/dist/python-input-exception-validation-20261008/after-03-parameter-facts.log",
+      "log_sha256": "8a81defa52393c9eee0cb63044012c61585ca332dd33fb2d6ece4dce58241176",
+      "junit": "/home/rockingsisyphus/projects/VibeFlow/dist/python-input-exception-validation-20261008/after-03-parameter-facts.xml",
+      "junit_sha256": "47675763d787081827541c2f580a0b8d75e88a8e0b36f3bde5bc98f0a1028afe",
+      "summary": {
+        "kind": "formal-targeted-tests",
+        "launcher": "tools/run_tests.py",
+        "scratch": "/home/rockingsisyphus/.cache/vibeflow-input-exception-20261008/parameter-facts-after-03",
+        "total": 463,
+        "passed": 463,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "groups": {
+          "original_exception_tests": 112,
+          "existing_input_writeback_tests": 293,
+          "new_parameter_and_binding_controls": 58
+        },
+        "log": "/home/rockingsisyphus/projects/VibeFlow/dist/python-input-exception-validation-20261008/after-03-parameter-facts.log",
+        "xml": "/home/rockingsisyphus/projects/VibeFlow/dist/python-input-exception-validation-20261008/after-03-parameter-facts.xml",
+        "hashes_captured_after_batch": {
+          "src/vibeflow/targets/python/quality/source_analysis/parameter_facts.py": "c2cd674aa28d86821bbc89b8bdc2e490c7c8e8ef44876a75f329251327e2ca03",
+          "src/vibeflow/targets/python/quality/source_analysis/input_tracking.py": "ad2ab0532bea6147b7bee65bfc5b628bf61d3d7738b27115e5e033edec8f1893",
+          "src/vibeflow/targets/python/quality/source_analysis/bindings.py": "f012cb2ac445f48608d134b302f6c2432e681b40c000f063e0b19407ae6482b5",
+          "src/vibeflow/targets/python/quality/source_analysis/visitors.py": "f457db35cfd1000304d2a1e64b3ea50321716dc97241a877cde810adef5d20b5",
+          "src/vibeflow/targets/python/quality/rules/effects.py": "73984a4c2948a7308277f39a409da65ac12d60e2d8c2419a6529b245c020c72b",
+          "tests/targets/python/test_input_exception_states.py": "1e0ab9102039851f1b080e3264c72278df2b963a33b6fb7e1084b7a54e540846",
+          "tests/targets/python/test_input_writeback.py": "03403fedf79d996c40447b871e5d083b811e4d26a27a511f4e34925d88dd83a5",
+          "tests/targets/python/test_source_parameter_facts.py": "4eecca8aa6b36559a4f0f2ed7a053e9f64163d96d295f86e098d49bba2aa7bce"
+        },
+        "old_test_sha_unchanged_since_after02": {
+          "tests/targets/python/test_input_exception_states.py": true,
+          "tests/targets/python/test_input_writeback.py": true
+        },
+        "notes": [
+          "Tests use delayed canonical SDK descriptors, actual SourceContext references and native RulePlans; inspected business definitions are not executed.",
+          "This targeted checkout validation does not replace full repository or generated-product validation."
+        ]
+      },
+      "failed_cases": [],
+      "raw_artifacts_modified": false
+    }
+  ],
+  "confirmed_failure_groups": [
+    {
+      "batch": "after-01",
+      "group": "nested_inner_handler_clears",
+      "cases": 4,
+      "observation": "Pure aliases after inner handler clearing still had input-mutation findings."
+    },
+    {
+      "batch": "after-01",
+      "group": "called_nested_body_writes_before_error",
+      "cases": 4,
+      "observation": "Called nested-body input writes followed by an exception lacked input-mutation findings."
+    },
+    {
+      "batch": "after-01",
+      "group": "nonlocal_both_branch_clear",
+      "cases": 3,
+      "observation": "Both-branch clearing left an input-owned fact at the read point."
+    },
+    {
+      "batch": "after-02-parameter-facts",
+      "group": "nonlocal_comp",
+      "cases": 3,
+      "observation": "Input ownership written via a comprehension nonlocal was not propagated to the read point."
+    }
+  ],
+  "final_targeted_passed": 463,
+  "final_targeted_failures": 0,
+  "source_context_targeted86": "Root separately reported86 passed; not counted in these three raw JUnit reports.",
+  "original_observations_and_logs_modified": false
+}
