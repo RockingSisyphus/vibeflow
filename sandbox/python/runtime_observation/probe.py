@@ -8,7 +8,9 @@ import subprocess
 import sys
 import time
 
-from sandbox.python.sdk_defaults.validate_probe import REPOSITORY, write_project
+from sandbox.python.runtime_observation.project import write_project
+
+REPOSITORY = Path(__file__).resolve().parents[3]
 
 
 BODY = '''        info = [{"metrics": {"loss": 0.125}}, {"message": "正在训练第10轮"}]

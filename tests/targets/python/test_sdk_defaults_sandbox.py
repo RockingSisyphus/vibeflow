@@ -7,8 +7,8 @@ import sys
 
 import pytest
 
-from sandbox.python.sdk_defaults.runtime_isolation_probe import observe
-from sandbox.python.sdk_defaults.validate_probe import CASES, execute, write_project
+from tests.fixtures.python.sdk_defaults.runtime_isolation_probe import observe
+from tests.fixtures.python.sdk_defaults.validate_probe import CASES, execute, write_project
 from vibeflow.tooling.application.python.workspace_service import run_workspace_checked
 from vibeflow.tooling.project.workspace_loader import load_workspace_config
 
@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_all_sdk_default_types_and_merge_isolation(tmp_path):
-    script = ROOT / "sandbox/python/sdk_defaults/default_types_probe.py"
+    script = ROOT / "tests/fixtures/python/sdk_defaults/default_types_probe.py"
     result = subprocess.run([sys.executable, "-B", str(script)], cwd=tmp_path,
                             capture_output=True, text=True, check=True)
     report = json.loads(result.stdout)

@@ -4,7 +4,7 @@ import ast
 
 import pytest
 
-from sandbox.python.source_false_positives.probe import CASES, observe
+from tests.fixtures.python.source_false_positives.probe import CASES, observe
 from vibeflow.targets.python.quality.source_context import PythonSourceFile, build_python_source_context
 
 

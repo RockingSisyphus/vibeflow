@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 import os
+import shutil
 import re
 import subprocess
 import sys
@@ -34,7 +35,9 @@ except ImportError:  # direct ``python distribution/build.py`` execution
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = ROOT / "dist" / "vibeflow-distribution"
 DEFAULT_AUTONOMOUS_OUTPUT = ROOT / "dist" / "vibeflow-distribution-autonomous"
-DEFAULT_ARCHIVE_DIR = ROOT / "archive"
+DEFAULT_ARCHIVE_DIR = ROOT / "dist"
+HISTORY_DIR = ROOT / "archive"
+DOCUMENTS_ROOT = ROOT / "distribution" / "docs"
 ARCHIVE_ROOT_NAME = "vibeflow-distribution"
 MINIMAL_PROJECTS_RELATIVE = Path("distribution/minimal_projects")
 PROFILES_PATH = ROOT / "distribution" / "profiles.jsonc"
@@ -110,8 +113,7 @@ def main() -> int:
     parser.add_argument(
         "--archive-dir",
         type=Path,
-        default=DEFAULT_ARCHIVE_DIR,
-        help=f"directory for {ARCHIVE_NAME} (default: {DEFAULT_ARCHIVE_DIR})",
+        help="ZIP output directory (default: beside the output directory; canonical releases use dist)",
     )
     parser.add_argument("--keep-existing", action="store_true", help="fail instead of replacing an existing output directory")
     args = parser.parse_args()
@@ -151,7 +153,7 @@ def main() -> int:
 def build_release(
     output: Path = DEFAULT_OUTPUT,
     *,
-    archive_dir: Path = DEFAULT_ARCHIVE_DIR,
+    archive_dir: Path | None = None,
     replace: bool = True,
     run_self_check: bool = True,
     profile: str = "collaborative",
@@ -159,7 +161,7 @@ def build_release(
     profiles = _load_profiles()
     selected = _select_profile(profiles, profile)
     output = _safe_output_path(output)
-    archive_dir = _safe_archive_dir(archive_dir)
+    archive_dir = _safe_archive_dir(archive_dir if archive_dir is not None else output.parent)
     archive = archive_dir / _archive_name(profile)
     _validate_release_paths(output=output, archive=archive)
     if output.exists() and not replace:
@@ -204,7 +206,7 @@ def build_release_set(
     collaborative_output: Path = DEFAULT_OUTPUT,
     *,
     autonomous_output: Path = DEFAULT_AUTONOMOUS_OUTPUT,
-    archive_dir: Path = DEFAULT_ARCHIVE_DIR,
+    archive_dir: Path | None = None,
     replace: bool = True,
     run_self_check: bool = True,
 ) -> ReleaseSetArtifacts:
@@ -213,13 +215,15 @@ def build_release_set(
         "collaborative": _safe_output_path(collaborative_output),
         "autonomous": _safe_output_path(autonomous_output),
     }
-    archive_dir = _safe_archive_dir(archive_dir)
+    archive_dir = _safe_archive_dir(archive_dir if archive_dir is not None else outputs["collaborative"].parent)
     archives = {name: archive_dir / _archive_name(name) for name in PROFILE_NAMES}
     targets = [*outputs.values(), *archives.values()]
     for left_index, left in enumerate(targets):
         for right in targets[left_index + 1 :]:
             if left == right or left in right.parents or right in left.parents:
                 raise BuildDistributionError(f"release-set paths must not overlap: {left}; {right}")
+    for name in PROFILE_NAMES:
+        _validate_release_paths(output=outputs[name], archive=archives[name])
     if not replace:
         existing = [path for path in targets if path.exists()]
         if existing:
@@ -244,7 +248,7 @@ def build_release_set(
             _verify_staged_distribution(staged_output)
             _write_distribution_archive(staged_output, staged_archive)
             _verify_distribution_archive(staged_output, staged_archive)
-        _publish_release_targets(staging, replace=replace)
+        _publish_latest_release_targets(staging, replace=replace)
     finally:
         for _, root in staging.values():
             if root.exists():
@@ -362,6 +366,13 @@ def _validate_release_paths(*, output: Path, archive: Path) -> None:
             "distribution output and archive paths must not overlap: "
             f"output={output}; archive={archive}"
         )
+    if archive.parent == DEFAULT_ARCHIVE_DIR.resolve():
+        expected_output = (
+            DEFAULT_AUTONOMOUS_OUTPUT
+            if archive.name == AUTONOMOUS_ARCHIVE_NAME else DEFAULT_OUTPUT
+        )
+        if output != expected_output.resolve():
+            raise BuildDistributionError("a canonical dist ZIP requires its matching canonical distribution directory")
 
 
 def _populate_distribution(output: Path, *, profile: DistributionProfile | None = None) -> None:
@@ -408,16 +419,16 @@ def _write_profile_assets(output: Path, profile: DistributionProfile) -> None:
     docs_root = output / "kernel" / "docs"
     docs_root.mkdir(parents=True, exist_ok=True)
     for source in profile.documents:
-        destination = docs_root / source.relative_to(ROOT / "docs")
+        destination = docs_root / source.relative_to(DOCUMENTS_ROOT)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(source.read_bytes())
     profile_document = next(
-        source.relative_to(ROOT / "docs").as_posix()
+        source.relative_to(DOCUMENTS_ROOT).as_posix()
         for source in profile.documents
         if source.parent.name == "profiles"
     )
     links = [
-        f"- [{source.stem}]({source.relative_to(ROOT / 'docs').as_posix()})"
+        f"- [{source.stem}]({source.relative_to(DOCUMENTS_ROOT).as_posix()})"
         for source in profile.documents
     ]
     (docs_root / "README.md").write_text(
@@ -430,12 +441,51 @@ def _write_profile_assets(output: Path, profile: DistributionProfile) -> None:
     )
 
 
-def _publish_release_targets(
+def _publish_latest_release_targets(
     staging: dict[Path, tuple[Path, Path]], *, replace: bool
+) -> None:
+    """Publish current ZIPs and preserve displaced canonical ZIPs in history."""
+    history: dict[Path, tuple[Path, Path]] = {}
+    retirements: dict[Path, Path] = {}
+    for target, (staged, work) in staging.items():
+        if target.parent != ROOT / "dist" or target.suffix != ".zip":
+            continue
+        pattern = (
+            "vibeflow-distribution-autonomous-*.zip"
+            if target.name.startswith("vibeflow-distribution-autonomous-")
+            else "vibeflow-distribution-[0-9]*.zip"
+        )
+        for previous in sorted(target.parent.glob(pattern)):
+            if previous == target and _hash_file(previous) == _hash_file(staged):
+                continue
+            if not replace:
+                raise BuildDistributionError(f"release target already exists: {previous}")
+            digest = _hash_file(previous)
+            destination = HISTORY_DIR / previous.name
+            if destination.exists() and _hash_file(destination) != digest:
+                destination = HISTORY_DIR / "history" / digest / previous.name
+            if not destination.exists():
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                history_work = work / f"history-{len(history)}"
+                history_work.mkdir()
+                payload = history_work / previous.name
+                shutil.copy2(previous, payload)
+                history[destination] = (payload, history_work)
+            if previous not in staging:
+                retirements[previous] = work / f"retired-{len(retirements)}"
+    _publish_release_targets({**staging, **history}, replace=replace, retirements=retirements)
+
+
+def _publish_release_targets(
+    staging: dict[Path, tuple[Path, Path]], *, replace: bool,
+    retirements: dict[Path, Path] | None = None,
 ) -> None:
     backups: dict[Path, Path] = {}
     published: list[Path] = []
     try:
+        for target, backup in (retirements or {}).items():
+            os.replace(target, backup)
+            backups[target] = backup
         for target, (staged, root) in staging.items():
             if target.exists():
                 if not replace:
@@ -506,61 +556,11 @@ def _publish_release_pair(
     output_staging_root: Path,
     archive_staging_root: Path,
 ) -> None:
-    previous_output = output_staging_root / "previous"
-    previous_archive = archive_staging_root / "previous.zip"
-    if not replace:
-        if output.exists():
-            raise BuildDistributionError(f"output already exists: {output}")
-        if archive.exists():
-            raise BuildDistributionError(f"archive already exists: {archive}")
-
-    output_backed_up = False
-    archive_backed_up = False
-    published_output = False
-    published_archive = False
-    try:
-        if output.exists():
-            os.replace(output, previous_output)
-            output_backed_up = True
-        if archive.exists():
-            os.replace(archive, previous_archive)
-            archive_backed_up = True
-        os.replace(staged_output, output)
-        published_output = True
-        os.replace(staged_archive, archive)
-        published_archive = True
-    except BaseException as exc:
-        rollback_errors: list[str] = []
-        if published_archive and archive.exists():
-            try:
-                archive.unlink()
-            except OSError as rollback_exc:
-                rollback_errors.append(f"remove new archive: {rollback_exc}")
-        if published_output and output.exists():
-            try:
-                _remove_tree(output)
-            except OSError as rollback_exc:
-                rollback_errors.append(f"remove new directory: {rollback_exc}")
-        if output_backed_up and previous_output.exists():
-            try:
-                os.replace(previous_output, output)
-            except OSError as rollback_exc:
-                rollback_errors.append(f"restore previous directory: {rollback_exc}")
-        if archive_backed_up and previous_archive.exists():
-            try:
-                os.replace(previous_archive, archive)
-            except OSError as rollback_exc:
-                rollback_errors.append(f"restore previous archive: {rollback_exc}")
-        if rollback_errors:
-            raise BuildDistributionError(
-                "release publication failed and rollback was incomplete: "
-                + "; ".join(rollback_errors)
-            ) from exc
-        raise
-    if previous_output.exists():
-        _remove_tree(previous_output)
-    if previous_archive.exists():
-        previous_archive.unlink()
+    _publish_latest_release_targets(
+        {output: (staged_output, output_staging_root),
+         archive: (staged_archive, archive_staging_root)},
+        replace=replace,
+    )
 
 
 def _run_core_self_check() -> None:
@@ -659,11 +659,11 @@ def _verify_profile_assets(output: Path) -> None:
         for path in docs_root.rglob("*.md")
         if path.is_file() and path.name != "README.md"
     )
-    expected_paths = sorted(source.relative_to(ROOT / "docs") for source in profile.documents)
+    expected_paths = sorted(source.relative_to(DOCUMENTS_ROOT) for source in profile.documents)
     if actual_docs != expected_paths:
         raise BuildDistributionError("generated profile document set is incomplete or contains extras")
     for source in profile.documents:
-        relative = source.relative_to(ROOT / "docs")
+        relative = source.relative_to(DOCUMENTS_ROOT)
         if (docs_root / relative).read_bytes() != source.read_bytes():
             raise BuildDistributionError(f"generated profile document differs from source: {relative}")
     _verify_distribution_document_links(output)

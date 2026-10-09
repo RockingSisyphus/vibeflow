@@ -1,61 +1,32 @@
-# VibeFlow Sandbox
+# VibeFlow 真实使用沙盒
 
-Runnable fixtures are grouped by target and scope:
+沙盒按 Python 与 JavaScript 两个 Target 组织，直接使用工作区 src。项目通过公开 SDK、配置和正式 CLI 模拟用户接入；运行输出与依赖放入临时工作区，不留在案例目录。
 
-- `python/minimal`: compact Python Node, base_lib, Plugin, and config fixture.
-- `python/integration`: the complete Python runtime and CLI sandbox.
-- `python/domain_rules`: model/data tags, domain source ownership, and numerical execution.
-- `python/rule_graph`: external Rule providers/checkers, typed `requires`, and local overrides.
-- `python/source_false_positives`: independent formal CLI controls for local bindings,
-  pure paths, source-visible helper effects and inherited Node implementations;
-  [observations and commands](python/source_false_positives/README.md).
-- `python/exit_stack`: ExitStack receiver identity, deferred callback effects,
-  and project-adaptation negative controls through the formal CLI;
-  [observations and commands](python/exit_stack/README.md).
-- `python/context_reuse`: frozen-fact reuse across subjects, phases and Node
-  types, with formal CLI identity controls;
-  [observations and commands](python/context_reuse/README.md).
-- `python/review_performance`: command-local analysis reuse, presentation without
-  binding, repeated Nodeset/Loop calls and browser-verified canonical products;
-  [observations and commands](python/review_performance/README.md).
-- `python/review_layout`: resource isolation between workflow and detail panels,
-  nested Nodeset/Loop layout, and browser-verified expanded SVG;
-  [observations and commands](python/review_layout/README.md).
-- `python/resource_sections` and `javascript/resource_sections`: ordered Plugin,
-  BaseLib, Host and Node type panels, opt-in Rule details, display-only Nodeset
-  folding, formal CLI and browser checks; [Python](python/resource_sections/README.md)
-  and [JavaScript](javascript/resource_sections/README.md) observations.
-- `adaptation_regressions`: SDK source identity, Record sharing, compiler and
-  inspection phases, resource ownership, Host closure and JS analysis reuse;
-  [cases and commands](adaptation_regressions/README.md).
-- `python/sdk_defaults`: independent SDK JSON-default registration probes,
-  formal CLI observations, and native-container isolation controls; see
-  [its README](python/sdk_defaults/README.md) for the reproduced failures.
-- `javascript/minimal`: minimal JavaScript/TypeScript AOT end-to-end build.
-- `javascript/integration`: the complete TypeScript AOT, Capability, Host
-  Extension, and browser sandbox.
-- `javascript/domain_rules`: code-plugin domain resources through TypeScript analysis and native AOT execution.
-- `javascript/rule_graph`: the same declarative Rule graph through the JavaScript worker.
-- `resources/python` and `resources/javascript`: multi-file Node, BaseLib, Plugin,
-  and JS/TS Host implementations, with formal SVG and Architecture JSONC examples.
+| 场景 | Python | JavaScript |
+| --- | --- | --- |
+| 最小接入 | [minimal](python/minimal/README.md) | [minimal](javascript/minimal/README.md) |
+| 完整工作流、CLI、宿主与生命周期 | [integration](python/integration/README.md) | [integration](javascript/integration/README.md) |
+| 领域插件与真实数值 | [domain_rules](python/domain_rules/README.md) | javascript/domain_rules |
+| 外部规则、资料传递与局部覆盖 | [rule_graph](python/rule_graph/README.md) | [rule_graph](javascript/rule_graph/README.md) |
+| 多文件 Node、库、Plugin 与 Host | [multifile_resources](python/multifile_resources/README.md) | [multifile_resources](javascript/multifile_resources/README.md) |
+| 运行日志、状态与异常 | [runtime_observation](python/runtime_observation/README.md) | [runtime_observation](javascript/runtime_observation/README.md) |
 
-The formal CLI resource matrix covers registration, ownership, rules, edits,
-presentation, and runtime behavior. Its commands and evidence are listed in
-[resources/README.md](resources/README.md).
+错误配置、运行异常和资源释放属于真实使用场景。内部缓存次数、AST/对象身份、历史实现对照及专门的布局回归属于 tests/fixtures，由功能测试或完整仓库验证入口执行，仍保持原覆盖。
 
-The runnable projects are the baseline fixtures. Automated tests copy them and
-exercise invalid declarations, unavailable records, graph conflicts, source
-ownership errors, and formal command failures. See [TEST_COVERAGE.md](TEST_COVERAGE.md)
-for the coverage matrix and repeatable commands.
+## 验证
 
-Integration runners discover a source checkout or built distribution from
-marker files. They use temporary workspaces by default and therefore do not
-leave reports, build directories, dependencies, or package links in this tree.
-Pass `--keep-artifacts` only when the generated files are needed for inspection.
+```bash
+python tools/verify_project.py --full
+```
 
-## 运行观测与注解回归
+单独运行两 Target 的主要沙盒：
 
-- [Python 双日志与状态接口](python/runtime_observation/README.md)
-- [JS/TS AOT 与浏览器状态接口](javascript/runtime_observation/README.md)
-- [类型注解与动态模块访问](python/typing_annotations/README.md)
-- [RuleContext 共享对象图与实际工作流校验](python/readonly_graph/README.md)
+```bash
+python sandbox/python/integration/run_all.py
+python sandbox/javascript/minimal/run_e2e.py
+python sandbox/javascript/integration/run_all.py --puppeteer-root /path/to/renderer
+```
+
+默认运行自动清理临时工作区。需要检查产物时使用 runner 的显式工作目录或 --keep-artifacts，目录放在仓库外，检查后及时清理。
+
+覆盖入口见 [TEST_COVERAGE](TEST_COVERAGE.md)，目录职责见 [开发说明](../docs/maintainers/directory-layout.md)，历史原始观察见 [证据索引](../docs/maintainers/evidence/index.md)。

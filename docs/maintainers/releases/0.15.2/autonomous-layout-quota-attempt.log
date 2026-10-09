@@ -1,4 +1,0 @@
-layout.review.nested_repeat_loop OBSERVATION ERROR RuntimeError('CLI instrumentation failed: {"report": "/tmp/vf-release-0152-isolated/autonomous/layout/layout.review.nested_repeat_loop/observation.json", "exit_code": 2, "error": "OSError(122, \'Disk quota exceeded\')"}\n')
-layout.expanded_svg.nested_repeat_loop OBSERVATION ERROR OSError(122, 'Disk quota exceeded')
-layout.mermaid.explicit_resources OBSERVATION ERROR OSError(122, 'Disk quota exceeded')
-layout.ordinary_svg.explicit_resources OBSERVATION ERROR OSError(122, 'Disk quota exceeded')

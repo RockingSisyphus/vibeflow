@@ -40,8 +40,8 @@ Architecture 中的 `load_state` 记录生成快照时的观察：`loaded`、`no
 
 ## 回归入口
 
-`sandbox/python/review_performance/run_all.py` 在新进程中执行正式 CLI，并在内存中计数，结束后写报告。自动验收检查展示阶段的绑定、规则执行和重复编译，检查真实调用次数及逐文件解析次数。时间使用 monotonic 时钟；代表案例重复三次，报告中位数。
+`tests/fixtures/python/review_performance/run_all.py` 在新进程中执行正式 CLI，并在内存中计数，结束后写报告。自动验收检查展示阶段的绑定、规则执行和重复编译，检查真实调用次数及逐文件解析次数。时间使用 monotonic 时钟；代表案例重复三次，报告中位数。
 
-完整门禁包含该沙箱、实际浏览器 SVG 检验、旧规则回归和分发安装验收。沙箱使用 VibeFlow 自身固定的 SDK 资源；详见[运行说明](../../sandbox/python/review_performance/README.md)。
+完整门禁包含该沙箱、实际浏览器 SVG 检验、旧规则回归和分发安装验收。沙箱使用 VibeFlow 自身固定的 SDK 资源；详见[运行说明](../../tests/fixtures/python/review_performance/README.md)。
 
-`sandbox/python/review_layout/run_all.py` 验证资源只出现在独立资源面板、各层横竖方向及右侧详情排列，并以正式 CLI 和真实浏览器检查最终 SVG，保留修复前后的观察。
+`tests/fixtures/python/review_layout/run_all.py` 验证资源只出现在独立资源面板、各层横竖方向及右侧详情排列，并以正式 CLI 和真实浏览器检查最终 SVG，保留修复前后的观察。

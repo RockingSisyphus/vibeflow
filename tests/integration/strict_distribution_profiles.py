@@ -15,7 +15,7 @@ from distribution.profile_config import DistributionProfileError, load_distribut
 def _profile_payload() -> dict[str, object]:
     return {
         "schema": "vibeflow.distribution-profiles.v1",
-        "document_sets": {"common": ["docs/doc.md"]},
+        "document_sets": {"common": ["distribution/docs/doc.md"]},
         "profiles": {
             "collaborative": {
                 "prompt_fragments": ["distribution/prompts/prompt.md"],
@@ -58,9 +58,9 @@ def _profile_payload() -> dict[str, object]:
 def _write_profiles(tmp_path: Path, payload: dict[str, object]) -> Path:
     repository = tmp_path / "repository"
     (repository / "distribution/prompts").mkdir(parents=True)
-    (repository / "docs").mkdir()
+    (repository / "distribution/docs").mkdir()
     (repository / "distribution/prompts/prompt.md").write_text("prompt\n", encoding="utf-8")
-    (repository / "docs/doc.md").write_text("doc\n", encoding="utf-8")
+    (repository / "distribution/docs/doc.md").write_text("doc\n", encoding="utf-8")
     path = repository / "distribution/profiles.jsonc"
     path.write_text(json.dumps(payload), encoding="utf-8")
     return path

@@ -14,4 +14,4 @@ Rule 和 compiler hook 使用有限图快照：定义保留一次，Nodeset 与 
 
 Target 分别提取入口引用和模块初始化引用。与入口同文件的插件声明承担其模块初始化检查，入口按自己的实际引用检查；没有该声明归属的实现同时检查两者。类型引用、别名，以及初始化时实际调用的本地方法和构造器均保留导入位置；未调用的本地方法不会凭空成为入口依赖。另一 workflow 的声明不会改变当前 workflow 的权限。
 
-复现与机器结果见[适配修复记录](adaptation-repair-20261005.md)及 `sandbox/adaptation_regressions/`。JS/TS 公共 SDK、配置格式和 ABI 保持不变。
+复现与机器结果见[适配修复记录](history/adaptation-repair-20261005.md)及 `tests/fixtures/adaptation_regressions/`。JS/TS 公共 SDK、配置格式和 ABI 保持不变。

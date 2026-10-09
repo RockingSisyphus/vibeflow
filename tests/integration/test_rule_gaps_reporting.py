@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def load(name):
-    spec = importlib.util.spec_from_file_location("gaps_" + name, ROOT / "sandbox/rule_gaps" / (name + ".py"))
+    spec = importlib.util.spec_from_file_location("gaps_" + name, ROOT / "tests/fixtures/rule_gaps" / (name + ".py"))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

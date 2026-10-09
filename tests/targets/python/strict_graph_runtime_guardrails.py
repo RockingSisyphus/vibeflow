@@ -444,7 +444,7 @@ def test_documented_neutral_topologies_are_extracted_validated_and_executed(tmp_
     from pathlib import Path
 
     repository_root = Path(__file__).resolve().parents[3]
-    guide = repository_root / "docs" / "user" / "workflow-and-config.md"
+    guide = repository_root / "distribution" / "docs" / "user" / "workflow-and-config.md"
     pattern = re.compile(
         r"<!-- vibeflow-executable-example: ([a-z0-9-]+) -->\s*```jsonc\n(.*?)\n```",
         re.DOTALL,
@@ -498,7 +498,7 @@ def test_ai_guidance_is_generic_and_contains_required_runtime_guardrails() -> No
     guides = [
         repository_root / "distribution" / "prompts" / "common.md",
         repository_root / "docs" / "design" / "execution-model.md",
-        repository_root / "docs" / "user" / "commands-and-results.md",
+        repository_root / "distribution" / "docs" / "user" / "commands-and-results.md",
     ]
     contents = {path: path.read_text(encoding="utf-8") for path in guides}
     combined = "\n".join(contents.values())
