@@ -508,8 +508,8 @@ class _MermaidRenderer:
         if icon:
             sections[0][0] = f"{icon} {sections[0][0]}"
         if descriptor is not None:
-            selections = self.registry.rulesets(node.type_used)
-            sections.append([f"rulesets: {', '.join(selections) or 'unconstrained'}"])
+            selections = node.rulesets if node.rulesets is not None else self.registry.rulesets(node.type_used)
+            sections.append([f"rulesets: {', '.join(str(getattr(ref, 'rule_id', ref)) for ref in selections) or 'unconstrained'}"])
             if descriptor.tags:
                 sections.append([f"tags: {', '.join(descriptor.tags)}"])
         source_lines = _source_lines(graph.root_id, graph.root_path, graph.source_path)
@@ -559,7 +559,7 @@ class _MermaidRenderer:
         if self.show_semantics:
             call_lines = [
                 f"flow_kind: {node_flow_kind(node, compiled) or nodeset.flow_kind}",
-                f"rulesets: {', '.join(nodeset.graph.rulesets) or 'unconstrained'}",
+                f"rulesets: {', '.join(str(getattr(ref, 'rule_id', ref)) for ref in nodeset.graph.rulesets or ()) or 'unconstrained'}",
                 *_node_metadata_lines(node),
                 *_async_semantic_lines(node),
             ]
@@ -609,7 +609,7 @@ class _MermaidRenderer:
         if self.show_semantics:
             call_lines = [
                 f"flow_kind: {node_flow_kind(node, compiled) or nodeset.flow_kind}",
-                f"rulesets: {', '.join(nodeset.graph.rulesets) or 'unconstrained'}",
+                f"rulesets: {', '.join(str(getattr(ref, 'rule_id', ref)) for ref in nodeset.graph.rulesets or ()) or 'unconstrained'}",
                 *_node_metadata_lines(node),
                 *_async_semantic_lines(node),
             ]

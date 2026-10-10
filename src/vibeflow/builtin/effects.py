@@ -1,6 +1,6 @@
 """Default review selections, independent of language implementation."""
 
-from vibeflow.core.rules.models import EFFECT_POLICY_TYPE, RuleCall, RuleDescriptor, RulesetDescriptor
+from vibeflow.core.rules.models import EFFECT_POLICY_TYPE, RuleCall, RuleDescriptor, RuleRelation, RulesetDescriptor
 from vibeflow.builtin.import_policy import IMPORT_POLICY_SCHEMA
 
 
@@ -22,10 +22,10 @@ def builtin_effect_resources() -> tuple[tuple[RuleDescriptor, ...], tuple[Rulese
                        params_schema={"policy": {"type": "object"}}, params_defaults={"policy": {}}),
         RuleDescriptor("vibeflow.import_side_effects", description="Inspect the selected module before import.",
                        params_schema=scope_schema, params_defaults={"effect_scope": "none", "policy": {}}, handler="vibeflow.import_side_effects", scope="source"),
-        RuleDescriptor("vibeflow.workflow", description="Check current workflow architecture facts.",
+        RuleDescriptor("vibeflow.workflow", description="Aggregate explicit workflow checks.",
+                       inputs={"events": "vibeflow.planned_events.v1", "review": "vibeflow.workflow_review.v1"},
                        outputs={"planned_events": "vibeflow.planned_events.v1", "workflow_review": "vibeflow.workflow_review.v1"},
-                       params_schema={"nodeset_max_depth": {"type": "integer"}, "nodeset_warn_width": {"type": "integer"}},
-                       params_defaults={"nodeset_max_depth": 4, "nodeset_warn_width": 10}, handler="vibeflow.workflow"),
+                       handler="vibeflow.workflow"),
     )
     scopes = {"process": "none", "io": "terminal", "python_io": "python_io", "document": "python_io",
               "data_store": "python_io", "global_state": "global_state", "base_lib": "none"}
@@ -41,8 +41,17 @@ def builtin_effect_resources() -> tuple[tuple[RuleDescriptor, ...], tuple[Rulese
         review_calls = ("effects", "maintainability") if name == "base_lib" else ("effects", "architecture", "inputs", "interface", "maintainability")
         rulesets.append(RulesetDescriptor("vibeflow." + name, calls=calls,
                         entrypoints={"static": review_calls, "run": review_calls, "import": ("imports",)}))
-    rulesets.append(RulesetDescriptor("vibeflow.workflow", calls=(RuleCall("workflow", rule_id="vibeflow.workflow"),),
-                    entrypoints={"static": ("workflow",), "run": ("workflow",)}))
+    topics = ("flow", "join", "nodesets", "duplicates", "planned", "review")
+    rulesets.append(RulesetDescriptor("vibeflow.workflow",
+        calls=(RuleCall("analysis", rule_id="vibeflow.workflow.analysis"),
+               *(RuleCall(name, rule_id="vibeflow.workflow." + name) for name in topics),
+               RuleCall("summary", rule_id="vibeflow.workflow")),
+        relations=(*(RuleRelation(name, "analysis", "requires", {"analysis": "graphs"}) for name in topics),
+                   RuleRelation("summary", "planned", "requires", {"events": "events"}),
+                   RuleRelation("summary", "review", "requires", {"review": "review"}),
+                   *(RuleRelation("summary", name, "requires") for name in topics if name not in {"planned", "review"})),
+        entrypoints={"static": ("summary",), "run": ("summary",)},
+        workflow_default=True, graph_scope="effective_subtree"))
     for name, scope in (("plugin", "none"), ("host_extension", "python_io")):
         rulesets.append(RulesetDescriptor("vibeflow." + name, calls=(
             RuleCall("imports", rule_id="vibeflow.import_side_effects"),

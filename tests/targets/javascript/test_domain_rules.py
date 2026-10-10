@@ -114,9 +114,9 @@ def _domain_cli(workspace: Path, project: Path, command: str, *options: str):
         check=False, capture_output=True, text=True, timeout=60)
 
 
-def _domain_diagnostic(diagnostics, source: Path, line: int):
+def _domain_diagnostic(diagnostics, source: Path, line: int, rule="example.model_definition"):
     finding = next(item for item in diagnostics if item.get("code") == "EXAMPLE.MODEL.LOCATION")
-    assert finding["definition_id"] == "example.model_definition"
+    assert finding["definition_id"] == rule
     assert finding["object_id"] == "example.transform"
     assert finding["source_location"] == {"path": str(source), "line": line, "column": 1}
     assert finding["details"]["node_type"] == "example.transform"
@@ -133,10 +133,10 @@ def test_domain_locations_are_rejected_by_formal_commands_without_publishing(dom
     config = project / "configs/model.jsonc"
     with pytest.raises(ProjectBuildError) as audit_error:
         audit_javascript_project(JavascriptAuditRequest(workspace, config))
-    expected = _domain_diagnostic(audit_error.value.diagnostics, source, line)
+    expected = _domain_diagnostic(audit_error.value.diagnostics, source, line, "example.model_files" if location == "shared_file" else "example.model_definition")
     with pytest.raises(ProjectBuildError) as build_error:
         build_project_aot(ProjectBuildRequest(workspace, config, tmp_path / "dist", "node", "single-esm"))
-    assert _domain_diagnostic(build_error.value.diagnostics, source, line) == expected
+    assert _domain_diagnostic(build_error.value.diagnostics, source, line, "example.model_files" if location == "shared_file" else "example.model_definition") == expected
     assert not (tmp_path / "dist").exists()
 
     for command in ("validate", "quality-check"):
@@ -145,10 +145,10 @@ def test_domain_locations_are_rejected_by_formal_commands_without_publishing(dom
         payload = json.loads(result.stdout)
         assert payload["status"] in {"ERROR", "FAIL"}
         diagnostics = payload["reports"][0]["diagnostics"] if command == "quality-check" else payload["diagnostics"]
-        assert _domain_diagnostic(diagnostics, source, line) == expected
+        assert _domain_diagnostic(diagnostics, source, line, "example.model_files" if location == "shared_file" else "example.model_definition") == expected
         result = _domain_cli(workspace, project, command)
         assert result.returncode == 1, result.stderr or result.stdout
-        for fragment in ("EXAMPLE.MODEL.LOCATION", "example.model_definition", f"{source}:{line}:1", "example.transform"):
+        for fragment in ("EXAMPLE.MODEL.LOCATION", "example.model_files" if location == "shared_file" else "example.model_definition", f"{source}:{line}:1", "example.transform"):
             assert fragment in result.stdout
 
     architecture, output = project / "Architecture.jsonc", tmp_path / "review.svg"
@@ -158,7 +158,7 @@ def test_domain_locations_are_rejected_by_formal_commands_without_publishing(dom
     assert reviewed.returncode == 1, reviewed.stderr or reviewed.stdout
     payload = json.loads(reviewed.stdout)
     assert payload["status"] == "FAIL" and payload["failed_stage"] == "preflight" and payload["published"] is False
-    assert _domain_diagnostic(payload["diagnostics"], source, line) == expected
+    assert _domain_diagnostic(payload["diagnostics"], source, line, "example.model_files" if location == "shared_file" else "example.model_definition") == expected
     assert architecture.read_text() == "previous Architecture" and output.read_text() == "previous SVG"
     assert not list(tmp_path.glob("*.tmp.svg"))
 
@@ -334,7 +334,7 @@ def test_call_effect_policy_keeps_actual_call_config_and_findings(domain_project
 
 def _select_scoped_file_rule(project: Path, scope: str, *, implementation: str = "builtin") -> tuple[Path, Path]:
     helper = project / "nodes/model_helper.ts"
-    helper.write_text("export function multiply(value: number): number { return value * 2; }\n" + "\n" * 12)
+    helper.write_text("export function multiply(value: number): number {\n" + "  value += 0;\n" * 12 + "  return value * 2;\n}\n")
     model = project / "nodes/model.ts"
     model.write_text('import {multiply} from "./model_helper.ts";\n' + model.read_text().replace("return value * 2", "return multiply(value)"))
     # Unused code has neither a descriptor nor a place in this source scope.
@@ -484,9 +484,9 @@ def test_rule_abi_arguments_records_ast_and_native_file_io(domain_project) -> No
     output = project / "rule-output.txt"
     with JavascriptPluginSession() as session:
         session.open_rule("rule:wire", rule={"id": "example.wire", "module": str(rule), "export": "check"}, package_root=project)
-        returned = session.evaluate_rule("rule:wire", context={"facts": {"source_files": [str(project / "nodes/model.ts")]}, "subject": {}, "scope": {}, "phase": "static", "target": "node"}, inputs={"prior": {"type_id": "example.input.v1", "value": 5}}, params={"limit": 9, "file": str(output)})
+        returned = session.evaluate_rule("rule:wire", context={"facts": {"source_files": [str(project / "nodes/model.ts")], "sources": [{"path":str(source),"text":source.read_text()},{"path":str(helper),"text":helper.read_text()}]}, "subject": {}, "scope": {}, "phase": "static", "target": "node"}, inputs={"prior": {"type_id": "example.input.v1", "value": 5}}, params={"limit": 9, "file": str(output)})
     value = returned["records"]["value"]["value"]
-    assert (value["abi"], value["supplied"], value["parameter"]) == ("vibeflow.rule.v1", 5, 9)
+    assert (value["abi"], value["supplied"], value["parameter"]) == ("vibeflow.rule.v2", 5, 9)
     assert "modelForward" in value["names"]
     assert output.read_text() == "rule ran"
     assert value["imports"] == [str(helper)]
@@ -522,3 +522,20 @@ def test_rule_scope_keeps_call_identity_and_caches_source_snapshots(domain_proje
     assert [finding.to_dict()["details"]["call_paths"] for finding in findings] == expected_paths
 
 # Historical mutations are test inputs; publish fixed SDK code explicitly.
+
+
+def test_call_empty_selection_is_used_by_actual_compiler_and_aot_runtime(domain_project, tmp_path):
+    workspace, project = domain_project
+    config = project / "configs/model.jsonc"
+    data = json.loads(config.read_text())
+    data["pipeline"]["nodes"][-1]["rulesets"] = []
+    config.write_text(json.dumps(data))
+    audited = audit_javascript_project(JavascriptAuditRequest(workspace,config))
+    assert audited.compiled.effect_scopes["start"] == "terminal"
+    assert audited.compiled.effect_scopes["end"] == "unconstrained"
+    selected = next(item for item in audited.architecture["rule_selections"] if item["kind"] == "node" and item["call_path"] == ["end"])
+    assert selected["selection"]["references"] == [] and selected["selection"]["replaced"] == ["vibeflow.io"]
+    built = build_project_aot(ProjectBuildRequest(workspace,config,tmp_path / "dist","node","single-esm"))
+    assert built.prepared.compiled.effect_scopes["end"] == "unconstrained"
+    result = subprocess.run(["node","--input-type=module","--eval",f"import {{pathToFileURL}} from 'node:url'; const workflow=await import(pathToFileURL({json.dumps(str(built.entry))})); console.log(JSON.stringify(workflow.runWorkflow({{value:3}})));"],capture_output=True,text=True,check=False)
+    assert result.returncode == 0 and json.loads(result.stdout) == {"result":7}

@@ -109,9 +109,9 @@ planned Nodeset 保留 `type_key`、名称、说明和契约，可以暂时省�
 
 普通 graph 和 Nodeset body 保持无环；重复执行由 Loop 表达。Nodeset 调用和 `loop.body` 都参与递归与最大嵌套深度检查。
 
-workflow 与 Nodeset 默认选择 `vibeflow.workflow` Ruleset，其中深度上限为 4、宽度警告阈值为 10。顶层 pipeline 为 0 层，循环迭代不增加层数；深度超限报错，宽度超限产生 `NODESET.SMELL.TOO_WIDE` 警告及 `CONCERNS` 状态。Ruleset 参数与局部覆盖可以调整这些值；显式空选择取消相应审查，原生解析与执行计划仍照常生成。
+Workflow 的静态默认包含 `vibeflow.workflow`；Nodeset 缺省继承上级有效选择。该 Ruleset 使用整体范围，其中深度上限为 4、宽度警告阈值为 10。顶层 pipeline 为 0 层，循环迭代不增加层数；深度超限报错，宽度超限产生 `NODESET.SMELL.TOO_WIDE` 警告及 `CONCERNS` 状态。Ruleset 参数与局部覆盖可以调整这些值；显式空选择取消相应审查，原生解析与执行计划仍照常生成。
 
-Python root 的 `runtime.nodeset_max_depth` 与 JavaScript root 的 `javascript.nodeset_max_depth` 提供内置规则的默认参数，取正整数。规则的显式参数及 overrides 优先。深度诊断包含实际深度、调用链 `chain` 和逐步调用 `calls`；planned 定义和 loop body 按同一套依赖遍历计数。规则组合见[Ruleset 与局部覆盖](rules-and-nodes.md#ruleset-与局部覆盖)。
+Python root 的 `runtime.nodeset_max_depth` 与 JavaScript root 的 `javascript.nodeset_max_depth` 提供内置规则的默认参数，取正整数。规则的显式参数及 overrides 优先。深度诊断包含实际深度和完整 `call_path`；循环体按静态调用结构计数，显式子选择划定新的负责范围。规则组合见[Ruleset 与局部覆盖](rules-and-nodes.md#ruleset-与局部覆盖)。
 
 验证：
 
@@ -119,3 +119,7 @@ Python root 的 `runtime.nodeset_max_depth` 与 JavaScript root 的 `javascript.
 python run.py validate --config <root>/configs/main.jsonc
 python run.py review --config <root>/configs/main.jsonc --output reports/workflow.svg
 ```
+
+## Nodeset 的规则接管
+
+图级 `rulesets` 写在 Nodeset 定义文件顶层，与 `pipeline` 并列。未填写则继承上级；显式列表替代继承规则、接管内部；`[]` 停止内部继承。上级仍可检查该 Nodeset 调用的外部连接，内部 Node 自己的局部规则继续执行。Node 调用上的 `rulesets` 是局部选择，不能代替 Nodeset 定义上的图级选择。完整写法见 [Nodeset 接管的配置位置](rules-and-nodes.md#nodeset-接管的配置位置)。

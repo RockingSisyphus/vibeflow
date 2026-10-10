@@ -92,7 +92,7 @@ Decision Node 使用 `flow_kind="decision"`，提供 route-like 输出，例如 
 | `vibeflow.document` / `vibeflow.data_store` Ruleset | 允许文件、网络、数据库等 Python I/O |
 | `vibeflow.global_state` Ruleset | 允许有限效果检查所识别的共享／模块状态操作，仍执行其他所选检查 |
 
-Node 的代码声明直接选择 Ruleset，并通过 workflow 选中的插件贡献。省略或空列表表示未选择 Node 审查规则；报告中的 `effect_scope` 来自有效规则记录。`flow_kind` 描述执行身份，`external` 标记外部边界，副作用权限由规则表达。详见[Rule 与 Node](rules-and-nodes.md)。需要协调 `global_state` 冲突资源时使用静态命名 `execution_lock`；相同 key 互斥，不同 key 可并行。
+Node 的代码声明直接选择 Ruleset，并通过 workflow 选中的插件贡献。类型声明中的列表提供默认，调用 Config 的缺省使用默认、非空完整替代、空列表取消局部选择；报告中的 `effect_scope` 来自有效规则记录。`flow_kind` 描述执行身份，`external` 标记外部边界，副作用权限由规则表达。详见[Rule 与 Node](rules-and-nodes.md)。需要协调 `global_state` 冲突资源时使用静态命名 `execution_lock`；相同 key 互斥，不同 key 可并行。
 
 ## 可执行结构示例
 
@@ -177,3 +177,7 @@ workspace 根的 `vibeflow_config.jsonc` 登记项目 root。每个 root 的 `vi
 python run.py architecture --config <root>/configs/main.jsonc --output <root>/ARCHITECTURE.jsonc
 python run.py validate --config <root>/configs/main.jsonc
 ```
+
+## Workflow 的规则选择
+
+Workflow 顶层的 `rulesets` 未填写时，使用内置及所选 Plugin 的 Workflow 默认；非空列表替代全部默认，`[]` 取消根图规则。Node 调用自身的 `rulesets` 独立控制局部规则，不解除图级约束。需要同时保留内置 Workflow 审查与自定义图规则时，应显式列出 `["vibeflow.workflow", "example.graph"]`。定义和接入方法见 [规则选择与插件示例](rules-and-nodes.md)。

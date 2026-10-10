@@ -40,64 +40,34 @@ class _CompositeChild:
     nodeset: NodesetSpec | None
 
 
-def node_configuration_findings(
-    graph: GraphConfig,
-    *,
-    registry: NodeRegistry,
-    global_config: Mapping[str, object] | ConfigScope | None = None,
-) -> tuple[HealthFinding, ...]:
-    findings: list[HealthFinding] = []
-    called_nodesets: set[str] = set()
-    _validate_graph_node_configs(
-        graph,
-        registry=registry,
-        findings=findings,
-        owner="pipeline",
-        global_scope=normalize_config_scope(global_config),
-        overrides={},
-        called_nodesets=called_nodesets,
-        stack=(),
-    )
-    for nodeset in graph.nodesets.values():
-        if nodeset.type_key in called_nodesets or not nodeset.graph.rulesets:
-            continue
-        _validate_graph_node_configs(
-            nodeset.graph,
-            registry=registry,
-            findings=findings,
-            owner=f"nodeset:{nodeset.type_key}",
-            global_scope=normalize_config_scope(nodeset.global_config),
-            overrides={},
-            called_nodesets=called_nodesets,
-            stack=(nodeset.type_key,),
-        )
-    _validate_nodeset_override_paths(graph, registry=registry, findings=findings)
-    return tuple(findings)
-
-
-def _validate_graph_node_configs(
-    graph: GraphConfig,
-    *,
-    registry: NodeRegistry,
-    findings: list[HealthFinding],
-    owner: str,
-    global_scope: ConfigScope,
-    overrides: Mapping[str, Mapping[str, object]],
-    called_nodesets: set[str],
-    stack: tuple[str, ...],
-) -> None:
+def current_node_configuration_findings(graph, *, registry, owner, global_config=None, overrides=None):
+    """Validate only current calls; child tasks own their internal parameters."""
+    findings = []
+    scope = normalize_config_scope(global_config)
+    overrides = overrides or {}
     for node in graph.nodes:
-        if node.status == STATUS_PLANNED:
+        if node.status == STATUS_PLANNED or node.type_used == IO_NODE_TYPE:
             continue
-        if node.type_used == IO_NODE_TYPE:
+        child = _resolve_composite_child(node, graph)
+        if child is not None:
+            if child.nodeset is not None:
+                _append_override_warning(findings, rule_id="CONFIG.GLOBAL_CONFIG.OVERRIDES_LOCAL",
+                    object_id=node.id, message=f"global config overrides nodeset call config: {node.id}",
+                    base=node.params, override=scope.values, allow=scope.allow_config_override,
+                    details={"owner":owner, "nodeset":child.type_key})
+                caller = node_invocation_scope({**node.params, **scope.values, **overrides.get(node.id, {})},
+                    allow_config_override=node.allow_config_override)
+                _append_override_warning(findings, rule_id="NODESET.CONFIG.OVERRIDES_GLOBAL_CONFIG",
+                    object_id=node.id, message=f"nodeset call config overrides nodeset global_config: {node.id}",
+                    base=normalize_config_scope(child.nodeset.global_config).values,
+                    override=caller.values, allow=caller.allow_config_override,
+                    details={"owner":owner, "nodeset":child.type_key})
+                _validate_override_map(node.id, child.nodeset, node.node_config_overrides,
+                    registry=registry, findings=findings)
             continue
-        if node.type_used in LOOP_NODE_TYPES:
-            _validate_nodeset_call_config(node, graph, registry=registry, findings=findings, owner=owner, global_scope=global_scope, overrides=overrides, called_nodesets=called_nodesets, stack=stack, nodeset_name=node.loop.body)
-            continue
-        if node.type_used in graph.nodesets:
-            _validate_nodeset_call_config(node, graph, registry=registry, findings=findings, owner=owner, global_scope=global_scope, overrides=overrides, called_nodesets=called_nodesets, stack=stack)
-            continue
-        _append_node_config_finding(node, registry=registry, findings=findings, owner=owner, global_scope=global_scope, overrides=overrides)
+        _append_node_config_finding(node, registry=registry, findings=findings, owner=owner,
+            global_scope=scope, overrides=overrides or {})
+    return tuple(findings)
 
 
 def _append_node_config_finding(
@@ -132,82 +102,6 @@ def _append_node_config_finding(
                 details={"type_used": node.type_used, "owner": owner, "params": dict(node.params), "global_config": dict(global_scope.values)},
             )
         )
-
-
-def _validate_nodeset_call_config(
-    node: NodeSpec,
-    graph: GraphConfig,
-    *,
-    registry: NodeRegistry,
-    findings: list[HealthFinding],
-    owner: str,
-    global_scope: ConfigScope,
-    overrides: Mapping[str, Mapping[str, object]],
-    called_nodesets: set[str],
-    stack: tuple[str, ...],
-    nodeset_name: str | None = None,
-) -> None:
-    nodeset_name = nodeset_name or node.type_used
-    nodeset = graph.nodesets.get(nodeset_name)
-    if nodeset is None or nodeset_name in stack or not nodeset.graph.rulesets:
-        return
-    called_nodesets.add(nodeset_name)
-    _append_override_warning(
-        findings,
-        rule_id="CONFIG.GLOBAL_CONFIG.OVERRIDES_NODESET_CONFIG",
-        object_id=node.id,
-        message=f"global config overrides nodeset call config: {node.id}",
-        base=node.params,
-        override=global_scope.values,
-        allow=global_scope.allow_config_override,
-        details={"owner": owner, "nodeset": nodeset_name},
-    )
-    caller_values = {**dict(node.params), **dict(global_scope.values), **dict(overrides.get(node.id, {}))}
-    caller_scope = node_invocation_scope(caller_values, allow_config_override=node.allow_config_override)
-    internal_scope = normalize_config_scope(nodeset.global_config)
-    _append_override_warning(
-        findings,
-        rule_id="NODESET.CONFIG.OVERRIDES_GLOBAL_CONFIG",
-        object_id=node.id,
-        message=f"nodeset call config overrides nodeset global_config: {node.id}",
-        base=internal_scope.values,
-        override=caller_scope.values,
-        allow=caller_scope.allow_config_override,
-        details={"owner": owner, "nodeset": nodeset_name},
-    )
-    child_scope = merge_config_scopes(internal_scope, caller_scope)
-    _validate_graph_node_configs(
-        nodeset.graph,
-        registry=registry,
-        findings=findings,
-        owner=f"nodeset:{nodeset.type_key}",
-        global_scope=child_scope,
-        overrides=nested_node_config_overrides(node, overrides),
-        called_nodesets=called_nodesets,
-        stack=(*stack, nodeset_name),
-    )
-
-
-def _validate_nodeset_override_paths(
-    graph: GraphConfig,
-    *,
-    registry: NodeRegistry,
-    findings: list[HealthFinding],
-    visited_nodesets: set[str] | None = None,
-) -> None:
-    if visited_nodesets is None:
-        visited_nodesets = set()
-    for node in graph.nodes:
-        child = _resolve_composite_child(node, graph)
-        if child is not None:
-            if child.nodeset is None:
-                continue
-            _validate_override_map(node.id, child.nodeset, node.node_config_overrides, registry=registry, findings=findings)
-    for nodeset in graph.nodesets.values():
-        if nodeset.type_key in visited_nodesets:
-            continue
-        visited_nodesets.add(nodeset.type_key)
-        _validate_nodeset_override_paths(nodeset.graph, registry=registry, findings=findings, visited_nodesets=visited_nodesets)
 
 
 def _validate_override_map(
@@ -363,4 +257,4 @@ def _node_config_finding(
         details=dict(details or {}),
     )
 
-__all__ = ["node_configuration_findings"]
+__all__ = ["current_node_configuration_findings"]

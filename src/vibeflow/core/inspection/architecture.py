@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from vibeflow.core.rules.selection import selection_data
+
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.constants import (
     EFFECT_SCOPE_GLOBAL_STATE,
@@ -32,7 +34,7 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
         else any(declared_global_state.values())
     )
     return {
-        "rulesets": list(graph.rulesets),
+        "rulesets": selection_data(graph.rulesets),
         "summary": {
             "nodes": len(nodes),
             "nodesets": len(graph.nodesets),

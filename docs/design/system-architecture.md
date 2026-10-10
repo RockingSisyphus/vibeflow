@@ -40,21 +40,15 @@ Python 和 JavaScript Target 使用相同 Core 语义，但分别声明可执行
 
 ## 规则与 Node 声明
 
-公开规则模型位于 `vibeflow.core.rules`，完整 Node 声明和 ContributionBuilder/PluginContributions 位于 `vibeflow.core.descriptors`。Node 自己声明规则和默认展示；省略 `rulesets` 与显式 `[]` 都表示不选择 Node 审查规则。workflow 与 Nodeset 的顶层 `rulesets` 默认选择 `vibeflow.workflow`。自由 tags/metadata 可供领域规则识别业务含义，不改变原生 Node/Nodeset/Loop 的组合与执行。
+公开规则模型位于 `vibeflow.core.rules`。`selection/static` 与 `selection/dynamic` 只读选择来源，`selection/resolve.py` 统一默认、继承与完整替代，`planning.py` 统一调用路径、范围与接管边界；Targets 负责语言事实与绑定。内置及所选 Plugin 的 `workflow_default` Ruleset 贡献根默认，不向 Config 递归注入规则。
 
-Rule 图使用独立的 includes/requires/overrides 关系，不使用业务边的调度和数据传递语义。Core 先展开组合、解析显式覆盖，再按具名资料依赖执行选中规则。覆盖链决定优先级，文件加载顺序不决定结果；规则不能删除其他规则的诊断。
+Node 类型声明提供局部默认，调用 Config 缺省使用默认、非空完整替代、`[]` 取消当前调用的局部选择。Workflow 缺省使用静态默认；Nodeset 缺省继承，显式选择接管内部。Node 局部与所属图规则共同生效。父图保留子调用外部契约，内部由子选择负责。
 
-Target 提供当前检查范围的源码、符号、导入、实际实现和 helper 归属，选中的 Rule 消费这些事实作判断。Rule ABI 为 `vibeflow.rule.v1`，接口是 `check(context, inputs, params)`；Plugin ABI 为 `vibeflow.plugin.v3`。固定插件经 Python/JS SDK 贡献资源，并可提供 compiler/runtime 生命周期与变换；workflow 的 plugins 是自定义资源唯一启用入口。公开上下文提供只读视图，受信扩展代码仍可访问文件系统，不构成操作系统沙箱。
+图 Rule 的背景资料与负责范围分开：`current_graph` 逐图检查，`effective_subtree` 在范围入口执行一次，显式子选择停止遍历。每个完整 Ruleset 依赖计划只有一种图范围，Records 只在显式同范围依赖中传递。范围规划先避免重叠，再由统一执行器复用等价 source 计算。
 
-Rule 使用 `RuleImplementationDescriptor(language, source)` 表达执行语言与入口，每个执行族最多一个兼容实现。JS Rule 在 Node worker 中检查，用户程序平台通过上下文提供。Target 提取 `ProjectQualityFacts`，Core 的 `evaluate_project_quality(facts, rulesets=..., rules=..., ruleset_catalog=..., handlers=...)` 将事实交给选定规则图；报告保留 rule_executions 与 record_availability。
+Node 公开上下文只含当前声明、调用、实现/继承实现及实际 helper 闭包，不含其他 Node、全图或 Catalog。源码、AST、引用和归属遵守同一符号边界，保留真实位置。Target 内部继续分析真实模块初始化和资源归属；原生解析、绑定、编译错误独立于规则选择。
 
-JS 内置 Rule 可绑定原生 Python callable，与外部 worker 绑定共用解析。综合主题直接调用判定算法，不在内部创建固定小规则图；独立 topic Rule 的选择和执行单独记录。项目默认规则由 Application 装配，Core 空选择只返回事实。
-
-Python 的 Node、BaseLib、Plugin 和普通源码共用效果 visitor，真实解析调用优先于函数名称猜测；各资源保留自己的结构、接口、支撑文件和诊断等级要求。两种 Target 都将 RulePlan 的有效参数传入实际判定，JavaScript 通过独立 `ruleParams` 传递；资源 owner 和依赖只作为事实，不承载另一份效果权限。缓存包含有效参数与源码归属，`effect_policy` 记录实际约束。
-
-效果检查按当前 subject 的真实实现符号、支撑文件及可达 helper 取范围；同一声明模块中的独立资源不会相互套用参数。Node 实际调用库 helper 时仍按 Node 的选择检查函数体，库自身审查保持独立。完整源码闭包继续供导入初始化、ownership 和领域 Rule 查询；编译专用源码不会因为与 runtime 同文件而成为 runtime 的效果，但其所属 compiler Plugin 仍按自己的规则检查。
-
-默认参数按实际绑定的 handler 提供。effects/imports 只消费导入政策，指标参数只进入对应指标规则；未知或不相关参数明确失败。Core 对对象参数的整体替换及逐参数来源记录保持不变。导入允许不解除效果或资源依赖约束，`global_state` 不允许修改 builtin、原型或宿主关键状态。
+Rule ABI 为 `vibeflow.rule.v2`，入口是 `check(context, inputs, params)`；Plugin ABI 保持 `vibeflow.plugin.v3`。内置 Workflow 由明确的分析、叶检查、汇总和 Records 依赖组成，保留统一执行器和诊断。公开上下文只读，可信扩展仍可访问文件系统，不构成安全沙箱。设计理由、范围示例、目录职责与回归依据见 [Rule 机制设计](rule-system.md)；插件定义与使用见 [用户规则手册](../../distribution/docs/user/rules-and-nodes.md)，升级见 [迁移手册](../../distribution/docs/user/rule-system-migration.md)。
 
 ## 插件装配与多文件源码
 

@@ -24,6 +24,7 @@ EXACT_ARTIFACTS = (
     ".pytest_cache",
     "build",
     "output",
+    "outputs",
     "reports",
     "review_artifacts",
     "runs",

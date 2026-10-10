@@ -1,9 +1,0 @@
-{
-  "kind": "data_schema",
-  "type_key": "sandbox.branch.message",
-  "representation": "json",
-  "schema": {
-    "type": "string",
-    "minLength": 1
-  }
-}

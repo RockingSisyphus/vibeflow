@@ -132,6 +132,8 @@ def test_architecture_cli_stdout_contains_canonical_document(tmp_path, capsys) -
         "node_types",
         "resources",
         "implementation_graph",
+        "call_effect_scopes",
+        "rule_selections",
     ]
     graph = json.loads(output.removeprefix(ARCHITECTURE_DOCUMENT_HEADER))["implementation_graph"]
     assert set(graph) == {"resources", "files", "relations"}
@@ -441,4 +443,6 @@ def test_workspace_run_writes_canonical_architecture_artifact(tmp_path) -> None:
         "node_types",
         "resources",
         "implementation_graph",
+        "call_effect_scopes",
+        "rule_selections",
     ]

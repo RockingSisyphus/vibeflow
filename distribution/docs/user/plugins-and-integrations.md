@@ -2,7 +2,7 @@
 
 固定插件贡献自定义 Node、Rule、Ruleset、DataSchema、BaseLib、Capability 和 HostExtension。Python 用 `Plugin`，JS/TS 用 `definePlugin`；workflow 的 `plugins` 显式选择本次使用的插件及资源。
 
-默认规则和资源由内置插件自动接入，Config 无需声明。它们与外部插件共用 Catalog、冲突诊断和实现绑定；报告记录实际声明及实现来源。资源存在与规则选择是独立的，`rulesets=[]` 不触发默认检查。
+默认规则和资源由内置插件自动接入，Config 无需声明。报告记录实际声明及实现来源。插件贡献普通 Rule/Ruleset 只让其可被引用；设置 `workflow_default` 的 Ruleset 才加入 Workflow 默认。Workflow/Nodeset 的 `rulesets=[]` 取消对应图级选择，Node 调用的 `[]` 只取消自身局部选择。
 
 ## 选择与配置
 
@@ -17,16 +17,30 @@
 }
 ```
 
-`id` 可选，用来核对插件导出身份。`root` 可选，取已登记的 workspace root ID。文件相对该 root；`module/package` 显式定位 Target 已安装的模块。插件导出固定资源列表、契约和规则组合；`config` 按插件 schema/defaults 合并，提供给 Rule 的只读 `context.facts["plugins"]` 及生命周期工厂。Node 调用 `params` 和 Ruleset 参数分别配置。
+`id` 可选，用来核对插件导出身份。`root` 可选，取已登记的 workspace root ID。文件相对该 root；`module/package` 显式定位 Target 已安装的模块。插件导出固定资源列表、契约和规则组合；`config` 按插件 schema/defaults 合并，提供给图级和资源 Rule 的只读 `context.facts["plugins"]` 及生命周期工厂；Node 局部 Rule 使用自身声明、Rule 参数和当前调用资料。Node 调用 `params` 和 Ruleset 参数分别配置。
 
 不同 workflow 拥有独立的资源集合、插件配置和生命周期实例。`enabled: false` 跳过加载；`status: "planned"` 保存规划记录。Nodeset 的结构由导入文件提供，所需插件统一在顶层 workflow 选择。
+
+## Plugin 如何贡献和使用规则
+
+把 Python 的 `@rule` 函数与 `ruleset(...)` 对象，或 JS/TS 的 `defineRule(...)` 与 `defineRuleset(...)` 对象，全部放进插件 `resources`。然后在顶层 Workflow 的 `plugins` 中选择这个固定导出。
+
+规则有两种默认声明、三种动态选择：
+
+- Node 类型的 `rulesets` 声明局部默认；Ruleset 的 `workflow_default` 声明 Workflow 默认。
+- Workflow、Nodeset 定义、Node 调用 Config 的 `rulesets` 可以显式选择已贡献的 Rule/Ruleset。
+- 动态列表替代对应默认或继承列表，局部规则与所属图级规则共同生效。
+
+Plugin 自己的 `rulesets` 检查其生命周期实现，`declaration_rulesets` 检查插件包声明；这两个字段不会给 Workflow 或全部 Node 附加规则。要提供 Workflow 默认，应在贡献的 **Ruleset** 上填写 `workflow_default`。
+
+完整 Python/TypeScript 定义、配置位置和替代示例见 [Rule、Ruleset 与 Node 声明](rules-and-nodes.md)。
 
 ## 加载与检查
 
 VibeFlow 按以下顺序装配当前 workflow：
 
 1. 读取插件选择，加载受信入口及其直接导入，取得固定定义。
-2. 校验资源、配置和冲突，冻结本次资源集合。
+2. 校验资源、配置和冲突，确定本次可用资源。
 3. 解析工作流引用和有效 Ruleset，再执行对应阶段的检查。
 4. 绑定延迟实现，进入原生构建或运行；生命周期工厂在各自阶段创建实例。
 

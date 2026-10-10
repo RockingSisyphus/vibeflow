@@ -52,6 +52,7 @@ class PreparationState:
     used_nodes: dict[str, NodeDescriptor]
     used_types: set[str]
     used_io_operations: set[str]
+    call_effect_scopes: Mapping = None
 
 
 def prepare_graph(
@@ -129,6 +130,8 @@ def prepare_graph(
                 set(nodeset.graph.nodesets),
                 f"nodeset:{nodeset.type_key}",
             )
+            from vibeflow.targets.javascript.frontend.facts import apply_call_effect_scopes
+            child_compiled = apply_call_effect_scopes(child_compiled, nodeset.graph, state.call_effect_scopes or {}, call_path)
             state.compiled_by_path[call_path] = child_compiled
             prepare_graph(
                 nodeset.graph,

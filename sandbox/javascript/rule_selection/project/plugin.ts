@@ -1,0 +1,8 @@
+import {definePlugin,defineRuleset} from "@vibeflow/plugin";
+import {boundary} from "./nodes.ts";
+import {analyze,graphCheck,localCheck} from "./rules.ts";
+const r0 = defineRuleset({"id": "selection.default", "workflow_default": true, "graph_scope": "current_graph", "calls": [{"id": "analyze", "rule_id": "selection.analyze", "params": {"label": "selection.default"}}, {"id": "check", "rule_id": "selection.graph_check"}], "relations": [{"source": "check", "target": "analyze", "kind": "requires", "bindings": {"coverage": "coverage"}}], "entrypoints": {"static": ["check"]}});
+const r1 = defineRuleset({"id": "selection.child", "graph_scope": "current_graph", "calls": [{"id": "analyze", "rule_id": "selection.analyze", "params": {"label": "selection.child"}}, {"id": "check", "rule_id": "selection.graph_check"}], "relations": [{"source": "check", "target": "analyze", "kind": "requires", "bindings": {"coverage": "coverage"}}], "entrypoints": {"static": ["check"]}});
+const r2 = defineRuleset({"id": "selection.whole", "graph_scope": "effective_subtree", "calls": [{"id": "analyze", "rule_id": "selection.analyze", "params": {"label": "selection.whole"}}, {"id": "check", "rule_id": "selection.graph_check"}], "relations": [{"source": "check", "target": "analyze", "kind": "requires", "bindings": {"coverage": "coverage"}}], "entrypoints": {"static": ["check"]}});
+const r3 = defineRuleset({"id": "selection.local", "calls": [{"id": "check", "rule_id": "selection.local_check"}], "entrypoints": {"static": ["check"]}});
+export const plugin = definePlugin({id:"selection.plugin",resources:[boundary,analyze,graphCheck,localCheck,r0,r1,r2,r3]});

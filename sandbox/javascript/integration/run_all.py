@@ -100,11 +100,6 @@ from vibeflow.tooling.application.javascript.build import (
 
 from advanced_cases import (
     detached_case,
-    edge_role_case,
-    execution_model_case,
-    loop_max_error_case,
-    nested_async_case,
-    nested_override_case,
     runtime_error_case,
 )
 from declaration_cases import (
@@ -115,30 +110,11 @@ from declaration_cases import (
 from host_extension_cases import (
     browser_permanent_port_host_case,
     host_extension_case,
-    permanent_port_host_case,
-)
-from plugin_cases import (
-    build_plugin_hook_case,
-    plugin_manifest_case,
-    runtime_plugin_concurrent_isolation_case,
-    runtime_plugin_repeat_case,
 )
 from runtime_cases import (
-    async_capability_case,
-    branch_case,
     capability_error_case,
-    capability_isolation_case,
-    concurrent_trace_case,
-    fanout_case,
     import_case,
     input_error_case,
-    linear_case,
-    loop_case,
-    loop_stop_when_case,
-    nodeset_case,
-    optional_input_case,
-    port_math_case,
-    repeat_case,
 )
 
 
@@ -635,6 +611,44 @@ def _source_marker_location(path: Path, marker: str) -> tuple[int, int]:
     return source.count("\n", 0, offset) + 1, offset - previous_newline
 
 
+def _addition_case(name):
+    work = _RUNTIME_ROOT / name
+    command = [sys.executable, str(_SOURCE_SANDBOX_ROOT.parent / name / "run_all.py"),
+               "--work-dir", str(work), "--toolchain-root", str(PROJECT_ROOT)]
+    completed = subprocess.run(command, capture_output=True, text=True,
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+    if completed.returncode:
+        raise AssertionError(completed.stdout + completed.stderr)
+    payload = json.loads((work / "report.json").read_text())
+    assert payload["status"] == "PASS", payload
+    return payload
+
+
+def _rule_selection_case():
+    work = _RUNTIME_ROOT / "rule_selection"
+    command = [sys.executable, str(_SOURCE_SANDBOX_ROOT.parent / "rule_selection/run_all.py"),
+               "--work-dir", str(work), "--toolchain-root", str(PROJECT_ROOT)]
+    completed = subprocess.run(command, capture_output=True, text=True,
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+    if completed.returncode:
+        raise AssertionError(completed.stdout + completed.stderr)
+    return json.loads((work / "report.json").read_text())
+
+
+def _comprehensive_math_case(puppeteer_root: Path, *, skip_browser: bool):
+    work = _RUNTIME_ROOT / "comprehensive_math"
+    command = [sys.executable, str(_SOURCE_SANDBOX_ROOT.parent / "comprehensive_math/run_all.py"),
+               "--work-dir", str(work), "--toolchain-root", str(PROJECT_ROOT),
+               "--puppeteer-root", str(puppeteer_root)]
+    if skip_browser:
+        command.append("--skip-browser")
+    completed = subprocess.run(command, capture_output=True, text=True,
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+    if completed.returncode:
+        raise AssertionError(completed.stdout + completed.stderr)
+    return json.loads((work / "report.json").read_text())
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Build and run the VibeFlow TypeScript integration sandbox."
@@ -685,36 +699,24 @@ def main() -> int:
         optional_input = lambda: cache.build(
             "optional_input", "optional_input.jsonc"
         )
-        fanout = lambda: cache.build("fanout", "fanout_join.jsonc")
-        edge_roles = lambda: cache.build("edge_roles", "edge_roles.jsonc")
-        branch = lambda: cache.build("branch", "branch_join.jsonc")
-        nodeset = lambda: cache.build("nodeset", "nodeset.jsonc")
-        loop = lambda: cache.build("loop", "loop.jsonc")
-        loop_stop_when = lambda: cache.build(
-            "loop_stop_when", "loop_stop_when.jsonc"
-        )
-        loop_max_failure = lambda: cache.build(
-            "loop_max_failure", "loop_max_failure.jsonc"
-        )
         async_capability = lambda: cache.build(
             "async_capability", "async_capability.jsonc"
         )
         detached = lambda: cache.build("detached", "detached.jsonc")
-        port_math = lambda: cache.build("port_math", "port_math.jsonc")
-        nested_override = lambda: cache.build(
-            "nested_override", "nested_override.jsonc"
-        )
-        nested_async = lambda: cache.build(
-            "nested_async", "nested_async.jsonc"
-        )
         runtime_node_failure = lambda: cache.build(
             "runtime_node_failure", "runtime_node_failure.jsonc"
         )
         runtime_output_failure = lambda: cache.build(
             "runtime_output_failure", "runtime_output_failure.jsonc"
         )
-        plugins = lambda: cache.build("plugins", "plugins.jsonc")
         cases: list[tuple[str, Any]] = [
+            ("rules:selection-and-boundaries", _rule_selection_case),
+            ("math:workflow-nesting-and-trace", lambda: _addition_case("workflow_math")),
+            ("math:plugin-addition", lambda: _addition_case("plugin_addition")),
+            ("math:async-addition", lambda: _addition_case("async_addition")),
+            ("math:comprehensive-plugin-rules", lambda: _comprehensive_math_case(
+                puppeteer_root, skip_browser=args.skip_browser
+            )),
             ("review:javascript-expanded-parity", lambda: _review_case(puppeteer_root)),
             ("profile:esm-module", lambda: _manifest_case(
                 cache, key="linear_module", profile="esm-module"
@@ -724,79 +726,15 @@ def main() -> int:
             )),
             ("profile:web-app", lambda: _web_profile_case(cache)),
             ("host-extension:lifecycle-and-capability", lambda: host_extension_case(cache)),
-            ("host-extension:async-permanent-port-cleanup",
-             lambda: permanent_port_host_case(cache)),
-            ("plugin:manifest-and-planned", lambda: plugin_manifest_case(
-                plugins()
-            )),
-            ("plugin:policy-compiler-hooks", lambda: build_plugin_hook_case(
-                plugins()
-            )),
-            ("plugin:runtime-repeat", lambda: runtime_plugin_repeat_case(
-                plugins()
-            )),
-            (
-                "plugin:runtime-concurrent-isolation",
-                lambda: runtime_plugin_concurrent_isolation_case(plugins()),
-            ),
-            (
-                "execution:sync-async-taskplan-metadata",
-                lambda: execution_model_case(
-                    module(),
-                    async_capability(),
-                    detached(),
-                ),
-            ),
             ("abi:import-no-side-effect", lambda: import_case(module().entry)),
-            ("math:linear-base-lib", lambda: linear_case(module().entry)),
-            ("abi:optional-input", lambda: optional_input_case(
-                optional_input().entry
-            )),
-            ("abi:repeat-isolation", lambda: repeat_case(module().entry)),
-            ("abi:concurrent-trace-isolation", lambda: concurrent_trace_case(
-                module().entry
-            )),
             ("abi:input-and-trace-errors", lambda: input_error_case(
                 module().entry
-            )),
-            ("math:fanout-all-join", lambda: fanout_case(fanout().entry)),
-            ("routes:schedule-transfer-split", lambda: edge_role_case(
-                edge_roles()
-            )),
-            ("branch:any-active-positive", lambda: branch_case(
-                branch().entry, 4, "non-negative:4"
-            )),
-            ("branch:any-active-negative", lambda: branch_case(
-                branch().entry, -3, "negative:-3"
-            )),
-            ("nodeset:nested-math", lambda: nodeset_case(nodeset().entry)),
-            ("nodeset:nested-qualified-override", lambda: nested_override_case(
-                nested_override().entry
-            )),
-            ("nodeset:nested-deferred-detached", lambda: nested_async_case(
-                nested_async()
-            )),
-            ("loop:bounded-carry", lambda: loop_case(loop().entry)),
-            ("loop:stop-when-carry-collect", lambda: loop_stop_when_case(
-                loop_stop_when().entry
-            )),
-            ("loop:max-iterations-error", lambda: loop_max_error_case(
-                loop_max_failure().entry
-            )),
-            ("async:promise-and-capability", lambda: async_capability_case(
-                async_capability().entry
-            )),
-            ("capability:concurrent-isolation", lambda: capability_isolation_case(
-                async_capability().entry
             )),
             ("capability:missing-and-cancel", lambda: capability_error_case(
                 async_capability().entry
             )),
             ("async:detached-cleanup-and-timeout", lambda: detached_case(
                 detached().entry
-            )),
-            ("io:receive-node-base-lib-send", lambda: port_math_case(
-                port_math().entry
             )),
             ("error:node-cause-and-path", lambda: runtime_error_case(
                 runtime_node_failure().entry,

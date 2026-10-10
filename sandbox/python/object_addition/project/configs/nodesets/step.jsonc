@@ -1,0 +1,153 @@
+{
+  "type_key": "addition.step",
+  "display_name": "addition.step",
+  "description": "addition.step",
+  "requires": [
+    {
+      "type": "object.box",
+      "cardinality": "exactly_one",
+      "display_name": "object.box"
+    },
+    {
+      "type": "object.counter",
+      "cardinality": "exactly_one",
+      "display_name": "object.counter"
+    }
+  ],
+  "provides": [
+    {
+      "key": "object.box_after",
+      "type": "object.box_after",
+      "display_name": "object.box_after"
+    },
+    {
+      "key": "object.counter_after",
+      "type": "object.counter_after",
+      "display_name": "object.counter_after"
+    },
+    {
+      "key": "object.snapshot",
+      "type": "object.snapshot",
+      "display_name": "object.snapshot"
+    },
+    {
+      "key": "object.metadata",
+      "type": "object.metadata",
+      "display_name": "object.metadata"
+    },
+    {
+      "key": "object.value",
+      "type": "object.value",
+      "display_name": "object.value"
+    },
+    {
+      "key": "object.done",
+      "type": "object.done",
+      "display_name": "object.done"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "object.box",
+        "type": "object.box",
+        "display_name": "object.box",
+        "required": true
+      },
+      {
+        "key": "object.counter",
+        "type": "object.counter",
+        "display_name": "object.counter",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "addition.boundary",
+        "display_name": "start",
+        "description": "start"
+      },
+      {
+        "id": "add",
+        "type_used": "addition.add",
+        "display_name": "add",
+        "description": "add",
+        "delta": 3
+      },
+      {
+        "id": "report",
+        "type_used": "addition.report",
+        "display_name": "report",
+        "description": "report"
+      },
+      {
+        "id": "end",
+        "type_used": "addition.boundary",
+        "display_name": "end",
+        "description": "end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "add"
+      },
+      {
+        "from": "add",
+        "to": "report"
+      },
+      {
+        "from": "report",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "object.box_after",
+        "cardinality": "exactly_one",
+        "display_name": "object.box_after",
+        "as": "object.box_after"
+      },
+      {
+        "type": "object.counter_after",
+        "cardinality": "exactly_one",
+        "display_name": "object.counter_after",
+        "as": "object.counter_after"
+      },
+      {
+        "type": "object.snapshot",
+        "cardinality": "exactly_one",
+        "display_name": "object.snapshot",
+        "as": "object.snapshot"
+      },
+      {
+        "type": "object.metadata",
+        "cardinality": "exactly_one",
+        "display_name": "object.metadata",
+        "as": "object.metadata"
+      },
+      {
+        "type": "object.value",
+        "cardinality": "exactly_one",
+        "display_name": "object.value",
+        "as": "object.value"
+      },
+      {
+        "type": "object.done",
+        "cardinality": "exactly_one",
+        "display_name": "object.done",
+        "as": "object.done"
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
+}

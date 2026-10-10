@@ -35,7 +35,11 @@ def run_cases(work,toolchain):
                 replace(root,file,f'"{part}"','"unused.py"');(root/"unused.py").write_text("UNUSED=1\n");code="VF_IMPORT_OWNER"
             elif variant in {"over_limit","total_over_limit"}:
                 path=root/part;text=path.read_text();count=501 if variant=="over_limit" else 300
-                path.write_text(text+"# reviewed support\n"*(count-len(text.splitlines())))
+                if kind == "node":
+                    from resource_boundaries import pad
+                    pad(path, count, "python", local=True)
+                else:
+                    path.write_text(text+"# reviewed support\n"*(count-len(text.splitlines())))
                 if variant=="over_limit":code="BASE_LIB.SOURCE.MAX_LINES"
                 else:
                     path=root/file;text=path.read_text();path.write_text(text+"# reviewed entry\n"*(300-len(text.splitlines())))

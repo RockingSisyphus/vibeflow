@@ -45,7 +45,7 @@ def _parse_rule_implementations(value: object) -> tuple[RuleImplementationDescri
 
 
 def parse_ruleset(data: Mapping[str, Any]) -> RulesetDescriptor:
-    check_fields(data, allowed={"kind", "id", "display_name", "description", "calls", "relations", "entrypoints"}, field="ruleset")
+    check_fields(data, allowed={"kind", "id", "display_name", "description", "calls", "relations", "entrypoints", "workflow_default", "graph_scope"}, field="ruleset")
     calls = []
     for value in object_list(data.get("calls", ()), field="ruleset.calls"):
         check_fields(value, allowed={"id", "rule_id", "ruleset_id", "params"}, field="ruleset.call")
@@ -67,7 +67,8 @@ def parse_ruleset(data: Mapping[str, Any]) -> RulesetDescriptor:
     return _construct(RulesetDescriptor,
         id=required_string(data.get("id"), field="ruleset.id"), calls=tuple(calls), relations=tuple(relations),
         entrypoints={key: string_list(value, field=f"ruleset.entrypoints.{key}") for key, value in entries.items()},
-        display_name=optional_string(data.get("display_name")), description=optional_string(data.get("description")))
+        display_name=optional_string(data.get("display_name")), description=optional_string(data.get("description")),
+        workflow_default=data.get("workflow_default", False), graph_scope=data.get("graph_scope"))
 
 
 def _construct(model, **values):

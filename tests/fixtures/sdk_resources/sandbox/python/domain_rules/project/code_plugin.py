@@ -1,3 +1,4 @@
+from vibeflow.targets.python.sdk import rule
 from vibeflow.targets.python.sdk import Plugin,node,rule,ruleset,data_schema,base_lib,capability,host_extension,ResourceDefinition
 from vibeflow.core.descriptors.decode import decode_resource
 resource_0 = node(**{'type_key': 'example.model',
@@ -132,4 +133,8 @@ resource_8 = data_schema(**{'type_key': 'example.output',
  'representation': 'json',
  'schema': {'type': 'number'}})
 
-plugin = Plugin(id='fixture.resources', resources=[resource_0, resource_1, resource_2, resource_3, resource_4, resource_5, resource_6, resource_7, resource_8])
+resource_9 = rule(id="example.model_files", implementations=[{"language":"python", "source":{"kind":"file", "ref":"rules/model_files.py", "export":"check"}}], source={"kind":"file", "ref":"rules/model_files.py", "export":"check"})
+resource_10 = ruleset(id="example.model_layout", workflow_default=True,
+    calls=[{"id":"files", "rule_id":"example.model_files"}], entrypoints={"static":["files"], "run":["files"]})
+
+plugin = Plugin(id='fixture.resources', resources=[resource_0, resource_1, resource_2, resource_3, resource_4, resource_5, resource_6, resource_7, resource_8, resource_9, resource_10])

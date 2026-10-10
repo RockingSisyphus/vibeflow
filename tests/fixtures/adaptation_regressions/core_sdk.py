@@ -305,10 +305,15 @@ def inspect_config(context, inputs, params):
     with Path(__file__).with_name("config.marker").open("a") as stream:
         stream.write(json.dumps({"mode":context.facts["plugins"]["case.resources"]["mode"]})+"\\n")
     return RuleResult()
-checks = ruleset(id="case.configs",calls=[{"id":"check","rule_id":"case.config"}],entrypoints={"static":["check"]})
+checks = ruleset(id="case.configs", workflow_default=True,calls=[{"id":"check","rule_id":"case.config"}],entrypoints={"static":["check"]})
 '''
-    write_project(root,body=body,resources=['inspect_config','checks'],selections=['case.configs'],config={'mode':1})
+    write_project(root,body=body,resources=['inspect_config','checks'],selections=[],config={'mode':1})
     write_workflow(root,name='second.jsonc',config={'mode':2})
+    for filename in ('workflow.jsonc','second.jsonc'):
+        path = root / filename
+        data = json.loads(path.read_text())
+        data['rulesets'] = ['case.configs']
+        path.write_text(json.dumps(data))
     statuses = []
     for index,config in enumerate(('workflow.jsonc','second.jsonc','workflow.jsonc')):
         actual, _ = _cli(root,kernel,name='isolation_'+str(index),config=config)

@@ -198,3 +198,11 @@ __all__ = [
     "target_neutral_implementation_facts_from_catalog",
     "validate_javascript_descriptor_catalogs",
 ]
+
+
+def apply_call_effect_scopes(compiled, graph, scopes, path=()):
+    """Project the evaluated call policy into compiler/runtime metadata."""
+    from dataclasses import replace
+    return replace(compiled, effect_scopes={**compiled.effect_scopes, **{
+        node.id: scopes[(node.type_used, *path, node.id)] for node in graph.nodes
+        if (node.type_used, *path, node.id) in scopes}})

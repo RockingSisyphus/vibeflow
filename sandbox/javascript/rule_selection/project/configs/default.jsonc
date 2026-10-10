@@ -1,0 +1,110 @@
+{
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ],
+  "nodeset_imports": [
+    {
+      "path": "nodesets/inherited.jsonc"
+    },
+    {
+      "path": "nodesets/takeover.jsonc"
+    },
+    {
+      "path": "nodesets/muted.jsonc"
+    }
+  ],
+  "pipeline": {
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "selection.node",
+        "display_name": "start",
+        "description": "start"
+      },
+      {
+        "id": "direct",
+        "type_used": "selection.node",
+        "display_name": "direct",
+        "description": "direct",
+        "rulesets": [
+          {
+            "rule_id": "selection.local_check"
+          }
+        ]
+      },
+      {
+        "id": "disabled",
+        "type_used": "selection.node",
+        "display_name": "disabled",
+        "description": "disabled",
+        "rulesets": []
+      },
+      {
+        "id": "left",
+        "type_used": "selection.inherited",
+        "display_name": "left",
+        "description": "left"
+      },
+      {
+        "id": "right",
+        "type_used": "selection.inherited",
+        "display_name": "right",
+        "description": "right"
+      },
+      {
+        "id": "takeover",
+        "type_used": "selection.takeover",
+        "display_name": "takeover",
+        "description": "takeover"
+      },
+      {
+        "id": "muted",
+        "type_used": "selection.muted",
+        "display_name": "muted",
+        "description": "muted"
+      },
+      {
+        "id": "end",
+        "type_used": "selection.node",
+        "display_name": "end",
+        "description": "end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "direct"
+      },
+      {
+        "from": "direct",
+        "to": "disabled"
+      },
+      {
+        "from": "disabled",
+        "to": "left"
+      },
+      {
+        "from": "left",
+        "to": "right"
+      },
+      {
+        "from": "right",
+        "to": "takeover"
+      },
+      {
+        "from": "takeover",
+        "to": "muted"
+      },
+      {
+        "from": "muted",
+        "to": "end"
+      }
+    ]
+  }
+}

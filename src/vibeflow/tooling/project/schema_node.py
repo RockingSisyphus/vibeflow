@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from vibeflow.tooling.project.schema_common import (
+    _validate_rule_selection,
     _error,
     _non_empty_string,
     _provider_keys,
@@ -26,6 +27,8 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
         findings.append(_error("CONFIG.SCHEMA.NODE_OBJECT", f"{prefix} must be an object", prefix))
         return
     status = str(value.get("status", "implemented")).strip()
+    if "rulesets" in value:
+        _validate_rule_selection(value["rulesets"], f"{prefix}.rulesets", findings)
     _validate_node_identity(value, prefix, findings, status=status)
     _validate_planned_behavior(value, prefix, findings, status=status)
     _validate_node_contract_fields(

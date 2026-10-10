@@ -1,0 +1,64 @@
+{
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugin.py",
+        "export": "plugin"
+      }
+    }
+  ],
+  "nodeset_imports": [
+    {
+      "path": "nodesets/step.jsonc"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "a",
+        "type": "addition.a",
+        "display_name": "addition.a",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "addition.boundary",
+        "display_name": "start",
+        "description": "start"
+      },
+      {
+        "id": "step",
+        "type_used": "addition.step",
+        "display_name": "step",
+        "description": "step"
+      },
+      {
+        "id": "end",
+        "type_used": "addition.boundary",
+        "display_name": "end",
+        "description": "end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "step"
+      },
+      {
+        "from": "step",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "addition.result",
+        "cardinality": "exactly_one",
+        "display_name": "addition.result",
+        "as": "result"
+      }
+    ]
+  }
+}

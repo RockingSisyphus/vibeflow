@@ -2,75 +2,27 @@ from __future__ import annotations
 
 from typing import Mapping
 
-from vibeflow.targets.python.project.compiler import GraphCompiler, GraphCompileError
 from vibeflow.core.flow import (
     GraphConfig,
     IO_NODE_TYPE,
     LOOP_NODE_TYPES,
     STATUS_PLANNED,
 )
-from vibeflow.core.nodeset_dependencies import (
-    analyze_nodeset_dependencies,
-)
-from vibeflow.core.quality.nodesets import nodeset_quality_findings
 from vibeflow.core.findings import HealthFinding
 from vibeflow.core.contracts import provider_keys, providers_to_dicts, requirement_types, requirements_to_dicts
 from vibeflow.targets.python.project.registry import NodeRegistry, NodeRegistryError
 
 
-def nodeset_declaration_findings(graph: GraphConfig, *, registry: NodeRegistry | None, selected_only: bool = False) -> tuple[tuple[HealthFinding, ...], tuple[HealthFinding, ...]]:
-    errors: list[HealthFinding] = []
-    warnings: list[HealthFinding] = []
-    dependencies = analyze_nodeset_dependencies(graph)
-    references = {
-        name: tuple(sorted({dependency.target for dependency in items}))
-        for name, items in dependencies.nodesets.items()
-    }
-    for nodeset in graph.nodesets.values():
-        if nodeset.status == STATUS_PLANNED or (selected_only and not nodeset.graph.rulesets):
-            continue
-        errors.extend(_validate_nodeset_metadata(nodeset))
-        errors.extend(_validate_nodeset_contract(nodeset))
-        errors.extend(_validate_nodeset_key_scope(nodeset))
-        try:
-            GraphCompiler().compile(nodeset.graph, registry=registry, owner=f"nodeset:{nodeset.type_key}")
-        except GraphCompileError as exc:
-            errors.append(
-                _nodeset_finding(
-                    "NODESET.GRAPH.COMPILE",
-                    nodeset.type_key,
-                    f"nodeset internal graph failed to compile: {exc}",
-                    details={"compile_error": str(exc), "compile_rule_id": exc.rule_id, **dict(exc.details or {})},
-                )
-            )
-        if registry is not None:
-            errors.extend(_validate_node_types_in_scope(nodeset.graph.nodes, graph.nodesets, registry=registry, owner=f"nodeset:{nodeset.type_key}"))
-        for ref_name in references.get(nodeset.type_key, ()):
-            if ref_name not in graph.nodesets:
-                errors.append(
-                    _nodeset_finding(
-                        "NODESET.REFERENCE.UNKNOWN",
-                        nodeset.type_key,
-                        f"nodeset references unknown nested nodeset: {ref_name}",
-                        details={"referenced_nodeset": ref_name},
-                    )
-                )
-    errors.extend(
-        finding for finding in nodeset_quality_findings(graph)
-        if finding.rule_id == "NODESET.RECURSION"
-    )
-    errors.extend(_validate_nodeset_usages(graph.nodes, graph.nodesets, owner="pipeline"))
-    for nodeset in graph.nodesets.values():
-        if selected_only and not nodeset.graph.rulesets:
-            continue
-        errors.extend(_validate_nodeset_usages(nodeset.graph.nodes, graph.nodesets, owner=f"nodeset:{nodeset.type_key}"))
-    return tuple(errors), tuple(warnings)
-
-
-
-
-
-
+def current_nodeset_declaration_findings(graph, *, definition, registry, owner):
+    """Declaration belongs to its own graph; parent owns external call contracts."""
+    findings = list(_validate_nodeset_usages(graph.nodes, graph.nodesets, owner=owner))
+    if definition is not None and definition.status != STATUS_PLANNED:
+        findings.extend(_validate_nodeset_metadata(definition))
+        findings.extend(_validate_nodeset_contract(definition))
+        findings.extend(_validate_nodeset_key_scope(definition))
+    if registry is not None:
+        findings.extend(_validate_node_types_in_scope(graph.nodes, graph.nodesets, registry=registry, owner=owner))
+    return tuple(findings)
 
 
 def _validate_node_types_in_scope(nodes, nodesets, *, registry: NodeRegistry, owner: str) -> tuple[HealthFinding, ...]:
@@ -214,5 +166,5 @@ def _nodeset_finding(
     )
 
 __all__ = [
-    "nodeset_declaration_findings",
+    "current_nodeset_declaration_findings",
 ]

@@ -1,6 +1,6 @@
 # 0.16 统一资源与旧 API 退役
 
-自 0.15.0 起，VibeFlow 使用代码插件声明资源。升级时将旧登记转换为所属语言的 SDK 声明和 workflow 插件选择。公开契约为 Rule ABI v1、Plugin ABI v3、Workflow ABI v5；原生数据路由、Nodeset、Loop 和业务执行协议保持原有语义。
+自 0.15.0 起，VibeFlow 使用代码插件声明资源。升级时将旧登记转换为所属语言的 SDK 声明和 workflow 插件选择。当前公开契约为 Rule ABI v2、Plugin ABI v3、Workflow ABI v5；原生数据路由、Nodeset、Loop 和业务执行协议保持原有语义。
 
 0.16 完成内部迁移，直接移除旧公开 API。默认资源由自动接入的内置插件贡献，无需在 Config 中声明；内置和外部插件共用贡献校验、来源、冲突处理和实现绑定。资源进入 Catalog 不表示选中了它的规则，显式空 Ruleset 仍只提供资料。
 
@@ -19,7 +19,7 @@
 | Target `analyze_python_source` / `analyze_python_source_tree` 的 `check_side_effects` 参数 | Target 只返回源码事实；使用 Application `scan_code_quality(check_side_effects=True)` 或 CLI 的 `--check-side-effects` 执行所选效果 Rule |
 | Target `scan_javascript_quality` 默认检查入口 | Target 提取源码事实；Application `vibeflow.tooling.application.javascript.quality_scan.scan_javascript_quality` 复用所选 Catalog 执行项目规则 |
 
-Python 的 NodeRegistry 仅保存 canonical 声明和实际绑定，不自动装配默认规则。直接使用低级 Target API 时，调用者应显式提供规则 Catalog 与绑定；正式 Application 入口完成默认装配。Core 的 `evaluate_project_quality` 只接收事实和显式规则，`rulesets=[]` 支持 facts-only。
+使用正式 CLI 和发行入口时，内置资源自动提供，外部资源通过 Workflow 选择的 Plugin 提供。调用规则是否生效取决于实际的默认或配置选择。
 
 库放在 `boundary`、`nodes`、`runtime` 或其他目录不会改变身份。身份来自声明、具名导出、支撑文件和真实导入位置；未声明的跨资源依赖仍会失败。纯 Node 调用有副作用的库 helper，仍受 Node 自身选中的效果规则约束，即使库的 `rulesets=[]`。
 
@@ -48,7 +48,7 @@ plugin = Plugin(id="model", resources=[Affine, model_rules])
 
 `model_rules` 同样由 SDK 声明并列入插件。workflow 的 `plugins` 使用显式文件/模块 source；项目 `descriptors/registry`、JSONC bundle 和 ID-only 插件选择不再加载。
 
-省略 `rulesets` 与显式 `[]` 都表示未选择 Node 审查。需要默认 Process 约束时明确填写 `vibeflow.process`。改变 `flow_kind` 不再获得副作用权限。领域规则通过参数约定 tags，例如 `model_tag=model_block`；核心不判断任意模型代码的功能块，也不规定模型拓扑。
+Node **类型声明**省略 `rulesets` 或填写 `[]`，都表示该类型没有局部默认规则。Node **调用 Config** 省略该字段则使用类型默认；调用显式 `[]` 才取消当前调用的局部选择。需要默认 Process 约束时明确填写 `vibeflow.process`。改变 `flow_kind` 不再获得副作用权限。领域规则通过参数约定 tags，例如 `model_tag=model_block`；核心不判断任意模型代码的功能块，也不规定模型拓扑。
 
 默认展示按原生默认、Node 默认、状态展示、调用点覆盖依次应用。保留系统状态色，Node 默认展示不能占用它们。图中执行身份和诊断标记独立保留。浅蓝模型示例使用 `#cceeff`。
 
@@ -83,7 +83,7 @@ BaseLib、Plugin、HostExtension 通过 `rulesets` 选择审查，插件包声�
 
 ## 默认检查行为
 
-综合 workflow、effects 等主题直接执行各自判定，保留原有检查范围。可独立选择的 topic Rule 不会自动成为综合主题的子调用；执行记录只列实际选择和执行的规则。主题内部可以复用普通算法，覆盖有效 `policy` 参数会直接影响判定。
+综合 Workflow 使用整体范围检查，依赖及实际调用都出现在执行记录中。可独立选择的 topic Rule 使用显式 Ruleset 组合；覆盖有效 `policy` 参数会影响相应判定。
 
 `vibeflow.no_side_effects` 在两个 Target 都消费有效 `effect_scope`、`policy` 参数。Python 的 Node、BaseLib、Plugin 和普通源码共用效果遍历；可解析 helper 按真实函数体判断，纯函数改名为 write/read/close 不改变结果。资源仍独立选择规则，BaseLib 保留自身顶层结构与显式支撑文件检查，不继承调用者权限。
 
@@ -109,3 +109,17 @@ BaseLib、Plugin、HostExtension 通过 `rulesets` 选择审查，插件包声�
 8. 使用 `inspect-resources --config` 和 `review-rules --config` 核对资源、双方冲突来源、有效参数与原始实现位置，再运行正式检查和业务测试。
 
 旧资源接入会报告明确的迁移诊断。升级后的多文件登记、样式字段和正式图内容见[多文件资源](multifile-resources.md)。
+
+## 统一选择与 Rule ABI v2 迁移
+
+升级后，配置中的字段缺省、显式列表与显式空列表具有不同含义。外部插件应作以下调整：
+
+1. Node 类型声明的 rulesets 作为默认；需要替代的调用在 Config 中填写列表，需要取消时写 `[]`。序列化时保留字段缺省，不能把缺省转成空列表。
+2. 希望静态全局生效的 Ruleset 声明 `workflow_default=True` / `workflow_default:true`，通过既有 Plugin 贡献。根动态列表替代全部默认。Nodeset 明确列表接管内部，即使列表等于父层，也建立新范围。
+3. Node Rule 迁为只读取自己的符号、继承实现和实际 helper。文件整体、跨资源或多 Node 检查移到 Workflow/Nodeset。共享源文件不会让一个 Node Rule 看到其他实现。领域示例把模型文件整体归属放在 `example.model_layout` 图规则中，局部模型定义检查保留在 Node Ruleset。
+4. 需要整体检查时在外层 Ruleset 声明 `graph_scope="effective_subtree"`；嵌套组合不填写范围即可继承。完整计划不能混合 current_graph 与 effective_subtree。使用 facts.graphs 遍历负责图，用 global_graph 查询背景，遵守 boundaries；删除 handler 内的隐式递归。
+5. source Rule 不再收到其他调用或当前调用参数。依赖参数的规则使用 call 范围；共享分析通过同一计划的 Records 与 requires/bindings 实现。
+6. JavaScript 插件按 `vibeflow.rule.v2` 的公开类型更新。sources 对未知路径报 RULE.SOURCE.UNAVAILABLE；不再使用文件系统回退。Plugin ABI v3 与 Workflow ABI v5 保持各自原生协议。
+7. 规则字符串只引用 Ruleset。直接 Rule 改写为 `{rule_id, params}` 对象；参数不作为 Node 业务 params 传入。核对具体调用的有效选择、负责范围与执行记录，不只看 Node 类型摘要。
+
+`review-rules` 可在不执行检查时预览来源、替代、范围和依赖。实际验收仍需 validate、quality、首次加载与运行。迁移不会让空选择绕过真实解析、绑定和编译错误。

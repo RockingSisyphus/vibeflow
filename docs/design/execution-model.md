@@ -51,3 +51,5 @@ Core 提供纯数据的运行状态记录与 JSON 信息快照契约。Python Ta
 JS emitter 包含可移植的信息缓存和状态回调。Node 构建另附文件适配器，用 AsyncLocalStorage 关联控制台输出，使用独立状态线程及原子替换写入 JSON。浏览器使用 onStatus，由宿主接入存储。Host 会话拥有一个观测范围，原生多次工作流调用复用它，正常停止后发布最终状态；调度、Capability 和生命周期协议保持原有语义。
 
 新运行清空缓存，状态变化和结束立即发布，定时更新读取最新缓存。SDK 只允许业务修改 info，state/error/updated_at 来自内核。用户接口见[运行日志与状态接口](../../distribution/docs/user/runtime-observation.md)。
+
+规则的使用位置决定公开资料，实际任务按完整调用路径及负责范围规划。图级约束与 Node 局部检查独立生效，整体检查在入口执行一次并遵守子选择边界；具体设计理由见 [Rule 机制设计](rule-system.md)。

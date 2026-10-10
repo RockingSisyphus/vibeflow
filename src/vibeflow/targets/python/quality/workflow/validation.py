@@ -19,6 +19,7 @@ class _HealthValidationState:
     mainline: dict = field(default_factory=dict)
     rule_executions: list = field(default_factory=list)
     call_effect_policies: list = field(default_factory=list)
+    rule_selections: list = field(default_factory=list)
 
 
 def validate_graph_health(graph, *, registry=None, plugin_registry=None,
@@ -50,6 +51,7 @@ def validate_graph_health(graph, *, registry=None, plugin_registry=None,
         source_report = execute_python_node_rules(registry, source_context, phase=rule_phase, purity_policy=purity_policy, quality_policy=quality_policy)
         _append_findings(state, source_report.findings)
         state.rule_executions.extend(source_report.executions)
+        state.rule_selections.extend(source_report.selections)
         state.call_effect_policies.extend({"owner":owner,"node":call,"policies":policies,
             "effect_scope":source_report.call_effect_scopes.get((owner,call),"unconstrained")}
             for (owner,call),policies in source_report.call_effect_policies.items())
@@ -62,8 +64,9 @@ def validate_graph_health(graph, *, registry=None, plugin_registry=None,
         elif registry is not None:
             compilation = compiler._refresh_rule_facts(compilation, registry=registry)
     except GraphCompileError as exc:
-        return HealthReport(status="FAIL", errors=(HealthFinding(rule_id=exc.rule_id, severity="error",
+        _append_findings(state, (HealthFinding(rule_id=exc.rule_id, severity="error",
             object_type="pipeline", object_id="pipeline", failure_layer="topology", message=str(exc), details=dict(exc.details or {})),))
+        return _build_health_report(graph, None, plugin_registry, state)
     if session is not None:
         session.compilation_input = graph
         session.compilation = compilation

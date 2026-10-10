@@ -1,0 +1,248 @@
+{
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugin.py",
+        "export": "plugin"
+      }
+    }
+  ],
+  "nodeset_imports": [
+    {
+      "path": "nodesets/step.jsonc"
+    },
+    {
+      "path": "nodesets/wrapper.jsonc"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "object.box",
+        "type": "object.box",
+        "display_name": "object.box",
+        "required": true
+      },
+      {
+        "key": "object.counter",
+        "type": "object.counter",
+        "display_name": "object.counter",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "addition.boundary",
+        "display_name": "start",
+        "description": "start"
+      },
+      {
+        "id": "loop",
+        "type_used": "vibeflow.loop.while",
+        "display_name": "loop",
+        "description": "loop",
+        "loop": {
+          "body": "addition.wrapper",
+          "max_iterations": 5,
+          "carry": [
+            {
+              "from": "object.box",
+              "as": "object.box",
+              "update": "object.box_after"
+            },
+            {
+              "from": "object.counter",
+              "as": "object.counter",
+              "update": "object.counter_after"
+            }
+          ],
+          "collect": [
+            {
+              "from": "object.value",
+              "as": "object.history"
+            },
+            {
+              "from": "object.metadata",
+              "as": "object.metadata_history"
+            }
+          ],
+          "outputs": [
+            {
+              "from": "object.box_after",
+              "as": "object.box_after"
+            },
+            {
+              "from": "object.counter_after",
+              "as": "object.counter_after"
+            },
+            {
+              "from": "object.snapshot",
+              "as": "object.snapshot"
+            },
+            {
+              "from": "object.metadata",
+              "as": "object.metadata"
+            },
+            {
+              "from": "object.value",
+              "as": "object.value"
+            },
+            {
+              "from": "object.done",
+              "as": "object.done"
+            },
+            {
+              "from": "object.history",
+              "as": "object.history"
+            },
+            {
+              "from": "object.metadata_history",
+              "as": "object.metadata_history"
+            },
+            {
+              "from": "loop.iterations",
+              "as": "loop.iterations"
+            }
+          ],
+          "stop_when": {
+            "from": "object.done",
+            "equals": true
+          }
+        },
+        "requires": [
+          {
+            "type": "object.box",
+            "cardinality": "exactly_one",
+            "display_name": "object.box"
+          },
+          {
+            "type": "object.counter",
+            "cardinality": "exactly_one",
+            "display_name": "object.counter"
+          }
+        ],
+        "provides": [
+          {
+            "key": "object.box_after",
+            "type": "object.box_after",
+            "display_name": "object.box_after"
+          },
+          {
+            "key": "object.counter_after",
+            "type": "object.counter_after",
+            "display_name": "object.counter_after"
+          },
+          {
+            "key": "object.snapshot",
+            "type": "object.snapshot",
+            "display_name": "object.snapshot"
+          },
+          {
+            "key": "object.metadata",
+            "type": "object.metadata",
+            "display_name": "object.metadata"
+          },
+          {
+            "key": "object.value",
+            "type": "object.value",
+            "display_name": "object.value"
+          },
+          {
+            "key": "object.done",
+            "type": "object.done",
+            "display_name": "object.done"
+          },
+          {
+            "key": "object.history",
+            "type": "object.history",
+            "display_name": "object.history"
+          },
+          {
+            "key": "object.metadata_history",
+            "type": "object.metadata_history",
+            "display_name": "object.metadata_history"
+          },
+          {
+            "key": "loop.iterations",
+            "type": "loop.iterations",
+            "display_name": "loop.iterations"
+          }
+        ]
+      },
+      {
+        "id": "end",
+        "type_used": "addition.boundary",
+        "display_name": "end",
+        "description": "end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "loop"
+      },
+      {
+        "from": "loop",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "object.box_after",
+        "cardinality": "exactly_one",
+        "display_name": "object.box_after",
+        "as": "object.box_after"
+      },
+      {
+        "type": "object.counter_after",
+        "cardinality": "exactly_one",
+        "display_name": "object.counter_after",
+        "as": "object.counter_after"
+      },
+      {
+        "type": "object.snapshot",
+        "cardinality": "exactly_one",
+        "display_name": "object.snapshot",
+        "as": "object.snapshot"
+      },
+      {
+        "type": "object.metadata",
+        "cardinality": "exactly_one",
+        "display_name": "object.metadata",
+        "as": "object.metadata"
+      },
+      {
+        "type": "object.value",
+        "cardinality": "exactly_one",
+        "display_name": "object.value",
+        "as": "object.value"
+      },
+      {
+        "type": "object.done",
+        "cardinality": "exactly_one",
+        "display_name": "object.done",
+        "as": "object.done"
+      },
+      {
+        "type": "object.history",
+        "cardinality": "exactly_one",
+        "display_name": "object.history",
+        "as": "object.history"
+      },
+      {
+        "type": "object.metadata_history",
+        "cardinality": "exactly_one",
+        "display_name": "object.metadata_history",
+        "as": "object.metadata_history"
+      },
+      {
+        "type": "loop.iterations",
+        "cardinality": "exactly_one",
+        "display_name": "loop.iterations",
+        "as": "loop.iterations"
+      }
+    ]
+  }
+}

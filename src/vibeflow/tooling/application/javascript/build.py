@@ -41,6 +41,7 @@ from vibeflow.core.descriptors import DescriptorCatalogs
 from vibeflow.targets.javascript.frontend.facts import (
     JavascriptImplementationFactsError,
     implementation_facts_from_catalog,
+    apply_call_effect_scopes,
     native_workflow_facts,
     validate_javascript_descriptor_catalogs,
 )
@@ -264,7 +265,7 @@ def prepare_project_build(
                     owner="pipeline",
                 )
                 graph = compilation.workflow.graph
-                compiled = compilation.compiled_graph
+                compiled = apply_call_effect_scopes(compilation.compiled_graph, graph, rule_report.call_effect_scopes)
                 plugin_runner.after_compile(graph, compiled)
                 plugin_report = plugin_runner.report()
         except JavascriptPluginError as exc:
@@ -278,7 +279,8 @@ def prepare_project_build(
             owner="pipeline",
         )
         graph = compilation.workflow.graph
-        compiled = compilation.compiled_graph
+        compiled = apply_call_effect_scopes(compilation.compiled_graph, graph, rule_report.call_effect_scopes)
+    compilation = replace(compilation, compiled_graph=compiled)
     try:
         top_overrides = normalize_node_config_overrides(
             request.node_config_overrides or {}
@@ -313,6 +315,7 @@ def prepare_project_build(
         used_nodes={},
         used_types=set(),
         used_io_operations=set(),
+        call_effect_scopes=rule_report.call_effect_scopes,
     )
     _prepare_graph(
         graph,
@@ -324,8 +327,13 @@ def prepare_project_build(
         active_nodesets=(),
     )
 
+    from vibeflow.core.rules.planning import graph_rule_subjects
+    declarations = {subject.definition.type_key: subject.graph
+        for subject in graph_rule_subjects(graph) if subject.declaration_only}
+    compiled_declarations = {key: state.compile_graph(child, set(child.nodesets), "nodeset:" + key)
+        for key, child in declarations.items()}
     rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={(): compiled, **state.compiled_by_path}, node_report=rule_report, project_root=root.path, package_root=package_root, rule_defaults=workflow_rule_defaults(catalogs, javascript["nodeset_max_depth"]), target=request.target, node_command=request.node_command,
-                                                 quality_policy=javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
+        compiled_nodesets=compiled_declarations, quality_policy=javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
     workflow_errors = tuple(item for item in rule_report.findings if item.severity == "error")
     if workflow_errors:
         first = workflow_errors[0]

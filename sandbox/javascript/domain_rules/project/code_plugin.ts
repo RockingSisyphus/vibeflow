@@ -15,4 +15,6 @@ export const resource_6=defineDataSchema({"type_key": "example.input", "represen
 
 export const resource_7=defineDataSchema({"type_key": "example.output", "representation": "json", "schema": {"type": "number"}});
 
-export const plugin=definePlugin({id:"example.javascript.domain_rules",resources:[resource_0,resource_1,resource_2,resource_3,resource_4,resource_5,resource_6,resource_7]});
+import {modelFiles,modelLayout} from "./rules/model_files.ts";
+
+export const plugin=definePlugin({id:"example.javascript.domain_rules",resources:[resource_0,resource_1,resource_2,resource_3,resource_4,resource_5,resource_6,resource_7,modelFiles,modelLayout]});

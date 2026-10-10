@@ -1,0 +1,76 @@
+{
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "key",
+        "type": "addition.key",
+        "display_name": "addition.key",
+        "required": true
+      },
+      {
+        "key": "b",
+        "type": "addition.b",
+        "display_name": "addition.b",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "addition.boundary",
+        "display_name": "start",
+        "description": "start"
+      },
+      {
+        "id": "read",
+        "type_used": "addition.read",
+        "display_name": "read",
+        "description": "read"
+      },
+      {
+        "id": "add",
+        "type_used": "addition.add",
+        "display_name": "add",
+        "description": "add"
+      },
+      {
+        "id": "end",
+        "type_used": "addition.boundary",
+        "display_name": "end",
+        "description": "end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "read"
+      },
+      {
+        "from": "read",
+        "to": "add"
+      },
+      {
+        "from": "add",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "addition.result",
+        "cardinality": "exactly_one",
+        "display_name": "addition.result",
+        "as": "result"
+      }
+    ],
+    "entry_mode": "async"
+  }
+}

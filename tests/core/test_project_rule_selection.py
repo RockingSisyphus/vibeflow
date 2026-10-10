@@ -53,7 +53,8 @@ def test_project_parameters_follow_native_binding_identity_and_alias():
 
 def test_workflow_depth_parameters_follow_native_binding_identity_and_alias():
     from functools import wraps
-    from vibeflow.builtin.workflow import bound_workflow_depth_defaults, workflow_rule_checks
+    from vibeflow.builtin.workflow import bound_workflow_depth_defaults
+    from vibeflow.builtin.workflow_plan import nodesets as workflow_rule_checks
     @wraps(workflow_rule_checks, assigned=(), updated=())
     def alias(*args):
         return workflow_rule_checks(*args)
@@ -97,7 +98,8 @@ def test_standard_configuration_requires_actual_declaration_factory_and_callable
 
 @pytest.mark.parametrize("topic", [False, True])
 def test_depth_configuration_preserves_external_defaults_and_requires_declared_field(topic):
-    from vibeflow.builtin.workflow import bound_workflow_depth_defaults, workflow_rule_checks, workflow_topic_handlers
+    from vibeflow.builtin.workflow import bound_workflow_depth_defaults, workflow_topic_handlers
+    from vibeflow.builtin.workflow_plan import nodesets as workflow_rule_checks
     native = workflow_topic_handlers()["vibeflow.graph.nodesets"] if topic else workflow_rule_checks
     owned = RuleDescriptor("domain.depth", params_schema={"nodeset_max_depth": {"type": "integer"}},
         params_defaults={"nodeset_max_depth": 2})

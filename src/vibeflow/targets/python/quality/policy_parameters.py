@@ -149,13 +149,5 @@ def native_rule_origins(registry):
 
 
 def bound_python_workflow_defaults(handlers, depth, *, rules, origins):
-    from vibeflow.builtin.effects import builtin_effect_resources
-    from vibeflow.builtin.plugin import configured_rule_defaults
     from vibeflow.builtin.workflow import bound_workflow_depth_defaults
-    from vibeflow.targets.python.quality.rules.workflow import workflow
-    defaults = bound_workflow_depth_defaults(handlers, depth, rules=rules, origins=origins)
-    defaults.update({key:configured_rule_defaults(rules[key], {"nodeset_max_depth":depth},
-                        origins.get(("rules", key)), factory=builtin_effect_resources)
-                    for key, handler in handlers.items()
-                     if callable(handler) and unwrap(handler) is workflow})
-    return defaults
+    return bound_workflow_depth_defaults(handlers, depth, rules=rules, origins=origins)

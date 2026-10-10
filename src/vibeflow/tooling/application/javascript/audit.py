@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from vibeflow.core.rules.selection import selection_data
+
 from vibeflow.targets.javascript.build.driver_session import check_scope
 
 from dataclasses import dataclass
@@ -51,6 +53,7 @@ from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
 from vibeflow.targets.javascript.frontend.facts import (
     JavascriptImplementationFactsError,
     target_neutral_implementation_facts_from_catalog,
+    apply_call_effect_scopes,
     validate_javascript_descriptor_catalogs,
 )
 from vibeflow.tooling.project.config_loader import (
@@ -178,7 +181,7 @@ def audit_javascript_project(
         node_ids=None if request.audit_registered_resources else frozenset(node_type_calls(graph)), host_extension_ids=frozenset(rule_host_ids), plugin_ids=frozenset(rule_plugin_ids),
     )
     rule_report = run_javascript_rules(graph, catalogs, project_root=root.path, package_root=package_root,
-                                     phase="static", import_policy=rule_import_policy, node_command=request.node_command, evaluate_sources=request.audit_sources, collect_sources=True, include_registered=request.audit_registered_resources, prefetched_quality=(request.quality_facts_by_root or {}).get(str(root.path)),
+                                     phase="static", import_policy=rule_import_policy, node_command=request.node_command, evaluate_sources=request.audit_sources, include_registered=request.audit_registered_resources, prefetched_quality=(request.quality_facts_by_root or {}).get(str(root.path)),
                                      quality_policy=request.quality_policy or javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
     rule_errors = tuple(item for item in rule_report.findings if item.severity == "error")
     if rule_errors:
@@ -204,6 +207,7 @@ def audit_javascript_project(
         active_nodesets=(),
         compiled_by_path=compiled_by_path,
         used_node_types=used_node_types,
+        call_effect_scopes=rule_report.call_effect_scopes,
     )
     graph = compilation.workflow.graph
     compiled = compilation.compiled_graph
@@ -316,6 +320,8 @@ def audit_javascript_project(
         source_path=config_path.relative_to(root.path).as_posix(),
         findings=rule_report.findings,
     )
+    from vibeflow.core.rules.planning import selection_report
+    architecture["rule_selections"] = selection_report(graph, catalogs)
     architecture["rule_checks"] = rule_report.to_dict()
     from vibeflow.tooling.presentation.resource_architecture import resource_architecture
     architecture["implementation_graph"] = resource_architecture(catalogs, project_root=root.path,
@@ -491,6 +497,7 @@ def _validate_graph_tree(
     active_nodesets: tuple[str, ...],
     compiled_by_path: dict[tuple[str, ...], CompiledGraph],
     used_node_types: set[str],
+    call_effect_scopes: Mapping,
 ):
     compilation = compile_core(
         CoreCompileRequest(
@@ -502,7 +509,9 @@ def _validate_graph_tree(
         )
     )
     graph = compilation.workflow.graph
-    compiled = compilation.compiled_graph
+    from dataclasses import replace
+    compiled = apply_call_effect_scopes(compilation.compiled_graph, graph, call_effect_scopes, path)
+    compilation = replace(compilation, compiled_graph=compiled)
     for node in graph.nodes:
         call_path = (*path, node.id)
         if node.status == STATUS_PLANNED:
@@ -535,6 +544,7 @@ def _validate_graph_tree(
                 active_nodesets=(*active_nodesets, nodeset_key),
                 compiled_by_path=compiled_by_path,
                 used_node_types=used_node_types,
+                call_effect_scopes=call_effect_scopes,
             )
             compiled_by_path[call_path] = child.compiled_graph
             continue
@@ -720,7 +730,7 @@ def _architecture_payload(
                 "expand": value.expand,
                 "flow_kind": value.flow_kind,
                 "effect_scope": "unavailable" if value.status == STATUS_PLANNED else "unconstrained",
-                "rulesets": list(value.graph.rulesets),
+                "rulesets": selection_data(value.graph.rulesets),
                 "reachable_from_workflow": key in _reachable_javascript_nodesets(graph),
                 "requires": requirements_to_dicts(value.requires),
                 "provides": providers_to_dicts(value.provides),
@@ -804,7 +814,7 @@ def _javascript_graph_document(
     report = build_architecture_report(graph, compiled=compiled)
     return {
         "source": dict(source),
-        "rulesets": list(graph.rulesets),
+        "rulesets": selection_data(graph.rulesets),
         "inputs": providers_to_dicts(graph.inputs),
         "outputs": requirements_to_dicts(graph.outputs),
         "max_steps": graph.max_steps,
@@ -898,8 +908,8 @@ def _javascript_node_document(
         "source": dict(source),
         "role": getattr(node, "metadata").to_dict(),
         "presentation": presentation.to_dict(),
-        "rulesets": list(nodeset.graph.rulesets) if nodeset is not None else list(descriptor.rulesets) if descriptor and descriptor.rulesets is not None else None,
-        "selected_rulesets": list(nodeset.graph.rulesets) if nodeset is not None else list(descriptor.rulesets) if descriptor else [],
+        "rulesets": selection_data(nodeset.graph.rulesets) if nodeset is not None else selection_data(node.rulesets if node.rulesets is not None else descriptor.rulesets) if descriptor else None,
+        "selected_rulesets": selection_data(nodeset.graph.rulesets) if nodeset is not None else selection_data(node.rulesets if node.rulesets is not None else descriptor.rulesets) if descriptor else [],
         "tags": list(descriptor.tags) if descriptor else [],
         "metadata": dict(descriptor.metadata) if descriptor else {},
         "contract_source": contract_source,

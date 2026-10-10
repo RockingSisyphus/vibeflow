@@ -49,14 +49,7 @@ POLICY_PATH = PROJECT_DIR / "kernel_policy.jsonc"
 WORKSPACE_PATH = FIXTURE_WORKSPACE_PATH
 REVIEW_ARCHITECTURE_DIR = PROJECT_DIR / "review_artifacts"
 REVIEW_ARCHITECTURE_PATH = REVIEW_ARCHITECTURE_DIR / "ARCHITECTURE.jsonc"
-DELEGATE_ARCHITECTURE_PATH = REVIEW_ARCHITECTURE_DIR / "DELEGATE_CLI_ARCHITECTURE.jsonc"
-NUMERIC_PATHLIB_ARCHITECTURE_PATH = REVIEW_ARCHITECTURE_DIR / "NUMERIC_PATHLIB_CLI_ARCHITECTURE.jsonc"
-NUMERIC_STREAMS_ARCHITECTURE_PATH = REVIEW_ARCHITECTURE_DIR / "NUMERIC_STREAMS_CLI_ARCHITECTURE.jsonc"
 REVIEW_DIR = REPORT_DIR / "review"
-DELEGATE_CONFIG_PATH = CONFIG_DIR / "pass_delegate_cli.jsonc"
-DELEGATE_INPUT_PATH = PROJECT_DIR / "data" / "delegate_input.yaml"
-NUMERIC_PATHLIB_CONFIG_PATH = CONFIG_DIR / "pass_delegate_cli_numeric_pathlib.jsonc"
-NUMERIC_STREAMS_CONFIG_PATH = CONFIG_DIR / "pass_delegate_cli_numeric_streams.jsonc"
 EXTERNAL_DEDUP_REVIEW_CONFIG_PATH = CONFIG_DIR / "review_external_nodeset_dedup.jsonc"
 
 
@@ -105,33 +98,8 @@ COMPILED_SOURCE_FAST_FORBIDDEN = ("_run_node(",)
 
 
 VALID_RUN_CASES = [
-    {
-        "name": "linear",
-        "config": "pass_linear.jsonc",
-        "initial": {},
-        "expected_status": {"PASS", "CONCERNS"},
-        "expected_outputs": {"value.final": 14},
-        "expected_portable_execution": {
-            "start": ["immediate", "inline", "current"],
-            "seed": ["immediate", "inline", "current"],
-            "add": ["immediate", "inline", "current"],
-            "multiply": ["immediate", "inline", "current"],
-            "end": ["immediate", "inline", "current"],
-        },
-        "expected_portable_tasks": [],
-    },
     {"name": "free_nodes", "config": "pass_free_nodes.jsonc", "initial": {}, "expected_status": {"PASS", "CONCERNS"}},
-    {"name": "nodeset_simple", "config": "pass_nodeset_simple.jsonc", "initial": {"value.in": 1}, "expected_outputs": {"value.out": 6}},
-    {"name": "nodeset_nested", "config": "pass_nodeset_nested.jsonc", "initial": {"value.in": 1}, "expected_outputs": {"value.final": 11}},
     {"name": "io_data_store", "config": "pass_io_data_store.jsonc", "initial": {"io.result": 20}},
-    {
-        "name": "port_math",
-        "config": "pass_port_math.jsonc",
-        "initial": {},
-        "port_math": True,
-        "expected_outputs": {"value.final": 21},
-    },
-    {"name": "plugins", "config": "pass_plugins.jsonc", "initial": {"io.result": 20}},
     {"name": "comprehensive_flowchart", "config": "pass_comprehensive_flowchart.jsonc", "initial": {"value.in": 3}, "expected_outputs": {"io.output": "final=13;request=13"}},
     {
         "name": "global_state_execution_lock",
@@ -185,372 +153,10 @@ VALID_RUN_CASES = [
         "expected_svg_cloud_nodes": ("forward", "backward", "step"),
     },
     {
-        "name": "training_nodeset_object_flow",
-        "config": "pass_training_nodeset_object_flow.jsonc",
-        "initial_factory": _training_initial,
-        "expected_outputs": {"train.step_report": {"steps": 1, "weight": 0.7}},
-        "expected_same_as_initial": [("train.model_after", "train.model"), ("train.optimizer_after", "train.optimizer")],
-        "expected_object_attrs": [("train.model_after", "weight", 0.7), ("train.optimizer_after", "steps", 1)],
-        "expect_training_metrics": True,
-    },
-    {
         "name": "training_non_json_metrics",
         "config": "pass_training_non_json_metrics.jsonc",
         "initial_factory": _batch_initial,
         "expect_batch_metrics": True,
-    },
-    {
-        "name": "loop_stop_after_nodeset_training",
-        "config": "pass_loop_stop_after_nodeset_training.jsonc",
-        "initial_factory": _training_initial,
-        "expected_outputs": {
-            "train.step_report": {"steps": 4, "weight": 0.24009999999999998},
-            "train.loss_history": [6.0, 4.199999999999999, 2.94, 2.058],
-            "loop.iterations": 4,
-        },
-        "expected_same_as_initial": [("train.model_after", "train.model"), ("train.optimizer_after", "train.optimizer")],
-        "expected_object_attrs": [("train.model_after", "weight", 0.24009999999999998), ("train.optimizer_after", "steps", 4)],
-        "expected_runtime_exec_order": ["start", "train_loop", "end"],
-        "expected_trace_kind_counts": {"loop_enter": 1, "loop_exit": 1, "loop_iteration": 4},
-        "expected_trace_summary": {
-            "current_node": "end",
-            "node_runs": {"start": 1, "train_loop": 1, "end": 1},
-            "step_count": 3,
-            "total_step_count": 15,
-            "stop_reason": "completed",
-        },
-        "expected_qualified_exec_contains": [
-            "train_loop.iter_0.train_step",
-            "train_loop.iter_3.train_step",
-        ],
-    },
-    {
-        "name": "loop_stop_after_nodeset_training_block",
-        "config": "pass_loop_stop_after_nodeset_training.jsonc",
-        "initial_factory": _training_initial,
-        "runtime_options": {"trace": "full", "execution": "block"},
-        "expected_outputs": {
-            "train.step_report": {"steps": 4, "weight": 0.24009999999999998},
-            "train.loss_history": [6.0, 4.199999999999999, 2.94, 2.058],
-            "loop.iterations": 4,
-        },
-        "expected_trace_kind_counts": {"loop_block_enter": 1, "loop_block_exit": 1, "loop_iteration": 4},
-        "expected_qualified_exec_contains": ["train_loop.iter_3.train_step"],
-    },
-    {
-        "name": "loop_while_nodeset_retry",
-        "config": "pass_loop_while_nodeset_retry.jsonc",
-        "initial": {"loop.current": 1},
-        "expected_outputs": {"loop.next": 7, "loop.done": True, "loop.iterations": 3},
-        "expected_runtime_exec_order": ["start", "retry_loop", "end"],
-        "expected_trace_kind_counts": {"loop_enter": 1, "loop_exit": 1, "loop_iteration": 3},
-        "expected_trace_summary": {
-            "current_node": "end",
-            "node_runs": {"start": 1, "retry_loop": 1, "end": 1},
-            "step_count": 3,
-            "total_step_count": 15,
-            "stop_reason": "completed",
-        },
-        "expected_qualified_exec_contains": ["retry_loop.iter_2.increment", "retry_loop.iter_2.done"],
-        "expected_svg_text_contains": ["Retry Loop", "vibeflow.loop.while", "stop_when"],
-    },
-    {
-        "name": "loop_while_nodeset_retry_compiled",
-        "config": "pass_loop_while_nodeset_retry.jsonc",
-        "initial": {"loop.current": 1},
-        "runtime_options": {"trace": "full", "execution": "compiled"},
-        "expected_outputs": {"loop.next": 7, "loop.done": True, "loop.iterations": 3},
-        "expected_trace_kind_counts": {"loop_block_enter": 1, "loop_block_exit": 1, "loop_iteration": 3},
-        "expected_qualified_exec_contains": ["retry_loop.iter_2.increment", "retry_loop.iter_2.done"],
-    },
-    {
-        "name": "loop_while_inside_nodeset",
-        "config": "pass_loop_while_inside_nodeset.jsonc",
-        "initial": {"loop.current": 1},
-        "expected_outputs": {"loop.next": 7, "loop.done": True, "loop.iterations": 3},
-        "expected_runtime_exec_order": ["start", "wrapper", "end"],
-        "expected_qualified_exec_contains": ["wrapper.inner_loop.iter_2.increment", "wrapper.inner_loop.iter_2.done"],
-    },
-    {
-        "name": "loop_nested_outer_after_inner_when_accumulate",
-        "config": "pass_loop_nested_outer_after_inner_when_accumulate.jsonc",
-        "initial": {},
-        "expected_outputs": {
-            "total.final": 15,
-            "outer.final": 3,
-            "outer.done": False,
-            "outer.iterations": 3,
-            "inner.iterations.history": [2, 2, 2],
-        },
-        "expected_runtime_exec_order": ["start", "seed", "outer_loop", "end"],
-        "expected_qualified_exec_contains": [
-            "outer_loop.iter_2.inner_loop.iter_1.accumulate",
-            "outer_loop.iter_2.advance_outer",
-        ],
-    },
-    {
-        "name": "loop_nested_outer_after_inner_when_accumulate_block",
-        "config": "pass_loop_nested_outer_after_inner_when_accumulate.jsonc",
-        "initial": {},
-        "runtime_options": {"trace": "full", "execution": "block"},
-        "expected_outputs": {
-            "total.final": 15,
-            "outer.final": 3,
-            "outer.done": False,
-            "outer.iterations": 3,
-            "inner.iterations.history": [2, 2, 2],
-        },
-        "expected_trace_kind_counts": {"loop_block_enter": 4, "loop_block_exit": 4, "loop_iteration": 9},
-        "expected_qualified_exec_contains": ["outer_loop.iter_2.inner_loop.iter_1.accumulate"],
-    },
-    {
-        "name": "loop_nested_outer_when_inner_after_accumulate",
-        "config": "pass_loop_nested_outer_when_inner_after_accumulate.jsonc",
-        "initial": {},
-        "expected_outputs": {
-            "total.final": 15,
-            "outer.final": 2,
-            "outer.done": True,
-            "outer.iterations": 2,
-            "inner.iterations.history": [3, 3],
-        },
-        "expected_runtime_exec_order": ["start", "seed", "outer_loop", "end"],
-        "expected_qualified_exec_contains": [
-            "outer_loop.iter_1.inner_loop.iter_2.accumulate",
-            "outer_loop.iter_1.advance_outer",
-        ],
-    },
-    {
-        "name": "loop_nested_outer_when_inner_after_accumulate_compiled",
-        "config": "pass_loop_nested_outer_when_inner_after_accumulate.jsonc",
-        "initial": {},
-        "runtime_options": {"trace": "full", "execution": "compiled"},
-        "expected_outputs": {
-            "total.final": 15,
-            "outer.final": 2,
-            "outer.done": True,
-            "outer.iterations": 2,
-            "inner.iterations.history": [3, 3],
-        },
-        "expected_trace_kind_counts": {"loop_block_enter": 3, "loop_block_exit": 3, "loop_iteration": 8},
-        "expected_qualified_exec_contains": ["outer_loop.iter_1.inner_loop.iter_2.accumulate"],
-    },
-    {
-        "name": "runtime_boundary_trace",
-        "config": "pass_runtime_boundary_trace.jsonc",
-        "initial": {"value.in": 1},
-        "runtime_options": {"trace": "boundary"},
-        "expected_outputs": {"value.out": 6},
-        "expected_trace_kinds": ["run_start", "nodeset_enter", "run_start", "run_end", "nodeset_exit", "run_end", "runtime_summary"],
-    },
-    {
-        "name": "runtime_trace_off",
-        "config": "pass_runtime_trace_off.jsonc",
-        "initial": {},
-        "runtime_options": {"trace": "off"},
-        "expected_outputs": {"value.out": 7},
-        "expected_trace_kinds": ["runtime_summary"],
-        "expected_trace_summary": {"stop_reason": "completed", "current_node": "end"},
-    },
-    {
-        "name": "runtime_node_hooks_off",
-        "config": "pass_runtime_node_hooks_off.jsonc",
-        "initial": {},
-        "runtime_options": {"node_hooks": False},
-        "expected_outputs": {"value.out": 6},
-        "expected_hook_delta_present": {"after_run"},
-        "expected_hook_delta_absent": {"before_node", "after_node"},
-    },
-    {
-        "name": "compiled_trace_full",
-        "config": "pass_runtime_node_hooks_off.jsonc",
-        "initial": {},
-        "runtime_options": {"trace": "full", "node_hooks": False, "execution": "compiled"},
-        "expected_outputs": {"value.out": 6},
-        "expected_trace_kinds": ["block_enter", "node", "node", "node", "node", "block_exit", "runtime_summary"],
-        "expected_trace_kind_counts": {"block_enter": 1, "node": 4, "block_exit": 1},
-        "expected_trace_summary": {
-            "current_node": "end",
-            "edge_executions": {"start->seed": 1, "seed->add": 1, "add->end": 1},
-            "exec_order": ["start", "seed", "add", "end"],
-            "node_runs": {"start": 1, "seed": 1, "add": 1, "end": 1},
-            "step_count": 4,
-            "stop_reason": "completed",
-        },
-    },
-    {
-        "name": "compiled_with_node_hooks",
-        "config": "pass_runtime_node_hooks_off.jsonc",
-        "initial": {},
-        "runtime_options": {"trace": "boundary", "node_hooks": True, "execution": "compiled"},
-        "expected_outputs": {"value.out": 6},
-        "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
-        "expected_trace_summary": {
-            "current_node": "end",
-            "exec_order": ["start", "seed", "add", "end"],
-            "node_runs": {"start": 1, "seed": 1, "add": 1, "end": 1},
-            "step_count": 4,
-            "stop_reason": "completed",
-        },
-        "expected_hook_delta_present": {"before_node", "after_node", "after_run"},
-    },
-    {
-        "name": "semantic_linear_arithmetic",
-        "config": "pass_semantic_linear_arithmetic.jsonc",
-        "initial": {"calc.a": 2, "calc.b": 5},
-        "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "calc.branch": 21, "calc.final": 17},
-        "expected_runtime_exec_order": ["start", "add_pair", "scale", "use_scaled", "finalize", "end"],
-        "expected_trace_summary": {
-            "current_node": "end",
-            "edge_executions": {"start->add_pair": 1, "add_pair->scale": 1, "scale->use_scaled": 1, "use_scaled->finalize": 1, "finalize->end": 1},
-            "exec_order": ["start", "add_pair", "scale", "use_scaled", "finalize", "end"],
-            "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "use_scaled": 1, "finalize": 1, "end": 1},
-            "step_count": 6,
-            "stop_reason": "completed",
-        },
-    },
-    {
-        "name": "compiled_semantic_linear_arithmetic",
-        "config": "pass_semantic_linear_arithmetic.jsonc",
-        "initial": {"calc.a": 2, "calc.b": 5},
-        "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
-        "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "calc.branch": 21, "calc.final": 17},
-        "expected_runtime_exec_order": ["start", "add_pair", "scale", "use_scaled", "finalize", "end"],
-        "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
-        "expected_trace_summary": {
-            "current_node": "end",
-            "exec_order": ["start", "add_pair", "scale", "use_scaled", "finalize", "end"],
-            "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "use_scaled": 1, "finalize": 1, "end": 1},
-            "step_count": 6,
-            "stop_reason": "completed",
-        },
-        "expected_blocks": [["start", "add_pair", "scale", "use_scaled", "finalize", "end"]],
-        "expected_block_source_contains": COMPILED_SOURCE_FAST_REQUIRED,
-        "expected_block_source_absent": COMPILED_SOURCE_FAST_FORBIDDEN,
-    },
-    {
-        "name": "compiled_full_semantic_linear_arithmetic",
-        "config": "pass_semantic_linear_arithmetic.jsonc",
-        "initial": {"calc.a": 2, "calc.b": 5},
-        "runtime_options": {"trace": "full", "node_hooks": False, "execution": "compiled"},
-        "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "calc.branch": 21, "calc.final": 17},
-        "expected_trace_kind_counts": {"block_enter": 1, "node": 6, "block_exit": 1},
-        "expected_trace_summary": {
-            "current_node": "end",
-            "edge_executions": {"start->add_pair": 1, "add_pair->scale": 1, "scale->use_scaled": 1, "use_scaled->finalize": 1, "finalize->end": 1},
-            "exec_order": ["start", "add_pair", "scale", "use_scaled", "finalize", "end"],
-            "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "use_scaled": 1, "finalize": 1, "end": 1},
-            "step_count": 6,
-            "stop_reason": "completed",
-        },
-        "expected_blocks": [["start", "add_pair", "scale", "use_scaled", "finalize", "end"]],
-        "expected_block_source_contains": COMPILED_SOURCE_FULL_REQUIRED,
-        "expected_block_source_absent": COMPILED_SOURCE_FORBIDDEN,
-    },
-    {
-        "name": "semantic_decision_branch_left",
-        "config": "pass_semantic_decision_branch.jsonc",
-        "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 9, "calc.d": 4},
-        "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "route.branch": "left", "calc.left_branch": 31},
-        "expected_runtime_exec_order": ["start", "add_pair", "compare", "scale", "left_adjust", "left_end"],
-        "expected_trace_summary": {
-            "current_node": "left_end",
-            "edge_executions": {"start->add_pair": 1, "start->compare": 1, "add_pair->scale": 1, "scale->left_adjust": 1, "scale->right_adjust": 1, "compare->left_adjust": 1, "left_adjust->left_end": 1},
-            "exec_order": ["start", "add_pair", "compare", "scale", "left_adjust", "left_end"],
-            "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "compare": 1, "left_adjust": 1, "left_end": 1},
-            "step_count": 6,
-            "stop_reason": "completed",
-        },
-    },
-    {
-        "name": "semantic_decision_branch_right",
-        "config": "pass_semantic_decision_branch.jsonc",
-        "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 1, "calc.d": 4},
-        "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "route.branch": "right", "calc.right_branch": 15},
-        "expected_runtime_exec_order": ["start", "add_pair", "compare", "scale", "right_adjust", "right_end"],
-        "expected_trace_summary": {
-            "current_node": "right_end",
-            "edge_executions": {"start->add_pair": 1, "start->compare": 1, "add_pair->scale": 1, "scale->left_adjust": 1, "scale->right_adjust": 1, "compare->right_adjust": 1, "right_adjust->right_end": 1},
-            "exec_order": ["start", "add_pair", "compare", "scale", "right_adjust", "right_end"],
-            "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "compare": 1, "right_adjust": 1, "right_end": 1},
-            "step_count": 6,
-            "stop_reason": "completed",
-        },
-    },
-    {
-        "name": "compiled_semantic_decision_branch_left",
-        "config": "pass_semantic_decision_branch.jsonc",
-        "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 9, "calc.d": 4},
-        "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
-        "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "route.branch": "left", "calc.left_branch": 31},
-        "expected_runtime_exec_order": ["start", "add_pair", "compare", "scale", "left_adjust", "left_end"],
-        "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
-        "expected_trace_summary": {
-            "current_node": "left_end",
-            "exec_order": ["start", "add_pair", "compare", "scale", "left_adjust", "left_end"],
-            "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "compare": 1, "left_adjust": 1, "left_end": 1},
-            "step_count": 6,
-            "stop_reason": "completed",
-        },
-        "expected_blocks": [["start", "add_pair", "scale", "compare", "left_adjust", "right_adjust", "left_end", "right_end"]],
-        "expected_block_source_contains": COMPILED_SOURCE_FAST_REQUIRED,
-        "expected_block_source_absent": COMPILED_SOURCE_FAST_FORBIDDEN,
-    },
-    {
-        "name": "compiled_full_semantic_decision_branch_left",
-        "config": "pass_semantic_decision_branch.jsonc",
-        "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 9, "calc.d": 4},
-        "runtime_options": {"trace": "full", "node_hooks": False, "execution": "compiled"},
-        "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "route.branch": "left", "calc.left_branch": 31},
-        "expected_trace_kind_counts": {"block_enter": 1, "node": 6, "block_exit": 1},
-        "expected_trace_summary": {
-            "current_node": "left_end",
-            "edge_executions": {"start->add_pair": 1, "start->compare": 1, "add_pair->scale": 1, "scale->left_adjust": 1, "scale->right_adjust": 1, "compare->left_adjust": 1, "left_adjust->left_end": 1},
-            "exec_order": ["start", "add_pair", "compare", "scale", "left_adjust", "left_end"],
-            "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "compare": 1, "left_adjust": 1, "left_end": 1},
-            "step_count": 6,
-            "stop_reason": "completed",
-        },
-        "expected_blocks": [["start", "add_pair", "scale", "compare", "left_adjust", "right_adjust", "left_end", "right_end"]],
-        "expected_block_source_contains": COMPILED_SOURCE_FULL_REQUIRED,
-        "expected_block_source_absent": COMPILED_SOURCE_FORBIDDEN,
-    },
-    {
-        "name": "compiled_semantic_decision_branch_right",
-        "config": "pass_semantic_decision_branch.jsonc",
-        "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 1, "calc.d": 4},
-        "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
-        "expected_outputs": {"calc.sum": 7, "calc.scaled": 21, "route.branch": "right", "calc.right_branch": 15},
-        "expected_runtime_exec_order": ["start", "add_pair", "compare", "scale", "right_adjust", "right_end"],
-        "expected_trace_kind_counts": {"block_enter": 1, "block_exit": 1},
-        "expected_trace_summary": {
-            "current_node": "right_end",
-            "exec_order": ["start", "add_pair", "compare", "scale", "right_adjust", "right_end"],
-            "node_runs": {"start": 1, "add_pair": 1, "scale": 1, "compare": 1, "right_adjust": 1, "right_end": 1},
-            "step_count": 6,
-            "stop_reason": "completed",
-        },
-        "expected_blocks": [["start", "add_pair", "scale", "compare", "left_adjust", "right_adjust", "left_end", "right_end"]],
-        "expected_block_source_contains": COMPILED_SOURCE_FAST_REQUIRED,
-        "expected_block_source_absent": COMPILED_SOURCE_FAST_FORBIDDEN,
-    },
-    {
-        "name": "semantic_nodeset_arithmetic",
-        "config": "pass_semantic_nodeset_arithmetic.jsonc",
-        "initial": {"calc.a": 4, "calc.b": 6},
-        "expected_outputs": {"calc.scaled": 20, "calc.branch": 20, "calc.final": 25},
-        "expected_runtime_exec_order": ["start", "arithmetic", "use_scaled", "finalize", "end"],
-        "expected_trace_summary": {
-            "current_node": "end",
-            "edge_executions": {"start->arithmetic": 1, "arithmetic->use_scaled": 1, "use_scaled->finalize": 1, "finalize->end": 1},
-            "exec_order": ["start", "arithmetic", "use_scaled", "finalize", "end"],
-            "node_runs": {"start": 1, "arithmetic": 1, "use_scaled": 1, "finalize": 1, "end": 1},
-            "step_count": 5,
-            "stop_reason": "completed",
-        },
-        "expected_nodeset_subplan_params": {"arithmetic.scale": {"factor": 2}},
-        "expected_nodeset_subplan_nodes": {"arithmetic": ["start", "add_pair", "scale", "end"]},
-        "expected_nodeset_exports": {"arithmetic": ["calc.scaled"]},
     },
     {
         "name": "config_resources_nodeset_arithmetic",
@@ -623,72 +229,6 @@ VALID_RUN_CASES = [
         ],
     },
     {
-        "name": "compiled_semantic_nodeset_arithmetic",
-        "config": "pass_semantic_nodeset_arithmetic.jsonc",
-        "initial": {"calc.a": 4, "calc.b": 6},
-        "runtime_options": {"trace": "boundary", "node_hooks": False, "execution": "compiled"},
-        "expected_outputs": {"calc.scaled": 20, "calc.branch": 20, "calc.final": 25},
-        "expected_runtime_exec_order": ["start", "arithmetic", "use_scaled", "finalize", "end"],
-        "expected_trace_kind_counts": {"nodeset_enter": 1, "nodeset_exit": 1, "block_enter": 2, "block_exit": 2},
-        "expected_trace_summary": {
-            "current_node": "end",
-            "edge_executions": {"start->arithmetic": 1, "arithmetic->use_scaled": 1},
-            "exec_order": ["start", "arithmetic", "use_scaled", "finalize", "end"],
-            "node_runs": {"start": 1, "arithmetic": 1, "use_scaled": 1, "finalize": 1, "end": 1},
-            "step_count": 5,
-            "stop_reason": "completed",
-        },
-        "expected_blocks": [["arithmetic"], ["start", "arithmetic", "use_scaled", "finalize", "end"]],
-        "expected_nodeset_subplan_params": {"arithmetic.scale": {"factor": 2}},
-        "expected_nodeset_subplan_nodes": {"arithmetic": ["start", "add_pair", "scale", "end"]},
-        "expected_nodeset_exports": {"arithmetic": ["calc.scaled"]},
-        "expected_block_source_contains": COMPILED_SOURCE_FAST_REQUIRED,
-        "expected_block_source_absent": COMPILED_SOURCE_FAST_FORBIDDEN,
-    },
-    {
-        "name": "execution_plan_bound_params",
-        "config": "pass_execution_plan_bound_params.jsonc",
-        "initial": {},
-        "expected_outputs": {"value.final": 26},
-        "expected_plan_params": {"seed": {"value": 4}, "add": {"delta": 9}, "multiply": {"factor": 2}},
-    },
-    {
-        "name": "execution_plan_nodeset_subplan",
-        "config": "pass_execution_plan_nodeset_subplan.jsonc",
-        "initial": {"value.in": 2},
-        "expected_outputs": {"value.out": 10},
-        "expected_nodeset_subplan_params": {"add_one.add": {"delta": 8}},
-    },
-    {
-        "name": "execution_plan_training_nodeset",
-        "config": "pass_execution_plan_training_nodeset.jsonc",
-        "initial_factory": _training_initial,
-        "expected_outputs": {"train.step_report": {"steps": 1, "weight": 0.7}},
-        "expected_same_as_initial": [("train.model_after", "train.model"), ("train.optimizer_after", "train.optimizer")],
-        "expected_object_attrs": [("train.model_after", "weight", 0.7), ("train.optimizer_after", "steps", 1)],
-        "expect_training_metrics": True,
-        "expected_nodeset_subplan_nodes": {"training_step": ["start", "training_input", "forward_loss", "backward_grad", "optimizer_step", "training_metrics", "end"]},
-    },
-    {
-        "name": "nodeset_loop_subplan_reuse",
-        "config": "pass_nodeset_loop_subplan_reuse.jsonc",
-        "initial": {"value.in": 1},
-        "expected_outputs": {"value.next": 3, "loop.done": True, "loop.iterations": 2},
-        "expected_runtime_exec_order": ["start", "input", "retry_loop", "end"],
-        "expected_trace_kind_counts": {"loop_enter": 1, "loop_exit": 1, "loop_iteration": 2, "nodeset_enter": 2, "nodeset_exit": 2},
-        "expected_qualified_exec_contains": ["retry_loop.iter_0.increment_step.increment", "retry_loop.iter_1.increment_step.increment"],
-    },
-    {
-        "name": "nodeset_reference_exports",
-        "config": "pass_nodeset_reference_exports.jsonc",
-        "initial_factory": _training_initial,
-        "expected_outputs": {"train.step_report": {"steps": 1, "weight": 0.7}},
-        "expected_same_as_initial": [("train.model_after", "train.model"), ("train.optimizer_after", "train.optimizer")],
-        "expected_object_attrs": [("train.model_after", "weight", 0.7), ("train.optimizer_after", "steps", 1)],
-        "expect_training_metrics": True,
-        "expected_nodeset_exports": {"train_step": ["train.model_after", "train.optimizer_after", "train.step_report", "train.metrics"]},
-    },
-    {
         "name": "block_linear_training",
         "config": "pass_block_linear_training.jsonc",
         "initial_factory": _training_initial,
@@ -742,15 +282,6 @@ VALID_RUN_CASES = [
             "stop_reason": "completed",
         },
         "expected_blocks": [["start", "input", "prepare", "compute", "route", "external", "end", "again_end"]],
-    },
-    {
-        "name": "mainline_data_bypass",
-        "config": "pass_mainline_data_bypass.jsonc",
-        "initial": {},
-        "expected_outputs": {"value.final": 14},
-        "expected_runtime_exec_order": ["start", "seed", "prepare", "add", "multiply", "end"],
-        "expected_mermaid_contains": ["linkStyle 5 stroke-dasharray:6 4,stroke-width:2px;"],
-        "expected_run_mermaid_contains": ["linkStyle 5 stroke-dasharray:6 4,stroke-width:2px;"],
     },
     {
         "name": "async_result_key_join",
@@ -853,27 +384,6 @@ VALID_RUN_CASES = [
         "expected_outputs": {"value.out": 10},
         "expected_trace_kind_counts": {"async_detached": 1, "async_detached_done": 1},
         "expected_runtime_exec_order": ["start", "seed", "side_task", "main_add", "end"],
-    },
-    {
-        "name": "safe_or_join_mutually_exclusive_left",
-        "config": "pass_safe_or_join_mutually_exclusive.jsonc",
-        "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 9, "calc.d": 4},
-        "expected_outputs": {"final_result": 131},
-        "expected_runtime_exec_order": ["start", "add_pair", "compare", "scale", "left_adjust", "consume_branch", "end"],
-    },
-    {
-        "name": "safe_or_join_mutually_exclusive_right",
-        "config": "pass_safe_or_join_mutually_exclusive.jsonc",
-        "initial": {"calc.a": 2, "calc.b": 5, "calc.c": 1, "calc.d": 4},
-        "expected_outputs": {"final_result": 215},
-        "expected_runtime_exec_order": ["start", "add_pair", "compare", "scale", "right_adjust", "consume_branch", "end"],
-    },
-    {
-        "name": "join_policy_all",
-        "config": "pass_join_policy_all.jsonc",
-        "initial": {},
-        "expected_outputs": {"value.out": 8},
-        "expected_runtime_exec_order": ["start", "left_value", "other_value", "join", "end"],
     },
 ]
 
@@ -994,8 +504,10 @@ def _run_sandbox(work_root: Path) -> int:
         _reset_outputs()
         results = [
             _run_workspace_quality_case(),
+            _run_comprehensive_math_case(),
+            _run_rule_selection_case(),
             *_run_review_cases(),
-            *_run_delegate_cli_cases(),
+            *(_run_addition_case(name) for name in ("cli_addition", "object_addition", "plugin_addition", "piecewise_math", "workflow_math")),
             *_run_execution_model_cases(),
             *_run_source_preflight_cases(),
             *_run_global_state_cases(),
@@ -1014,14 +526,52 @@ def _run_sandbox(work_root: Path) -> int:
     return 1 if failed else 0
 
 
+def _run_rule_selection_case() -> CaseResult:
+    work = WORK_ROOT / "rule_selection"
+    completed = subprocess.run(
+        [sys.executable, str(SANDBOX_DIR.parent / "rule_selection/run_all.py"), "--work-dir", str(work)],
+        env={**os.environ, "PYTHONPATH": str(SOURCE_ROOT), "PYTHONDONTWRITEBYTECODE": "1"},
+        capture_output=True, text=True,
+    )
+    if completed.returncode:
+        return CaseResult("rule_selection", "FAIL", completed.stdout + completed.stderr)
+    payload = json.loads((work / "report.json").read_text())
+    return CaseResult("rule_selection", "PASS", completed.stdout.strip(), payload)
+
+
+def _run_comprehensive_math_case() -> CaseResult:
+    work = WORK_ROOT / "comprehensive_math"
+    completed = subprocess.run(
+        [sys.executable, str(SANDBOX_DIR.parent / "comprehensive_math/run_all.py"),
+         "--work-dir", str(work), "--renderer-root", os.environ["VIBEFLOW_MERMAID_RENDERER_ROOT"]],
+        env={**os.environ, "PYTHONPATH": str(SOURCE_ROOT), "PYTHONDONTWRITEBYTECODE": "1"},
+        capture_output=True, text=True,
+    )
+    if completed.returncode:
+        return CaseResult("comprehensive_math", "FAIL", completed.stdout + completed.stderr)
+    payload = json.loads((work / "report.json").read_text())
+    return CaseResult("comprehensive_math", "PASS", completed.stdout.strip(), payload)
+
+
+def _run_addition_case(name: str) -> CaseResult:
+    work = WORK_ROOT / name
+    completed = subprocess.run(
+        [sys.executable, str(SANDBOX_DIR.parent / name / "run_all.py"), "--work-dir", str(work),
+         "--renderer-root", os.environ["VIBEFLOW_MERMAID_RENDERER_ROOT"]],
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}, capture_output=True, text=True,
+    )
+    if completed.returncode:
+        return CaseResult(name, "FAIL", completed.stdout + completed.stderr)
+    payload = json.loads((work / "report.json").read_text())
+    return CaseResult(name, payload["status"], completed.stdout.strip(), payload)
+
+
 def _configure_runtime(work_root: Path) -> None:
     global WORK_ROOT, PROJECT_DIR, CONFIG_DIR, REPORT_DIR, ASCII_DIR
     global MERMAID_DIR, SVG_DIR, COMPILED_BLOCK_DIR, RUN_ROOT, POLICY_PATH
     global WORKSPACE_PATH, REVIEW_ARCHITECTURE_DIR, REVIEW_ARCHITECTURE_PATH
-    global DELEGATE_ARCHITECTURE_PATH, NUMERIC_PATHLIB_ARCHITECTURE_PATH
-    global NUMERIC_STREAMS_ARCHITECTURE_PATH, REVIEW_DIR, DELEGATE_CONFIG_PATH
-    global DELEGATE_INPUT_PATH, NUMERIC_PATHLIB_CONFIG_PATH
-    global NUMERIC_STREAMS_CONFIG_PATH, EXTERNAL_DEDUP_REVIEW_CONFIG_PATH
+    global REVIEW_DIR
+    global EXTERNAL_DEDUP_REVIEW_CONFIG_PATH
 
     WORK_ROOT = work_root.resolve()
     PROJECT_DIR = WORK_ROOT / "project"
@@ -1045,24 +595,7 @@ def _configure_runtime(work_root: Path) -> None:
     POLICY_PATH = PROJECT_DIR / "kernel_policy.jsonc"
     REVIEW_ARCHITECTURE_DIR = PROJECT_DIR / "review_artifacts"
     REVIEW_ARCHITECTURE_PATH = REVIEW_ARCHITECTURE_DIR / "ARCHITECTURE.jsonc"
-    DELEGATE_ARCHITECTURE_PATH = (
-        REVIEW_ARCHITECTURE_DIR / "DELEGATE_CLI_ARCHITECTURE.jsonc"
-    )
-    NUMERIC_PATHLIB_ARCHITECTURE_PATH = (
-        REVIEW_ARCHITECTURE_DIR / "NUMERIC_PATHLIB_CLI_ARCHITECTURE.jsonc"
-    )
-    NUMERIC_STREAMS_ARCHITECTURE_PATH = (
-        REVIEW_ARCHITECTURE_DIR / "NUMERIC_STREAMS_CLI_ARCHITECTURE.jsonc"
-    )
     REVIEW_DIR = REPORT_DIR / "review"
-    DELEGATE_CONFIG_PATH = CONFIG_DIR / "pass_delegate_cli.jsonc"
-    DELEGATE_INPUT_PATH = PROJECT_DIR / "data" / "delegate_input.yaml"
-    NUMERIC_PATHLIB_CONFIG_PATH = (
-        CONFIG_DIR / "pass_delegate_cli_numeric_pathlib.jsonc"
-    )
-    NUMERIC_STREAMS_CONFIG_PATH = (
-        CONFIG_DIR / "pass_delegate_cli_numeric_streams.jsonc"
-    )
     EXTERNAL_DEDUP_REVIEW_CONFIG_PATH = (
         CONFIG_DIR / "review_external_nodeset_dedup.jsonc"
     )
@@ -1174,12 +707,7 @@ def _audit_published_diagrams(results: list[CaseResult]) -> CaseResult:
     )
 
     valid_names = {str(case["name"]) for case in VALID_RUN_CASES}
-    success_run_names = {
-        *valid_names,
-        "delegate_cli",
-        "delegate_cli_numeric_pathlib",
-        "delegate_cli_numeric_streams",
-    }
+    success_run_names = valid_names
     success_run_svgs: set[Path] = set()
     for run_name in sorted(success_run_names):
         run_dir = RUN_ROOT / run_name
@@ -1264,342 +792,16 @@ def _audit_published_diagrams(results: list[CaseResult]) -> CaseResult:
     )
 
 
-def _run_delegate_cli_cases() -> list[CaseResult]:
-    cases = (
-        ("delegate-cli:native_process", _run_delegate_cli_case),
-        ("delegate-cli:numeric_pathlib", _run_numeric_pathlib_delegate_cli_case),
-        ("delegate-cli:numeric_streams", _run_numeric_streams_delegate_cli_case),
-    )
-    results: list[CaseResult] = []
-    for name, runner in cases:
-        try:
-            result = runner()
-        except Exception as exc:
-            result = CaseResult(name, "FAIL", str(exc))
-        results.append(result)
-    return results
 
 
-def _run_delegate_cli_case() -> CaseResult:
-    environment = os.environ.copy()
-    python_paths = [str(SOURCE_ROOT), str(PROJECT_DIR)]
-    if environment.get("PYTHONPATH"):
-        python_paths.append(environment["PYTHONPATH"])
-    environment["PYTHONPATH"] = os.pathsep.join(python_paths)
-
-    architecture = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "vibeflow",
-            "export-architecture",
-            "--workspace",
-            str(WORKSPACE_PATH),
-            "--config",
-            str(DELEGATE_CONFIG_PATH),
-            "--output",
-            str(DELEGATE_ARCHITECTURE_PATH),
-        ],
-        cwd=WORK_ROOT,
-        env=environment,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if architecture.returncode != 0 or not DELEGATE_ARCHITECTURE_PATH.is_file():
-        raise AssertionError(
-            f"delegate architecture generation failed: code={architecture.returncode}, "
-            f"stdout={architecture.stdout!r}, stderr={architecture.stderr!r}"
-        )
-
-    completed = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "vibeflow",
-            "delegate-cli",
-            "--workspace",
-            str(WORKSPACE_PATH),
-            "--config",
-            str(DELEGATE_CONFIG_PATH),
-            "--run-root",
-            str(RUN_ROOT),
-            "--run-id",
-            "delegate_cli",
-            "--",
-            "--input",
-            str(DELEGATE_INPUT_PATH),
-            "--verbose",
-        ],
-        cwd=WORK_ROOT,
-        env=environment,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if completed.returncode != 0:
-        raise AssertionError(
-            f"delegate-cli returned {completed.returncode}: stdout={completed.stdout!r}, stderr={completed.stderr!r}"
-        )
-    if completed.stdout != "processed:hello-vibeflow\n":
-        raise AssertionError(f"delegate-cli polluted or changed stdout: {completed.stdout!r}")
-    if completed.stderr != "verbose:delegate-cli\n":
-        raise AssertionError(f"delegate-cli polluted or changed stderr: {completed.stderr!r}")
-
-    run_dir = RUN_ROOT / "delegate_cli"
-    log_text = (run_dir / "vibeflow.log").read_text(encoding="utf-8")
-    if "CLI.DELEGATE.END" not in log_text or "exit_code=0" not in log_text:
-        raise AssertionError("delegate-cli core log is missing the successful exit record")
-    for business_text in ("processed:hello-vibeflow", "verbose:delegate-cli", str(DELEGATE_INPUT_PATH)):
-        if business_text in log_text:
-            raise AssertionError("delegate-cli core log captured business data")
-    health = json.loads((run_dir / "health_report.json").read_text(encoding="utf-8"))
-    if health.get("status") not in {"PASS", "CONCERNS"}:
-        raise AssertionError(f"delegate-cli health failed: {health.get('status')}")
-    output_summary = json.loads((run_dir / "output_summary.json").read_text(encoding="utf-8"))
-    if output_summary.get("cli.exit_code", {}).get("data_type") != "cli.exit_code":
-        raise AssertionError(f"delegate-cli output summary is missing cli.exit_code: {output_summary}")
-
-    return CaseResult(
-        "delegate-cli:native_process",
-        "PASS",
-        payload={
-            "stdout": completed.stdout.rstrip("\n"),
-            "stderr": completed.stderr.rstrip("\n"),
-            "exit_code": completed.returncode,
-            "run_log": str((run_dir / "vibeflow.log").relative_to(WORK_ROOT)),
-        },
-    )
 
 
-def _run_numeric_pathlib_delegate_cli_case() -> CaseResult:
-    return _run_numeric_delegate_cli_case(
-        name="pathlib",
-        config_path=NUMERIC_PATHLIB_CONFIG_PATH,
-        architecture_path=NUMERIC_PATHLIB_ARCHITECTURE_PATH,
-        left_path=PROJECT_DIR / "data" / "numeric_pathlib_left.txt",
-        right_path=PROJECT_DIR / "data" / "numeric_pathlib_right.txt",
-        stdin_text="7\n",
-        expected_left="11\n",
-        expected_right="13\n",
-        expected_stdout="sum=31\n",
-        expected_stderr="writer=pathlib\n",
-        expected_output="31\n",
-    )
 
 
-def _run_numeric_streams_delegate_cli_case() -> CaseResult:
-    return _run_numeric_delegate_cli_case(
-        name="streams",
-        config_path=NUMERIC_STREAMS_CONFIG_PATH,
-        architecture_path=NUMERIC_STREAMS_ARCHITECTURE_PATH,
-        left_path=PROJECT_DIR / "data" / "numeric_streams_left.txt",
-        right_path=PROJECT_DIR / "data" / "numeric_streams_right.txt",
-        stdin_text="5\n",
-        expected_left="17\n",
-        expected_right="19\n",
-        expected_stdout="sum=41\n",
-        expected_stderr="writer=open\n",
-        expected_output="41\n",
-    )
 
 
-def _run_numeric_delegate_cli_case(
-    *,
-    name: str,
-    config_path: Path,
-    architecture_path: Path,
-    left_path: Path,
-    right_path: Path,
-    stdin_text: str,
-    expected_left: str,
-    expected_right: str,
-    expected_stdout: str,
-    expected_stderr: str,
-    expected_output: str,
-) -> CaseResult:
-    if left_path.read_text(encoding="utf-8") != expected_left:
-        raise AssertionError(f"unexpected left numeric fixture: {left_path}")
-    if right_path.read_text(encoding="utf-8") != expected_right:
-        raise AssertionError(f"unexpected right numeric fixture: {right_path}")
-
-    output_dir = REPORT_DIR / "delegate_cli_numeric"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / f"{name}_sum.txt"
-    output_path.unlink(missing_ok=True)
-    run_id = f"delegate_cli_numeric_{name}"
-
-    environment = os.environ.copy()
-    python_paths = [str(SOURCE_ROOT), str(PROJECT_DIR)]
-    if environment.get("PYTHONPATH"):
-        python_paths.append(environment["PYTHONPATH"])
-    environment["PYTHONPATH"] = os.pathsep.join(python_paths)
-
-    architecture = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "vibeflow",
-            "export-architecture",
-            "--workspace",
-            str(WORKSPACE_PATH),
-            "--config",
-            str(config_path),
-            "--output",
-            str(architecture_path),
-        ],
-        cwd=WORK_ROOT,
-        env=environment,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if architecture.returncode != 0 or not architecture_path.is_file():
-        raise AssertionError(
-            f"{name} architecture generation failed: code={architecture.returncode}, "
-            f"stdout={architecture.stdout!r}, stderr={architecture.stderr!r}"
-        )
-    if output_path.exists():
-        raise AssertionError(f"{name} architecture export executed an effectful example")
-
-    completed = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "vibeflow",
-            "delegate-cli",
-            "--workspace",
-            str(WORKSPACE_PATH),
-            "--config",
-            str(config_path),
-            "--run-root",
-            str(RUN_ROOT),
-            "--run-id",
-            run_id,
-            "--",
-            "--left",
-            str(left_path),
-            "--right",
-            str(right_path),
-            "--output",
-            str(output_path),
-        ],
-        cwd=WORK_ROOT,
-        env=environment,
-        input=stdin_text.encode("utf-8"),
-        capture_output=True,
-        check=False,
-    )
-    if completed.returncode != 0:
-        raise AssertionError(
-            f"{name} delegate-cli returned {completed.returncode}: "
-            f"stdout={completed.stdout!r}, stderr={completed.stderr!r}"
-        )
-    if completed.stdout != expected_stdout.encode("utf-8"):
-        raise AssertionError(f"{name} stdout mismatch: {completed.stdout!r}")
-    if completed.stderr != expected_stderr.encode("utf-8"):
-        raise AssertionError(f"{name} stderr mismatch: {completed.stderr!r}")
-    if not output_path.is_file():
-        raise AssertionError(f"{name} output file was not created: {output_path}")
-    if output_path.read_bytes() != expected_output.encode("utf-8"):
-        raise AssertionError(f"{name} output file mismatch: {output_path.read_bytes()!r}")
-
-    run_dir = RUN_ROOT / run_id
-    health = json.loads((run_dir / "health_report.json").read_text(encoding="utf-8"))
-    if health.get("status") not in {"PASS", "CONCERNS"}:
-        raise AssertionError(f"{name} delegate-cli health failed: {health.get('status')}")
-    effect_scopes = health.get("info", {}).get("node_effect_scopes", {})
-    expected_scopes = {
-        "start": "none",
-        "parse_argv": "terminal",
-        "read_stdin": "terminal",
-        "read_left": "python_io",
-        "read_right": "python_io",
-        "sum_numbers": "none",
-        "write_file": "python_io",
-        "write_output": "terminal",
-        "end": "none",
-    }
-    wrong_scopes = {
-        node: effect_scopes.get(node)
-        for node, expected in expected_scopes.items()
-        if effect_scopes.get(node) != expected
-    }
-    if wrong_scopes:
-        raise AssertionError(f"{name} effect scopes did not match the graph roles: {wrong_scopes}")
-    output_summary = json.loads((run_dir / "output_summary.json").read_text(encoding="utf-8"))
-    exit_summary = output_summary.get("cli.exit_code")
-    if not isinstance(exit_summary, dict) or exit_summary.get("data_type") != "cli.exit_code":
-        raise AssertionError(f"{name} output summary is missing cli.exit_code: {output_summary}")
-    if exit_summary.get("value") != {"scalar": True, "type": "int"}:
-        raise AssertionError(f"{name} output summary has an invalid cli.exit_code: {exit_summary}")
-
-    trace = _runtime_trace_lines(run_dir)
-    if not trace or trace[-1].get("kind") != "runtime_summary":
-        raise AssertionError(f"{name} runtime trace is missing its summary")
-    node_runs = trace[-1].get("qualified_node_runs")
-    expected_nodes = {
-        "start",
-        "parse_argv",
-        "read_stdin",
-        "read_left",
-        "read_right",
-        "sum_numbers",
-        "write_file",
-        "write_output",
-        "end",
-    }
-    if not isinstance(node_runs, dict):
-        raise AssertionError(f"{name} runtime summary is missing qualified_node_runs")
-    bad_runs = {node: node_runs.get(node) for node in expected_nodes if node_runs.get(node) != 1}
-    if bad_runs:
-        raise AssertionError(f"{name} nodes did not execute exactly once: {bad_runs}")
-
-    log_text = (run_dir / "vibeflow.log").read_text(encoding="utf-8")
-    if "CLI.DELEGATE.END" not in log_text or "exit_code=0" not in log_text:
-        raise AssertionError(f"{name} delegate-cli core log is missing the successful exit record")
-    sensitive_business_text = {
-        stdin_text.strip(),
-        expected_left.strip(),
-        expected_right.strip(),
-        str(left_path),
-        str(right_path),
-        str(output_path),
-        expected_stdout.strip(),
-        expected_stderr.strip(),
-        expected_output.strip(),
-    }
-    leaked = sorted(
-        text
-        for text in sensitive_business_text
-        if text and _log_contains_business_text(log_text, text)
-    )
-    if leaked:
-        raise AssertionError(f"{name} delegate-cli core log captured business data: {leaked}")
-
-    return CaseResult(
-        f"delegate-cli:numeric_{name}",
-        "PASS",
-        payload={
-            "stdin": stdin_text.rstrip("\n"),
-            "stdout": completed.stdout.decode("utf-8").rstrip("\n"),
-            "stderr": completed.stderr.decode("utf-8").rstrip("\n"),
-            "output": expected_output.rstrip("\n"),
-            "exit_code": completed.returncode,
-            "run_log": str((run_dir / "vibeflow.log").relative_to(WORK_ROOT)),
-        },
-    )
 
 
-def _log_contains_business_text(log_text: str, value: str) -> bool:
-    if not value.isdecimal():
-        return value in log_text
-    labelled_value = re.compile(
-        rf"\b(?:stdin|input|content|payload|value|left|right|output)\b"
-        rf"\s*[:=]\s*['\"]?{re.escape(value)}(?:\b|['\"])",
-        flags=re.IGNORECASE,
-    )
-    return labelled_value.search(log_text) is not None
 
 
 def _run_registered_review_case() -> CaseResult:
@@ -2656,21 +1858,6 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     initial = case["initial_factory"]() if "initial_factory" in case else case.get("initial", {})
     hook_marker = REPORT_DIR / "plugin_hooks.jsonl"
     hook_count_before = len(hook_marker.read_text(encoding="utf-8").splitlines()) if hook_marker.exists() else 0
-    capabilities = None
-    sent_port_values: list[dict[str, Any]] = []
-    if case.get("port_math"):
-        capabilities = {
-            "vibeflow.port": {
-                "receive": lambda request: {
-                    "value": 5
-                    if request["port"] == "sandbox.math.in"
-                    else 0
-                },
-                "send": lambda request: sent_port_values.append(
-                    dict(request)
-                ),
-            }
-        }
     run_result = run_checked(
         config_path,
         registry=node_registry,
@@ -2679,7 +1866,6 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         run_root=RUN_ROOT,
         run_id=name,
         runtime_options=runtime_options,
-        capabilities=capabilities,
     )
     _assert_artifacts(run_result.run_dir)
     _assert_run_mermaid(case, run_result.run_dir)
@@ -2699,12 +1885,6 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
                 "global-state structural examples must not execute; expected "
                 f"one runtime call, got {legal_global_state_nodes.GLOBAL_STATE_RUNS}"
             )
-    if case.get("port_math") and sent_port_values != [
-        {"port": "sandbox.math.out", "value": 21}
-    ]:
-        raise AssertionError(
-            f"port math send expected 21, got {sent_port_values!r}"
-        )
     for key in case.get("expected_absent_outputs", ()):
         if run_result.context.exists(str(key)):
             raise AssertionError(f"{key} should be absent, got {run_result.context.get(str(key))!r}")

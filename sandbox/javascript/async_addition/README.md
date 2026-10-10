@@ -1,0 +1,11 @@
+# javascript async_addition
+
+两个 Capability 调用使用相同 key 和不同能力实现，释放前均等待，先释放右侧得到 30，再释放左侧得到 5。持续 Host 接收两对数字、发送 5/30，第三次接收挂起，stop 后 VF_ABORTED，重复 stop 不产生额外生命周期。保留 browser ESM 构建检查。
+
+```bash
+python sandbox/javascript/async_addition/run_all.py
+```
+
+默认使用外部临时目录；`--work-dir /absolute/outside/repository` 保留项目、报告与运行记录。Python 可用 `--renderer-root` 复用 Mermaid/Puppeteer，JavaScript 可用 `--toolchain-root` 复用按 package-lock 安装的 TypeScript/esbuild。
+
+业务代码在 project，Config 在 project/configs，测试驱动在 run_all.py。所有源码修改仅发生在工作副本中。完整检查条件及旧任务替代关系见 [维护归档](../../../docs/maintainers/history/audits/addition-sandboxes-20261009.md)。

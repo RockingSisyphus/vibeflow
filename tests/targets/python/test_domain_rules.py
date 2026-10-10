@@ -240,7 +240,7 @@ def test_same_file_model_definitions_have_precise_domain_ownership(domain_projec
     assert code == 1, payload
     finding = next(item for item in payload["errors"]
                    if item["code"] == "EXAMPLE.MODEL.LOCATION" and item["details"]["symbol"] == symbol)
-    assert finding["definition_id"] == "example.model_definition"
+    assert finding["definition_id"] == ("example.model_files" if location == "module" else "example.model_definition")
     assert finding["source_location"] == {"path": str(path), "line": line, "column": 1}
     if location == "ordinary_node":
         assert finding["details"]["node_type"] == "example.transform"

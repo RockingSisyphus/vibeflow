@@ -86,8 +86,28 @@
     "rulesets": {
       "type": "array",
       "items": {
-        "type": "string",
-        "minLength": 1
+        "oneOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "object",
+            "required": [
+              "rule_id"
+            ],
+            "properties": {
+              "rule_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "params": {
+                "type": "object"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
       }
     },
     "presentation": {

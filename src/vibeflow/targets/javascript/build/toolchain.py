@@ -188,6 +188,8 @@ class DriverRuleResult:
     toolchain: AuditToolchainInfo
     findings: tuple[Mapping[str, Any], ...]
     sources: tuple[Mapping[str, Any], ...]
+    local_sources: tuple[Mapping[str, Any], ...] = ()
+    local_quality: Mapping[str, Any] | None = None
 
 
 def run_rule_check_driver(
@@ -205,7 +207,7 @@ def run_rule_check_driver(
         raise AotToolchainError("VF_PROTOCOL", "source Rule driver returned invalid results")
     info = AuditToolchainInfo(str(probe.get("node", "")), str(probe.get("typescript", "")))
     _validate_audit_versions(info)
-    return DriverRuleResult(info, tuple(findings), tuple(sources))
+    return DriverRuleResult(info, tuple(findings), tuple(sources), tuple(result.get("local_sources", ())), result.get("local_quality"))
 
 
 def run_quality_facts_driver(

@@ -86,7 +86,7 @@ def _cases() -> tuple[Case, ...]:
         Case('js.node.console', 'Process 默认无副作用规则检测 console', 'effects.console', source=_body(NODE, 'console.log("parity");'), current_code='VF_BASE_LIB_HOST_IO', classification='new_feature', notes='基线未把 console 纳入 Node host-I/O；当前显式默认 none 补强。'),
         Case('js.node.console-empty', '显式空规则选择不隐式恢复 Process 权限', 'effects.selection', source=_body(NODE, 'console.log("parity");'), empty_selection=True, classification='approved_change'),
         Case('js.node.console-shadow', '局部纯 console 名称遮蔽', 'effects.console', source=_body(NODE, 'const console = {log: (value: number) => value + 1}; console.log(1);')),
-        Case('js.node.source-lines', 'Node 源码超过 500 行', 'maintainability.source', source=normal_node + '\n' * 501, code='NODE.PURITY.SOURCE_TOO_LARGE'),
+        Case('js.node.source-lines', 'Node 源码超过 500 行', 'maintainability.source', source=normal_node.replace('  return ', '  // Implementation line\n' * 501 + '  return '), code='NODE.PURITY.SOURCE_TOO_LARGE'),
         Case('js.node.call-depth', 'Node 实际内部调用链超过四层', 'maintainability.call_chain', source='function a(value: number) { return b(value); }\nfunction b(value: number) { return c(value); }\nfunction c(value: number) { return d(value); }\nfunction d(value: number) { return e(value); }\nfunction e(value: number) { return value + 1; }\n' + _body(NODE, 'a(1);'), code='NODE.MAINTAINABILITY.CALL_CHAIN_TOO_DEEP'),
         Case('js.node.recursive-helper', 'Node 实际递归 helper', 'maintainability.call_chain', source='function recurse(value: number): number { return value > 0 ? recurse(value - 1) : 0; }\n' + _body(NODE, 'recurse(1);'), code='NODE.MAINTAINABILITY.RECURSIVE_CALL_CHAIN'),
         Case('js.node.abi-output', '实际 Node 输出与声明 ABI 不符', 'native.contract', source=normal_node.replace('result:', 'wrong:'), code='VF_TYPESCRIPT', entrypoint='build'),
@@ -132,7 +132,7 @@ def _cases() -> tuple[Case, ...]:
         Case('js.node.top-call.quality-cli', '正式 quality-check 拒绝 Node 顶层执行', 'imports.purity', source='function boot() { return 1; }\nconst value = boot();\n' + normal_node, code='VF_IMPORT_SIDE_EFFECT', entrypoint='quality-cli'),
     ))
     common.extend((
-        Case('js.quality.file-lines', '普通 JS 源文件长度检查', 'quality.source', source=normal_node + '\n' * 501, code='QUALITY.FILE.MAX_LINES', entrypoint='quality'),
+        Case('js.quality.file-lines', '普通 JS 源文件长度检查', 'quality.source', source=normal_node.replace('  return ', '  // Implementation line\n' * 501 + '  return '), code='QUALITY.FILE.MAX_LINES', entrypoint='quality'),
         Case('js.quality.function-duplicate', '真实 TS AST 重复函数产生 warning', 'quality.duplicates', source='export function first(value: number) {\n  const result = value + 1;\n  return result;\n}\nexport function second(value: number) {\n  const result = value + 2;\n  return result;\n}\n', code='QUALITY.DUPLICATE.AST_FINGERPRINT', entrypoint='quality'),
         Case('js.quality.syntax', '真实 TS 语法错误', 'quality.syntax', source='export function broken( { return 1;\n', code='QUALITY.SYNTAX.JAVASCRIPT', entrypoint='quality'),
         Case('js.quality.metrics', '真实 TS function/branch/参数指标', 'quality.metrics', source='export function choose(value: number, extra?: number) {\n  if (value > 0) return value + (extra ?? 1);\n  return 0;\n}\n', entrypoint='quality', metrics={'function_count': 1, 'first_function_params': 2, 'branch_count': 2}),

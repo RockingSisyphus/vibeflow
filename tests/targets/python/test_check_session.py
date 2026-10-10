@@ -52,34 +52,25 @@ def test_source_reuse_is_private_to_session_and_call_checks_are_live(tmp_path):
     end_python_check(registry)
 
 
-def test_plugin_config_policy_load_state_extra_facts_and_handler_change_invalidate(tmp_path):
+def test_local_source_cache_uses_effective_params_and_handler_without_global_facts(tmp_path):
     registry,sources,handlers = _case(tmp_path,policy_parameters=True)
     seen = []
     from functools import wraps
     @wraps(registry.direct_bindings[("rule","vibeflow.maintainability")])
     def check(context,inputs,params):
-        seen.append((context.facts["plugins"]["demo"]["value"],
-            params["policy"]["node_source"]["max_lines"],dict(context.facts["source_load_states"]),
-            context.facts["extra"]["value"]))
+        assert not {"plugins", "node_catalog", "source_load_states", "extra"} & context.facts.keys()
+        seen.append(params["policy"]["node_source"]["max_lines"])
         return RuleResult()
     handlers["test.review"] = check
-    registry.source_load_states = {sources.files[0].path:"not_loaded"}
     config = {"plugins":{"demo":{"value":1}},"extra":{"value":1}}
     def run(policy=500):
         return execute_python_node_rules(registry,sources,phase="import",purity_policy=PurityPolicy(max_source_lines=policy),extra_facts=config)
     run(); run()
-    assert len(seen) == 1
     config["plugins"]["demo"]["value"] = 9
-    run()
     config["extra"]["value"] = 2
     run()
     run(100)
-    registry.source_load_states[sources.files[0].path] = "loaded"
-    run(100)
-    assert len(seen) == 5
-    assert seen[0][0] == 1 and seen[-1][:2] == (9,100)
-    assert seen[0][2][sources.files[0].path] == "not_loaded"
-    assert seen[-1][2][sources.files[0].path] == "loaded"
+    assert seen == [500,100]
     replacements = []
     handlers["test.review"] = lambda *_: replacements.append(1) or RuleResult()
     run(100)
@@ -114,7 +105,7 @@ def test_changed_source_and_selected_params_are_new_views(tmp_path):
     handlers["test.review"] = lambda context,*_: seen.append(context.facts["source_context"].files[0].text) or RuleResult()
     execute_python_node_rules(registry,sources,phase="import")
     path = tmp_path / "nodes.py"
-    path.write_text(path.read_text()+"\n# changed source snapshot\n")
+    path.write_text(path.read_text().replace("return {}", "return {1: 2}"))
     changed = collect_workflow_source_context(registry,_repeated_graph())
     execute_python_node_rules(registry,changed,phase="import")
     assert len(seen) == 2 and seen[0] != seen[1]
@@ -149,11 +140,11 @@ def test_opaque_mutable_extra_fact_is_not_reused_by_object_identity(tmp_path):
     registry,sources,handlers = _case(tmp_path)
     external = SimpleNamespace(value=1)
     seen = []
-    handlers["test.review"] = lambda context,*_: seen.append(context.facts["opaque"].value) or RuleResult()
+    handlers["test.review"] = lambda context,*_: seen.append("opaque" in context.facts) or RuleResult()
     execute_python_node_rules(registry,sources,phase="import",extra_facts={"opaque":external})
     external.value = 2
     execute_python_node_rules(registry,sources,phase="import",extra_facts={"opaque":external})
-    assert seen == [1,2]
+    assert seen == [False]
     end_python_check(registry)
 
 
@@ -251,11 +242,11 @@ def test_unknown_primitive_subclass_is_not_stable_by_its_base_value(tmp_path):
     value = MutableString("same base string")
     value.observed = 1
     seen = []
-    handlers["test.review"] = lambda context,*_: seen.append(context.facts["extra"].observed) or RuleResult()
+    handlers["test.review"] = lambda context,*_: seen.append("extra" in context.facts) or RuleResult()
     execute_python_node_rules(registry,sources,phase="import",extra_facts={"extra":value})
     value.observed = 2
     execute_python_node_rules(registry,sources,phase="import",extra_facts={"extra":value})
-    assert seen == [1,2]
+    assert seen == [False]
     end_python_check(registry)
 
 
@@ -284,7 +275,7 @@ def test_changed_provider_records_invalidate_source_consumer_only(tmp_path):
     report = execute_python_node_rules(registry,sources,phase="import")
     assert produced == [1,2,2] and consumed == [1,2]
     assert len(report.findings) == 2
-    assert all({item["node"] for item in finding.details["calls"]} == {"first","second","third"} for finding in report.findings)
+    assert [{item["node"] for item in finding.details["calls"]} for finding in report.findings] == [{"first"}, {"second","third"}]
     again = execute_python_node_rules(registry,sources,phase="import")
     assert produced == [1,2,2,1,2,2] and consumed == [1,2]
     assert all(item.executed == ("provide",) for item in again.executions)

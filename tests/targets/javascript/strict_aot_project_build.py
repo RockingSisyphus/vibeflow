@@ -325,6 +325,19 @@ def _request(tmp_path: Path, **changes: object) -> ProjectBuildRequest:
     return ProjectBuildRequest(**values)
 
 
+def test_build_compiles_uncalled_empty_rule_declarations(tmp_path):
+    request = _request(tmp_path)
+    data = json.loads(Path(request.config).read_text())
+    data["rulesets"] = []
+    declaration = Path(request.config).parent / "nodesets/unused.jsonc"
+    _write(declaration,{"type_key":"demo.unused","display_name":"Unused","description":"Native error still applies.",
+        "requires":[],"provides":[],"rulesets":[],"pipeline":{"nodes":[{"id":"unknown","display_name":"Unknown","description":"An unknown native Node type.","type_used":"unknown.node","rulesets":[]}]}})
+    data.setdefault("nodeset_imports",[]).append("nodesets/unused.jsonc")
+    _write(Path(request.config),data)
+    with pytest.raises(Exception,match="unknown.node"):
+        prepare_project_build(request)
+
+
 def _add_host_extension(
     project: Path,
     extension_id: str,

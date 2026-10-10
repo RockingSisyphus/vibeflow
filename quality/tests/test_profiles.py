@@ -53,11 +53,17 @@ class ProfileTests(unittest.TestCase):
         self.fixture.write("archive/review-performance-observations.zip", "audit")
         self.fixture.write("docs/maintainers/run.log", "output")
         self.fixture.write("sandbox/rule_gaps/report.json", "{}")
+        self.fixture.write("docs/maintainers/history/audits/case-index.json", "{}")
+        self.fixture.write("docs/maintainers/history/audits/sandbox-task-inventory-20261010.json", "{}")
         subjects = {f.subject_id for f in profile_module._directory_role_findings(self.fixture.root)}
         self.assertIn("dist/independent-review", subjects)
         self.assertIn("archive/review-performance-observations.zip", subjects)
         self.assertIn("docs/maintainers/run.log", subjects)
         self.assertIn("sandbox/rule_gaps", subjects)
+        self.assertIn("docs/maintainers/history/audits/case-index.json", subjects)
+        self.assertIn("docs/maintainers/history/audits/sandbox-task-inventory-20261010.json", subjects)
+        self.fixture.write("outputs/test-audit/table.xlsx", "workbook")
+        self.assertIn(self.fixture.root / "outputs", profile_module._generated_paths(self.fixture.root))
 
     def test_directory_roles_allow_releases_sources_and_document_assets(self) -> None:
         self.fixture.write("dist/vibeflow-distribution/DISTRIBUTION.json", '{"version":"0.17.0"}')
@@ -65,6 +71,7 @@ class ProfileTests(unittest.TestCase):
         self.fixture.write("dist/SHA256SUMS-0.17.0.txt", "hash")
         self.fixture.write("archive/history/old-build/vibeflow-distribution-0.15.1.zip", "old")
         self.fixture.write("docs/assets/architecture.svg", "image")
+        self.fixture.write("docs/assets/audits/test-inventory/table.xlsx", "workbook")
         self.fixture.write("docs/maintainers/design.pdf", "document")
         self.fixture.write("docs/maintainers/notes.txt", "notes")
         self.fixture.write("docs/design/diagram.json", "{}")

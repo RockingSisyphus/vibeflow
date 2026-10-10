@@ -138,7 +138,7 @@ def _parse_node(data: Mapping[str, Any]) -> NodeDescriptor:
         capabilities=_parse_capability_requirements(
             data.get("capabilities", ()),
         ),
-        rulesets=_string_list(data.get("rulesets", ()), field="node.rulesets"),
+        rulesets=data.get("rulesets", ()),
         presentation=_mapping_or_empty(data.get("presentation"), field="node.presentation"),
         metadata=_mapping_or_empty(data.get("metadata"), field="node.metadata"),
     )
@@ -352,7 +352,7 @@ def _parse_base_lib(data: Mapping[str, Any]) -> BaseLibDescriptor:
     )
     return BaseLibDescriptor(
         presentation=_mapping_or_empty(data.get("presentation"), field="base_lib.presentation"),
-        rulesets=_string_list(data.get("rulesets", ()), field="base_lib.rulesets"),
+        rulesets=data.get("rulesets", ()),
         id=_required_string(data.get("id"), field="base_lib.id"),
         display_name=_required_string(
             data.get("display_name"),
@@ -490,7 +490,7 @@ def _parse_host_extension(
     return HostExtensionDescriptor(
         presentation=_mapping_or_empty(data.get("presentation"), field="host_extension.presentation"),
         base_libs=_string_list(data.get("base_libs", ()), field="host_extension.base_libs"),
-        rulesets=_string_list(data.get("rulesets", ()), field="host_extension.rulesets"),
+        rulesets=data.get("rulesets", ()),
         id=_required_string(
             data.get("id"),
             field="host_extension.id",
@@ -556,7 +556,7 @@ def _parse_plugin(data: Mapping[str, Any]) -> PluginDescriptor:
     return PluginDescriptor(
         presentation=_mapping_or_empty(data.get("presentation"), field="plugin.presentation"),
         base_libs=_string_list(data.get("base_libs", ()), field="plugin.base_libs"),
-        rulesets=_string_list(data.get("rulesets", ()), field="plugin.rulesets"),
+        rulesets=data.get("rulesets", ()),
         id=_required_string(data.get("id"), field="plugin.id"),
         plugin_type=_required_string(data.get("type"), field="plugin.type"),
         targets=_string_list(data.get("targets"), field="plugin.targets"),

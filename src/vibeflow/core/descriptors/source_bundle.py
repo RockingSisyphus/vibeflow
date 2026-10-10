@@ -1,3 +1,5 @@
+
+from vibeflow.core.rules.selection.models import selection_refs, selection_data
 """Portable source membership for executable resources and plugin declarations."""
 
 from dataclasses import dataclass, field
@@ -28,7 +30,8 @@ class PluginDeclarationDescriptor:
 
     def __post_init__(self):
         object.__setattr__(self, "id", _required_text(self.id, field_name="plugin.id"))
-        for name in ("rulesets", "base_libs"):
+        object.__setattr__(self, "rulesets", selection_refs(self.rulesets))
+        for name in ("base_libs",):
             object.__setattr__(self, name, _string_tuple(getattr(self, name), field_name="plugin." + name))
         if not isinstance(self.implementations,(tuple,list)) or not self.implementations or not all(isinstance(item,ImplementationDescriptor) for item in self.implementations):
             raise DescriptorModelError("plugin.declaration.implementations requires implementation descriptors")
@@ -41,7 +44,7 @@ class PluginDeclarationDescriptor:
     def to_dict(self):
         return {"kind":"plugin_declaration", "id":self.id, "display_name":self.display_name or self.id,
                 "description":self.description, "version":self.version,
-                "rulesets":list(self.rulesets), "base_libs":list(self.base_libs),
+                "rulesets":selection_data(self.rulesets), "base_libs":list(self.base_libs),
                 "presentation":dict(self.presentation),
                 "implementations":[item.to_dict() for item in self.implementations]}
 

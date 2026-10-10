@@ -42,6 +42,7 @@ class NodeRegistry:
         self.rule_catalogs: tuple[object, ...] = ()
         self.rule_handler_loader = None
         self._effect_policies: dict[str, str] = {}
+        self.call_effect_scopes: dict[tuple[str, ...], str] = {}
         self.rule_policy_resolver: Callable[[str], str] | None = None
         self._rule_defaults: dict[str, object] = {"purity_policy":None,"quality_policy":None}
 
@@ -116,6 +117,7 @@ class NodeRegistry:
         self._effect_policies[key] = scope
 
     def reset_effect_policies(self, keys) -> None:
+        self.call_effect_scopes.clear()
         for key in keys:
             self._effect_policies.pop(key,None)
 
@@ -149,6 +151,7 @@ class NodeRegistryQueries:
         object.__setattr__(self,'_effects',MappingProxyType({key:registry.effect_scope(key) for key in registry.available()}))
         object.__setattr__(self,'_rulesets',MappingProxyType({key:registry.rulesets(key) for key in registry.available()}))
         object.__setattr__(self,'source_context_snapshot',getattr(registry,"source_context_snapshot",None))
+        object.__setattr__(self, "call_effect_scopes", MappingProxyType(dict(registry.call_effect_scopes)))
 
     def descriptor(self,key):
         return self._descriptors[key]

@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+
+def _validate_rule_selection(value, prefix, findings, code="CONFIG.SCHEMA.RULESETS"):
+    from vibeflow.core.rules.selection.models import selection_refs
+    try:
+        selection_refs(value, field_name=prefix)
+    except ValueError as exc:
+        findings.append(_error(code, str(exc), prefix))
+
 from typing import Any, Mapping
 
 from vibeflow.core.findings import HealthFinding

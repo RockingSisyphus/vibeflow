@@ -33,15 +33,7 @@ class SemanticRightAdjustNode:
     def run_pure(self, inputs, params):
         return {'calc.right_branch': VALUE(inputs, 'calc.scaled') - params.get('penalty', 0)}
 
-class SemanticLeftKeyAdjustNode:
 
-    def run_pure(self, inputs, params):
-        return {'calc.left_branch': VALUE(inputs, 'calc.scaled') + params.get('bonus', 0)}
-
-class SemanticRightKeyAdjustNode:
-
-    def run_pure(self, inputs, params):
-        return {'calc.right_branch': VALUE(inputs, 'calc.scaled') - params.get('penalty', 0)}
 
 class SemanticBranchTypeConsumerNode:
 
@@ -159,15 +151,7 @@ class SemanticFinalEndNode:
     def run_pure(self, inputs, params):
         return {}
 
-class SemanticLeftBranchEndNode:
 
-    def run_pure(self, inputs, params):
-        return {}
-
-class SemanticRightBranchEndNode:
-
-    def run_pure(self, inputs, params):
-        return {}
 
 class SemanticLoopEndNode:
 

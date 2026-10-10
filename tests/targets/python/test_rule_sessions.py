@@ -212,7 +212,7 @@ def test_native_project_checker_with_unrelated_resource_name_gets_facts_and_decl
     assert call["rule_id"] == rule.id and call["params"] == {"max_file_lines":expected}
 
 
-@pytest.mark.parametrize("native_id", ["vibeflow.workflow", "vibeflow.graph.nodesets"])
+@pytest.mark.parametrize("native_id", ["vibeflow.workflow.nodesets", "vibeflow.graph.nodesets"])
 @pytest.mark.parametrize("own_default", [None, 2])
 def test_native_workflow_alias_preserves_its_schema_and_own_defaults(tmp_path, native_id, own_default):
     from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
@@ -222,13 +222,15 @@ def test_native_workflow_alias_preserves_its_schema_and_own_defaults(tmp_path, n
     rule = replace(original, id="example.arbitrary_depth", handler="",
         params_schema={"nodeset_max_depth":{"type":"integer"}},
         params_defaults={} if own_default is None else {"nodeset_max_depth":own_default})
-    selection = RulesetDescriptor("example.depth", calls=(RuleCall("depth", rule_id=rule.id),))
+    selection = RulesetDescriptor("example.depth", calls=(RuleCall("analysis", rule_id="vibeflow.workflow.analysis"), RuleCall("depth", rule_id=rule.id)),
+        relations=(RuleRelation("depth", "analysis", "requires", {"analysis":"graphs"}),) if native_id == "vibeflow.workflow.nodesets" else (),
+        entrypoints={"static": ("depth",), "import": (), "run": ()})
     registry = _registry(tmp_path, (rule,), selection)
     registry.direct_bindings[("rule", rule.id)] = native
-    registry.rule_handler_loader = lambda plan:{rule.id:native}
+    registry.rule_handler_loader = lambda plan:{rule.id:native, "vibeflow.workflow.analysis":standard.direct_bindings[("rule", "vibeflow.workflow.analysis")]}
     report = validate_graph_health(GraphConfig(nodes=(), rulesets=(selection.id,)),
         registry=registry, nodeset_max_depth=7)
-    call = report.info["rule_executions"][0]["plan"]["calls"][0]
+    call = next(item for item in report.info["rule_executions"][0]["plan"]["calls"] if item["id"] == "depth")
     assert call["params"] == {"nodeset_max_depth":7 if own_default is None else own_default}
 
 
@@ -408,13 +410,15 @@ def test_selected_project_theme_reports_original_parse_location_without_reparse(
     broken = "class Leaf:\n    def run_pure(self, inputs, params):\n        return (\n"
     source_path.write_text(broken)
     snapshot = collect_workflow_source_context(registry,GraphConfig(nodes=(NodeSpec("leaf","test.leaf"),),rulesets=()))
-    monkeypatch.setattr(ast,"parse",lambda *args,**kwargs:pytest.fail("A missing AST must remain unavailable, without reparse"))
-    report = execute_python_node_rules(registry,snapshot)
+    with monkeypatch.context() as parsing:
+        parsing.setattr(ast,"parse",lambda *args,**kwargs:pytest.fail("A missing AST must remain unavailable, without reparse"))
+        report = execute_python_node_rules(registry,snapshot)
     error = next(item for item in report.findings if item.code == "QUALITY.SYNTAX.PYTHON")
     assert error.source_location["path"] == str(source_path)
     assert error.source_location["line"] == 3
-    assert error.definition_id == "vibeflow.quality.files"
-    assert report.executions[0].results["files"].state == "unavailable"
+    # Parsing is a native Target failure even when no Rule is selected.
+    assert error.definition_id == ""
+    assert report.executions == ()
 
 
 @pytest.mark.parametrize("max_lines",[2,1000])

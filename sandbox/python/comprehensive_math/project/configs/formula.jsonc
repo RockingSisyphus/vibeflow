@@ -1,0 +1,305 @@
+{
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ],
+  "rulesets": [
+    "vibeflow.workflow"
+  ],
+  "nodeset_imports": [
+    {
+      "path": "nodesets/affine.jsonc"
+    },
+    {
+      "path": "nodesets/prepare.jsonc"
+    },
+    {
+      "path": "nodesets/loop_body.jsonc"
+    }
+  ],
+  "pipeline": {
+    "entry_mode": "async",
+    "inputs": [
+      {
+        "key": "math.offset",
+        "type": "math.offset",
+        "display_name": "math.offset",
+        "required": false
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "math.boundary",
+        "display_name": "start",
+        "description": "start"
+      },
+      {
+        "id": "offset",
+        "type_used": "math.offset",
+        "display_name": "offset",
+        "description": "offset"
+      },
+      {
+        "id": "receive",
+        "type_used": "vibeflow.io",
+        "display_name": "receive",
+        "description": "receive",
+        "requires": [],
+        "provides": [
+          {
+            "key": "x",
+            "type": "math.x",
+            "display_name": "x"
+          }
+        ],
+        "io": {
+          "operation": "receive",
+          "port": "math.in"
+        }
+      },
+      {
+        "id": "prepare",
+        "type_used": "math.prepare",
+        "display_name": "prepare",
+        "description": "prepare",
+        "node_configs": {
+          "inner.affine": {
+            "gain": 3,
+            "shift": 2
+          },
+          "subtract": {
+            "amount": 3
+          }
+        }
+      },
+      {
+        "id": "companion",
+        "type_used": "math.companion",
+        "display_name": "companion",
+        "description": "companion"
+      },
+      {
+        "id": "route",
+        "type_used": "math.route",
+        "display_name": "route",
+        "description": "route"
+      },
+      {
+        "id": "square",
+        "type_used": "math.square",
+        "display_name": "square",
+        "description": "square"
+      },
+      {
+        "id": "negative",
+        "type_used": "math.negative",
+        "display_name": "negative",
+        "description": "negative"
+      },
+      {
+        "id": "choice",
+        "type_used": "math.choice",
+        "display_name": "choice",
+        "description": "choice",
+        "join_policy": "any_active"
+      },
+      {
+        "id": "join",
+        "type_used": "math.join",
+        "display_name": "join",
+        "description": "join",
+        "join_policy": "all"
+      },
+      {
+        "id": "loop",
+        "type_used": "vibeflow.loop.while",
+        "display_name": "loop",
+        "description": "loop",
+        "requires": [
+          {
+            "type": "math.value",
+            "cardinality": "exactly_one",
+            "display_name": "math.value"
+          },
+          {
+            "type": "math.counter",
+            "cardinality": "exactly_one",
+            "display_name": "math.counter"
+          }
+        ],
+        "provides": [
+          {
+            "key": "loop_result",
+            "type": "math.loop_result",
+            "display_name": "loop_result"
+          },
+          {
+            "key": "history",
+            "type": "math.history",
+            "display_name": "history"
+          },
+          {
+            "key": "iterations",
+            "type": "math.iterations",
+            "display_name": "iterations"
+          }
+        ],
+        "loop": {
+          "body": "math.loop_body",
+          "max_iterations": 5,
+          "stop_when": {
+            "from": "done",
+            "equals": true
+          },
+          "carry": [
+            {
+              "from": "math.value",
+              "as": "math.value",
+              "update": "next"
+            },
+            {
+              "from": "math.counter",
+              "as": "math.counter",
+              "update": "counter"
+            }
+          ],
+          "collect": [
+            {
+              "from": "next",
+              "as": "history"
+            }
+          ],
+          "outputs": [
+            {
+              "from": "math.value",
+              "as": "loop_result"
+            },
+            {
+              "from": "history",
+              "as": "history"
+            },
+            {
+              "from": "loop.iterations",
+              "as": "iterations"
+            }
+          ]
+        }
+      },
+      {
+        "id": "finish",
+        "type_used": "math.finish",
+        "display_name": "finish",
+        "description": "finish",
+        "join_policy": "all"
+      },
+      {
+        "id": "send",
+        "type_used": "vibeflow.io",
+        "display_name": "send",
+        "description": "send",
+        "requires": [
+          {
+            "type": "math.result",
+            "cardinality": "exactly_one",
+            "display_name": "math.result"
+          }
+        ],
+        "provides": [],
+        "io": {
+          "operation": "send",
+          "port": "math.out"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "receive"
+      },
+      {
+        "from": "start",
+        "to": "offset"
+      },
+      {
+        "from": "offset",
+        "to": "finish"
+      },
+      {
+        "from": "receive",
+        "to": "prepare"
+      },
+      {
+        "from": "receive",
+        "to": "companion"
+      },
+      {
+        "from": "prepare",
+        "to": "route"
+      },
+      {
+        "from": "route",
+        "to": "square",
+        "when": "nonnegative == true"
+      },
+      {
+        "from": "route",
+        "to": "negative",
+        "when": "nonnegative == false"
+      },
+      {
+        "from": "square",
+        "to": "choice"
+      },
+      {
+        "from": "negative",
+        "to": "choice"
+      },
+      {
+        "from": "choice",
+        "to": "join"
+      },
+      {
+        "from": "companion",
+        "to": "join"
+      },
+      {
+        "from": "join",
+        "to": "loop"
+      },
+      {
+        "from": "loop",
+        "to": "finish"
+      },
+      {
+        "from": "finish",
+        "to": "send"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "math.result",
+        "cardinality": "exactly_one",
+        "display_name": "math.result",
+        "as": "result"
+      },
+      {
+        "type": "math.history",
+        "cardinality": "exactly_one",
+        "display_name": "math.history",
+        "as": "history"
+      },
+      {
+        "type": "math.iterations",
+        "cardinality": "exactly_one",
+        "display_name": "math.iterations",
+        "as": "iterations"
+      }
+    ]
+  }
+}

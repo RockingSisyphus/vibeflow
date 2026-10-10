@@ -52,9 +52,11 @@ def project_rule_facts(plan,source_context,cache, *, handlers):
         return callable(handler) and any(unwrap(handler) is check for check in native)
     if source_context is None or not any(needs_facts(item) for item in plan.invocations):
         return {}
-    if "project_facts" not in cache:
-        cache["project_facts"] = source_context_quality_facts(source_context)
-    return {"project_facts":cache["project_facts"]}
+    from vibeflow.targets.python.project.check_session import fact_key
+    key = fact_key(tuple((item.path, item.text) for item in source_context.files))
+    if key not in cache:
+        cache[key] = source_context_quality_facts(source_context)
+    return {"project_facts":cache[key]}
 
 
 __all__ = ["source_context_quality_facts","source_quality_policy"]

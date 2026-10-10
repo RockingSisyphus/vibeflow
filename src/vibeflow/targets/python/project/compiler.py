@@ -56,6 +56,7 @@ class GraphCompiler:
         known_nodesets: set[str] | None = None,
         plugin_registry: CompilerPluginRegistry | None = None,
         owner: str = "pipeline",
+        call_path: tuple[str, ...] = (),
         implementation_facts: ImplementationFacts | None = None,
     ) -> CompiledGraph:
         return self.compile_with_findings(
@@ -65,6 +66,7 @@ class GraphCompiler:
             known_nodesets=known_nodesets,
             plugin_registry=plugin_registry,
             owner=owner,
+            call_path=call_path,
             implementation_facts=implementation_facts,
         ).compiled_graph
 
@@ -77,6 +79,7 @@ class GraphCompiler:
         known_nodesets: set[str] | None = None,
         plugin_registry: CompilerPluginRegistry | None = None,
         owner: str = "pipeline",
+        call_path: tuple[str, ...] = (),
         implementation_facts: ImplementationFacts | None = None,
     ) -> CoreCompilation:
         """Compile and retain advisory Core findings for health/report callers."""
@@ -109,6 +112,11 @@ class GraphCompiler:
                 owner=owner,
             ),
         )
+        call_scopes = getattr(registry, "call_effect_scopes", {})
+        if call_scopes:
+            compilation = replace(compilation, compiled_graph=replace(compilation.compiled_graph, effect_scopes={
+                **compilation.compiled_graph.effect_scopes, **{node.id:call_scopes[(*call_path, node.id)]
+                    for node in graph.nodes if (*call_path, node.id) in call_scopes}}))
         _call_compiler_plugins(
             plugin_registry,
             "after_compile",
@@ -129,7 +137,7 @@ class GraphCompiler:
         return _adapt_implementation_facts(graph, source=catalog if catalog is not None else registry,
                                            nodesets=set(graph.nodesets))
 
-    def _refresh_rule_facts(self, compilation: CoreCompilation, *, registry) -> CoreCompilation:
+    def _refresh_rule_facts(self, compilation: CoreCompilation, *, registry, call_path=()) -> CoreCompilation:
         """Update review metadata while retaining the compiler stage artifact.
 
         Rules describe the explicitly selected effects.
@@ -147,7 +155,7 @@ class GraphCompiler:
         for node in graph.nodes:
             fact = facts.get(node.type_used)
             if node.status != STATUS_PLANNED and fact is not None:
-                scopes[node.id] = fact.effect_scope or "unconstrained"
+                scopes[node.id] = getattr(registry, "call_effect_scopes", {}).get((*call_path, node.id), fact.effect_scope or "unconstrained")
         return replace(compilation, workflow=replace(compilation.workflow, implementation_facts=facts),
                        compiled_graph=replace(compiled, effect_scopes=scopes))
 

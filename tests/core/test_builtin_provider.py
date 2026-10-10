@@ -71,9 +71,9 @@ def test_portable_implementation_rule_applies_selected_policy_parameters():
 def test_core_graph_models_and_parser_do_not_select_standard_plugins():
     from vibeflow.core.flow import GraphConfig
     from vibeflow.core.config.graph import parse_graph_config_data
-    assert GraphConfig(()).rulesets == ()
+    assert GraphConfig(()).rulesets is None
     graph = parse_graph_config_data({"pipeline":{"nodes":[{"id":"root","type_used":"example.node","display_name":"Call","description":"An explicit call instance."}]},"nodesets":[{
         "type_key":"example.stage","display_name":"Stage","description":"An explicit native scope.",
         "requires":[],"provides":[],"pipeline":{"nodes":[{"id":"child","type_used":"example.node","display_name":"Call","description":"An explicit call instance."}]}}]})
-    assert graph.rulesets == ()
-    assert graph.nodesets["example.stage"].graph.rulesets == ()
+    assert graph.rulesets is None
+    assert graph.nodesets["example.stage"].graph.rulesets is None

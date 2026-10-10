@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from vibeflow.core.rules.selection import selection_data
+
 import inspect
 import json
 from pathlib import Path
@@ -66,6 +68,11 @@ def _build_architecture_document(prepared) -> dict[str, object]:
             selected_nodes={item.type_key for item in sources.nodes},
             findings=getattr(registry,"review_findings",()),
             roots={str(root_id):str(path) for path,root_id in registry.source_root_ids.items()})
+    from vibeflow.core.rules.planning import selection_report
+    payload["call_effect_scopes"] = [{"call_path":list(path), "effect_scope":scope} for path,scope in sorted(getattr(registry,"call_effect_scopes",{}).items())]
+    catalogs = getattr(getattr(registry, "loaded_plugins", None), "catalogs", None)
+    if catalogs is not None:
+        payload["rule_selections"] = selection_report(graph, catalogs)
     from vibeflow.tooling.presentation.portable_paths import portable_paths
     known_roots = {str(root_id):str(path) for path,root_id in getattr(registry,"source_root_ids",{}).items()}
     return portable_paths(payload, roots={**roots, **known_roots}, primary_root=graph.root_path)
@@ -135,7 +142,7 @@ def _nodesets_document(graph: GraphConfig, *, registry: object | None, prepared=
             "planned_behavior": nodeset.planned_behavior.to_dict() if nodeset.status == STATUS_PLANNED else None,
             "flow_kind": nodeset.flow_kind,
             "effect_scope": "unavailable" if nodeset.status == STATUS_PLANNED else "unconstrained",
-            "rulesets": list(nodeset.graph.rulesets),
+            "rulesets": selection_data(nodeset.graph.rulesets),
             "reachable_from_workflow": type_key in reachable,
             "requires": requirements_to_dicts(nodeset.requires),
             "provides": providers_to_dicts(nodeset.provides),
@@ -160,7 +167,7 @@ def _graph_body_document(
         prepared=prepared,
     )
     return {
-        "rulesets": list(graph.rulesets),
+        "rulesets": selection_data(graph.rulesets),
         "inputs": providers_to_dicts(graph.inputs),
         "outputs": requirements_to_dicts(graph.outputs),
         "max_steps": graph.max_steps,
@@ -202,7 +209,7 @@ def _node_document(
     invocation = invocation_for_node(graph, node)
     target = invocation.nodeset if invocation is not None else None
     descriptor = registry_descriptor(registry, node.type_used)
-    selected_rulesets = list(target.graph.rulesets) if target is not None else list(registry.rulesets(node.type_used)) if descriptor is not None else []
+    selected_rulesets = selection_data(target.graph.rulesets) if target is not None else selection_data(node.rulesets if node.rulesets is not None else registry.rulesets(node.type_used)) if descriptor is not None else []
     planned = node.status == STATUS_PLANNED or getattr(target, "status", "") == STATUS_PLANNED
     async_config = None
     if node.async_mode:
@@ -440,7 +447,7 @@ def _node_type_document(
                              if source_reference(root_id, root_path, registry.source_info(type_key).path).get("path")), {}),
         "info": {**_node_info_document(descriptor), "effect_scope": registry.effect_scope(type_key) if has_implemented_occurrence else "unavailable"},
         "contract": _node_contract_document(descriptor.contract),
-        "rulesets": list(registry.rulesets(type_key)),
+        "rulesets": selection_data(registry.rulesets(type_key)),
         "declared_presentation":dict(descriptor.presentation),
         "presentation": resolve_presentation(descriptor).to_dict(),
         "config": _node_config_document(registry, type_key),

@@ -31,6 +31,8 @@ def test_rule_review_reads_declarations_without_importing_business_code(tmp_path
     config, marker = _project(tmp_path)
     payload = effective_rule_plans(config, node_path="seed")
     assert payload["workflow"] == []
+    assert payload["workflow_selection"] == {"references":[],"source":"dynamic","origin":"pipeline","replaced":["vibeflow.workflow"]}
+    assert payload["workflow_coverage"] == []
     assert payload["nodes"][0]["rulesets"] == ["vibeflow.process"]
     assert any(call["rule_id"] == "vibeflow.no_side_effects" for call in payload["nodes"][0]["plans"][0]["calls"])
     assert not marker.exists()
@@ -84,12 +86,12 @@ def test_rule_review_preserves_repeated_nodeset_invocation_paths_and_scope_selec
     nodeset = {
         "type_key": "project.stage", "display_name": "Stage",
         "description": "One declared child, with an explicit empty scope selection.",
-        "rulesets": [], "pipeline": {"nodes": [seed]},
+        "requires":[], "provides":[], "rulesets": [], "pipeline": {"nodes": [seed]},
     }
     (tmp_path / "stage.jsonc").write_text(json.dumps(nodeset))
     data["nodeset_imports"] = ["stage.jsonc"]
     data["pipeline"]["nodes"] = [
-        {"id": name, "type_used": "project.stage", "flow_kind": "nodeset",
+        {"id": name, "type_used": "project.stage",
          "display_name": name, "description": "Invoke the shared definition at a distinct call path."}
         for name in ("first", "second")
     ]
@@ -113,9 +115,9 @@ def test_rule_review_uses_project_depth_defaults_and_preserves_local_override(tm
     project.update({"project_target": target, section: {"nodeset_max_depth": 7}})
     project_config.write_text(json.dumps(project))
     append_resource(tmp_path, {
-        "kind": "ruleset", "id": "example.depth",
+        "kind": "ruleset", "id": "example.depth", "graph_scope":"effective_subtree",
         "calls": [{"id": "base", "ruleset_id": "vibeflow.workflow"}],
-        "relations": [{"source": "$self", "target": "base/workflow", "kind": "overrides",
+        "relations": [{"source": "$self", "target": "base/nodesets", "kind": "overrides",
                        "params": {"nodeset_max_depth": 9}}],
     })
     _select_target(tmp_path, config, target)
@@ -123,8 +125,8 @@ def test_rule_review_uses_project_depth_defaults_and_preserves_local_override(tm
     data["rulesets"] = ["vibeflow.workflow", "example.depth"]
     config.write_text(json.dumps(data))
     plans = effective_rule_plans(config)["workflow"]
-    assert plans[0]["calls"][0]["params"]["nodeset_max_depth"] == 7
-    assert plans[1]["calls"][0]["params"]["nodeset_max_depth"] == 9
+    assert next(call for call in plans[0]["calls"] if call["rule_id"] == "vibeflow.workflow.nodesets")["params"]["nodeset_max_depth"] == 7
+    assert next(call for call in plans[1]["calls"] if call["rule_id"] == "vibeflow.workflow.nodesets")["params"]["nodeset_max_depth"] == 9
     assert not marker.exists()
 
 

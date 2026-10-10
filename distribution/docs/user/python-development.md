@@ -63,7 +63,7 @@ workflow 保留 JSONC 和原生连边，下面是插件选择与 Node 调用片�
 
 `contextlib.ExitStack` 可以组织清理操作。默认规则根据源码确认接收对象后检查 `close()`，并按当前资源选择的副作用范围检查可解析的 `callback/push` 回调及其 helper 函数体。空栈清理可用于 Process Node；登记 `print/open` 仍需要相应规则允许，状态恢复需要状态规则允许。BaseLib 按自己的 Ruleset 检查，不继承调用 Node 的更宽权限；文件或连接的 `close()` 继续接受 IO 检查。
 
-Node 通过 `rulesets` 选择审查约束。省略和 `[]` 都表示未选择 Node 审查规则；`flow_kind` 表达执行身份。自由 `tags/metadata` 和 `presentation` 由 Node 自己声明，见 [规则与 Node](rules-and-nodes.md)。
+Node 通过 `rulesets` 选择审查约束。类型声明提供默认；调用 Config 缺省使用默认，显式列表完整替代，`[]` 仅取消当前调用局部规则；`flow_kind` 表达执行身份。自由 `tags/metadata` 和 `presentation` 由 Node 自己声明，见 [规则与 Node](rules-and-nodes.md)。
 
 ## 规则与其他资源
 

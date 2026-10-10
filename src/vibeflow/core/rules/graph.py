@@ -8,6 +8,7 @@ from typing import Any, Mapping
 from vibeflow.core.algorithms import strongly_connected_components
 from vibeflow.core.config.node import merge_node_config, normalize_node_config_spec
 from vibeflow.core.rules.models import RuleCall, RuleDescriptor, RuleRelation, RulesetDescriptor, plain, readonly
+from vibeflow.core.rules.selection.models import RuleReference
 
 
 @dataclass
@@ -55,13 +56,14 @@ class RulePlan:
     entrypoint: str
     invocations: tuple[RuleInvocation, ...]
     relations: tuple[RuleRelation, ...] = ()
+    graph_scope: str = "current_graph"
 
     @property
     def order(self) -> tuple[str, ...]:
         return tuple(item.id for item in self.invocations)
 
     def to_dict(self) -> dict[str, object]:
-        return {"ruleset_id": self.ruleset_id, "entrypoint": self.entrypoint, "order": list(self.order),
+        return {"ruleset_id": self.ruleset_id, "entrypoint": self.entrypoint, "graph_scope": self.graph_scope, "order": list(self.order),
                 "calls": [item.to_dict() for item in self.invocations],
                 "relations": [item.to_dict() for item in self.relations]}
 
@@ -88,7 +90,10 @@ class _Expansion:
         self.includes: dict[str, list[str]] = {}
         self.relations: list[RuleRelation] = []
 
-    def expand(self, descriptor: RulesetDescriptor, prefix: str = "", stack: tuple[str, ...] = ()) -> None:
+    def expand(self, descriptor: RulesetDescriptor, prefix: str = "", stack: tuple[str, ...] = (), graph_scope=None) -> None:
+        effective_scope = graph_scope or descriptor.graph_scope or "current_graph"
+        if descriptor.graph_scope is not None and descriptor.graph_scope != effective_scope:
+            raise RuleGraphError("RULE.GRAPH_SCOPE.CONFLICT", f"ruleset '{descriptor.id}' mixes '{descriptor.graph_scope}' with '{effective_scope}'")
         if descriptor.id in stack:
             raise RuleGraphError("RULE.INCLUDES.CYCLE", "ruleset inclusion cycle: " + " -> ".join((*stack, descriptor.id)))
         origin = (*stack, descriptor.id)
@@ -104,7 +109,7 @@ class _Expansion:
             if call.ruleset_id:
                 if call.params:
                     raise RuleGraphError("RULE.PARAMS.GROUP", f"ruleset call '{qualified}' uses params; bind member params with a local overrides relation")
-                self.expand(_lookup(self.rulesets, call.ruleset_id, "ruleset"), qualified + "/", origin)
+                self.expand(_lookup(self.rulesets, call.ruleset_id, "ruleset"), qualified + "/", origin, effective_scope)
             else:
                 self.calls[qualified] = (call, _lookup(self.rules, call.rule_id, "rule"), origin)
         for relation in descriptor.relations:
@@ -248,6 +253,10 @@ def _compile_ruleset(ruleset: str | RulesetDescriptor, *, rules: Any, rulesets: 
     if entrypoint not in {"import", "static", "run"}:
         raise RuleGraphError("RULE.ENTRYPOINT.INVALID", f"unknown rule entrypoint: {entrypoint!r}")
     descriptor = _lookup(rulesets, ruleset, "ruleset") if isinstance(ruleset, str) else ruleset
+    if isinstance(descriptor, RuleReference):
+        descriptor = RulesetDescriptor("rule:" + descriptor.rule_id,
+            calls=(RuleCall("rule", rule_id=descriptor.rule_id, params=descriptor.params),),
+            entrypoints={phase: ("rule",) for phase in ("import", "static", "run")})
     if not isinstance(descriptor, RulesetDescriptor):
         raise TypeError("ruleset must be RulesetDescriptor or registered ID")
     expansion = _Expansion(rules, rulesets, entrypoint)
@@ -284,7 +293,7 @@ def _compile_ruleset(ruleset: str | RulesetDescriptor, *, rules: Any, rulesets: 
         remaining.difference_update(ready)
     invocations = tuple(RuleInvocation(key, effective[key][0], effective[key][1], tuple(sorted(dependencies[key])),
                                        inputs[key], expansion.calls[key][2], effective[key][2], expansion.calls[key][1].id) for key in order)
-    return RulePlan(descriptor.id, entrypoint, invocations, tuple(expansion.relations))
+    return RulePlan(descriptor.id, entrypoint, invocations, tuple(expansion.relations), descriptor.graph_scope or "current_graph")
 
 
 def compile_ruleset(ruleset: str | RulesetDescriptor, *, rules: Any, rulesets: Any = None,

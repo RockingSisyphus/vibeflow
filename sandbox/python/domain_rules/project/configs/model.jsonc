@@ -1,6 +1,7 @@
 {
   "rulesets": [
-    "vibeflow.workflow"
+    "vibeflow.workflow",
+    "example.model_layout"
   ],
   "pipeline": {
     "inputs": [

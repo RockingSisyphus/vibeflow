@@ -1,0 +1,100 @@
+{
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugin.py",
+        "export": "plugin"
+      }
+    }
+  ],
+  "nodeset_imports": [
+    {
+      "path": "nodesets/step.jsonc"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "object.box",
+        "type": "object.box",
+        "display_name": "object.box",
+        "required": true
+      },
+      {
+        "key": "object.counter",
+        "type": "object.counter",
+        "display_name": "object.counter",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "addition.boundary",
+        "display_name": "start",
+        "description": "start"
+      },
+      {
+        "id": "step",
+        "type_used": "addition.step",
+        "display_name": "step",
+        "description": "step"
+      },
+      {
+        "id": "end",
+        "type_used": "addition.boundary",
+        "display_name": "end",
+        "description": "end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "step"
+      },
+      {
+        "from": "step",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "object.box_after",
+        "cardinality": "exactly_one",
+        "display_name": "object.box_after",
+        "as": "object.box_after"
+      },
+      {
+        "type": "object.counter_after",
+        "cardinality": "exactly_one",
+        "display_name": "object.counter_after",
+        "as": "object.counter_after"
+      },
+      {
+        "type": "object.snapshot",
+        "cardinality": "exactly_one",
+        "display_name": "object.snapshot",
+        "as": "object.snapshot"
+      },
+      {
+        "type": "object.metadata",
+        "cardinality": "exactly_one",
+        "display_name": "object.metadata",
+        "as": "object.metadata"
+      },
+      {
+        "type": "object.value",
+        "cardinality": "exactly_one",
+        "display_name": "object.value",
+        "as": "object.value"
+      },
+      {
+        "type": "object.done",
+        "cardinality": "exactly_one",
+        "display_name": "object.done",
+        "as": "object.done"
+      }
+    ]
+  }
+}
