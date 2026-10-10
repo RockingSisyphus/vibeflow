@@ -3,6 +3,7 @@
 | 位置 | 所有者与内容 |
 | --- | --- |
 | 根目录 | 项目入口、许可证、构建与 Git/CI 元数据；不保存临时脚本或运行输出 |
+| .github | GitHub Actions、Issue 和 Pull Request 模板 |
 | src/vibeflow | Core、BlockCompiler、Builtin、Python/JavaScript Target、Tooling 的核心源码及运行资源 |
 | distribution | 构建器、profile 配置、提示词、项目模板、最小项目和 distribution/docs 用户文档原稿 |
 | dist | 最新正式发行目录、对应 ZIP 和校验清单 |
@@ -26,8 +27,18 @@
 
 默认构建的两个目录及 ZIP 都进入 dist。正式替换时，被替换的 ZIP 进入 archive；已有同名历史包的内容不覆盖。同版本重建也保存先前字节。生成、验证或事务发布失败时，恢复先前正式产物。
 
-目录整改只搬迁既有 0.15.2 正式 ZIP，并核对其与既有发行目录逐文件一致；当前 0.17.0 源码的验收包在隔离工作区构建，不由目录整改自动提升为正式版本。
+版本号以 pyproject.toml 和发行包元数据为准。目录维护不自动更新正式产物；候选包在仓库外构建，正式更新使用 distribution/build.py。
 
 源码全文摘录、pytest 收集输出和重复机器盘点使用仓库外临时工作区，完成用途后删除；中文结论及有阅读价值的工作簿保留在 history 和 assets。outputs 与 output 都不是根目录的持久资料位置。
 
 本轮原则和验收见 [目录清理记录](directory-cleanup-20261010.md)。
+
+## 各层目录说明
+
+仓库自行维护的每层目录用 README.md 说明唯一用途、禁止混入的内容和生成物去向。现有案例的 README 保留运行方法与验收说明，并补充目录边界；新增子目录时同步维护说明。目录职责随实际架构调整，不能把目录名当作自动判断文件用途的依据。
+
+dist 中的发行树、archive/history 中的版本资产和 references 中的第三方项目由其上层说明约束，不逐层添加维护者文件。Git 内部目录、工具缓存和临时工作区也不属于源码目录说明的覆盖范围。
+
+新增的维护者目录说明以 `<!-- vibeflow-directory-purpose -->` 开头。发行构建跳过带此前缀的 README，避免将开发路径或维护要求带入内核和用户模板；原有用户指南及 distribution/docs 中被 profile 选中的正文仍正常分发。
+
+目录说明是维护约定，不增加新的运行或发布准入检查。现有仓库 quality 检查接受 dist、archive 和 archive/history 的目录 README，并继续识别明确放错位置的生成物。

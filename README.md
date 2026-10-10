@@ -26,8 +26,8 @@ VibeFlow 检查工程结构、源码健康度和所选领域约束；项目测�
 
 从 GitHub Release 下载所需发行包并解压：
 
-- `vibeflow-distribution-0.16.0.zip`：人机协同审核；
-- `vibeflow-distribution-autonomous-0.16.0.zip`：无人值守开发。
+- `vibeflow-distribution-<version>.zip`：人机协同审核；
+- `vibeflow-distribution-autonomous-<version>.zip`：无人值守开发。
 
 打开解压目录后，AI 从根 `AGENTS.md` 获得任务阅读路径；人类从 `kernel/docs/README.md` 进入使用者手册。两个包都包含最小的 `python_project/` 和 `javascript_project/`。
 
@@ -60,6 +60,26 @@ node javascript_project/scripts/workflow_execution_probe.mjs
 python tools/verify_project.py --full
 ```
 
-当前开发版本为 `0.18.0`，Workflow ABI 为 `vibeflow.workflow.v5`，AOT manifest 为 `vibeflow.aot-build.v2`。旧计划与构建目录需重新生成；本次本地整改不代表已发布新 Release。
+当前开发版本为 `0.18.1`，Workflow ABI 为 `vibeflow.workflow.v5`，AOT manifest 为 `vibeflow.aot-build.v2`。旧计划与构建目录需重新生成；本次本地整改不代表已发布新 Release。
 
 质量检查只覆盖当前实际选择的 Rule；不证明业务正确、代码安全、算法确定性或全部无副作用。有限 Python 输入写入规则独立于效果政策，详见[产品检查边界](distribution/docs/user/product-check-boundaries.md)。
+
+## 仓库目录用途
+
+根目录仅保存项目入口、许可证和构建 / Git 元数据。开发文档归 docs，用户文档原稿与发行资源归 distribution；临时脚本和执行产物不能堆在根目录。
+
+| 目录 | 用途 |
+| --- | --- |
+| [src](src/README.md) | 产品各模块的核心源码与运行资源 |
+| [tests](tests/README.md) | 非沙盒的功能、代码和集成回归 |
+| [sandbox](sandbox/README.md) | Python / JavaScript 真实使用项目，加载工作区 src |
+| [quality](quality/README.md) | 独立的仓库内部质检工具 |
+| [tools](tools/README.md) | 开发、验证、清理和辅助工具 |
+| [distribution](distribution/README.md) | 发行构建器、模板、提示词和用户文档原稿 |
+| [dist](dist/README.md) | 最新正式发行目录、ZIP 和校验清单 |
+| [archive](archive/README.md) | 被替换的历史正式发行包 |
+| [docs](docs/README.md) | 设计、维护、历史结论和正文附件 |
+| [references](references/README.md) | 外来参考项目 |
+| [.github](.github/README.md) | GitHub CI 与协作模板 |
+
+新建自行维护的子目录时同步写明职责。过时且不再使用的文件直接删除；运行产物在仓库外临时工作区使用并及时清理。详细规则见[仓库目录职责](docs/maintainers/directory-layout.md)。

@@ -12,3 +12,13 @@ PYTHONPATH=src:. python -B -m sandbox.python.runtime_observation.probe \
 使用新的工作目录。不匹配返回非零。pytest 还检查空信息、非法 JSON、参数校验、并发运行隔离、默认 Process Node 更新、项目默认值以及中断退出。
 
 `documentation-release.json` 记录两种正式发行包的文档与提示词一致性，以及从解压包运行 Python/JS 手册 Node 的结果；这些示例在默认 Process Ruleset 下更新 info 并返回原契约输出。
+
+## 目录用途与边界
+
+仅用于：python / runtime_observation 案例，验证运行时观察、调度及可见执行证据；保留真实项目输入与 runner。
+
+- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
+- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
+- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
+
+完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。

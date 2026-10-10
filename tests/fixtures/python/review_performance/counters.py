@@ -71,6 +71,14 @@ class Observations:
         self.wrap(workspace_service, "_environment_or_report", "environment")
         self.wrap(workspace_service, "_prepare_workspace_graph", "prepare")
         self.wrap(workspace_service, "_validate_prepared_workspace_graph", "health")
+        self.calls['native_initialization_identity'] = 0
+        if hasattr(rule_adapter,'native_analysis_identity'):
+            self.wrap(rule_adapter,'native_analysis_identity','native_initialization_identity')
+        try:
+            from vibeflow.targets.shared.facts import FactStore
+            self.wrap(FactStore,'capture','fact_capture')
+        except ImportError:
+            pass
         for owner in (rule_adapter, resource_rules, rule_phase):
             self.wrap(owner, "execute_rule_plan", "rule_plan")
         for cls, name in ((source_context.PythonSourceFile,"tree"),(source_context.PythonSymbol,"node")):

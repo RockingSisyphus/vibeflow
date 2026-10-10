@@ -280,3 +280,53 @@ def test_changed_provider_records_invalidate_source_consumer_only(tmp_path):
     assert produced == [1,2,2,1,2,2] and consumed == [1,2]
     assert all(item.executed == ("provide",) for item in again.executions)
     end_python_check(registry)
+
+
+def test_native_identity_captures_loading_after_handler_preparation_and_only_selected_rules(tmp_path,monkeypatch):
+    from types import SimpleNamespace
+    from vibeflow.targets.python.quality import rule_adapter as adapter
+    registry,sources,handlers = _case(tmp_path)
+    path = sources.files[0].path
+    seen=[]; identities=[]
+    def check(context,*_):
+        assert 'call' not in context.facts and 'call_id' not in context.subject
+        seen.append(context.facts['source_load_states'][path])
+        return RuleResult()
+    handlers['test.review']=check
+    bindings={**handlers,**{f'unselected.{i}':lambda *_:RuleResult() for i in range(26)}}
+    monkeypatch.setattr(adapter,'native_rule_bindings',lambda *_:bindings)
+    monkeypatch.setattr(adapter,'native_rule_origins',lambda *_:{('rules',key):SimpleNamespace(plugin_id='vibeflow.core') for key in bindings})
+    state={'value':'first'}
+    registry.source_load_states={path:'before_loading'}
+    def load(_):
+        registry.source_load_states[path]=state['value']
+        return handlers
+    registry.rule_handler_loader=load
+    original=adapter.execute_rule_plan
+    def execute(plan,context,**kwargs):
+        identities.append(set(context.subject['source_cache_identities']))
+        return original(plan,context,**kwargs)
+    monkeypatch.setattr(adapter,'execute_rule_plan',execute)
+    for value in ('first','first','second'):
+        state['value']=value
+        adapter.execute_python_node_rules(registry,sources,phase='import')
+    assert seen==['first','second']
+    assert all(keys=={'test.review'} for keys in identities)
+    end_python_check(registry)
+
+
+def test_native_alias_uses_the_implementation_background_without_exposing_it_to_custom_rules(tmp_path,monkeypatch):
+    from types import SimpleNamespace
+    from vibeflow.targets.python.quality import rule_adapter as adapter
+    registry,sources,handlers = _case(tmp_path)
+    seen=[]
+    def check(context,*_):
+        seen.append('node_catalog' in context.facts)
+        return RuleResult()
+    handlers['test.review']=check
+    monkeypatch.setattr(adapter,'native_rule_bindings',lambda *_: {'core.original':check,'test.review':check})
+    monkeypatch.setattr(adapter,'native_rule_origins',lambda *_:{('rules','core.original'):SimpleNamespace(plugin_id='vibeflow.core'),
+        ('rules','test.review'):SimpleNamespace(plugin_id='custom')})
+    adapter.execute_python_node_rules(registry,sources,phase='import')
+    assert seen==[True]
+    end_python_check(registry)

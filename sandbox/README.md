@@ -44,3 +44,13 @@ python sandbox/javascript/rule_selection/run_all.py
 覆盖入口见 [TEST_COVERAGE](TEST_COVERAGE.md)，目录职责见 [开发说明](../docs/maintainers/directory-layout.md)，历史原始观察见 [证据索引](../docs/maintainers/evidence/index.md)。
 
 当前两个 integration runner 登记 152 项（Python 103、JavaScript 49）。其中两项是新增的规则选择综合案例；此前 150 项的完整分类与原名见 [任务清单](../docs/maintainers/history/audits/sandbox-task-inventory-workflow-20261010.md)。
+
+## 目录用途与边界
+
+仅用于：两个 Target 的真实使用项目和验收 runner；直接加载工作区 src，非沙盒的机制回归归 tests。
+
+- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
+- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
+- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
+
+完整归位规则见[仓库目录职责](../docs/maintainers/directory-layout.md)。

@@ -69,10 +69,11 @@ def review_python_resource(resource, *, base_path, registry=None, phase="import"
             from vibeflow.targets.python.quality.project_context import project_rule_facts
             view = session.view(registry,sources,extra_facts=facts)
             from dataclasses import replace
-            context = replace(view.context(phase),facts={**view.facts,**project_rule_facts(plan,sources,view.project_facts,handlers=handlers)},subject={"kind":kind,"id":resource.id,"descriptor":descriptor,
-                "source_identity":("python",str(path),symbol_name,view.snapshot,view.token,
+            view = view.derive(project_rule_facts(plan,sources,session.project_facts_for(view),handlers=handlers))
+            context = replace(view.context(phase),subject={"kind":kind,"id":resource.id,"descriptor":descriptor,
+                "source_identity":("python",str(path),symbol_name,view.identity,
                     session.implementation_identity(plan,handlers))})
-            result = execute_rule_plan(plan,context,handlers=handlers,source_cache=view.source_cache(phase))
+            result = execute_rule_plan(plan,context,handlers=handlers,source_cache=session.source_cache(phase))
             findings.extend(item for invocation,value in result.results.items()
                 if invocation not in result.aliases or result.aliases[invocation].startswith("session:")
                 for item in value.findings)
@@ -141,10 +142,11 @@ def review_reached_base_libs(registry, sources, *, rules, rulesets, handlers, ph
                 view = session.view(registry,library_sources,extra_facts={
                     "resource_source_file":source,"base_lib_file":source,"resource_symbol":symbol,
                     })
-                context = replace(view.context(phase),facts={**view.facts,**project_rule_facts(plan,library_sources,view.project_facts,handlers=handlers)},subject={"kind":"base_lib","id":descriptor.id,"descriptor":descriptor.to_dict(),
-                    "source_identity":("python",source.path,symbol,view.snapshot,view.token,
+                view = view.derive(project_rule_facts(plan,library_sources,session.project_facts_for(view),handlers=handlers))
+                context = replace(view.context(phase),subject={"kind":"base_lib","id":descriptor.id,"descriptor":descriptor.to_dict(),
+                    "source_identity":("python",source.path,symbol,view.identity,
                         session.implementation_identity(plan,handlers))})
-                result = execute_rule_plan(plan,context,handlers=handlers,source_cache=view.source_cache(phase))
+                result = execute_rule_plan(plan,context,handlers=handlers,source_cache=session.source_cache(phase))
                 executions.append(result)
                 findings.extend(replace(item,root_id=item.root_id or source.root_id,source_path=item.source_path or source.path)
                                 for invocation,value in result.results.items()

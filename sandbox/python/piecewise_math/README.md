@@ -27,3 +27,13 @@ python sandbox/python/piecewise_math/run_all.py --work-dir /tmp/vibeflow-piecewi
 ```
 
 Python integration 自动执行此入口。11 个旧任务及断言迁移位置见 [替代归档](../../../docs/maintainers/history/audits/piecewise-math-20261010.md)。异常调度、循环边界、异步清理等专项继续独立保留。
+
+## 目录用途与边界
+
+仅用于：python / piecewise_math 案例，验证以分段数学流程验证分支、汇合与数据旁路；保留真实项目输入与 runner。
+
+- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
+- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
+- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
+
+完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。

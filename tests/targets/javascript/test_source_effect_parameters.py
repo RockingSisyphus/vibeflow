@@ -9,7 +9,7 @@ from tests.targets.javascript.test_domain_rules import domain_project
 from vibeflow.core.flow import GraphConfig, NodeSpec
 from vibeflow.core.rules import RuleContext
 from vibeflow.targets.javascript.build.driver_session import DriverScope
-from vibeflow.targets.javascript.build.rule_session import _AnalysisCache
+from vibeflow.targets.javascript.build.analysis_service import JavascriptAnalysis
 from vibeflow.targets.javascript.quality.builtin_plugin import javascript_rule_bindings
 from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
 from vibeflow.targets.javascript.quality.rules import run_javascript_rules
@@ -49,7 +49,7 @@ def test_sdk_scope_selects_effect_categories_with_real_node_identity(domain_proj
     workspace, project = domain_project
     params = {"effect_scope":scope, "policy":{}}
     source = _select(project, params, 'console.log("hello"); void fetch("https://example.invalid");')
-    import vibeflow.targets.javascript.build.rule_session as service
+    import vibeflow.targets.javascript.build.analysis_service as service
     original = service.run_rule_check_driver
     requests = []
     def record(request, **kwargs):
@@ -120,7 +120,7 @@ def test_sdk_global_state_allows_literal_module_state_and_its_mutation(domain_pr
 def test_same_effect_parameters_apply_to_each_real_resource_owner(domain_project, kind):
     _, project = domain_project
     source = project / "nodes/transform.ts"
-    cache = _AnalysisCache()
+    cache = JavascriptAnalysis()
     context = RuleContext(subject={"kind":kind,"id":"test.subject"},target="javascript",facts={
         "source_files":[str(source)],"sources":[{"path":str(source),"text":'export function run(){console.log("hello");void fetch("https://example.invalid");return {};}'}],
         "analysis_cache":cache,"package_root":str(project),
@@ -147,7 +147,7 @@ def test_scoped_npm_package_policy_uses_the_full_package_root(domain_project):
     source = project / "nodes/transform.ts"
     context = RuleContext(subject={"kind":"node","type_key":"example.transform"},target="javascript",facts={
         "source_files":[str(source)],"sources":[{"path":str(source),"text":'import {value} from "@scope/pkg/sub"; export function run(){return value;}'}],
-        "analysis_cache":_AnalysisCache(),"package_root":str(project),
+        "analysis_cache":JavascriptAnalysis(),"package_root":str(project),
         "import_policy":{"owners":[{"path":str(source),"kind":"node","id":"example.transform","export":"run"}],"allowedExternalPackages":["@scope/pkg"]}})
     check = javascript_rule_bindings()["vibeflow.import_side_effects"]
     with DriverScope():
@@ -173,7 +173,7 @@ def test_shared_driver_cache_does_not_share_effect_or_policy_decisions(domain_pr
     _, project = domain_project
     source = project / "nodes/transform.ts"
     text = 'import {readFile} from "node:fs"; export function run(){console.log("hello");void readFile;return {};}'
-    cache = _AnalysisCache()
+    cache = JavascriptAnalysis()
     context = RuleContext(subject={"kind":"node", "type_key":"example.transform"}, target="javascript", facts={
         "source_files":[str(source)], "sources":[{"path":str(source),"text":text}],
         "analysis_cache":cache, "package_root":str(project),

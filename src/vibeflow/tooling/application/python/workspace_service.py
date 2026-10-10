@@ -71,8 +71,9 @@ from vibeflow.tooling.application.python.project.types import (
     WorkspaceEnvironment,
     WorkspaceRoot,
 )
+from vibeflow.targets.python.project.check_session import python_check_scope as _python_check_scope
 from vibeflow.tooling.application.python.presentation.prepared import (
-    python_check_scope as _python_check_scope, final_python_compilation as _final_compilation,
+    final_python_compilation as _final_compilation,
 )
 
 

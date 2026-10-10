@@ -123,7 +123,7 @@ def _python_quality_workflow_reports(args: argparse.Namespace, *, catalogs_by_ro
     from vibeflow.tooling.application.python.workspace_service import _environment_or_report, validate_workspace_config_path
     from vibeflow.tooling.project.workflow_discovery import workflow_configs_for_root
     from vibeflow.tooling.project.workspace_loader import WorkspaceConfigError
-    from vibeflow.tooling.application.python.presentation.prepared import python_check_scope
+    from vibeflow.targets.python.project.check_session import python_check_scope
     try:
         scope = _quality_workspace_scope(args)
     except WorkspaceConfigError:

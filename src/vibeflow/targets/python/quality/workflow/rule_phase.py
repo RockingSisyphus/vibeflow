@@ -38,9 +38,12 @@ def execute_workflow_rules(graph, state, *, registry=None, source_context=None,
         descriptor = rules[rule_id]
         rules[rule_id] = replace(descriptor, params_defaults={**descriptor.params_defaults, **defaults})
     handlers, project_fact_cache = {}, {}
-    from vibeflow.targets.python.project.check_session import current_python_check, fact_key
+    from vibeflow.targets.python.project.check_session import current_python_check
+    from vibeflow.targets.shared.facts import FactStore
+    from vibeflow.targets.python.quality.source_context import PythonSourceContext
     session = current_python_check(registry) if registry is not None else None
-    graph_cache = session.source_caches.setdefault(phase, {}) if session is not None else {}
+    store = session.facts.store if session is not None else FactStore("python",opaque_types=(PythonSourceContext,))
+    graph_cache = session.source_cache(phase) if session is not None else {}
     registry_queries = None
     invocations = workflow_invocations(graph)
     from vibeflow.core.rules.planning import graph_rule_selections
@@ -126,14 +129,16 @@ def execute_workflow_rules(graph, state, *, registry=None, source_context=None,
             subject = {"kind": "nodeset_definition" if invocation.declaration_only else "workflow", "id": owner, "owner": owner}
             if not invocation.declaration_only:
                 subject.update(call_id="/".join(path), call_path=path)
-            subject["source_identity"] = fact_key((task.graph_scope, path, task.boundaries, facts["graphs"], graph, source_context, contributions, global_config))
-            result = execute_rule_plan(plan, RuleContext(facts=facts,
+            view = store.capture(facts)
+            subject["source_identity"] = (view.identity,task.graph_scope,path,task.boundaries,
+                session.implementation_identity(plan,handlers) if session is not None else tuple((key,id(value)) for key,value in handlers.items()))
+            result = execute_rule_plan(plan, view.context(phase,
                 subject=subject,
                 scope={"workflow": owner, "workflows": tuple(item.owner for item in invocations),
                     "files": tuple(item.path for item in source_context.files) if source_context is not None else (),
                     "call_path":path, "graph_scope":task.graph_scope, "graph_paths":tuple(item.call_path for item in task.subjects),
                     "boundaries":task.boundaries},
-                phase=phase, target="python"), handlers=handlers, source_cache=graph_cache)
+                ), handlers=handlers, source_cache=graph_cache)
             result = replace(result, selection=task.selection.to_dict(), scope={"graph_scope":task.graph_scope,
                 "graph_paths":tuple(item.call_path for item in task.subjects), "boundaries":task.boundaries})
             state.rule_executions.append(result)

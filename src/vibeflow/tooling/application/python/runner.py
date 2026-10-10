@@ -107,7 +107,7 @@ def run_checked(
         config_path=path,
         explicit_policy_path=Path(policy_path) if policy_path else None,
     )
-    from vibeflow.tooling.application.python.presentation.prepared import python_check_scope
+    from vibeflow.targets.python.project.check_session import python_check_scope
     with python_check_scope(registry):
         registry.configure_rule_defaults(purity_policy=policy_result.effective_policy.to_purity_policy())
         effective_policy = policy_result.effective_policy.to_dict()

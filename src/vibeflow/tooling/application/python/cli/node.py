@@ -6,7 +6,7 @@ from vibeflow.tooling.application.python.project.declarations import declared_py
 from vibeflow.targets.python.quality.rule_adapter import execute_python_node_rules
 from vibeflow.tooling.application.python.project.effective_policy import resolve_effective_policy
 from vibeflow.tooling.project.config_loader import ConfigLoadError, load_config_document
-from vibeflow.tooling.application.python.presentation.prepared import python_check_scope
+from vibeflow.targets.python.project.check_session import python_check_scope
 from vibeflow.tooling.application.python.reports import config_load_error_report
 
 

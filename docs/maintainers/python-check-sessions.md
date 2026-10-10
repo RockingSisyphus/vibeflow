@@ -45,3 +45,30 @@ Architecture 中的 `load_state` 记录生成快照时的观察：`loaded`、`no
 完整门禁包含该沙箱、实际浏览器 SVG 检验、旧规则回归和分发安装验收。沙箱使用 VibeFlow 自身固定的 SDK 资源；详见[运行说明](../../tests/fixtures/python/review_performance/README.md)。
 
 `tests/fixtures/python/review_layout/run_all.py` 验证资源只出现在独立资源面板、各层横竖方向及右侧详情排列，并以正式 CLI 和真实浏览器检查最终 SVG，保留修复前后的观察。
+
+## Prepared fact views
+
+`targets/shared/facts.py` owns `FactStore.capture`, `FactView.identity`, `facts`,
+`derive` and `context`. Identities belong to one store/session. Portable mappings,
+sequences and dataclasses use Core's existing readonly snapshots; context creation
+reuses owned snapshots. Unknown mutable objects cause fresh capture identities.
+Target services remain opaque and are never proof that source/configuration is
+unchanged. A supplied capture/derive key must cover all supplied facts.
+
+`targets/python/project/fact_views.py` adapts Registry declarations, source text,
+imports, call/configuration metadata and loading states. Source snapshots are
+computed once for each immutable source-context instance. `check_session.py`
+owns analysis/result caches, compiler reuse and the nested check scope; views do
+not own execution caches. Generic encoders are imported from their shared owner.
+
+Prepare implementations and required project facts before deriving the final
+native view. Native source rules use the full background view plus the Node
+responsibility and actual implementation identity. Ordinary Node rules retain
+only local source facts. Per-call data is added to execution contexts, outside
+source identities; call rules remain live. Graph and resource rules also obtain
+view identities. Core still distinguishes phases, parameters and input records.
+
+The former module-initialization AST fingerprint has been removed. Full-view
+identity deliberately invalidates more broadly when background source changes;
+it must not recreate AST copying or source scans in the invocation loop. The
+performance sandbox observes this separately from legitimate AST reads by rules.

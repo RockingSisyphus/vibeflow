@@ -12,3 +12,13 @@ python -B -m sandbox.javascript.runtime_observation.probe \
 ```
 
 工具链目录安装 TypeScript/esbuild，renderer 目录安装 Puppeteer。使用新的工作目录；不匹配返回非零。pytest 覆盖同步/异步状态回调、非 JSON 数据拒绝及 Host 会话与生命周期；`verify_project.py --full` 另执行真实浏览器状态验收。
+
+## 目录用途与边界
+
+仅用于：javascript / runtime_observation 案例，验证运行时观察、调度及可见执行证据；保留真实项目输入与 runner。
+
+- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
+- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
+- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
+
+完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。

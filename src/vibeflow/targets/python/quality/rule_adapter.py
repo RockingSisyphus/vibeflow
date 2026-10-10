@@ -9,7 +9,7 @@ from vibeflow.core.findings import Finding, HealthFinding
 from vibeflow.core.rules import EFFECT_POLICY_TYPE, RuleContext, RuleGraphError, compile_ruleset, execute_rule_plan, rule_graph_error_finding
 from vibeflow.targets.python.quality.policy_parameters import complete_source_policy_plan, native_rule_bindings, native_rule_origins
 from vibeflow.core.rules.selection import resolve_node_selection
-from vibeflow.targets.python.quality.node_context import local_sources, node_context, bind_native_analysis, native_analysis_identity
+from vibeflow.targets.python.quality.node_context import local_sources, bind_native_analysis
 from vibeflow.core.rules.fingerprint import record_inputs_fingerprint, value_fingerprint
 
 
@@ -29,7 +29,9 @@ def rule_resources(registry, *, purity_policy=None, quality_policy=None):
     defaults = registry.rule_defaults() if hasattr(registry, "rule_defaults") else {}
     purity_policy = purity_policy if purity_policy is not None else defaults.get("purity_policy")
     quality_policy = quality_policy if quality_policy is not None else defaults.get("quality_policy")
-    from vibeflow.targets.python.project.check_session import current_python_check, catalog_key, fact_key
+    from vibeflow.targets.python.project.check_session import current_python_check
+    from vibeflow.targets.python.project.fact_views import catalog_key
+    from vibeflow.targets.shared.facts import fact_key
     session = current_python_check(registry)
     if session is None:
         return _rule_resources(registry, purity_policy=purity_policy, quality_policy=quality_policy)
@@ -109,7 +111,7 @@ def review_python_node_binding(registry, source_context, type_key, *, purity_pol
     from vibeflow.targets.python.project.check_session import current_python_check
     session = current_python_check(registry)
     cached = session.node_import_results.get(type_key) if session is not None else None
-    from vibeflow.targets.python.project.check_session import catalog_key
+    from vibeflow.targets.python.project.fact_views import catalog_key
     if cached is not None and cached[0] == (session.snapshot(source_context), catalog_key(registry)):
         return cached[1]
     return _execute_python_node_rules(registry, source_context, phase="import", purity_policy=purity_policy,
@@ -147,8 +149,8 @@ def _execute_python_node_rules(registry, source_context, *, phase="static", puri
     from vibeflow.targets.python.project.check_session import current_python_check, PythonCheckSession
     session = current_python_check(registry) or PythonCheckSession()
     view = session.view(registry, source_context, extra_facts=extra_facts)
-    source_cache = session.source_caches.setdefault(phase, {})
-    project_fact_cache = view.project_facts
+    source_cache = session.source_cache(phase)
+    project_fact_cache = session.project_facts_for(view)
     from vibeflow.targets.python.quality.project_context import project_rule_facts
     if phase in {"static","run"}:
         registry.reset_effect_policies(node.type_key for node in source_context.nodes)
@@ -194,22 +196,37 @@ def _execute_python_node_rules(registry, source_context, *, phase="static", puri
                     continue
                 if local is None:
                     local = local_sources(source_context, node)
-                identity = ("python", node.path, node.symbol, node.descriptor.to_dict(),
-                            session.snapshot(local), implementation_identity)
                 updates = {"source_load_states":getattr(registry, "source_load_states", {}),
                     **project_rule_facts(plan,source_context,project_fact_cache,handlers=handlers)}
-                private_context = replace(base_context, facts={**base_context.facts,
+                prepared = session.view(registry,source_context,extra_facts={**(extra_facts or {}),
                     **{key:value for key,value in updates.items() if key not in (extra_facts or {})}})
-                private_context = replace(private_context, facts={**private_context.facts, "call":call, "node_source_context":local},
-                    subject={"type_key":node.type_key,"kind":"node","descriptor":node.descriptor,
-                             "source_identity":identity,"owner":owner,"call_id":call_id})
-                context = node_context(source_context, node, call, phase=phase, identity=identity,
-                    extra_facts=project_rule_facts(plan, local, {}, handlers=handlers), local=local)
-                native = native_rule_bindings(registry, rules)
+                prepared = prepared.derive({"node_source_context":local},
+                    key=("node_source_context",session.snapshot(local)))
+                local_view = session.facts.store.capture({"source_context":local},
+                    key=("node",session.snapshot(local)),scope={"files":tuple(item.path for item in local.files)})
+                local_view = local_view.derive(project_rule_facts(plan,local,
+                    session.project_facts_for(local_view),handlers=handlers))
+                responsibility = (node.path,node.symbol,node.descriptor.to_dict(),implementation_identity)
+                identity = (local_view.identity,responsibility)
+                subject = {"type_key":node.type_key,"kind":"node","descriptor":node.descriptor,
+                    "source_identity":identity,"owner":owner,"call_id":call_id,
+                    **({"call_path":call.call_path} if call is not None else {})}
+                private_context = prepared.context(phase,subject)
+                context = local_view.context(phase,subject)
+                if call is not None:
+                    private_context = replace(private_context,facts={**private_context.facts,"call":call})
+                    context = replace(context,facts={**context.facts,"call":call})
+                native = native_rule_bindings(registry,rules)
                 origins = native_rule_origins(registry)
-                native = {key:value for key,value in native.items()
-                          if getattr(origins.get(("rules", key)), "plugin_id", "") == "vibeflow.core"}
-                context = replace(context, subject={**context.subject, "source_cache_identities":{key:(identity, native_analysis_identity(source_context, node, private_context.facts)) for key in native if callable(native[key])}})
+                core_handlers = tuple(value for key,value in native.items() if callable(value)
+                    and getattr(origins.get(("rules",key)),"plugin_id","") == "vibeflow.core")
+                native = {key:value for key,value in native.items() if callable(value) and (
+                    getattr(origins.get(("rules",key)),"plugin_id","") == "vibeflow.core" or
+                    any(value is core for core in core_handlers) and
+                    handlers.get(rules[key].handler or key,handlers.get(key)) is value)}
+                context = replace(context,subject={**context.subject,"source_cache_identities":{
+                    invocation.rule.id:(prepared.identity,responsibility) for invocation in plan.invocations
+                    if callable(native.get(invocation.rule.id))}})
                 public_handlers = bind_native_analysis(handlers, native, private_context)
                 result = execute_rule_plan(plan,context,handlers=public_handlers,source_cache=source_cache)
                 result = replace(result, selection=selection.to_dict(),
@@ -298,7 +315,7 @@ def _execute_python_node_rules(registry, source_context, *, phase="static", puri
         for node in source_context.nodes:
             if selected_types is None or node.type_key in selected_types:
                 related = tuple(item for item in findings if item.details.get("node_type", item.subject_id) == node.type_key)
-                from vibeflow.targets.python.project.check_session import catalog_key
+                from vibeflow.targets.python.project.fact_views import catalog_key
                 session.node_import_results[node.type_key] = ((session.snapshot(source_context), catalog_key(registry)), replace(report, findings=related))
     return report
 

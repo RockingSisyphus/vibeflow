@@ -8,8 +8,13 @@ __pycache__/
 .env.local
 .env.*.local
 /build/
-/dist/
-/archive/
+/dist/*
+!/dist/README.md
+/archive/*
+!/archive/README.md
+!/archive/history/
+/archive/history/*
+!/archive/history/README.md
 topology_kernel_distribution/
 vibeflow_distribution/
 *.egg-info/

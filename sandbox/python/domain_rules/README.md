@@ -26,3 +26,13 @@ python -m vibeflow run --workspace sandbox/python/domain_rules/vibeflow_config.j
 
 原生工作流先计算模型块 `3 × 2`，再由数据变换块加 `1`，结果为 `7`。
 `review-rules` 只加载声明及组合图，不导入 Node 或 Rule 的实现。
+
+## 目录用途与边界
+
+仅用于：python / domain_rules 案例，验证项目自定义领域 Rule 及诊断；保留真实项目输入与 runner。
+
+- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
+- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
+- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
+
+完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。

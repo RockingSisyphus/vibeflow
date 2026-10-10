@@ -123,35 +123,14 @@ def bind_native_analysis(handlers, native, private_context):
         def analyze(context, inputs, params, *, check=handler):
             # Services analyse the real import operation and canonical ownership;
             # their output is ordinary portable diagnostics/metrics, never facts.
-            return check(replace(private_context, phase=context.phase,
-                subject={**private_context.subject, "rule_call_id": context.subject.get("rule_call_id", "")}), inputs, params)
+            active = private_context
+            if "call" not in context.facts:
+                active = replace(active, facts={key:value for key,value in active.facts.items() if key != "call"})
+            return check(replace(active, phase=context.phase,
+                subject={**{key:value for key,value in private_context.subject.items() if key in context.subject},
+                    **({"rule_call_id":context.subject["rule_call_id"]} if "rule_call_id" in context.subject else {})}), inputs, params)
         result[key] = analyze
     return result
-
-
-def native_analysis_identity(sources, node, facts):
-    """Hash actual module initialization and related ownership, without bodies.
-
-    An import operation executes the module, including initializers outside the
-    Node symbol. Pure callable bodies elsewhere do not affect that operation.
-    """
-    from vibeflow.core.rules.fingerprint import value_fingerprint
-    class Initialization(ast.NodeTransformer):
-        def visit_FunctionDef(self, value):
-            value.body = []
-            return self.generic_visit(value)
-        visit_AsyncFunctionDef = visit_FunctionDef
-    closure = sources.import_closure(node.path)
-    files = {file.path for file in closure}
-    initialization = []
-    for file in closure:
-        tree = Initialization().visit(file.tree) if file._tree is not None else None
-        initialization.append((file.path, file.parse_error,
-            ast.dump(tree) if tree is not None else "", tuple((getattr(item, "lineno", 0), getattr(item, "col_offset", 0))
-                for item in ast.walk(tree) if hasattr(item, "lineno")) if tree is not None else ()))
-    return value_fingerprint((initialization,
-        {key:value for key,value in facts.get("source_load_states", {}).items() if key in files},
-        tuple(item for item in facts.get("source_owners", ()) if item.get("path") in files)))
 
 
 def graph_sources(sources, subjects):
