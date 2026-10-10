@@ -66,3 +66,13 @@ Node 声明显式选择 `vibeflow.process`、`vibeflow.io`、`vibeflow.document`
 `project/configs/pass_io_data_store.jsonc` 展示外部数据/副作用的替代建模方式：`data_store` 节点产出请求数据，`io` 节点消费外部输入结果。旧 `boundary` 配置只保留在失败用例中，验证内核会以 `CONFIG.BOUNDARY.REMOVED` 拒绝。
 
 `project/configs/review_external_nodeset_dedup.jsonc` 是严格 health-pass 的审查渲染 fixture。它用四个 loop 节点调用同一个 `visual.reusable_worker` body，每个调用通过 `loop.outputs` 映射到唯一 provider key，并在 `join_policy: all` 的 terminal `end` 汇合；同时保留一个真实 external 主线节点。`run_all.py` 先要求 `validate` 返回 `PASS`，再检查父图中的四个调用 ID 与四条 `worker_* -> end` 连线、唯一局部详情、`calls: 4` / 前三个 ID / `+1` / 配置计数摘要，以及 external 边框 CSS。普通 nodeset 调用必须与定义保持完全相同的 provides 契约，因此同一父图中的合法重复普通调用还受 provider key 唯一性约束；异步调用的分组与摘要由单元测试覆盖。
+
+## 目录用途与边界
+
+仅用于：python / integration 案例，验证公开接口的综合使用、跨资源协作与错误诊断；保留真实项目输入与 runner。
+
+- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
+- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
+- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
+
+完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。

@@ -722,6 +722,8 @@ def _copy_tree(
             raise BuildDistributionError(
                 f"refusing to copy a symlink into the distribution: {path}"
             )
+        if _is_directory_note(path):
+            continue
         destination = target / relative
         if path.is_dir():
             destination.mkdir(parents=True, exist_ok=True)
@@ -771,7 +773,7 @@ def _write_kernel_archive(source: Path, target: Path) -> None:
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for path in sorted(source.rglob("*"), key=lambda item: item.relative_to(source).as_posix()):
             relative_to_package = path.relative_to(source)
-            if path.is_dir() or _ignored(relative_to_package):
+            if path.is_dir() or _ignored(relative_to_package) or _is_directory_note(path):
                 continue
             archive_relative = Path("vibeflow") / relative_to_package
             info = zipfile.ZipInfo(archive_relative.as_posix())
@@ -1075,6 +1077,14 @@ def _remove_tree(path: Path) -> None:
         else:
             item.rmdir()
     path.rmdir()
+
+
+def _is_directory_note(path: Path) -> bool:
+    """Maintainer directory notes are not user-facing release resources."""
+    if path.name != "README.md" or not path.is_file() or path.is_symlink():
+        return False
+    with path.open("rb") as source:
+        return source.read(64).startswith(b"<!-- vibeflow-directory-purpose -->")
 
 
 def _ignored(relative: Path) -> bool:

@@ -1779,8 +1779,8 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     from vibeflow.tooling.application.python.presentation.prepared import (
         final_python_compilation,
         prepare_python_presentation,
-        python_check_scope,
     )
+    from vibeflow.targets.python.project.check_session import python_check_scope
     from vibeflow.tooling.application.python.presentation.mermaid.render import (
         is_mermaid_svg_renderer_available,
         render_mermaid_svg,

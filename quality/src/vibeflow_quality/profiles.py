@@ -80,9 +80,18 @@ _DOCUMENTATION_ROOTS = (
     "docs",
     "distribution/docs",
     "distribution/kernel_development_pack",
-    "tests/fixtures",
-    "quality/README.md",
+    "quality",
     "sandbox",
+    "src",
+    "tests",
+    "tools",
+    "distribution/README.md",
+    "distribution/minimal_projects",
+    "distribution/prompts/README.md",
+    "archive/README.md",
+    "archive/history/README.md",
+    "dist/README.md",
+    "references/README.md",
 )
 
 _AUDIT_GENERATED_NAMES = frozenset({
@@ -399,7 +408,8 @@ def _directory_role_findings(root: Path) -> list[Finding]:
             valid = path.is_dir() and path.name in release_directories
             if path.is_file():
                 valid = (
-                    path.name in packages
+                    path.name == "README.md"
+                    or path.name in packages
                     or path.name in {f"SHA256SUMS-{v}.txt" for v in versions}
                     or (not versions and re.fullmatch(r"vibeflow-distribution(?:-autonomous)?-[0-9][\w.-]*\.zip", path.name))
                 )
@@ -411,7 +421,7 @@ def _directory_role_findings(root: Path) -> list[Finding]:
             if path.is_dir():
                 if path.relative_to(archive).parts[0] != "history":
                     misplaced.append(path)
-            elif not re.fullmatch(r"(?:vibeflow-distribution(?:-autonomous)?-[0-9][\w.-]*\.zip|SHA256SUMS-[\w.-]+\.txt)", path.name):
+            elif not (path.name == "README.md" and path.parent in {archive, archive / "history"}) and not re.fullmatch(r"(?:vibeflow-distribution(?:-autonomous)?-[0-9][\w.-]*\.zip|SHA256SUMS-[\w.-]+\.txt)", path.name):
                 misplaced.append(path)
     sandbox = root / "sandbox"
     if sandbox.is_dir():

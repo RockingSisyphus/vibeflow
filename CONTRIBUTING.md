@@ -92,6 +92,14 @@ Release acceptance must also run the JavaScript integration Sandbox with its rea
 
 ## Generated files and distribution
 
+### Repository layout
+
+Follow the [directory responsibilities](docs/maintainers/directory-layout.md) and the README in the directory being changed. Every new manually maintained subdirectory needs a short README explaining its purpose and where generated output belongs. Keep the root for project entry points and metadata; place development documents in `docs`, user manuals in `distribution/docs`, implementation regressions in `tests`, and real usage projects in `sandbox`.
+
+Put temporary builds, installed dependencies and run output in disposable workspaces outside the checkout, then clean them up. Delete obsolete unused inputs rather than creating another archive. `archive` is for historical formal releases, `dist` for the latest formal releases, and `references` for external projects. Their generated or third-party subtrees keep their own layout.
+
+New maintainer directory notes start with `<!-- vibeflow-directory-purpose -->`; the distribution builder excludes these notes from the kernel and project templates while retaining user guides.
+
 Preview workspace cleanup before applying it:
 
 ```bash

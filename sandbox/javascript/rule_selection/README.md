@@ -38,3 +38,13 @@ python sandbox/javascript/rule_selection/run_all.py --work-dir /tmp/vibeflow-jav
 JavaScript runner 默认按锁文件安装 TypeScript/esbuild，也可用 `--toolchain-root /path/to/project` 复用该目录的 node_modules。本例只检查规则选择，不需要浏览器或渲染器。
 
 runner 在临时副本执行，不修改案例源码。指定工作目录时保留三个 `*-health.json` 与 `report.json`；工作目录应使用新的空目录。两个 Target 的 integration runner 已登记此案例，完整仓库验证也会执行。共享断言见 [runner 支持模块](../../../tests/fixtures/support/rule_selection.py)。
+
+## 目录用途与边界
+
+仅用于：javascript / rule_selection 案例，验证显式 Rule 选择、覆盖及执行记录；保留真实项目输入与 runner。
+
+- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
+- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
+- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
+
+完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。

@@ -27,3 +27,13 @@ PYTHONPATH=src:. python -B -m tests.fixtures.python.source_false_positives.probe
 Core 与 Python 回归为 770 passed / 5 skipped；跳过项为既有的 SVG 渲染器测试，本轮 33 个沙箱案例全部执行。仓库独立质量为 0 errors / 0 warnings，其自身测试为 46 passed。本轮未重建发行包，也未执行完整跨 Target、浏览器及发行验证。
 
 历史生成报告和截图已移出夹具目录，原始位置与恢复方法见 [证据索引](../../../../docs/maintainers/evidence/index.md)。上文历史成绩不代替当前运行。
+
+## 目录用途与边界
+
+仅用于：source_false_positives 专项实现回归的固定输入、预期及 runner；只保留有当前加载方的材料，运行产物写入临时工作区。
+
+- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
+- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
+- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
+
+完整归位规则见[仓库目录职责](../../../../docs/maintainers/directory-layout.md)。

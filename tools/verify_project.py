@@ -191,6 +191,12 @@ if not result['matched']:
           _puppeteer_root(scratch), scratch / "runtime-observation-browser.json"))
 
 
+def _javascript_review_performance(scratch: Path) -> None:
+    _run((PYTHON, "tests/fixtures/javascript/review_performance/run_all.py",
+          "--work", scratch / "javascript-review-performance", "--report", scratch / "javascript-review-performance.json",
+          "--toolchain", scratch / "pytest/javascript-toolchain"))
+
+
 def _review_performance_regressions(scratch: Path) -> None:
     _run((PYTHON, "tests/fixtures/python/review_performance/run_all.py",
           "--work", scratch / "review-performance", "--report", scratch / "review-performance.json",
@@ -661,6 +667,7 @@ def _steps(*, full: bool, workers: int = DEFAULT_WORKERS) -> tuple[Step, ...]:
         Step("review-layout-regressions", _review_layout_regressions),
         Step("resource-sections-regressions", _resource_sections_regressions),
         Step("review-performance-regressions", _review_performance_regressions),
+        Step("javascript-review-performance", _javascript_review_performance),
         Step("adaptation-regressions", lambda scratch: _adaptation_regressions(scratch, workers=workers)),
         Step("wheel-isolation", _wheel_smoke),
         Step("generated-artifact-cleanup", _cleanup_generated_artifacts),

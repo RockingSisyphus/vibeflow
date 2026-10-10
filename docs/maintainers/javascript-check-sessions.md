@@ -15,3 +15,40 @@ Rule 和 compiler hook 使用有限图快照：定义保留一次，Nodeset 与 
 Target 分别提取入口引用和模块初始化引用。与入口同文件的插件声明承担其模块初始化检查，入口按自己的实际引用检查；没有该声明归属的实现同时检查两者。类型引用、别名，以及初始化时实际调用的本地方法和构造器均保留导入位置；未调用的本地方法不会凭空成为入口依赖。另一 workflow 的声明不会改变当前 workflow 的权限。
 
 复现与机器结果见[适配修复记录](history/adaptation-repair-20261005.md)及 `tests/fixtures/adaptation_regressions/`。JS/TS 公共 SDK、配置格式和 ABI 保持不变。
+
+## Prepared fact views
+
+`build/fact_views.py` adapts complete source/declaration inputs to the shared
+`targets/shared/facts.py` store. Node local facts remain distinct from the native
+background. Graph inputs retain finite definitions, effective scope and
+boundaries. Views are captured before repeated calls, with project quality facts
+prepared only when the selected implementations require them. The session reuses
+that prepared derivation; it does not serialize all sources for every call.
+
+`build/analysis_service.py` owns driver analysis/result reuse. Its request keys
+include package root and Node command. `quality/diagnostics.py` converts findings.
+`build/rule_wire.py` only encodes already-prepared facts and never starts analysis.
+Native rules use these service interfaces instead of importing orchestration
+helpers from `rule_session.py`.
+
+Source result identities combine the relevant view, responsibility and actual
+native binding or worker/module/export binding. Temporary handler closures are
+not implementation identities. Worker sessions distinguish changed bindings;
+command cleanup clears facts, analysis and rule caches after closing resources.
+Core continues to distinguish phase, parameters and input records. Program keys
+and module-initialization semantic facts retain their existing behavior.
+
+The formal CLI performance fixture is
+`tests/fixtures/javascript/review_performance/run_all.py`. It records actual
+driver requests, Program builds, worker evaluations and view captures. A Node
+loader observer counts Program cache misses without changing cache decisions.
+One/four repetitions of the same eight-node, four-library Nodeset must not add
+driver requests, Program builds or source-worker evaluations. Compare three fresh
+processes on the same machine; wall-clock results are observations, not portable
+pass/fail thresholds.
+
+Common declarations, Node catalogs and execution configuration are captured once
+before resource iteration. Each resource derives only its source/ownership and
+local-quality parts from that immutable background. These derivations reuse
+Core-owned readonly values rather than re-encoding/freezing the full catalog.
+Unused driver prefetch objects stay in the analysis service, outside fact views.

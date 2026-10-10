@@ -42,3 +42,13 @@ npm_config_cache=/tmp/vibeflow-npm-cache python tools/run_tests.py -- \
 报告机制的 pytest 通过不能替代真实沙箱。完整门禁实际运行 current-only 全组，不匹配或观察错误使门禁失败。空组、重复 ID、残缺记录和丢失历史 ID 均不能算通过。修复前事实见 [历史检查](RESULTS.md)，最新验收见完整修复结果。
 
 历史生成报告和截图已移出夹具目录，原始位置与恢复方法见 [证据索引](../../../docs/maintainers/evidence/index.md)。上文历史成绩不代替当前运行。
+
+## 目录用途与边界
+
+仅用于：跨 Target 规则一致性的案例定义、固定期望及 reference.json 输入基线；运行报告不能覆盖基线。
+
+- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
+- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
+- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
+
+完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。

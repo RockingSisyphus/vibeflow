@@ -12,6 +12,27 @@ import distribution.build as distribution_builder
 from distribution.profile_config import DistributionProfileError, load_distribution_profiles
 
 
+def test_directory_notes_stay_out_of_release_resources(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    module = source / "nodes"
+    module.mkdir(parents=True)
+    (source / "README.md").write_text("# User project guide\n")
+    (module / "README.md").write_text("<!-- vibeflow-directory-purpose -->\n# Maintainer note\n")
+    (module / "runtime.py").write_text("VALUE = 1\n")
+
+    target = tmp_path / "copied"
+    distribution_builder._copy_tree(source, target)
+    assert (target / "README.md").read_text() == "# User project guide\n"
+    assert (target / "nodes/runtime.py").read_text() == "VALUE = 1\n"
+    assert not (target / "nodes/README.md").exists()
+
+    archive_path = tmp_path / "kernel.zip"
+    distribution_builder._write_kernel_archive(source, archive_path)
+    with zipfile.ZipFile(archive_path) as archive:
+        assert set(archive.namelist()) == {"vibeflow/README.md", "vibeflow/nodes/runtime.py"}
+        assert archive.read("vibeflow/nodes/runtime.py") == b"VALUE = 1\n"
+
+
 def _profile_payload() -> dict[str, object]:
     return {
         "schema": "vibeflow.distribution-profiles.v1",

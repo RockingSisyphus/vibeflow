@@ -36,3 +36,13 @@ python -I -B docs/maintainers/python-exception-alias-fix-20261008/replay_frozen_
 正式全量使用`python -B tools/verify_project.py --full`；源码、测试、工具、sandbox、quality、distribution及pyproject.toml的2340个 Git 可见验收输入，连同15个10月5日已存在且被 Git 忽略的历史日志，共2355个文件在 [full-01-inputs-before.json](../../evidence/index.md#artifact-92d92626ec008636) 中冻结。旧清单为2336个 Git 可见文件，本轮增加4个 Python 文件；另外15项来自收集范围扩大。新的[full-01结果](../../evidence/index.md#artifact-46b8abca27901512)为17/17通过、退出码0、pytest 4,534 passed；[批次后对照](../../evidence/index.md#artifact-65ced58fdd4e6f2b)无新增、缺失或字节变化。
 
 三种新包各18组、1,791次回归检查已完成，合计54组、5,373次，所有组退出码0。包内原始108观察的已知差异继续单列，详见[包内汇总](../../evidence/index.md#artifact-70dd677331fe9b61)和[实际执行命令](../../evidence/index.md#artifact-91352c1f26333c65)。完整7集合／各335文件在行为重放[之前](../../evidence/index.md#artifact-5e7313b2c6b1a7be)与[之后](../../evidence/index.md#artifact-9289a0a4f86471d3)均匹配；所有中间失败日志与摘要保留。
+
+## 目录用途与边界
+
+仅用于：历史专题 python-exception-alias-fix-20261008 的可阅读审核、修复与决策记录；保持当时口径，不追加机器输出或用作当前规范。
+
+- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
+- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
+- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
+
+完整归位规则见[仓库目录职责](../../directory-layout.md)。

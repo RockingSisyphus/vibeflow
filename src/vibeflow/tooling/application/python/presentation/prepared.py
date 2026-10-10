@@ -14,18 +14,6 @@ from vibeflow.core.models import CoreCompilation, ImplementationFacts
 from vibeflow.core.rules.models import plain, readonly
 
 
-@contextmanager
-def python_check_scope(registry, *, _parse_cache=None):
-    from vibeflow.targets.python.project.check_session import begin_python_check, current_python_check, end_python_check
-
-    owned = current_python_check(registry) is None
-    if owned:
-        begin_python_check(registry, _parse_cache=_parse_cache)
-    try:
-        yield
-    finally:
-        if owned:
-            end_python_check(registry)
 
 
 def final_python_compilation(graph, registry):

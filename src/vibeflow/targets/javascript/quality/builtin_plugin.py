@@ -19,7 +19,8 @@ def _effect_parameters(params: Mapping[str, Any]) -> str:
 
 
 def javascript_rule_bindings() -> Mapping[str, Any]:
-    from vibeflow.targets.javascript.build.rule_session import _source_check, _finding
+    from vibeflow.targets.javascript.build.analysis_service import source_check
+    from vibeflow.targets.javascript.quality.diagnostics import rule_finding
     def project_handler(checker):
         @wraps(checker, assigned=(), updated=())
         def check(context: RuleContext, inputs: Mapping[str, RuleRecord], params: Mapping[str, Any]) -> RuleResult:
@@ -32,27 +33,27 @@ def javascript_rule_bindings() -> Mapping[str, Any]:
         return check
     def effects(context: RuleContext, inputs: Mapping[str, RuleRecord], params: Mapping[str, Any]) -> RuleResult:
         scope = _effect_parameters(params)
-        findings = _source_check(context, ("module_state", "host_io", "effect_imports"), "vibeflow.no_side_effects", params=params)
+        findings = source_check(context, ("module_state", "host_io", "effect_imports"), "vibeflow.no_side_effects", params=params)
         allowed = {"none": [], "terminal": ["terminal"], "python_io": ["python_io"], "global_state": ["global_state"], "trusted": []}[scope]
         return RuleResult(records={"effect_policy": RuleRecord("vibeflow.effect_policy.v1", {"effect_scope": scope, "allowed_effects": allowed})}, findings=findings)
     def architecture(context, inputs, params):
-        return RuleResult(findings=_source_check(context, ("architecture",), "vibeflow.node_architecture"))
+        return RuleResult(findings=source_check(context, ("architecture",), "vibeflow.node_architecture"))
     def input_writes(context, inputs, params):
         return RuleResult(state="unavailable")
     def interface(context: RuleContext, inputs: Mapping[str, RuleRecord], params: Mapping[str, Any]) -> RuleResult:
-        return RuleResult(findings=_source_check(context, ("completion",), "vibeflow.node_interface"))
+        return RuleResult(findings=source_check(context, ("completion",), "vibeflow.node_interface"))
     def imports(context: RuleContext, inputs: Mapping[str, RuleRecord], params: Mapping[str, Any]) -> RuleResult:
         _effect_parameters(params)
-        return RuleResult(findings=_source_check(context, ("purity", "imports"), "vibeflow.import_side_effects", params=params))
+        return RuleResult(findings=source_check(context, ("purity", "imports"), "vibeflow.import_side_effects", params=params))
     def measured(context: RuleContext, params: Mapping[str, Any], *, topic="all"):
-        from vibeflow.targets.javascript.build.rule_session import measure_builtin_resource
+        from vibeflow.targets.javascript.build.analysis_service import measure_builtin_resource
         return measure_builtin_resource(context, params, topic=topic)
     def maintainability(context, inputs, params):
         result = measured(context, params)
         if isinstance(result, RuleResult):
             return result
         found, metrics = result
-        return RuleResult(records={"metrics": RuleRecord("vibeflow.node_metrics.v1", metrics)}, findings=tuple(_finding(item.to_dict(), "vibeflow.maintainability", context) for item in found))
+        return RuleResult(records={"metrics": RuleRecord("vibeflow.node_metrics.v1", metrics)}, findings=tuple(rule_finding(item.to_dict(), "vibeflow.maintainability", context) for item in found))
     def implementation(topic):
         def check(context, inputs, params):
             result = measured(context, params, topic=topic)

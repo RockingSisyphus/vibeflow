@@ -66,6 +66,9 @@ class ProfileTests(unittest.TestCase):
         self.assertIn(self.fixture.root / "outputs", profile_module._generated_paths(self.fixture.root))
 
     def test_directory_roles_allow_releases_sources_and_document_assets(self) -> None:
+        self.fixture.write("dist/README.md", "latest releases only")
+        self.fixture.write("archive/README.md", "historical releases only")
+        self.fixture.write("archive/history/README.md", "historical build variants")
         self.fixture.write("dist/vibeflow-distribution/DISTRIBUTION.json", '{"version":"0.17.0"}')
         self.fixture.write("dist/vibeflow-distribution-0.17.0.zip", "package")
         self.fixture.write("dist/SHA256SUMS-0.17.0.txt", "hash")

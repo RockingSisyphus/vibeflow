@@ -124,3 +124,13 @@ The runner now registers 48 tasks. `math:plugin-addition` checks multi-file reso
 These replace seven previous normal tasks. See [the complete replacement table](../../../docs/maintainers/history/audits/addition-sandboxes-20261009.md). Error, cancellation, detached, taskplan, type and browser regressions remain registered.
 
 The independent [workflow_math](../workflow_math/README.md) replaces six nested Nodeset, loop, route and execution metadata tasks. Eight observation groups use small integer formulas, including a two-level +1 loop and a shared build across full/boundary/off trace. Original fixtures still used by pytest and architecture review remain. See the [migration and validation record](../../../docs/maintainers/history/audits/workflow-math-20261010.md).
+
+## 目录用途与边界
+
+仅用于：javascript / integration 案例，验证公开接口的综合使用、跨资源协作与错误诊断；保留真实项目输入与 runner。
+
+- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
+- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
+- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
+
+完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。

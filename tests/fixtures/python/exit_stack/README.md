@@ -29,3 +29,13 @@ PYTHONPATH=src:. python -B -m tests.fixtures.python.exit_stack.probe \
 后续于 2026-10-05 重建两个 0.15.0 分发包，`released-after.json` 记录从新包解压内核执行的 34 个案例与四次真实运行，全部通过。内核、文档、提示词及其他专项回归见[发行验证记录](../../../../docs/maintainers/evidence/index.md#artifact-6603a23574036898)。此记录不替代下游训练或完整浏览器验收。
 
 历史生成报告和截图已移出夹具目录，原始位置与恢复方法见 [证据索引](../../../../docs/maintainers/evidence/index.md)。上文历史成绩不代替当前运行。
+
+## 目录用途与边界
+
+仅用于：exit_stack 专项实现回归的固定输入、预期及 runner；只保留有当前加载方的材料，运行产物写入临时工作区。
+
+- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
+- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
+- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
+
+完整归位规则见[仓库目录职责](../../../../docs/maintainers/directory-layout.md)。

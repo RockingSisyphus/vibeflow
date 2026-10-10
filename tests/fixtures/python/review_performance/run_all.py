@@ -93,6 +93,8 @@ def verify(identifier, options, command, observation, project, *, baseline):
         text = (project/'ARCHITECTURE.jsonc').read_text()
         if '#d6eaff' not in text or 'perf.library.0' not in text:
             failures.append('architecture lost styles or library identity')
+    if not baseline and observation['calls'].get('native_initialization_identity',0):
+        failures.append('initialization fingerprint repeated before rule cache lookup')
     calls = observation.get('presentation_calls', {})
     if not baseline and any(calls.get(name,0) for name in ('bind','library_review','rule_plan','compile')):
         failures.append('presentation triggered binding or checks')

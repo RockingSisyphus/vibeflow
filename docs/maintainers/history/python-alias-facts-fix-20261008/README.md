@@ -82,3 +82,13 @@ bash docs/maintainers/python-alias-facts-fix-20261008/replay_old_products.sh /ab
 `verify_final_product_bytes.py` 仅用标准库，比较冻结快照、wheel安装目录、whl、两个直接kernel及两个发行ZIP内嵌kernel的全334文件清单。重放前后分别保存 `product-byte-proof-before.json` 与 `product-byte-proof-after.json`，7份集合均逐字节一致，profile、版本和元数据同时匹配；安装产生的pyc单列记录。重放命令中的正式gate目录为 `/home/rockingsisyphus/.cache/vibeflow-alias-facts-20261008/full-03`。
 
 原审核3项及docs保存的脚本／补充证据均按保护清单核对。原91项脚本保存在本目录；ignored dist中的临时探针路径后来用于103项扩充版，旧路径的哈希差异如实保留，不能推导成所有临时原路径都未改变。
+
+## 目录用途与边界
+
+仅用于：历史专题 python-alias-facts-fix-20261008 的可阅读审核、修复与决策记录；保持当时口径，不追加机器输出或用作当前规范。
+
+- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
+- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
+- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
+
+完整归位规则见[仓库目录职责](../../directory-layout.md)。

@@ -38,3 +38,13 @@ python -B tests/fixtures/python/review_layout/run_all.py \
 历史 [sections-after.json](../../../../docs/maintainers/evidence/index.md#artifact-e4a865869cfb364d) 保存错误的内部实现图分区阶段，不再作为现行展示契约。本次恢复 `f169429` 用户资源目录的阅读层级，四个稳定案例 ID 保持不变；[user-layer-after.json](../../../../docs/maintainers/evidence/index.md#artifact-1dab9c8f6ed0e84a) 对新源码重跑全部入口，代表性 [SVG](../../../../docs/maintainers/evidence/index.md#artifact-9e74cb97aaeccb55) 与 [浏览器资料](../../../../docs/maintainers/evidence/index.md#artifact-75db2e33fe100530) 保存在独立证据目录。Nodeset 折叠、默认值及移除内部图参数的验收见[用户资源目录专项](../resource_sections/README.md)。
 
 历史生成报告和截图已移出夹具目录，原始位置与恢复方法见 [证据索引](../../../../docs/maintainers/evidence/index.md)。上文历史成绩不代替当前运行。
+
+## 目录用途与边界
+
+仅用于：review_layout 专项实现回归的固定输入、预期及 runner；只保留有当前加载方的材料，运行产物写入临时工作区。
+
+- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
+- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
+- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
+
+完整归位规则见[仓库目录职责](../../../../docs/maintainers/directory-layout.md)。

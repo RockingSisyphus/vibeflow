@@ -8,7 +8,7 @@ from vibeflow.core.rules import EFFECT_POLICY_TYPE, RuleCall, RuleDescriptor, Ru
 from vibeflow.targets.python.project.check_session import current_python_check
 from vibeflow.targets.python.project.compiler import GraphCompiler
 from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
-from vibeflow.tooling.application.python.presentation.prepared import python_check_scope
+from vibeflow.targets.python.project.check_session import python_check_scope
 from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
 
 
