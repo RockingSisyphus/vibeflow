@@ -1,0 +1,76 @@
+{
+  "type_key": "math.affine_block",
+  "display_name": "affine_block",
+  "description": "affine_block",
+  "requires": [
+    {
+      "type": "math.x",
+      "cardinality": "exactly_one",
+      "display_name": "math.x"
+    }
+  ],
+  "provides": [
+    {
+      "key": "scaled",
+      "type": "math.scaled",
+      "display_name": "scaled"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "math.x",
+        "type": "math.x",
+        "display_name": "math.x",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "math.boundary",
+        "display_name": "start",
+        "description": "start"
+      },
+      {
+        "id": "affine",
+        "type_used": "math.affine",
+        "display_name": "affine",
+        "description": "affine"
+      },
+      {
+        "id": "end",
+        "type_used": "math.boundary",
+        "display_name": "end",
+        "description": "end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "affine"
+      },
+      {
+        "from": "affine",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "math.scaled",
+        "cardinality": "exactly_one",
+        "display_name": "math.scaled",
+        "as": "scaled"
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "code_plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
+}

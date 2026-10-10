@@ -133,6 +133,8 @@ def test_architecture_document_is_deterministic_and_keeps_planned_and_unused_bod
         "nodesets",
         "node_types",
         "resources",
+        "call_effect_scopes",
+        "rule_selections",
     ]
     assert payload["project_target"] == "python"
     assert payload["workflow"]["source"] == {"root_id": "app", "path": "configs/main.jsonc"}

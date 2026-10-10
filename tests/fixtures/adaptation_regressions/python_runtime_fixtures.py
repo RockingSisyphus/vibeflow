@@ -114,7 +114,8 @@ from vibeflow.core.findings import HealthFinding
 def load_state(context, inputs, params):
     source = context.require("source_context")
     node = next(item for item in source.nodes if item.type_key == context.subject["type_key"])
-    present = node.path in context.facts["source_load_states"]
+    present = source.file(node.path) is not None
+    assert "source_load_states" not in context.facts
     with Path(__file__).with_name("rule.jsonl").open("a") as stream:
         stream.write(str(present) + "\\n")
     if REFUSE or not present:
@@ -173,7 +174,8 @@ def policy_project(root, *, inline=None, discovered=None, explicit=None, nested=
     code += f'plugin=Plugin(id="audit",resources=[{",".join(resources)}],declaration_rulesets=[])\n'
     project(root, code)
     leaf = 'class Leaf:\n    def run_pure(self, inputs, params):\n        return {"result":7}\n'
-    (root / "leaf.py").write_text(leaf + "\n" * (28 - len(leaf.splitlines())))
+    leaf = leaf.replace('        return {"result":7}', '\n'.join('        # Local implementation line' for _ in range(25)) + '\n        return {"result":7}')
+    (root / "leaf.py").write_text(leaf)
     (root / "bad.py").write_text('class Bad:\n    def run_pure(self, inputs, params):\n'
         '        print("unrelated forbidden output")\n        return {"result":7}\n')
     import json

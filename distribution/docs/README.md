@@ -10,7 +10,7 @@
 - [nodesets-and-loops](user/nodesets-and-loops.md)
 - [plugins-and-integrations](user/plugins-and-integrations.md)
 - [multifile-resources](user/multifile-resources.md)
-- [rules-and-nodes](user/rules-and-nodes.md)
+- [Rule、Ruleset 与 Node](user/rules-and-nodes.md)：两种默认、三处配置选择，以及 Python/TypeScript 插件定义与接入。
 - [rule-system-migration](user/rule-system-migration.md)
 - [runtime-observation](user/runtime-observation.md)
 - [commands-and-results](user/commands-and-results.md)

@@ -15,4 +15,6 @@ export const resource_6 = defineDataSchema({"type_key": "example.input", "repres
 
 export const resource_7 = defineDataSchema({"type_key": "example.output", "representation": "json", "schema": {"type": "number"}});
 
-export const plugin = definePlugin({id:"fixture.resources", resources:[resource_0, resource_1, resource_2, resource_3, resource_4, resource_5, resource_6, resource_7]});
+export const resource_8 = defineRule({"id":"example.model_files","implementations":[{"language":"typescript","source":{"kind":"file","ref":"rules/model_files.ts","export":"check"}}]});
+export const resource_9 = defineRuleset({"id":"example.model_layout","workflow_default":true,"calls":[{"id":"files","rule_id":"example.model_files"}],"entrypoints":{"static":["files"]}});
+export const plugin = definePlugin({id:"fixture.resources", resources:[resource_0, resource_1, resource_2, resource_3, resource_4, resource_5, resource_6, resource_7, resource_8, resource_9]});

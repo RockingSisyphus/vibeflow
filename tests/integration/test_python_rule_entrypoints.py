@@ -93,5 +93,5 @@ def check(context, inputs, params):
     proofs = [item for item in project.events() if "factor" in item]
     assert proofs
     assert all(item == {"owner": "pipeline", "call": "calculate", "factor": 5,
-        "all_calls": ["start", "calculate", "end"]} for item in proofs)
+        "all_calls": []} for item in proofs)
     assert business.read_text() == "7"

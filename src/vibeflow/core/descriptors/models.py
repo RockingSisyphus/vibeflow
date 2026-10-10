@@ -474,7 +474,8 @@ class NodeDescriptor:
             "tags",
             _string_tuple(self.tags, field_name="node.tags"),
         )
-        object.__setattr__(self, "rulesets", _string_tuple(self.rulesets, field_name="node.rulesets"))
+        from vibeflow.core.rules.selection.models import selection_refs
+        object.__setattr__(self, "rulesets", selection_refs(self.rulesets, field_name="node.rulesets"))
         from vibeflow.core.descriptors.presentation import normalize_presentation
         object.__setattr__(self, "presentation", normalize_presentation(self.presentation, field_name="node.presentation"))
         object.__setattr__(self, "metadata", _freeze_mapping(self.metadata, field_name="node.metadata"))
@@ -513,7 +514,8 @@ class NodeDescriptor:
         if self.author is not None:
             payload["author"] = self.author
         if self.rulesets is not None:
-            payload["rulesets"] = list(self.rulesets)
+            from vibeflow.core.rules.selection.models import selection_data
+            payload["rulesets"] = selection_data(self.rulesets)
         payload["presentation"] = _thaw_json(self.presentation)
         payload["metadata"] = _thaw_json(self.metadata)
         return payload

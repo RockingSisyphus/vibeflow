@@ -6,6 +6,8 @@ modules; those operations remain in the outer loading layer.
 """
 
 from __future__ import annotations
+from vibeflow.core.rules.selection import selection_refs, selection_data
+
 
 from dataclasses import dataclass
 from typing import Mapping, Protocol
@@ -46,7 +48,7 @@ class PluginDescriptor:
             "priority": self.priority,
             "scope": self.scope,
             "source": self.source,
-            "rulesets": list(self.rulesets),
+            "rulesets": selection_data(self.rulesets),
         }
         if self.root_id:
             payload["root_id"] = self.root_id

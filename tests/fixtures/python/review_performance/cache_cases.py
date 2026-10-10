@@ -15,7 +15,7 @@ from vibeflow.core.rules import RuleRecord, RuleResult
 
 def finding(context, code, message, severity="warning"):
     return HealthFinding(rule_id=code, severity=severity, object_type="node",
-        object_id=context.subject["type_key"], message=message,
+        object_id=context.subject.get("type_key", context.subject.get("owner", "pipeline")), message=message,
         source_location={"path": __file__, "line": 8, "column": 1})
 
 @node(type_key="case.start", flow_kind="terminal", contract={}, rulesets=[])
@@ -204,7 +204,7 @@ checks = ruleset(id="case.changing_records", calls=[
     if not marker.exists() or marker.read_text().splitlines() != ["1","2"]:
         failures.append("source consumer reused changed records or reran identical records")
     diagnostics = [item for item in observation["diagnostics"] if item.get("rule_id") == "CASE.CHANGING_RECORD"]
-    if any({call["node"] for call in item.get("details",{}).get("calls",())} != {"step0","step1","step2"}
+    if any({call["node"] for call in item.get("details",{}).get("calls",())} != ({"step0"} if item["message"] == "consumed 1" else {"step1","step2"})
            for item in diagnostics):
         failures.append("source diagnostic lost repeated-call associations")
     return observation, failures
@@ -251,8 +251,8 @@ checks = ruleset(id="case.native_records", calls=[
     if not marker.exists() or marker.read_text().splitlines() != list(kinds):
         failures.append("source consumer lost the actual native input record type")
     diagnostics = [item for item in observation["diagnostics"] if item.get("rule_id") == "CASE.NATIVE_RECORD"]
-    expected_calls = {f"step{index}" for index in range(len(kinds))}
-    if any({call["node"] for call in item.get("details",{}).get("calls",())} != expected_calls for item in diagnostics):
+    actual_calls = [{call["node"] for call in item.get("details",{}).get("calls",())} for item in diagnostics]
+    if sorted(sorted(calls) for calls in actual_calls) != [[f"step{index}"] for index in range(len(kinds))]:
         failures.append("native record diagnostic lost its call associations")
     return observation,failures
 
@@ -286,10 +286,15 @@ def _configuration_case(root, args):
 def check_config(context, inputs, params):
     value = context.facts["plugins"]["case.resources"]["mode"]
     return RuleResult(findings=(finding(context, "CASE.CONFIG", f"mode {value}"),))
-checks = ruleset(id="case.config", calls=[{"id":"check", "rule_id":"case.config"}], entrypoints={"static":["check"]})
+checks = ruleset(id="case.config", workflow_default=True, calls=[{"id":"check", "rule_id":"case.config"}], entrypoints={"static":["check"]})
 '''
-    _project(root, body, "check_config, checks", ["case.config"])
+    _project(root, body, "check_config, checks", [])
     _workflow(root, [node_call("step0", "case.step")], config={"mode": 2}, filename="second.jsonc")
+    for filename in ("workflow.jsonc", "second.jsonc"):
+        path = root / filename
+        data = json.loads(path.read_text())
+        data["rulesets"] = ["case.config"]
+        path.write_text(json.dumps(data))
     observations, failures = [], []
     for index, config in enumerate(("workflow.jsonc", "second.jsonc"), 1):
         observation = _observe(root, args, name=f"configuration{index}", config=config)

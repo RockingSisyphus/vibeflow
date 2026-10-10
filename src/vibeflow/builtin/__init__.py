@@ -3,14 +3,15 @@
 from vibeflow.builtin.effects import builtin_effect_resources
 from vibeflow.builtin.implementation import implementation_handlers, implementation_resources
 from vibeflow.builtin.project_quality import project_quality_handlers, project_quality_resources, project_quality_rule_defaults
-from vibeflow.builtin.workflow import workflow_rule_checks, workflow_topic_handlers, workflow_topic_resources
+from vibeflow.builtin.workflow import workflow_topic_handlers, workflow_topic_resources
+from vibeflow.builtin.workflow_plan import workflow_plan_handlers, workflow_plan_resources
 
 
 def builtin_rule_resources():
     """All public builtin resources, registered once by the composition root."""
     rules, rulesets = builtin_effect_resources()
     project_rules, project_set = project_quality_resources()
-    return (*rules, *implementation_resources(), *project_rules, *workflow_topic_resources()), (*rulesets, project_set)
+    return (*rules, *implementation_resources(), *project_rules, *workflow_topic_resources(), *workflow_plan_resources()), (*rulesets, project_set)
 
 
 def builtin_declaration_origins():
@@ -25,6 +26,7 @@ def builtin_declaration_origins():
         (implementation_resources, implementation_resources()),
         (project_quality_resources, (*project_rules, project_set)),
         (workflow_topic_resources, workflow_topic_resources()),
+        (workflow_plan_resources, workflow_plan_resources()),
     ):
         origin = ResourceOrigin("vibeflow.core", str(inspect.getsourcefile(factory)),
             inspect.getsourcelines(factory)[1], symbol=factory.__qualname__)
@@ -33,4 +35,4 @@ def builtin_declaration_origins():
     return origins
 
 
-__all__ = ["builtin_effect_resources", "builtin_rule_resources", "implementation_handlers", "implementation_resources", "project_quality_handlers", "project_quality_resources", "project_quality_rule_defaults", "workflow_rule_checks", "workflow_topic_handlers", "workflow_topic_resources"]
+__all__ = ["builtin_effect_resources", "builtin_rule_resources", "implementation_handlers", "implementation_resources", "project_quality_handlers", "project_quality_resources", "project_quality_rule_defaults", "workflow_topic_handlers", "workflow_topic_resources"]

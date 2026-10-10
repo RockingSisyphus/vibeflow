@@ -4,7 +4,8 @@ from copy import deepcopy
 import pytest
 
 from vibeflow.core.flow import GraphConfigError
-from vibeflow.tooling.application.graph_defaults import with_workflow_rule_defaults
+from vibeflow.core.rules.planning import graph_rule_tasks
+from vibeflow.builtin import builtin_rule_resources
 from vibeflow.tooling.project.graph_config import parse_graph_config
 
 
@@ -21,8 +22,11 @@ def test_application_defaults_missing_root_imported_and_planned_scopes():
     document = graph_document()
     original = deepcopy(document)
     graph = parse_graph_config(document)
-    assert graph.rulesets == ("vibeflow.workflow",)
-    assert all(item.graph.rulesets == ("vibeflow.workflow",) for item in graph.nodesets.values())
+    assert graph.rulesets is None
+    assert all(item.graph.rulesets is None for item in graph.nodesets.values())
+    _, defaults = builtin_rule_resources()
+    tasks = graph_rule_tasks(graph, {item.id:item for item in defaults})
+    assert {task.reference for task in tasks} == {"vibeflow.workflow"}
     assert document == original
 
 
@@ -37,17 +41,13 @@ def test_application_preserves_explicit_empty_and_custom_selections():
     assert graph.nodesets["example.planned"].graph.rulesets == ()
 
 
-def test_defaults_recurse_only_through_known_definition_scopes():
+def test_rule_defaults_do_not_mutate_business_params():
     opaque = {"nodesets": [{"label": "ordinary user value"}]}
-    document = {"pipeline": {"nodes": [{"id": "node", "type_used": "example.node", "params": opaque}],
-                             "nodesets": [{"pipeline": {"nodesets": [{}]}}]}}
+    document = graph_document()
+    document["pipeline"]["nodes"][0]["payload"] = opaque
     original = deepcopy(document)
-    configured = with_workflow_rule_defaults(document)
-    nested = configured["pipeline"]["nodesets"][0]
-    assert nested["rulesets"] == ("vibeflow.workflow",)
-    assert nested["pipeline"]["nodesets"][0]["rulesets"] == ("vibeflow.workflow",)
-    assert configured["pipeline"]["nodes"][0]["params"] == opaque
-    assert "rulesets" not in configured["pipeline"]["nodes"][0]["params"]["nodesets"][0]
+    graph = parse_graph_config(document)
+    assert graph.nodes[0].params["payload"] == opaque
     assert document == original
 
 

@@ -115,17 +115,37 @@
     "entrypoints": {
       "type": "object",
       "properties": {
-        "import": {"$ref": "#/$defs/entrypoint"},
-        "static": {"$ref": "#/$defs/entrypoint"},
-        "run": {"$ref": "#/$defs/entrypoint"}
+        "import": {
+          "$ref": "#/$defs/entrypoint"
+        },
+        "static": {
+          "$ref": "#/$defs/entrypoint"
+        },
+        "run": {
+          "$ref": "#/$defs/entrypoint"
+        }
       },
       "additionalProperties": false
+    },
+    "workflow_default": {
+      "type": "boolean",
+      "default": false
+    },
+    "graph_scope": {
+      "enum": [
+        "current_graph",
+        "effective_subtree",
+        null
+      ]
     }
   },
   "$defs": {
     "entrypoint": {
       "type": "array",
-      "items": {"type": "string", "minLength": 1}
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     }
   },
   "additionalProperties": false

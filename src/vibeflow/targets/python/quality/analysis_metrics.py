@@ -75,13 +75,22 @@ class PythonSourceAnalysis:
                    and any((alias.asname or alias.name.split(".")[0]) in used for alias in item.names)]
         return ast.Module(body=[*imports, *nodes], type_ignores=[])
 
-    def _measure_file(self, source):
-        key = (source.path, source.text)
+    def _measure_file(self, source, *, local=False):
+        key = (source.path, source.text, local)
         if key not in self._file_metrics:
-            self._file_metrics[key] = measure_tree(source._tree, source.text)[0]
+            self._file_metrics[key] = measure_tree(source._tree, self._visible_text(source) if local else source.text)[0]
         return self._file_metrics[key]
 
+    @staticmethod
+    def _visible_text(source):
+        # Blank masking preserves locations, but is not part of a local implementation.
+        lines = tuple(line for line in source.text.splitlines() if line.strip())
+        return "\n".join(lines) + ("\n" if lines and source.text.endswith("\n") else "")
+
     def measurements(self, context):
+        if "node_source_context" in context.facts:
+            from dataclasses import replace
+            context = replace(context, facts={**context.facts, "source_context":context.facts["node_source_context"]})
         sources = context.facts.get("source_context")
         if sources is not None and sources._analysis is not self:
             return sources._analysis.measurements(context)
@@ -121,7 +130,8 @@ class PythonSourceAnalysis:
                 params=len(node.descriptor.contract.params_schema),
                 contract_keys=len(node.descriptor.contract.requires) + len(node.descriptor.contract.provides))
             from dataclasses import replace
-            metrics = replace(metrics,source_lines=len(source.text.splitlines()),source_bytes=len(source.text.encode()))
+            visible = self._visible_text(source)
+            metrics = replace(metrics,source_lines=len(visible.splitlines()),source_bytes=len(visible.encode()))
             implementation_paths = {item.path for item in sources.nodes}
             helper_paths = {item.path for item in sources.helpers(node.type_key)}
             helper_paths.update(item["path"] for item in context.facts.get("source_owners", ())
@@ -136,7 +146,7 @@ class PythonSourceAnalysis:
             graph = {file.module: dependencies(file.path) for file in helpers}
             graph["node"] = starts
             chain = analyze_call_graph(graph, entry="node") if starts else CallChain()
-            helper_metrics = tuple((file.path, self._measure_file(file)) for file in helpers)
+            helper_metrics = tuple((file.path, self._measure_file(file, local=True)) for file in helpers)
             self._cache[key] = SourceMeasurements(metrics, node.path, symbol.line, helper_metrics, chain, starts,
                 tuple(counter.function_names), counter.run_pure_fingerprint, counter.run_pure_shape)
         return self._cache[key]

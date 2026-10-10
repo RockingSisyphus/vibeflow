@@ -48,7 +48,7 @@ def test_external_composite_loop_and_planned_styles_match_canonical_facts():
     assert python_nodes["external"]["values"]["fill"] != python_nodes["block"]["values"]["fill"]
     assert python["rulesets"] == javascript["rulesets"] == []
     assert document["nodesets"]["body"]["effect_scope"] == "unconstrained"
-    assert document["nodesets"]["body"]["rulesets"] == ["vibeflow.workflow"]
+    assert document["nodesets"]["body"]["rulesets"] is None
     assert document["nodesets"]["design"]["effect_scope"] == "unavailable"
     assert document["node_types"]["vibeflow.loop.while"]["info"]["effect_scope"] == "unconstrained"
     assert {item["id"]: item["effect_scope"] for item in python["nodes"]} == {item["id"]: item["effect_scope"] for item in javascript["nodes"]}

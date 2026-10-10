@@ -37,6 +37,7 @@ class CleanerDiscoveryTests(unittest.TestCase):
         self.mkdir("sandbox/javascript/integration/build")
         self.mkdir("sandbox/python/integration/reports")
         self.mkdir("some-package.egg-info")
+        self.mkdir("outputs/test-audit")
         self.mkdir(".agents")
         (self.root / "old-release.zip").write_bytes(b"zip")
 
@@ -48,6 +49,7 @@ class CleanerDiscoveryTests(unittest.TestCase):
         self.assertIn("sandbox/javascript/integration/build", subjects)
         self.assertIn("sandbox/python/integration/reports", subjects)
         self.assertIn("some-package.egg-info", subjects)
+        self.assertIn("outputs", subjects)
         self.assertIn(".agents", subjects)
         self.assertIn("old-release.zip", subjects)
 

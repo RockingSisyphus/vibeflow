@@ -3,6 +3,8 @@
 This sandbox exercises the JavaScript/TypeScript AOT project format without
 containing host-specific integration code.
 
+The runner now includes the independent [comprehensive math application](../comprehensive_math/README.md), which replaces ten overlapping runtime tasks below. It runs the formula in Node.js and a real browser, with plugin-defined source rules, expected warnings and source-repair controls. The original positive config fixtures remain where pytest preparation, profile, ABI or review checks still use them. See the [retirement map](../../../docs/maintainers/history/audits/comprehensive-sandbox-20261009.md).
+
 Positive workflows:
 
 - `project/configs/linear.jsonc` computes `(x + a) - b` with two TypeScript
@@ -101,7 +103,7 @@ python run.py build --config javascript_project/configs/linear.jsonc \
   --target node --profile single-esm --out-dir output/javascript
 ```
 
-The complete 67-case integration runner, including its browser installation,
+The complete 48-case integration runner, including its browser installation,
 remains in this source repository.  The release example keeps its own locked
 TypeScript/esbuild toolchain and does not share dependencies with the Python
 example root.
@@ -114,3 +116,11 @@ positive and negative fixtures through VibeFlow's normal build API. The
 module does not auto-run `runWorkflow()`. Reports are temporary by default;
 with `--keep-artifacts`, stable JSON and Markdown summaries are written under
 `.artifacts/reports/`.
+
+## Additional simple arithmetic scenarios
+
+The runner now registers 48 tasks. `math:plugin-addition` checks multi-file resources, compile/runtime hooks, synchronous repeated calls, local overrides, and a real helper edit/restore (`5→6→5`). `math:async-addition` holds two per-invocation Capability requests, checks `5/30` and separate traces, then checks permanent Port receive/send and Host cleanup. Its browser ESM build is checked; the existing real-browser Host/profile tasks remain independent.
+
+These replace seven previous normal tasks. See [the complete replacement table](../../../docs/maintainers/history/audits/addition-sandboxes-20261009.md). Error, cancellation, detached, taskplan, type and browser regressions remain registered.
+
+The independent [workflow_math](../workflow_math/README.md) replaces six nested Nodeset, loop, route and execution metadata tasks. Eight observation groups use small integer formulas, including a two-level +1 loop and a shared build across full/boundary/off trace. Original fixtures still used by pytest and architecture review remain. See the [migration and validation record](../../../docs/maintainers/history/audits/workflow-math-20261010.md).

@@ -14,10 +14,14 @@ from vibeflow.targets.python.sdk import rule, ruleset, RuleCall
 from vibeflow.core.rules import RuleResult
 seen = []
 def record(context, kind):
-    seen.append((context.facts["source_context"], context.facts["node_catalog"], kind))
+    sources = context.facts["source_context"]
+    assert len(sources.nodes) == 1
+    assert sources.nodes[0].type_key == context.subject["descriptor"].type_key
+    assert "node_catalog" not in context.facts
+    seen.append((sources, context.subject["descriptor"], kind))
     Path(__file__).with_name("identity.json").write_text(json.dumps({
         "checks": len(seen), "sources": len({id(item[0]) for item in seen}),
-        "catalogs": len({id(item[1]) for item in seen}),
+        "descriptors": len({id(item[1]) for item in seen}),
         "call_checks": sum(item[2] == "call" for item in seen),
         "source_checks": sum(item[2] == "source" for item in seen),
     }))
@@ -73,7 +77,7 @@ def observe(work):
     identity_path = root / "identity.json"
     identity = json.loads(identity_path.read_text()) if identity_path.exists() else {}
     matched = validation["exit_code"] == 0 and identity == {
-        "checks":24,"sources":1,"catalogs":1,"call_checks":12,"source_checks":12}
+        "checks":24,"sources":12,"descriptors":12,"call_checks":12,"source_checks":12}
     return {"schema":"vibeflow.context-reuse-cli.v1", "matched":matched,
             "identity":identity, "validate":validation}
 

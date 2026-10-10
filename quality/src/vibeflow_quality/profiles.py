@@ -61,6 +61,7 @@ _GENERATED_ROOT_NAMES = frozenset(
         ".pytest_cache",
         "build",
         "output",
+        "outputs",
         "reports",
         "review_artifacts",
         "runs",
@@ -83,6 +84,11 @@ _DOCUMENTATION_ROOTS = (
     "quality/README.md",
     "sandbox",
 )
+
+_AUDIT_GENERATED_NAMES = frozenset({
+    "case-index.json", "sandbox-index.json", "fixture-spec-index.json",
+    "source-manifest.json", "pytest-collection.txt", "归档校验.json",
+})
 
 _REMOVED_DOCUMENT_TOKENS = (
     "11_训练性能导向内核改进计划.md",
@@ -422,6 +428,10 @@ def _directory_role_findings(root: Path) -> list[Finding]:
                          and (path.suffix in {".log", ".zip", ".whl", ".gz", ".py", ".ts", ".mjs", ".patch"}
                               or path.name in {"before.json", "after.json", "report.json", "verification.json", "observations.json"}
                               or path.name.endswith(("-report.json", "-verification.json", "-observations.json"))))
+        misplaced.extend(path for path in docs.rglob("*") if path.is_file()
+                         and (path.name in _AUDIT_GENERATED_NAMES
+                              or (path.name.startswith("sandbox-task-inventory") and path.suffix == ".json")
+                              or re.fullmatch(r"workflow-math-retired-\d{8}\.json", path.name)))
     for relative in ("docs/user", "docs/overview.md"):
         path = root / relative
         if path.exists():

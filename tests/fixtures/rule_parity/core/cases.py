@@ -488,7 +488,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         from vibeflow.core.rules import compile_ruleset
         from vibeflow.builtin import builtin_rule_resources
         rules,sets=builtin_rule_resources()
-        for selected,phase,count in [("vibeflow.workflow","import",0),("vibeflow.workflow","static",1),("vibeflow.workflow","run",1),
+        for selected,phase,count in [("vibeflow.workflow","import",0),("vibeflow.workflow","static",8),("vibeflow.workflow","run",8),
             ("vibeflow.quality.project","import",0),("vibeflow.quality.project","static",4),("vibeflow.quality.project","run",0),
             ("vibeflow.process","import",1),("vibeflow.process","static",5),("vibeflow.process","run",5)]:
             def inspect_plan(selected=selected,phase=phase):

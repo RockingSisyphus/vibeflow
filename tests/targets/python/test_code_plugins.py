@@ -104,7 +104,8 @@ class Demo:
 @rule(id="demo.check")
 def check(context,inputs,params):
     print("rule execution")
-    assert context.facts["plugins"]["demo"]["value"] == 1
+    assert context.subject["descriptor"].type_key == "demo"
+    assert "plugins" not in context.facts
     return RuleResult()
 rules=ruleset(id="demo.rules",calls=[{"id":"check","rule_id":"demo.check"}])
 plugin=Plugin(id="demo",resources=[Start,Demo,check,rules],config_defaults={"value":1})

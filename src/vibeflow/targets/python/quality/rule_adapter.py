@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, fields, replace
-import json
 from typing import Mapping
 
 from vibeflow.core.findings import Finding, HealthFinding
 from vibeflow.core.rules import EFFECT_POLICY_TYPE, RuleContext, RuleGraphError, compile_ruleset, execute_rule_plan, rule_graph_error_finding
 from vibeflow.targets.python.quality.policy_parameters import complete_source_policy_plan, native_rule_bindings, native_rule_origins
+from vibeflow.core.rules.selection import resolve_node_selection
+from vibeflow.targets.python.quality.node_context import local_sources, node_context, bind_native_analysis, native_analysis_identity
 from vibeflow.core.rules.fingerprint import record_inputs_fingerprint, value_fingerprint
 
 
@@ -21,6 +22,7 @@ class PythonRuleReport:
     call_effect_scopes: Mapping[tuple[str,str],str] = field(default_factory=dict)
     call_effect_policies: Mapping[tuple[str,str],tuple[Mapping[str,object],...]] = field(default_factory=dict)
     call_node_metrics: Mapping[tuple[str,str],Mapping[str,object]] = field(default_factory=dict)
+    selections: tuple[Mapping[str,object], ...] = ()
 
 
 def rule_resources(registry, *, purity_policy=None, quality_policy=None):
@@ -104,6 +106,12 @@ def execute_python_node_rules(registry, source_context, *, phase="static", purit
 
 def review_python_node_binding(registry, source_context, type_key, *, purity_policy=None, quality_policy=None):
     """Review a pending binding using the command's complete source fact view."""
+    from vibeflow.targets.python.project.check_session import current_python_check
+    session = current_python_check(registry)
+    cached = session.node_import_results.get(type_key) if session is not None else None
+    from vibeflow.targets.python.project.check_session import catalog_key
+    if cached is not None and cached[0] == (session.snapshot(source_context), catalog_key(registry)):
+        return cached[1]
     return _execute_python_node_rules(registry, source_context, phase="import", purity_policy=purity_policy,
         quality_policy=quality_policy, selected_types=(type_key,))
 
@@ -116,13 +124,20 @@ def _execute_python_node_rules(registry, source_context, *, phase="static", puri
     except RuleGraphError as exc:
         finding = graph_error_finding(registry,exc,object_type="rule",object_id=str(exc.details.get("resource_id","")))
         return PythonRuleReport(findings=(finding,),effect_scopes={node.type_key:"unavailable" for node in source_context.nodes})
+    syntax = tuple(HealthFinding(rule_id="QUALITY.SYNTAX.PYTHON", severity="error", object_type="file",
+        object_id=source.path, message=source.parse_error, source_location={"path":source.path,
+            "line":source.parse_line, "column":source.parse_column}, failure_layer="implementation")
+        for source in source_context.files if source.parse_error)
+    if syntax:
+        return PythonRuleReport(findings=syntax)
     handlers = dict(extra_handlers or {})
     custom = getattr(registry, "rule_handler_loader", None)
     findings = []
-    seen_diagnostics = set()
+    seen_diagnostics = {}
     executions = []
     metrics = {}
     call_metrics = {}
+    selections = []
     scopes = {}
     policy_scopes = {}
     call_policy_scopes = {}
@@ -132,7 +147,7 @@ def _execute_python_node_rules(registry, source_context, *, phase="static", puri
     from vibeflow.targets.python.project.check_session import current_python_check, PythonCheckSession
     session = current_python_check(registry) or PythonCheckSession()
     view = session.view(registry, source_context, extra_facts=extra_facts)
-    source_cache = view.source_cache(phase)
+    source_cache = session.source_caches.setdefault(phase, {})
     project_fact_cache = view.project_facts
     from vibeflow.targets.python.quality.project_context import project_rule_facts
     if phase in {"static","run"}:
@@ -142,41 +157,63 @@ def _execute_python_node_rules(registry, source_context, *, phase="static", puri
     for node in source_context.nodes:
         if selected_types is not None and node.type_key not in selected_types:
             continue
-        for selected_id in registry.rulesets(node.type_key):
-            try:
-                plan = session.plan(selected_id, rules, rulesets, phase)
-            except RuleGraphError as exc:
-                findings.append(graph_error_finding(registry,exc,object_type="node",object_id=node.type_key,
-                    fallback_path=registry.source_info(node.type_key).path))
-                unavailable_types.add(node.type_key)
-                continue
-            if not plan.invocations:
-                continue
-            if callable(custom):
+        local = None
+        for owner, call_id in node.calls or (("source", node.type_key),):
+            call = source_context.call(owner, call_id)
+            selection = resolve_node_selection(node.descriptor, call)
+            selections.append({"kind":"node", "type_key":node.type_key, "owner":owner, "call_path":call.call_path if call is not None else (), "selection":selection.to_dict()})
+            call_policy_scopes.setdefault((owner, call_id), set())
+            for selected_id in selection.references:
                 try:
-                    handlers.update(custom(plan))
-                except Exception as exc:
-                    failure = getattr(exc,"findings",())
-                    if not failure:
-                        failure = (HealthFinding(rule_id="RULE.IMPLEMENTATION.LOAD",severity="error",object_type="node",
-                            object_id=node.type_key,message=str(exc),failure_layer="rule",
-                            source_location={"path":registry.source_info(node.type_key).path,"line":1,"column":1}),)
-                    findings.extend(failure)
+                    plan = session.plan(selected_id, rules, rulesets, phase)
+                except RuleGraphError as exc:
+                    findings.append(graph_error_finding(registry,exc,object_type="node",object_id=node.type_key,
+                        fallback_path=registry.source_info(node.type_key).path))
                     unavailable_types.add(node.type_key)
                     continue
-            plan = complete_source_policy_plan(plan, purity_policy, handlers=handlers)
-            implementation_identity = session.implementation_identity(plan,handlers)
-            identity = ("python",node.path,node.symbol,json.dumps(node.descriptor.to_dict(),sort_keys=True),
-                        view.snapshot,view.token,implementation_identity)
-            updates = {"source_load_states":getattr(registry, "source_load_states", {}),
-                **project_rule_facts(plan,source_context,project_fact_cache,handlers=handlers)}
-            node_context = replace(base_context, facts={**base_context.facts,
-                **{key:value for key,value in updates.items() if key not in (extra_facts or {})}})
-            for owner, call_id in node.calls or (("source",node.type_key),):
-                context = replace(node_context, facts={**node_context.facts,"call":source_context.call(owner,call_id)},subject={"type_key":node.type_key,"kind":"node","descriptor":node.descriptor,
-                    "source_identity":identity,"calls":node.calls,"owner":owner,"call_id":call_id},
-                    scope={**node_context.scope,"workflow":owner})
-                result = execute_rule_plan(plan,context,handlers=handlers,source_cache=source_cache)
+                if not plan.invocations:
+                    continue
+                if callable(custom):
+                    try:
+                        handlers.update(custom(plan))
+                    except Exception as exc:
+                        failure = getattr(exc,"findings",())
+                        if not failure:
+                            failure = (HealthFinding(rule_id="RULE.IMPLEMENTATION.LOAD",severity="error",object_type="node",
+                                object_id=node.type_key,message=str(exc),failure_layer="rule",
+                                source_location={"path":registry.source_info(node.type_key).path,"line":1,"column":1}),)
+                        findings.extend(failure)
+                        unavailable_types.add(node.type_key)
+                        continue
+                plan = complete_source_policy_plan(plan, purity_policy, handlers=handlers)
+                implementation_identity = session.implementation_identity(plan,handlers)
+                if plan.graph_scope == "effective_subtree":
+                    findings.append(HealthFinding(rule_id="RULE.GRAPH_SCOPE.NODE", severity="error", object_type="node",
+                        object_id=node.type_key, message="Node selections cannot use an effective_subtree Ruleset", failure_layer="rule"))
+                    unavailable_types.add(node.type_key)
+                    continue
+                if local is None:
+                    local = local_sources(source_context, node)
+                identity = ("python", node.path, node.symbol, node.descriptor.to_dict(),
+                            session.snapshot(local), implementation_identity)
+                updates = {"source_load_states":getattr(registry, "source_load_states", {}),
+                    **project_rule_facts(plan,source_context,project_fact_cache,handlers=handlers)}
+                private_context = replace(base_context, facts={**base_context.facts,
+                    **{key:value for key,value in updates.items() if key not in (extra_facts or {})}})
+                private_context = replace(private_context, facts={**private_context.facts, "call":call, "node_source_context":local},
+                    subject={"type_key":node.type_key,"kind":"node","descriptor":node.descriptor,
+                             "source_identity":identity,"owner":owner,"call_id":call_id})
+                context = node_context(source_context, node, call, phase=phase, identity=identity,
+                    extra_facts=project_rule_facts(plan, local, {}, handlers=handlers), local=local)
+                native = native_rule_bindings(registry, rules)
+                origins = native_rule_origins(registry)
+                native = {key:value for key,value in native.items()
+                          if getattr(origins.get(("rules", key)), "plugin_id", "") == "vibeflow.core"}
+                context = replace(context, subject={**context.subject, "source_cache_identities":{key:(identity, native_analysis_identity(source_context, node, private_context.facts)) for key in native if callable(native[key])}})
+                public_handlers = bind_native_analysis(handlers, native, private_context)
+                result = execute_rule_plan(plan,context,handlers=public_handlers,source_cache=source_cache)
+                result = replace(result, selection=selection.to_dict(),
+                    scope={"kind":"node", "call_path": call.call_path if call is not None else ()})
                 executions.append(result)
                 # Core suppresses duplicate top-level findings on cache hits.
                 # A new adapter/binding still needs the actual cached diagnostics.
@@ -184,7 +221,7 @@ def _execute_python_node_rules(registry, source_context, *, phase="static", puri
                 for invocation_id,item in diagnostics:
                     invocation = next(value for value in plan.invocations if value.id == invocation_id)
                     definition = invocation.rule
-                    association = node.calls if definition is not None and definition.scope == "source" else ((owner,call_id),)
+                    association = ((owner,call_id),)
                     inputs = {name:result.results[provider].records[output]
                               for name,(provider,output) in invocation.inputs.items()
                               if output in result.results[provider].records}
@@ -192,14 +229,21 @@ def _execute_python_node_rules(registry, source_context, *, phase="static", puri
                     effective_call = value_fingerprint((definition.id,invocation.params,inputs_key))
                     if definition.scope != "source" or inputs_key is None:
                         effective_call += value_fingerprint((selected_id,owner,call_id,invocation_id))
-                    diagnostic_key = node.type_key, association, effective_call, value_fingerprint({field.name:getattr(item,field.name) for field in fields(item)})
+                    diagnostic_key = node.type_key, (association if definition.scope != "source" else ()), effective_call, value_fingerprint({field.name:getattr(item,field.name) for field in fields(item)})
                     if diagnostic_key in seen_diagnostics:
+                        index = seen_diagnostics[diagnostic_key]
+                        previous = findings[index]
+                        calls = list(previous.details.get("calls", ()))
+                        related = {"owner": owner, "node": call_id}
+                        if related not in calls:
+                            calls.append(related)
+                        findings[index] = replace(previous, details={**previous.details, "calls": calls})
                         continue
-                    seen_diagnostics.add(diagnostic_key)
+                    seen_diagnostics[diagnostic_key] = len(findings)
                     location = str(item.source_location.get("path",node.path))
                     source = next((file for file in source_context.files if file.path == location),None)
                     findings.append(replace(item,details={**item.details,"node_type":node.type_key,
-                        "calls":item.details.get("calls",[{"owner":scope,"node":call} for scope,call in association])},
+                        "calls":[{"owner":scope,"node":call} for scope,call in association]},
                         root_id=item.root_id or (source.root_id if source else node.root_id),source_path=item.source_path or location))
                 for invocation_id,item in result.results.items():
                     if item.state != "completed" and not any(finding.severity == "error" for finding in item.findings):
@@ -222,13 +266,22 @@ def _execute_python_node_rules(registry, source_context, *, phase="static", puri
                                     call_scoped_types.add(node.type_key)
                                 call = source_context.call(owner,call_id)
                                 call_policies.setdefault((owner,call_id),[]).append({"definition_id":invocation.rule.id,
-                                    "ruleset_id":selected_id,"rule_call_id":invocation_id,"scope":invocation.rule.scope,
+                                    "ruleset_id":selected_id if isinstance(selected_id, str) else "rule:"+selected_id.rule_id,"rule_call_id":invocation_id,"scope":invocation.rule.scope,
                                     "value":plain(record.value),"call_path":call.call_path if call is not None else ()})
         selected_scopes = policy_scopes.get(node.type_key,set())
+        actual_scopes = {next(iter(value)) if len(value) == 1 else "mixed" if value else "unconstrained"
+            for key,value in call_policy_scopes.items() if key in set(node.calls or (("source",node.type_key),))}
+        if len(actual_scopes) > 1:
+            selected_scopes = actual_scopes
         scopes[node.type_key] = "unavailable" if node.type_key in unavailable_types else "mixed" if node.type_key in call_scoped_types else next(iter(selected_scopes)) if len(selected_scopes) == 1 else "mixed" if selected_scopes else "unconstrained"
         if phase in {"static","run"}:
             registry.record_effect_policy(node.type_key,scopes[node.type_key])
-    call_scopes = {key:next(iter(value)) if len(value) == 1 else "mixed" for key,value in call_policy_scopes.items()}
+    call_scopes = {key:next(iter(value)) if len(value) == 1 else "mixed" if value else "unconstrained" for key,value in call_policy_scopes.items()}
+    if phase in {"static", "run"}:
+        session.call_effect_scopes.update(call_scopes)
+        session.call_metrics.update(call_metrics)
+        registry.call_effect_scopes.update({call.call_path: call_scopes[(call.owner, call.node_id)]
+            for call in source_context.calls if (call.owner, call.node_id) in call_scopes})
     from vibeflow.targets.python.project.resource_rules import review_reached_base_libs
     entries = ()
     if selected_types is not None:
@@ -240,6 +293,13 @@ def _execute_python_node_rules(registry, source_context, *, phase="static", puri
         handlers=handlers,phase=phase,purity_policy=purity_policy,session=session,entry_paths=entries)
     findings.extend(library_findings)
     executions.extend(library_executions)
-    return PythonRuleReport(tuple(findings),tuple(executions),metrics,scopes,call_scopes,{key:tuple(value) for key,value in call_policies.items()},call_metrics)
+    report = PythonRuleReport(tuple(findings),tuple(executions),metrics,scopes,call_scopes,{key:tuple(value) for key,value in call_policies.items()},call_metrics, tuple(selections))
+    if phase == "import" and not any(item.severity == "error" for item in findings):
+        for node in source_context.nodes:
+            if selected_types is None or node.type_key in selected_types:
+                related = tuple(item for item in findings if item.details.get("node_type", item.subject_id) == node.type_key)
+                from vibeflow.targets.python.project.check_session import catalog_key
+                session.node_import_results[node.type_key] = ((session.snapshot(source_context), catalog_key(registry)), replace(report, findings=related))
+    return report
 
 __all__ = ["PythonRuleReport","execute_python_node_rules","rule_resources","selected_effect_scope"]

@@ -61,7 +61,7 @@ def parse_graph_config_data(
         root_path=actual_root_path,
         source_path=actual_source_path,
     )
-    return replace(graph, rulesets=_parse_rulesets(config.get("rulesets", ())))
+    return replace(graph, rulesets=_parse_rulesets(config.get("rulesets"), explicit="rulesets" in config))
 
 
 def _parse_graph_body(
@@ -121,7 +121,7 @@ def _parse_graph_body(
         root_path=root_path,
         source_path=source_path,
         execution_lock=execution_lock,
-        rulesets=_parse_rulesets(raw.get("rulesets", ())),
+        rulesets=_parse_rulesets(raw.get("rulesets"), explicit="rulesets" in raw),
     )
 
 
@@ -193,9 +193,10 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         item.get("execution_lock"),
         field=f"pipeline.nodes[{index}].execution_lock",
     )
-    reserved = {"id", "type_used", "requires", "provides", "config", "node_configs", "allow_config_override", "override_child_config", "status", "flow_kind", "planned_behavior", "async", "result_key", "execution_lock", "display_name", "description", "style", "similar_to", "join_policy", "loop", "io"}
+    reserved = {"rulesets", "id", "type_used", "requires", "provides", "config", "node_configs", "allow_config_override", "override_child_config", "status", "flow_kind", "planned_behavior", "async", "result_key", "execution_lock", "display_name", "description", "style", "similar_to", "join_policy", "loop", "io"}
     return NodeSpec(
         id=node_id,
+        rulesets=_parse_rulesets(item.get("rulesets"), explicit="rulesets" in item),
         type_used=type_used,
         requires=requires,
         provides=provides,
@@ -344,7 +345,7 @@ def _parse_nodesets(value: Any, *, project_root: str = "", root_id: str = "", ro
                 root_path=nodeset_root_path,
                 source_path=nodeset_source_path,
             )
-        graph = replace(graph, rulesets=_parse_rulesets(item.get("rulesets", ())))
+        graph = replace(graph, rulesets=_parse_rulesets(item.get("rulesets"), explicit="rulesets" in item))
         out[type_key] = NodesetSpec(
             type_key=type_key,
             display_name=str(item["display_name"]).strip(),
@@ -364,12 +365,14 @@ def _parse_nodesets(value: Any, *, project_root: str = "", root_id: str = "", ro
     return out
 
 
-def _parse_rulesets(value: object) -> tuple[str, ...]:
-    if isinstance(value, str) or not isinstance(value, (list, tuple)) or not all(isinstance(item, str) and item.strip() for item in value):
-        raise GraphConfigError("rulesets must be a list of non-empty rule set IDs")
-    if len(set(value)) != len(value):
-        raise GraphConfigError("rulesets contains duplicate IDs")
-    return tuple(value)
+def _parse_rulesets(value, *, explicit=False):
+    if value is None and explicit:
+        raise GraphConfigError("rulesets must be a list, not null")
+    from vibeflow.core.rules.selection.models import selection_refs
+    try:
+        return selection_refs(value, optional=True)
+    except ValueError as exc:
+        raise GraphConfigError(str(exc)) from exc
 
 
 def _parse_nodeset_requirements(value: Any, *, field: str) -> tuple[DataRequirement, ...]:

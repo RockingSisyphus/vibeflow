@@ -1,0 +1,103 @@
+{
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "a",
+        "type": "a",
+        "display_name": "a",
+        "required": true
+      },
+      {
+        "key": "b",
+        "type": "b",
+        "display_name": "b",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "piecewise.boundary",
+        "display_name": "start",
+        "description": "start"
+      },
+      {
+        "id": "u",
+        "type_used": "piecewise.sum_u",
+        "display_name": "u",
+        "description": "u"
+      },
+      {
+        "id": "left",
+        "type_used": "piecewise.left",
+        "display_name": "left",
+        "description": "left"
+      },
+      {
+        "id": "finish",
+        "type_used": "piecewise.finish",
+        "display_name": "finish",
+        "description": "finish"
+      },
+      {
+        "id": "end",
+        "type_used": "piecewise.boundary",
+        "display_name": "end",
+        "description": "end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "u"
+      },
+      {
+        "from": "u",
+        "to": "left"
+      },
+      {
+        "from": "left",
+        "to": "finish"
+      },
+      {
+        "from": "finish",
+        "to": "end"
+      },
+      {
+        "from": "u",
+        "to": "finish"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "result",
+        "display_name": "result",
+        "cardinality": "exactly_one"
+      },
+      {
+        "type": "u",
+        "display_name": "u",
+        "cardinality": "exactly_one"
+      },
+      {
+        "type": "selected_w",
+        "display_name": "selected_w",
+        "cardinality": "optional_one"
+      },
+      {
+        "type": "selected.key",
+        "display_name": "selected.key",
+        "cardinality": "exactly_one"
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
+}

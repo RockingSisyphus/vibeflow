@@ -1,0 +1,8 @@
+{
+  "roots": [
+    {
+      "id": "plugin_addition",
+      "path": "project"
+    }
+  ]
+}

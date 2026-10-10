@@ -43,8 +43,8 @@ def _duplicates(context, inputs, params):
 
 
 def _planned(context, inputs, params):
-    from vibeflow.core.quality.workflow_rules.planned import _planned_health_facts
-    events = _planned_health_facts(context.require("graph"))
+    from vibeflow.core.quality.workflow_rules.planned import current_graph_planned_events
+    events = current_graph_planned_events(context.require("graph"), owner=context.facts.get("owner", "pipeline"), definition=context.facts.get("definition"))
     return RuleResult({"events": RuleRecord("vibeflow.planned_events.v1", events)},
                       tuple(item for item in events if isinstance(item, Finding)))
 
@@ -64,32 +64,11 @@ def workflow_topic_handlers():
             "vibeflow.graph.duplicates": _duplicates, "vibeflow.graph.planned": _planned}
 
 
-def workflow_rule_checks(context, inputs, params):
-    """Default workflow checker; replacements can choose another callable."""
-    findings = []
-    for checker in (_flow, _join, _nodesets):
-        findings.extend(checker(context, inputs, params).findings)
-    if "fingerprints" in context.facts and "node_metrics" in context.facts:
-        findings.extend(_duplicates(context, inputs, params).findings)
-    planned = _planned(context, inputs, params)
-    findings.extend(planned.findings)
-    return RuleResult({"planned_events": planned.records["events"],
-                       "workflow_review": RuleRecord("vibeflow.workflow_review.v1", {"mainline": {}})}, tuple(findings))
-
-
-__all__ = ["workflow_rule_checks", "workflow_topic_handlers", "workflow_topic_resources"]
-
-
-def default_workflow_rulesets():
-    """Standard workflow selection applied only at the composition boundary."""
-    return ("vibeflow.workflow",)
-
-
 def bound_workflow_depth_defaults(handlers, depth, *, rules, origins):
     """Apply project depth configuration to the actual standard consumers."""
-    from vibeflow.builtin.effects import builtin_effect_resources
+    from vibeflow.builtin.workflow_plan import nodesets, workflow_plan_resources
     from vibeflow.builtin.plugin import configured_rule_defaults
-    consumers = ((_nodesets, workflow_topic_resources), (workflow_rule_checks, builtin_effect_resources))
+    consumers = ((_nodesets, workflow_topic_resources), (nodesets, workflow_plan_resources))
     result = {}
     for resource_id, handler in handlers.items():
         check = unwrap(handler) if handler is not None else None

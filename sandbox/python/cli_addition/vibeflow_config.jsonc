@@ -1,0 +1,8 @@
+{
+  "roots": [
+    {
+      "id": "cli_addition",
+      "path": "project"
+    }
+  ]
+}

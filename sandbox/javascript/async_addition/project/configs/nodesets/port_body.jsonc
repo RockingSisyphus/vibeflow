@@ -1,0 +1,104 @@
+{
+  "type_key": "addition.port_body",
+  "display_name": "Port addition",
+  "description": "Receive a pair, add, send",
+  "requires": [],
+  "provides": [],
+  "pipeline": {
+    "inputs": [],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "addition.boundary",
+        "display_name": "start",
+        "description": "start"
+      },
+      {
+        "id": "receive",
+        "type_used": "vibeflow.io",
+        "display_name": "receive",
+        "description": "receive",
+        "requires": [],
+        "provides": [
+          {
+            "key": "pair",
+            "type": "addition.pair",
+            "display_name": "pair"
+          }
+        ],
+        "io": {
+          "operation": "receive",
+          "port": "addition.in"
+        }
+      },
+      {
+        "id": "unpack",
+        "type_used": "addition.unpack",
+        "display_name": "unpack",
+        "description": "unpack"
+      },
+      {
+        "id": "add",
+        "type_used": "addition.add",
+        "display_name": "add",
+        "description": "add"
+      },
+      {
+        "id": "send",
+        "type_used": "vibeflow.io",
+        "display_name": "send",
+        "description": "send",
+        "requires": [
+          {
+            "type": "addition.result",
+            "cardinality": "exactly_one",
+            "display_name": "addition.result"
+          }
+        ],
+        "provides": [],
+        "io": {
+          "operation": "send",
+          "port": "addition.out"
+        }
+      },
+      {
+        "id": "end",
+        "type_used": "addition.boundary",
+        "display_name": "end",
+        "description": "end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "receive"
+      },
+      {
+        "from": "receive",
+        "to": "unpack"
+      },
+      {
+        "from": "unpack",
+        "to": "add"
+      },
+      {
+        "from": "add",
+        "to": "send"
+      },
+      {
+        "from": "send",
+        "to": "end"
+      }
+    ],
+    "outputs": []
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
+}

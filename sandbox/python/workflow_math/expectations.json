@@ -1,0 +1,272 @@
+[
+  {
+    "config": "retry",
+    "initial": {
+      "loop.current": 1
+    },
+    "expected_outputs": {
+      "loop.next": 7,
+      "loop.done": true,
+      "loop.iterations": 3
+    },
+    "expected_runtime_exec_order": [
+      "start",
+      "retry_loop",
+      "end"
+    ],
+    "expected_trace_kind_counts": {
+      "loop_enter": 1,
+      "loop_exit": 1,
+      "loop_iteration": 3
+    },
+    "expected_trace_summary": {
+      "current_node": "end",
+      "node_runs": {
+        "start": 1,
+        "retry_loop": 1,
+        "end": 1
+      },
+      "step_count": 3,
+      "total_step_count": 15,
+      "stop_reason": "completed"
+    },
+    "expected_qualified_exec_contains": [
+      "retry_loop.iter_2.increment",
+      "retry_loop.iter_2.done"
+    ],
+    "expected_svg_text_contains": [
+      "Retry Loop",
+      "vibeflow.loop.while",
+      "stop_when"
+    ]
+  },
+  {
+    "config": "retry",
+    "initial": {
+      "loop.current": 1
+    },
+    "runtime_options": {
+      "trace": "full",
+      "execution": "compiled"
+    },
+    "expected_outputs": {
+      "loop.next": 7,
+      "loop.done": true,
+      "loop.iterations": 3
+    },
+    "expected_trace_kind_counts": {
+      "loop_block_enter": 1,
+      "loop_block_exit": 1,
+      "loop_iteration": 3
+    },
+    "expected_qualified_exec_contains": [
+      "retry_loop.iter_2.increment",
+      "retry_loop.iter_2.done"
+    ]
+  },
+  {
+    "config": "wrapped_retry",
+    "initial": {
+      "loop.current": 1
+    },
+    "expected_outputs": {
+      "loop.next": 7,
+      "loop.done": true,
+      "loop.iterations": 3
+    },
+    "expected_runtime_exec_order": [
+      "start",
+      "wrapper",
+      "end"
+    ],
+    "expected_qualified_exec_contains": [
+      "wrapper.inner_loop.iter_2.increment",
+      "wrapper.inner_loop.iter_2.done"
+    ]
+  },
+  {
+    "config": "outer_fixed",
+    "initial": {},
+    "expected_outputs": {
+      "total.final": 6,
+      "outer.final": 3,
+      "outer.done": false,
+      "outer.iterations": 3,
+      "inner.iterations.history": [
+        2,
+        2,
+        2
+      ]
+    },
+    "expected_runtime_exec_order": [
+      "start",
+      "seed",
+      "outer_loop",
+      "end"
+    ],
+    "expected_qualified_exec_contains": [
+      "outer_loop.iter_2.inner_loop.iter_1.accumulate",
+      "outer_loop.iter_2.advance_outer"
+    ]
+  },
+  {
+    "config": "outer_fixed",
+    "initial": {},
+    "runtime_options": {
+      "trace": "full",
+      "execution": "block"
+    },
+    "expected_outputs": {
+      "total.final": 6,
+      "outer.final": 3,
+      "outer.done": false,
+      "outer.iterations": 3,
+      "inner.iterations.history": [
+        2,
+        2,
+        2
+      ]
+    },
+    "expected_trace_kind_counts": {
+      "loop_block_enter": 4,
+      "loop_block_exit": 4,
+      "loop_iteration": 9
+    },
+    "expected_qualified_exec_contains": [
+      "outer_loop.iter_2.inner_loop.iter_1.accumulate"
+    ]
+  },
+  {
+    "config": "outer_condition",
+    "initial": {},
+    "expected_outputs": {
+      "total.final": 6,
+      "outer.final": 2,
+      "outer.done": true,
+      "outer.iterations": 2,
+      "inner.iterations.history": [
+        3,
+        3
+      ]
+    },
+    "expected_runtime_exec_order": [
+      "start",
+      "seed",
+      "outer_loop",
+      "end"
+    ],
+    "expected_qualified_exec_contains": [
+      "outer_loop.iter_1.inner_loop.iter_2.accumulate",
+      "outer_loop.iter_1.advance_outer"
+    ]
+  },
+  {
+    "config": "outer_condition",
+    "initial": {},
+    "runtime_options": {
+      "trace": "full",
+      "execution": "compiled"
+    },
+    "expected_outputs": {
+      "total.final": 6,
+      "outer.final": 2,
+      "outer.done": true,
+      "outer.iterations": 2,
+      "inner.iterations.history": [
+        3,
+        3
+      ]
+    },
+    "expected_trace_kind_counts": {
+      "loop_block_enter": 3,
+      "loop_block_exit": 3,
+      "loop_iteration": 8
+    },
+    "expected_qualified_exec_contains": [
+      "outer_loop.iter_1.inner_loop.iter_2.accumulate"
+    ]
+  },
+  {
+    "config": "nested",
+    "initial": {
+      "calc.a": 4,
+      "calc.b": 6
+    },
+    "runtime_options": {
+      "trace": "boundary",
+      "node_hooks": false,
+      "execution": "compiled"
+    },
+    "expected_outputs": {
+      "calc.scaled": 20,
+      "calc.branch": 20,
+      "calc.final": 25
+    },
+    "expected_runtime_exec_order": [
+      "start",
+      "arithmetic",
+      "use_scaled",
+      "finalize",
+      "end"
+    ],
+    "expected_trace_kind_counts": {
+      "nodeset_enter": 1,
+      "nodeset_exit": 1,
+      "block_enter": 2,
+      "block_exit": 2
+    },
+    "expected_trace_summary": {
+      "current_node": "end",
+      "edge_executions": {
+        "start->arithmetic": 1,
+        "arithmetic->use_scaled": 1
+      },
+      "exec_order": [
+        "start",
+        "arithmetic",
+        "use_scaled",
+        "finalize",
+        "end"
+      ],
+      "node_runs": {
+        "start": 1,
+        "arithmetic": 1,
+        "use_scaled": 1,
+        "finalize": 1,
+        "end": 1
+      },
+      "step_count": 5,
+      "stop_reason": "completed"
+    },
+    "expected_blocks": [
+      [
+        "arithmetic"
+      ],
+      [
+        "start",
+        "arithmetic",
+        "use_scaled",
+        "finalize",
+        "end"
+      ]
+    ],
+    "expected_nodeset_subplan_params": {
+      "arithmetic.scale": {
+        "factor": 2
+      }
+    },
+    "expected_nodeset_subplan_nodes": {
+      "arithmetic": [
+        "start",
+        "add_pair",
+        "scale",
+        "end"
+      ]
+    },
+    "expected_nodeset_exports": {
+      "arithmetic": [
+        "calc.scaled"
+      ]
+    }
+  }
+]

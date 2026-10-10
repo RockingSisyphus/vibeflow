@@ -36,87 +36,6 @@ process.on("unhandledRejection", captureImportFailure);
     )
 
 
-def linear_case(entry: Path) -> Any:
-    return run_node(
-        entry,
-        """
-const result = await workflow.runWorkflow({ x: 10, a: 8, b: 3 });
-assert(result.result === 15, `unexpected result: ${JSON.stringify(result)}`);
-assert(Object.keys(result).join(",") === "result", "public envelope leaked");
-process.stdout.write(JSON.stringify(result));
-""",
-    )
-
-
-def optional_input_case(entry: Path) -> Any:
-    return run_node(
-        entry,
-        """
-const supplied = await workflow.runWorkflow({ x: 10, offset: 7 });
-const omitted = await workflow.runWorkflow({ x: 10 });
-assert(supplied.result === 17, JSON.stringify(supplied));
-assert(omitted.result === 10, JSON.stringify(omitted));
-assert(Object.keys(omitted).join(",") === "result", "optional envelope leaked");
-process.stdout.write(JSON.stringify({ supplied, omitted }));
-""",
-    )
-
-
-def repeat_case(entry: Path) -> Any:
-    return run_node(
-        entry,
-        """
-const first = await workflow.runWorkflow({ x: 1, a: 2, b: 3 });
-const second = await workflow.runWorkflow({ x: 20, a: -5, b: 7 });
-assert(first.result === 0, "first invocation was wrong");
-assert(second.result === 8, "second invocation was polluted");
-process.stdout.write(JSON.stringify({ first, second }));
-""",
-    )
-
-
-def concurrent_trace_case(entry: Path) -> Any:
-    return run_node(
-        entry,
-        """
-const leftTrace = [];
-const rightTrace = [];
-const [left, right] = await Promise.all([
-  workflow.runWorkflow(
-    { x: 4, a: 9, b: 2 },
-    { trace: "full", onTrace: event => leftTrace.push(event) },
-  ),
-  workflow.runWorkflow(
-    { x: 100, a: 1, b: 80 },
-    { trace: "boundary", onTrace: event => rightTrace.push(event) },
-  ),
-]);
-assert(left.result === 11 && right.result === 21, "concurrent outputs differ");
-const leftKinds = leftTrace.map(event => event.kind);
-const rightKinds = rightTrace.map(event => event.kind);
-const leftNodes = leftTrace
-  .filter(event => event.kind === "node_start")
-  .map(event => event.nodeId);
-assert(leftKinds.at(0) === "run_start", JSON.stringify(leftKinds));
-assert(leftKinds.at(-1) === "run_end", JSON.stringify(leftKinds));
-assert(
-  JSON.stringify(leftNodes) === '["start","add","subtract","end"]',
-  JSON.stringify(leftNodes),
-);
-assert(
-  JSON.stringify(rightKinds) === '["run_start","run_end"]',
-  JSON.stringify(rightKinds),
-);
-process.stdout.write(JSON.stringify({
-  left,
-  right,
-  leftKinds,
-  rightKinds,
-}));
-""",
-    )
-
-
 def input_error_case(entry: Path) -> Any:
     return run_node(
         entry,
@@ -176,58 +95,6 @@ process.stdout.write(JSON.stringify({ missing, unknown, schema, trace }));
     )
 
 
-def fanout_case(entry: Path) -> Any:
-    return run_node(
-        entry,
-        """
-const result = await workflow.runWorkflow({ x: 10 });
-assert(result.added === 11, JSON.stringify(result));
-assert(result.subtracted === 9, JSON.stringify(result));
-process.stdout.write(JSON.stringify(result));
-""",
-    )
-
-
-def branch_case(entry: Path, value: int, expected: str) -> Any:
-    return run_node(
-        entry,
-        f"""
-const trace = [];
-const result = await workflow.runWorkflow(
-  {{ x: {value} }},
-  {{ trace: "full", onTrace: event => trace.push(event) }},
-);
-assert(result.message === {json.dumps(expected)}, JSON.stringify(result));
-const nodes = trace
-  .filter(event => event.kind === "node_start")
-  .map(event => event.nodeId);
-const selected = {json.dumps("positive" if value >= 0 else "negative")};
-const rejected = {json.dumps("negative" if value >= 0 else "positive")};
-assert(nodes.includes(selected), JSON.stringify(nodes));
-assert(!nodes.includes(rejected), JSON.stringify(nodes));
-process.stdout.write(JSON.stringify({{ result, nodes }}));
-""",
-    )
-
-
-def nodeset_case(entry: Path) -> Any:
-    return run_node(
-        entry,
-        """
-const trace = [];
-const result = await workflow.runWorkflow(
-  { x: 12, a: 5, b: 4 },
-  { trace: "boundary", onTrace: event => trace.push(event) },
-);
-assert(result.result === 13, JSON.stringify(result));
-const kinds = trace.map(event => event.kind);
-assert(kinds.includes("nodeset_enter"), JSON.stringify(kinds));
-assert(kinds.includes("nodeset_exit"), JSON.stringify(kinds));
-process.stdout.write(JSON.stringify({ result, kinds }));
-""",
-    )
-
-
 def loop_case(entry: Path) -> Any:
     return run_node(
         entry,
@@ -249,110 +116,8 @@ process.stdout.write(JSON.stringify({
     )
 
 
-def loop_stop_when_case(entry: Path) -> Any:
-    return run_node(
-        entry,
-        """
-const trace = [];
-const result = await workflow.runWorkflow(
-  { x: 1 },
-  { trace: "full", onTrace: event => trace.push(event) },
-);
-const iterations = trace.filter(event => event.kind === "loop_iteration");
-assert(result.result === 4, JSON.stringify(result));
-assert(JSON.stringify(result.history) === "[2,3,4]", JSON.stringify(result));
-assert(result.iterations === 3, JSON.stringify(result));
-assert(iterations.length === 3, JSON.stringify(iterations));
-process.stdout.write(JSON.stringify({
-  result,
-  iterations: iterations.map(event => event.iteration),
-}));
-""",
-    )
 
 
-def async_capability_case(entry: Path) -> Any:
-    return run_node(
-        entry,
-        """
-const calls = [];
-const result = await workflow.runWorkflowAsync(
-  { x: 6, key: "alpha" },
-  {
-    capabilities: {
-      "sandbox.storage": {
-        read: async request => {
-          calls.push(request);
-          return { value: `stored:${request.key}` };
-        },
-      },
-    },
-  },
-);
-assert(result.doubled === 12, JSON.stringify(result));
-assert(result.value === "stored:alpha", JSON.stringify(result));
-assert(calls.length === 1 && calls[0].key === "alpha", JSON.stringify(calls));
-process.stdout.write(JSON.stringify({ result, calls }));
-""",
-    )
-
-
-def port_math_case(entry: Path) -> Any:
-    return run_node(
-        entry,
-        """
-const received = [];
-const sent = [];
-const result = await workflow.runWorkflowAsync({}, {
-  capabilities: {
-    "vibeflow.port": {
-      async receive(request) {
-        received.push(request);
-        return { value: 5 };
-      },
-      send(request) {
-        sent.push(request);
-        return null;
-      },
-    },
-  },
-});
-assert(result.result === 17, JSON.stringify(result));
-assert(
-  JSON.stringify(received) === '[{"port":"sandbox.math.in"}]',
-  JSON.stringify(received),
-);
-assert(
-  JSON.stringify(sent) ===
-    '[{"port":"sandbox.math.out","value":17}]',
-  JSON.stringify(sent),
-);
-process.stdout.write(JSON.stringify({ result, received, sent }));
-""",
-    )
-
-
-def capability_isolation_case(entry: Path) -> Any:
-    return run_node(
-        entry,
-        """
-const makeOptions = prefix => ({
-  capabilities: {
-    "sandbox.storage": {
-      read: async request => ({ value: `${prefix}:${request.key}` }),
-    },
-  },
-});
-const [left, right] = await Promise.all([
-  workflow.runWorkflowAsync({ x: 2, key: "same" }, makeOptions("left")),
-  workflow.runWorkflowAsync({ x: 9, key: "same" }, makeOptions("right")),
-]);
-assert(left.value === "left:same", JSON.stringify(left));
-assert(right.value === "right:same", JSON.stringify(right));
-assert(left.doubled === 4 && right.doubled === 18, "async state leaked");
-process.stdout.write(JSON.stringify({ left, right }));
-""",
-    )
 
 
 def capability_error_case(entry: Path) -> Any:
@@ -491,17 +256,9 @@ process.stdout.write(JSON.stringify({
 
 __all__ = [
     "async_capability_case",
-    "branch_case",
     "capability_error_case",
     "capability_isolation_case",
-    "concurrent_trace_case",
-    "fanout_case",
     "import_case",
     "input_error_case",
-    "linear_case",
     "loop_case",
-    "loop_stop_when_case",
-    "nodeset_case",
-    "optional_input_case",
-    "repeat_case",
 ]

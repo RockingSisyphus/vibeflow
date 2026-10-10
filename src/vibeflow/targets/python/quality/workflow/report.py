@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from vibeflow.core.rules.selection import selection_data
+
 import json
 from typing import TYPE_CHECKING, Any, Mapping
 
@@ -44,8 +46,9 @@ def _build_health_report(
             "plugins": plugin_registry.to_dict() if plugin_registry is not None else {"plugins": []},
             "planned": [dict(item) for item in planned_items(graph)],
             "production_ready": not has_planned(graph),
+            "rule_selections":state.rule_selections,
             "rule_executions": [item.to_dict() for item in state.rule_executions],
-            "workflow_rulesets": list(graph.rulesets),
+            "workflow_rulesets": selection_data(graph.rulesets),
         },
     )
 

@@ -453,8 +453,8 @@ def _graph_mermaid(
         if presentation.values.get("icon"):
             label[0] = f"{presentation.values['icon']} {label[0]}"
         if descriptor is not None:
-            selection = descriptor.rulesets
-            label.append(f"rulesets: {', '.join(selection) or 'unconstrained'}")
+            selection = node.rulesets if node.rulesets is not None else descriptor.rulesets
+            label.append(f"rulesets: {', '.join(str(getattr(ref, 'rule_id', ref)) for ref in selection) or 'unconstrained'}")
             if getattr(descriptor, "tags", ()):
                 label.append(f"tags: {', '.join(descriptor.tags)}")
         if node.type_used in LOOP_NODE_TYPES:

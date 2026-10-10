@@ -14,14 +14,17 @@ from vibeflow.tooling.application.cli import main
 def test_quality_cli_reuses_syntax_across_workflows_and_project_scan(tmp_path,monkeypatch,capsys):
     source = EXECUTABLE.replace('from vibeflow.core.rules import RuleResult',
         'from vibeflow.core.rules import RuleResult\nfrom vibeflow.core.findings import HealthFinding')
-    source = source.replace('    print("rule execution")\n    assert context.facts["plugins"]["demo"]["value"] == 1\n    return RuleResult()',
+    source = source.replace('    print("rule execution")\n    assert context.subject["descriptor"].type_key == "demo"\n    assert "plugins" not in context.facts\n    return RuleResult()',
         '    value = context.facts["plugins"]["demo"]["value"]\n'
         '    return RuleResult(findings=(HealthFinding(rule_id="TEST.CONFIG",severity="warning",message=str(value)),))')
     source = source.replace('plugin=Plugin(id="demo",','plugin=Plugin(declaration_rulesets=["vibeflow.plugin_declaration"],id="demo",')
+    source = source.replace('rulesets=["vibeflow.process","demo.rules"]', 'rulesets=["vibeflow.process"]')
+    source = source.replace('id="demo.rules",calls=', 'id="demo.rules",workflow_default=True,calls=')
     workspace, original = executable_project(tmp_path,source)
     configs = tmp_path / "configs"
     configs.mkdir()
     data = json.loads(original.read_text())
+    data["rulesets"] = ["demo.rules"]
     (configs / "first.jsonc").write_text(json.dumps(data))
     data["plugins"][0]["config"] = {"value":9}
     (configs / "second.jsonc").write_text(json.dumps(data))

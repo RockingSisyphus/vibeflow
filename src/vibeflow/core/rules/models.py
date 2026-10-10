@@ -215,9 +215,15 @@ class RulesetDescriptor:
     entrypoints: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     display_name: str = ""
     description: str = ""
+    workflow_default: bool = False
+    graph_scope: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "id", _text(self.id, "ruleset.id"))
+        if type(self.workflow_default) is not bool:
+            raise ValueError("ruleset.workflow_default must be a boolean")
+        if self.graph_scope not in {None, "current_graph", "effective_subtree"}:
+            raise ValueError("ruleset.graph_scope must be current_graph or effective_subtree")
         calls, relations = tuple(self.calls), tuple(self.relations)
         if not all(isinstance(item, RuleCall) for item in calls):
             raise ValueError("ruleset.calls must contain RuleCall")
@@ -239,7 +245,8 @@ class RulesetDescriptor:
     def to_dict(self) -> dict[str, object]:
         return {"kind": "ruleset", "id": self.id, "calls": [item.to_dict() for item in self.calls],
                 "relations": [item.to_dict() for item in self.relations], "entrypoints": plain(self.entrypoints),
-                "display_name": self.display_name, "description": self.description}
+                "display_name": self.display_name, "description": self.description,
+                "workflow_default": self.workflow_default, "graph_scope": self.graph_scope}
 
 
 @dataclass(frozen=True)

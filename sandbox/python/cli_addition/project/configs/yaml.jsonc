@@ -1,0 +1,129 @@
+{
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugin.py",
+        "export": "plugin"
+      }
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "cli.argv",
+        "type": "cli.argv",
+        "display_name": "cli.argv",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "addition.boundary",
+        "display_name": "start",
+        "description": "start"
+      },
+      {
+        "id": "parse_argv",
+        "type_used": "addition.argv",
+        "display_name": "parse_argv",
+        "description": "parse_argv"
+      },
+      {
+        "id": "read_stdin",
+        "type_used": "addition.input",
+        "display_name": "read_stdin",
+        "description": "read_stdin"
+      },
+      {
+        "id": "read_document",
+        "type_used": "addition.yaml",
+        "display_name": "read_document",
+        "description": "read_document"
+      },
+      {
+        "id": "sum_numbers",
+        "type_used": "addition.sum",
+        "display_name": "sum_numbers",
+        "description": "sum_numbers"
+      },
+      {
+        "id": "write_file",
+        "type_used": "addition.path_write",
+        "display_name": "write_file",
+        "description": "write_file"
+      },
+      {
+        "id": "write_output",
+        "type_used": "addition.print",
+        "display_name": "write_output",
+        "description": "write_output"
+      },
+      {
+        "id": "end",
+        "type_used": "addition.boundary",
+        "display_name": "end",
+        "description": "end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "parse_argv"
+      },
+      {
+        "from": "parse_argv",
+        "to": "read_stdin"
+      },
+      {
+        "from": "read_stdin",
+        "to": "read_document"
+      },
+      {
+        "from": "read_document",
+        "to": "sum_numbers"
+      },
+      {
+        "from": "sum_numbers",
+        "to": "write_file"
+      },
+      {
+        "from": "write_file",
+        "to": "write_output"
+      },
+      {
+        "from": "write_output",
+        "to": "end"
+      },
+      {
+        "from": "parse_argv",
+        "to": "write_file"
+      },
+      {
+        "from": "parse_argv",
+        "to": "write_output"
+      },
+      {
+        "from": "read_stdin",
+        "to": "sum_numbers"
+      },
+      {
+        "from": "sum_numbers",
+        "to": "write_output"
+      },
+      {
+        "from": "parse_argv",
+        "to": "read_document"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "cli.exit_code",
+        "cardinality": "exactly_one",
+        "display_name": "cli.exit_code",
+        "as": "cli.exit_code"
+      }
+    ]
+  }
+}

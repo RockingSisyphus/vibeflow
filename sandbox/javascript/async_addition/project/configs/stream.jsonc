@@ -1,0 +1,53 @@
+{
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ],
+  "host_extensions": [
+    {
+      "id": "addition.port_host",
+      "status": "implemented"
+    }
+  ],
+  "nodeset_imports": [
+    {
+      "path": "nodesets/port_body.jsonc"
+    }
+  ],
+  "pipeline": {
+    "inputs": [],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "addition.boundary",
+        "display_name": "start",
+        "description": "start"
+      },
+      {
+        "id": "loop",
+        "type_used": "vibeflow.loop.while",
+        "display_name": "loop",
+        "description": "loop",
+        "requires": [],
+        "provides": [],
+        "loop": {
+          "body": "addition.port_body",
+          "max_iterations": null
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "loop"
+      }
+    ],
+    "outputs": [],
+    "entry_mode": "async"
+  }
+}

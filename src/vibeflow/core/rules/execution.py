@@ -23,10 +23,14 @@ class RuleExecutionResult:
     findings: tuple[Finding, ...] = ()
     executed: tuple[str, ...] = ()
     aliases: Mapping[str, str] = field(default_factory=dict)
+    selection: Mapping[str, Any] = field(default_factory=dict)
+    scope: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "results", readonly(self.results))
         object.__setattr__(self, "aliases", readonly(self.aliases))
+        object.__setattr__(self, "selection", readonly(self.selection))
+        object.__setattr__(self, "scope", readonly(self.scope))
 
     @property
     def status(self) -> str:
@@ -45,7 +49,8 @@ class RuleExecutionResult:
         return {"status": self.status, "plan": self.plan.to_dict(),
                 "results": {key: value.to_dict() for key, value in self.results.items()},
                 "findings": [item.to_dict() for item in self.findings],
-                "executed": list(self.executed), "aliases": plain(self.aliases)}
+                "executed": list(self.executed), "aliases": plain(self.aliases),
+                "selection": plain(self.selection), "scope": plain(self.scope)}
 
 
 def _finding(invocation: RuleInvocation, code: str, message: str, **details: Any) -> HealthFinding:
@@ -118,7 +123,8 @@ def coerce_rule_result(value: Any, rule: Any) -> RuleResult:
 
 
 def _key(invocation: RuleInvocation, inputs: Mapping[str, RuleRecord], context: RuleContext) -> str | None:
-    identity = context.subject.get("source_identity")
+    identity = context.subject.get("source_cache_identities", {}).get(invocation.rule.id,
+        context.subject.get("source_identity"))
     if invocation.rule.scope != "source" or identity is None:
         return None
     inputs_key = record_inputs_fingerprint(inputs)
@@ -169,14 +175,12 @@ class _Execution:
         if invocation.rule.scope == "source":
             # Shared source results must not depend on the current call.
             subject = {key: value for key, value in self.context.subject.items()
-                       if key not in {"owner", "call_id", "call_spec", "call_path", "rule_call_id"}}
-            if "source_call_paths" in subject:
-                subject["call_paths"] = subject["source_call_paths"]
-            elif "call_paths" in subject:
-                del subject["call_paths"]
+                       if key not in {"owner", "call_id", "call_spec", "call_path", "rule_call_id", "source_cache_identities", "source_call_paths"}}
+            subject.pop("call_paths", None)
             return replace(self.context, facts={key: value for key, value in self.context.facts.items() if key != "call"},
                            subject=subject, scope={key: value for key, value in self.context.scope.items() if key != "workflow"})
-        return replace(self.context, subject={**self.context.subject, "rule_call_id": invocation.id})
+        return replace(self.context, subject={**{key:value for key,value in self.context.subject.items()
+            if key != "source_cache_identities"}, "rule_call_id": invocation.id})
 
     def accept(self, invocation: RuleInvocation, result: RuleResult, cache_key: str | None = None, *, executed: bool = False) -> None:
         diagnostics = []

@@ -104,10 +104,17 @@ class PythonSourceCall:
     source_path: str = ""
     local_id: str = ""
     call_path: tuple[str, ...] = ()
+    rulesets: tuple | None = None
 
     def __post_init__(self):
         from vibeflow.core.rules.models import readonly
         object.__setattr__(self,"params",readonly(self.params))
+        from vibeflow.core.rules.selection.models import selection_refs
+        object.__setattr__(self, "rulesets", selection_refs(self.rulesets, optional=True))
+
+    @property
+    def id(self):
+        return self.node_id
 
 
 @dataclass(frozen=True)

@@ -1,6 +1,8 @@
 """Pure plugin selection, Planned handling, and dependency closure."""
 
 from __future__ import annotations
+from vibeflow.core.rules.selection.models import selection_refs, selection_data
+
 
 from dataclasses import dataclass, field
 from typing import Any, Mapping
@@ -243,7 +245,7 @@ class PluginReviewRecord:
     rulesets: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        object.__setattr__(self,"rulesets",_string_tuple(self.rulesets,field_name="plugin review rulesets"))
+        object.__setattr__(self,"rulesets",selection_refs(self.rulesets,field_name="plugin review rulesets"))
         object.__setattr__(
             self,
             "config",
@@ -268,7 +270,7 @@ class PluginReviewRecord:
             "category": self.category,
             "description": self.description,
             "version": self.version,
-            "rulesets": list(self.rulesets),
+            "rulesets": selection_data(self.rulesets),
         }
 
 

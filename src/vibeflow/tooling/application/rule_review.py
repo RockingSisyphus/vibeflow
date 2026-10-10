@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from vibeflow.core.rules.models import plain
+from vibeflow.core.rules.selection import resolve_node_selection, selection_data
+from vibeflow.core.rules.planning import graph_rule_selections, graph_rule_tasks
+from vibeflow.tooling.project.graph_config import parse_graph_config
 
 import argparse
 from dataclasses import replace
@@ -50,7 +53,12 @@ def effective_rule_plans(config: Path, *, workspace=None, node_path: str = "", p
             from vibeflow.tooling.application.python.rule_defaults import complete_rule_plan
             plan = complete_rule_plan(plan, purity_policy, handlers=handlers)
         return plan.to_dict()
-    calls = list(_calls(document.data))
+    graph = parse_graph_config(document.data)
+    graph_choices = graph_rule_selections(graph, rulesets)
+    tasks = graph_rule_tasks(graph, rulesets)
+    specs = {"/".join((*subject.call_path, spec.id)): spec for subject, _ in graph_choices
+        if not subject.declaration_only for spec in subject.graph.nodes}
+    calls = [(path, plain(spec)) for path, spec in specs.items()]
     if node_path:
         calls = [(path, call) for path, call in calls if path == node_path]
         if not calls:
@@ -61,38 +69,44 @@ def effective_rule_plans(config: Path, *, workspace=None, node_path: str = "", p
         descriptor = catalogs.nodes.get(type_key)
         if descriptor is None:
             continue
-        selection = descriptor.rulesets
-        plans = []
-        for selected in selection:
-            if selected not in rulesets:
-                raise RuleGraphError("RULE.RESOURCE.UNKNOWN", f"unknown ruleset '{selected}'")
-            plans.append(compiled_plan(rulesets[selected]))
-        output.append({"call": path, "type_key": type_key,
-                       "selection_source": "node",
-                       "origin": catalogs.origins[("nodes",type_key)].to_dict(),
-                       "rulesets": list(selection), "constraint_state": "selected" if selection else "unconstrained", "plans": plans})
+        choice = resolve_node_selection(descriptor, specs[path])
+        selection = choice.references
+        plans = [compiled_plan(selected) for selected in selection]
+        if any(plan["graph_scope"] == "effective_subtree" for plan in plans):
+            raise RuleGraphError("RULE.GRAPH_SCOPE.NODE", "Node selections cannot use an effective_subtree Ruleset")
+        output.append({"call": path, "type_key": type_key, "selection": choice.to_dict(),
+                       "selection_source": choice.source,
+                       "origin": catalogs.origins[("nodes", type_key)].to_dict(),
+                       "rulesets": selection_data(selection), "constraint_state": "selected" if selection else "unconstrained", "plans": plans})
     reached_libraries = set()
     if owner.project_target == "python":
         from vibeflow.tooling.application.python.rule_defaults import reached_library_ids
         reached_libraries = reached_library_ids(registry, {call.get("type_used") for _, call in calls if call.get("status") != "planned"})
     resources = _resource_plans(catalogs, calls=calls, data=document.data, project=owner.project_config,
         compiled_plan=compiled_plan, reached_libraries=reached_libraries)
-    workflow = []
-    for selected in document.data.get("rulesets", ("vibeflow.workflow",)):
-        if selected not in rulesets:
-            raise RuleGraphError("RULE.RESOURCE.UNKNOWN", f"unknown ruleset '{selected}'")
-        workflow.append(compiled_plan(rulesets[selected]))
+    workflow = [compiled_plan(task.reference) for task in tasks if task.subject.owner == "pipeline"]
+    workflow_selection = next(choice for subject,choice in graph_choices if subject.owner == "pipeline")
+    workflow_coverage = [{"graph_scope":task.graph_scope, "graph_paths":[list(item.call_path) for item in task.subjects],
+        "boundaries":[list(value) for value in task.boundaries]} for task in tasks if task.subject.owner == "pipeline"]
     scopes = []
-    for owner, body in _called_bodies(document.data):
-        if owner == "workflow":
+    for subject, choice in graph_choices:
+        if subject.owner == "pipeline":
             continue
-        if node_path and not node_path.startswith(owner + "/"):
+        path = "/".join(subject.call_path)
+        if node_path and not subject.declaration_only and not node_path.startswith(path + "/"):
             continue
-        selection = tuple(body.get("rulesets", ("vibeflow.workflow",)))
-        plans = [compiled_plan(selected) for selected in selection]
-        scopes.append({"call": owner, "rulesets": list(selection), "plans": plans,
-                       "constraint_state": "selected" if selection else "unconstrained"})
+        # Subject instances come from separate Core enumerations; compare their
+        # full call identity, including independent declaration checks.
+        local_tasks = [task for task in tasks if (task.subject.owner, task.subject.call_path, task.subject.declaration_only)
+            == (subject.owner, subject.call_path, subject.declaration_only)]
+        scopes.append({"call": subject.owner if subject.declaration_only else path,
+            "selection": choice.to_dict(), "rulesets": selection_data(choice.references),
+            "plans": [compiled_plan(task.reference) for task in local_tasks],
+            "coverage": [{"graph_scope": task.graph_scope, "graph_paths": [list(item.call_path) for item in task.subjects],
+                "boundaries": [list(value) for value in task.boundaries]} for task in local_tasks],
+            "constraint_state": "selected" if choice.references else "unconstrained"})
     return {"config": str(config.resolve()), "phase": phase, "workflow": workflow, "scopes": scopes, "nodes": output,
+            "workflow_selection":workflow_selection.to_dict(), "workflow_coverage":workflow_coverage,
             "resources":resources, "project_rule_defaults": defaults,
             "plugins":plain(catalogs.plugin_records)}
 
@@ -122,7 +136,7 @@ def _resource_plans(catalogs, *, calls, data, project, compiled_plan, reached_li
     for item in declarations:
         selected["base_lib"].update(item.base_libs)
     output = [{"kind":"plugin_declaration","id":item.id,"selection_source":item.implementations[0].source.ref,
-        "rulesets":list(item.rulesets),"constraint_state":"selected" if item.rulesets else "unconstrained",
+        "rulesets":selection_data(item.rulesets),"constraint_state":"selected" if item.rulesets else "unconstrained",
         "plans":[compiled_plan(selection) for selection in item.rulesets]}
         for item in declarations]
     for kind, catalog in (("base_lib",catalogs.base_libs),("plugin",catalogs.plugins),("host_extension",catalogs.host_extensions)):
@@ -137,7 +151,7 @@ def _resource_plans(catalogs, *, calls, data, project, compiled_plan, reached_li
                 continue
             pending.extend(descriptor.dependencies)
             output.append({"kind":kind,"id":key,"selection_source":catalog.source_for(key),
-                "rulesets":list(descriptor.rulesets), "constraint_state":"selected" if descriptor.rulesets else "unconstrained",
+                "rulesets":selection_data(descriptor.rulesets), "constraint_state":"selected" if descriptor.rulesets else "unconstrained",
                 "plans":[compiled_plan(selection) for selection in descriptor.rulesets]})
     return sorted(output,key=lambda item:(item["kind"],item["id"]))
 
@@ -158,28 +172,6 @@ def _project_rule_defaults(root, *, document, workspace, handlers, rules, origin
             if root.project_target == "python" else source_rule_defaults(handlers, rules=rules, origins=origins, depth=depth))
 
 
-
-
-def _called_bodies(data: Mapping[str, object]):
-    def walk(body, prefix="workflow", inherited=None, active=()):
-        definitions = dict(inherited or {})
-        definitions.update({item["type_key"]: item for item in body.get("nodesets", ()) if isinstance(item, Mapping)})
-        yield prefix, body
-        for call in body.get("pipeline", {}).get("nodes", ()):
-            target = call.get("type_used")
-            if target in {"vibeflow.loop", "vibeflow.loop.while"}:
-                target = call.get("loop", {}).get("body")
-            if target in definitions and target not in active:
-                path = ("" if prefix == "workflow" else prefix + "/") + str(call["id"])
-                yield from walk(definitions[target], path, definitions, (*active, target))
-    yield from walk(data)
-
-
-def _calls(data: Mapping[str, object]):
-    for owner, body in _called_bodies(data):
-        prefix = "" if owner == "workflow" else owner + "/"
-        for call in body.get("pipeline", {}).get("nodes", ()):
-            yield prefix + str(call.get("id", "")), call
 
 
 def rule_plans_mermaid(payload: Mapping[str, object]) -> str:

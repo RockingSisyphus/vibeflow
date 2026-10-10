@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from vibeflow.core.rules.selection import selection_refs, selection_data
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
@@ -37,7 +38,7 @@ class Plugin:
         declaration_path = _location()[0]
         object.__setattr__(self, "presentation", normalize_presentation(self.presentation, field_name="plugin.presentation"))
         object.__setattr__(self, "implementation_files", _implementation_files(self.implementation_files, declaration_path))
-        object.__setattr__(self, "declaration_rulesets", _string_tuple(self.declaration_rulesets, field_name="plugin.declaration_rulesets"))
+        object.__setattr__(self, "declaration_rulesets", selection_refs(self.declaration_rulesets, field_name="plugin.declaration_rulesets"))
         object.__setattr__(self, "base_libs", _string_tuple(self.base_libs, field_name="plugin.base_libs"))
         resources = tuple(definition(value) for value in self.resources)
         for kind in ("compiler", "runtime"):
@@ -62,7 +63,7 @@ class Plugin:
         resources = tuple(ResourceDeclaration(resource.descriptor, ResourceOrigin(self.id, resource.path or self.source,
                           resource.line, symbol=resource.symbol)) for resource in self.resources)
         declaration = {"kind":"plugin_declaration", "id":self.id, "display_name":self.display_name or self.id,
-            "description":self.description, "version":self.version, "rulesets":list(self.declaration_rulesets),
+            "description":self.description, "version":self.version, "rulesets":selection_data(self.declaration_rulesets),
             "presentation":dict(self.presentation), "base_libs":list(self.base_libs),
             "implementations":[{"language":"python", "targets":["python"],
                 "source":{"kind":"file", "ref":self.source, "export":"plugin"},

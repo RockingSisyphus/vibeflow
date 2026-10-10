@@ -2,9 +2,20 @@
 from resource_support import project,cli,replace,observe,KINDS,FILES,PARTS
 
 
-def pad(path,count,target):
+def pad(path,count,target, *, local=False):
     text=path.read_text();comment="# audited file\n" if target=="python" else "// audited file\n"
-    path.write_text(text+comment*(count-len(text.splitlines())))
+    if local and target == "python":
+        import ast
+        lines = text.splitlines(keepends=True)
+        declarations = [item for item in ast.parse(text).body if isinstance(item, (ast.ClassDef, ast.FunctionDef))]
+        # Node measurements exclude its declaration decorator and module header.
+        start = declarations[0].lineno - 1
+        position = next(index for index,line in enumerate(lines) if line.lstrip().startswith("return "))
+        indent = lines[position][:len(lines[position])-len(lines[position].lstrip())]
+        padding = (indent + comment) * (count - sum(bool(line.strip()) for line in lines[start:]))
+        path.write_text("".join(lines[:position]) + padding + "".join(lines[position:]))
+    else:
+        path.write_text(text+comment*(count-len(text.splitlines())))
 
 
 def run_cases(work,toolchain):
@@ -15,7 +26,7 @@ def run_cases(work,toolchain):
             for role in ("entry","support"):
                 for count in (449,450,500,501):
                     case=f"limits.{target}.{kind}.{role}.{count}";root=project(work/case,target,toolchain)
-                    pad(root/(file if role=="entry" else part),count,target)
+                    pad(root/(file if role=="entry" else part),count,target, local=kind=="node")
                     actual=cli(root,"validate",name="validate")
                     node_entry=kind=="node" and role=="entry"
                     error="NODE.PURITY.SOURCE_TOO_LARGE" if node_entry else "NODE.PURITY.SOURCE_TOO_LARGE" if target=="javascript" and kind=="node" else "BASE_LIB.SOURCE.MAX_LINES"

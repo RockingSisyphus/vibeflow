@@ -40,13 +40,14 @@ def run_cases(work, toolchain):
             prefix='import {defineRule,defineRuleset} from "@vibeflow/plugin";\nimport {writeFileSync} from "node:fs";\nexport const capture=defineRule({id:"demo.config",check(context){writeFileSync('+json.dumps(str(marker))+',JSON.stringify(context.facts.plugins.demo.offset));return {findings:[]};}});\nexport const configuration=defineRuleset({id:"demo.configuration",calls:[{id:"check",rule_id:"demo.config"}],entrypoints:{static:["check"]}});\n'
             text=text.replace('id:"demo",','id:"demo",config_schema:{offset:{type:"integer"}},config_defaults:{offset:1},').replace('resources:[start,model,library,host,session,number]','resources:[start,model,library,host,session,number,capture,configuration]')
             path.write_text(prefix+text)
-            replace(root,"node.ts",'rulesets:["vibeflow.process"]','rulesets:["vibeflow.process","demo.configuration"]')
+
         else:
             path=root/"plugin.py";text=path.read_text()
             prefix='from vibeflow.targets.python.sdk import rule,ruleset\nfrom pathlib import Path\n@rule(id="demo.config")\ndef capture(context,inputs,params):\n    Path('+repr(str(marker))+').write_text(str(context.facts["plugins"]["demo"]["offset"]))\n    return {"findings":[]}\nconfiguration=ruleset(id="demo.configuration",calls=[{"id":"check","rule_id":"demo.config"}],entrypoints={"static":["check"]})\n'
             text=text.replace('id="demo",','id="demo",config_schema={"offset":{"type":"integer"}},config_defaults={"offset":1},').replace('resources=[Start, Model, increment, number]','resources=[Start, Model, increment, number,capture,configuration]')
             path.write_text(prefix+text)
-            replace(root,"node_resource.py",'rulesets=["vibeflow.process"]','rulesets=["vibeflow.process","demo.configuration"]')
+
+        config(root,lambda data:data.update(rulesets=["vibeflow.workflow", "demo.configuration"]))
         config(root,lambda data:data["plugins"][0].update(config={"offset":2}))
         first=cli(root,"inspect-resources",name="first")
         second=config(root);second["plugins"][0]["config"]={"offset":3}

@@ -109,7 +109,7 @@ def test_rule_bundle_contributes_node_and_workflow_findings_to_normal_run(tmp_pa
     config = _rule_project(tmp_path, handler_source=_DIAGNOSTIC_RULE)
     _select_node_rules(tmp_path, extra_calls=[{"id": "domain", "rule_id": "project.review"}])
     resource(tmp_path, "ruleset", "project.workflow_review").write_text(json.dumps({
-        "kind": "ruleset", "id": "project.workflow_review", "calls": [
+        "kind": "ruleset", "id": "project.workflow_review", "graph_scope":"effective_subtree", "calls": [
             {"id": "base", "ruleset_id": "vibeflow.workflow"}, {"id": "domain", "rule_id": "project.review"}],
         "entrypoints": {"static": ["base", "domain"], "run": ["base", "domain"]}}))
     data = json.loads(config.read_text())

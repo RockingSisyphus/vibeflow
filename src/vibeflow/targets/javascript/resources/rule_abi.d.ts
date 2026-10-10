@@ -1,4 +1,4 @@
-export const VIBEFLOW_RULE_ABI: "vibeflow.rule.v1";
+export const VIBEFLOW_RULE_ABI: "vibeflow.rule.v2";
 export type JsonValue = null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue };
 export interface RuleRecord { readonly type_id: string; readonly value: JsonValue; }
 export interface Finding {
@@ -23,7 +23,7 @@ export interface SourceAnalysis {
   nodes(path: string, kind: string): readonly SourceNode[];
 }
 export interface RuleContext {
-  readonly abiVersion: "vibeflow.rule.v1"; readonly ruleId: string;
+  readonly abiVersion: "vibeflow.rule.v2"; readonly ruleId: string;
   readonly phase: "static" | "run" | "import"; readonly target: string;
   /** Workflow graph facts contain finite Nodeset declarations; nested graph.nodeset_refs refer to graph.nodesets. compiled exists only after native compilation. */
   readonly facts: Readonly<Record<string, JsonValue>>;

@@ -32,6 +32,7 @@ coverage.xml
 # Local build, test, document-rendering, and release artifacts.
 /tmp/
 /output/
+/outputs/
 /docs/pdfs/
 /vibeflow_distribution-*.zip
 

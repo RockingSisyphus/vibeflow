@@ -116,6 +116,10 @@ class PythonCheckSession:
         self.library_sources = {}
         self.resource_sources = {}
         self.handlers = {}
+        self.source_caches = {}
+        self.node_import_results = {}
+        self.call_effect_scopes = {}
+        self.call_metrics = {}
         self.compilation = None
         self.compilation_input = None
         self.compilation_stages = {}
@@ -156,7 +160,7 @@ class PythonCheckSession:
         if previous is None or previous[0] is not sources:
             import hashlib
             facts = {"files":[(item.path,item.module,item.root_id,item.text) for item in sources.files],
-                "calls":[(item.owner,item.node_id,item.type_key,plain(item.params),item.source_path,item.local_id,item.call_path) for item in sources.calls],
+                "calls":[(item.owner,item.node_id,item.type_key,plain(item.params),item.source_path,item.local_id,item.call_path,plain(item.rulesets)) for item in sources.calls],
                 "imports":[(item.path,item.specifier,item.module,item.resolved_path,item.symbol,item.alias,item.line,item.column) for item in sources.imports],
                 "nodes":[(item.descriptor.to_dict(),item.path,item.symbol,item.root_id,item.calls) for item in sources.nodes]}
             previous = (sources, hashlib.sha256(fact_key(facts).encode()).hexdigest())
@@ -178,7 +182,7 @@ class PythonCheckSession:
 
     def plan(self, selected, rules, rulesets, phase):
         from vibeflow.core.rules import compile_ruleset
-        key = selected, phase, tuple((key,id(value)) for key,value in rules.items()), tuple((key,id(value)) for key,value in rulesets.items())
+        key = fact_key(selected), phase, tuple((key,id(value)) for key,value in rules.items()), tuple((key,id(value)) for key,value in rulesets.items())
         if key not in self.plans:
             self.plans[key] = compile_ruleset(selected, rules=rules, rulesets=rulesets, entrypoint=phase)
         return self.plans[key]

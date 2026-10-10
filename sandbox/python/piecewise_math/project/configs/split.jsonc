@@ -1,0 +1,173 @@
+{
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "a",
+        "type": "a",
+        "display_name": "a",
+        "required": true
+      },
+      {
+        "key": "b",
+        "type": "b",
+        "display_name": "b",
+        "required": true
+      },
+      {
+        "key": "c",
+        "type": "c",
+        "display_name": "c",
+        "required": true
+      },
+      {
+        "key": "d",
+        "type": "d",
+        "display_name": "d",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "piecewise.boundary",
+        "display_name": "start",
+        "description": "start"
+      },
+      {
+        "id": "u",
+        "type_used": "piecewise.sum_u",
+        "display_name": "u",
+        "description": "u"
+      },
+      {
+        "id": "v",
+        "type_used": "piecewise.sum_v",
+        "display_name": "v",
+        "description": "v"
+      },
+      {
+        "id": "compare",
+        "type_used": "piecewise.compare",
+        "display_name": "compare",
+        "description": "compare"
+      },
+      {
+        "id": "left",
+        "type_used": "piecewise.left",
+        "display_name": "left",
+        "description": "left"
+      },
+      {
+        "id": "right",
+        "type_used": "piecewise.right",
+        "display_name": "right",
+        "description": "right"
+      },
+      {
+        "id": "left_end",
+        "type_used": "piecewise.left_end",
+        "display_name": "left_end",
+        "description": "left_end"
+      },
+      {
+        "id": "right_end",
+        "type_used": "piecewise.right_end",
+        "display_name": "right_end",
+        "description": "right_end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "u"
+      },
+      {
+        "from": "start",
+        "to": "v"
+      },
+      {
+        "from": "u",
+        "to": "compare"
+      },
+      {
+        "from": "v",
+        "to": "compare"
+      },
+      {
+        "from": "u",
+        "to": "left"
+      },
+      {
+        "from": "v",
+        "to": "right"
+      },
+      {
+        "from": "compare",
+        "to": "left",
+        "when": "route == 'left'"
+      },
+      {
+        "from": "compare",
+        "to": "right",
+        "when": "route == 'right'"
+      },
+      {
+        "from": "left",
+        "to": "left_end"
+      },
+      {
+        "from": "right",
+        "to": "right_end"
+      },
+      {
+        "from": "u",
+        "to": "left_end"
+      },
+      {
+        "from": "u",
+        "to": "right_end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "left.result",
+        "display_name": "left.result",
+        "cardinality": "optional_one"
+      },
+      {
+        "type": "right.result",
+        "display_name": "right.result",
+        "cardinality": "optional_one"
+      },
+      {
+        "type": "u",
+        "display_name": "u",
+        "cardinality": "exactly_one"
+      },
+      {
+        "type": "selected_w",
+        "display_name": "selected_w",
+        "cardinality": "optional_one"
+      },
+      {
+        "type": "v",
+        "display_name": "v",
+        "cardinality": "exactly_one"
+      },
+      {
+        "type": "route",
+        "display_name": "route",
+        "cardinality": "exactly_one"
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
+}

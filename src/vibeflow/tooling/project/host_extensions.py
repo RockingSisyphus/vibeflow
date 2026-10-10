@@ -1,4 +1,6 @@
 from __future__ import annotations
+from vibeflow.core.rules.selection import selection_refs, selection_data
+
 
 from dataclasses import dataclass, field, replace
 from typing import Any, Mapping
@@ -36,7 +38,7 @@ class HostExtensionResource:
     style: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self):
-        object.__setattr__(self, "rulesets", _string_tuple(self.rulesets, field_name="host_extension.rulesets"))
+        object.__setattr__(self, "rulesets", selection_refs(self.rulesets, field_name="host_extension.rulesets"))
         object.__setattr__(self, "style", _freeze_json(self.style, field_name="host_extension.style"))
 
     def to_dict(self) -> dict[str, object]:
@@ -51,7 +53,7 @@ class HostExtensionResource:
             "provides": list(self.provides),
             "dependencies": list(self.dependencies),
             "config_keys": sorted(self.config),
-            "rulesets": list(self.rulesets),
+            "rulesets": selection_data(self.rulesets),
         }
         if self.root_id:
             payload["root_id"] = self.root_id

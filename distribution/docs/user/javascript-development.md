@@ -50,7 +50,7 @@ workflow 显式启用：
 {"plugins": [{"source": {"kind": "file", "ref": "plugins/text.ts"}}], "pipeline": { /* 原生 type_used 与连边 */ }}
 ```
 
-支持已安装模块/包、显式导出和已登记的 workspace `root`。Node 自己选择 `rulesets` 和默认 `presentation`；省略或 `[]` 表示未选择 Node 审查规则。DataSchema 由选中插件贡献，供公共输入输出、Node 和 Capability 查找。
+支持已安装模块/包、显式导出和已登记的 workspace `root`。Node 自己选择 `rulesets` 和默认 `presentation`；类型声明提供默认；调用 Config 的缺省继承该默认，显式列表替代，`[]` 取消局部规则。DataSchema 由选中插件贡献，供公共输入输出、Node 和 Capability 查找。
 
 ## 多文件资源
 

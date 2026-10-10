@@ -129,7 +129,7 @@ def test_source_context_exposes_all_source_calls_and_no_current_call_identity():
     source = observed["source"]
     assert "call" not in source.facts
     assert not {"owner", "call_id", "call_spec", "call_path", "rule_call_id"} & source.subject.keys()
-    assert source.subject["call_paths"] == (("first",), ("second",))
+    assert "call_paths" not in source.subject and "source_call_paths" not in source.subject
     assert "workflow" not in source.scope
     assert source.scope["workflows"] == ("first-workflow", "second-workflow")
     call = observed["call"]

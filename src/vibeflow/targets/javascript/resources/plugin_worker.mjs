@@ -9,7 +9,7 @@ import { pathToFileURL } from "node:url";
 import {sdkPlugin} from "./sdk_loader.mjs";
 
 const PLUGIN_ABI = "vibeflow.plugin.v3";
-const RULE_ABI = "vibeflow.rule.v1";
+const RULE_ABI = "vibeflow.rule.v2";
 const instances = new Map();
 const sourceAnalyses = new Map();
 // Keep trusted implementations' ordinary logging outside the JSONL protocol.
@@ -73,7 +73,7 @@ async function localTools(packageRoot) {
 }
 function sourceService(ts, packageRoot, facts) {
   const provided = new Map();
-  for (const source of facts.sources || []) {
+  for (const source of [...(facts.sources || []), ...(facts.global_sources || [])]) {
     if (source && source.path && typeof source.text === "string") provided.set(path.resolve(source.path), source.text);
   }
   const cache = new Map();
@@ -81,7 +81,8 @@ function sourceService(ts, packageRoot, facts) {
   const snapshots = [];
   function parsed(file) {
     const absolute = path.resolve(packageRoot, file);
-    const text = provided.get(absolute) ?? readFileSync(absolute, "utf8");
+    if (!provided.has(absolute)) failure("RULE.SOURCE.UNAVAILABLE", `Source outside the supplied Rule view: ${absolute}`);
+    const text = provided.get(absolute);
     const cached = cache.get(absolute);
     if (cached?.text === text) return cached;
     if(cached){for(const snapshot of snapshots.splice(0))snapshot.dispose();api?.close();api=null;cache.clear();}
@@ -117,7 +118,7 @@ function sourceService(ts, packageRoot, facts) {
     const base = path.resolve(path.dirname(file), specifier);
     const stem = /\.(?:js|jsx|mjs|cjs)$/.test(base) ? base.replace(/\.[^.]+$/, "") : base;
     const candidates = [base, ...[".ts", ".tsx", ".js", ".mjs", ".mts", ".cts"].map(suffix => stem + suffix), path.join(base, "index.ts"), path.join(base, "index.js")];
-    return candidates.find(candidate => provided.has(candidate) || (statSync(candidate, {throwIfNoEntry: false})?.isFile() && !path.extname(candidate).includes("json"))) || null;
+    return candidates.find(candidate => provided.has(candidate)) || null;
   }
   function imports(file) {
     const {tree} = parsed(file);
@@ -143,7 +144,7 @@ function sourceService(ts, packageRoot, facts) {
   }
   return Object.freeze({
     dispose() { for (const snapshot of snapshots) snapshot.dispose(); api?.close(); },
-    text(file) { const absolute=path.resolve(packageRoot,file);return provided.get(absolute)??readFileSync(absolute,"utf8"); },
+    text(file) { return parsed(file).text; },
     ast(file) { const value = parsed(file);return value.description??=deepFreeze(describe(value.tree,value.tree,true)); },
     symbols(file) {
       const {tree} = parsed(file); const result = [];
@@ -160,9 +161,17 @@ function sourceService(ts, packageRoot, facts) {
     reachable(file) { return Object.freeze(reachable(file)); },
     ownership(file, currentFacts = facts) {
       const absolute = path.resolve(packageRoot, file);
+      parsed(absolute);
       const declared = (currentFacts.source_owners || []).filter(item => path.resolve(item.path) === absolute);
       const nodeTypes = new Set();
-      for (const source of currentFacts.sources || []) if (currentFacts.node_types?.[source.owner] && (currentFacts.source_files || []).includes(source.path) && reachable(source.path).includes(absolute)) nodeTypes.add(source.owner);
+      for (const source of currentFacts.sources || []) if ((currentFacts.node_catalog || currentFacts.node_types)?.[source.owner] && (currentFacts.source_files || []).includes(source.path) && reachable(source.path).includes(absolute)) nodeTypes.add(source.owner);
+      for (const [key, descriptor] of Object.entries(currentFacts.node_catalog || currentFacts.node_types || {})) {
+        if (!descriptor || typeof descriptor !== "object") continue;
+        for (const implementation of descriptor.implementations || []) {
+          const entry = implementation.source?.ref;
+          if (entry && provided.has(path.resolve(entry)) && reachable(entry).includes(absolute)) nodeTypes.add(key);
+        }
+      }
       return deepFreeze({path: absolute, declared, node_types: [...nodeTypes]});
     },
     nodes(file, kind) {

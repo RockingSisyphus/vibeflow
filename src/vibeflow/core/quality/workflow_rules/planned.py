@@ -63,6 +63,23 @@ def _planned_health_facts(
     return tuple(events)
 
 
+def current_graph_planned_events(graph, *, owner="pipeline", definition=None):
+    """No recursive graph scan: this task owns only the current graph."""
+    events = []
+    _append_graph_events(graph, events, owner=owner)
+    for nodeset in graph.nodesets.values():
+        if nodeset.status == STATUS_PLANNED:
+            events.append(_planned_nodeset_finding(nodeset))
+            _append_implementation_check(nodeset.planned_behavior, events, object_type="nodeset",
+                object_id=nodeset.type_key, project_root=graph.project_root)
+    if definition is not None and definition.status == STATUS_IMPLEMENTED:
+        if graph_has_blocking_planned(graph):
+            events.append(_planned_child_finding(definition.type_key, severity="error"))
+        elif graph_has_planned(graph):
+            events.append(_planned_child_finding(definition.type_key, severity="warning"))
+    return tuple(events)
+
+
 def planned_health_events(graph):
     return _planned_health_facts(graph)
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from vibeflow.tooling.project.schema_common import (
+    _validate_rule_selection,
     _error,
     _non_empty_string,
     _validate_execution_lock,
@@ -22,7 +23,7 @@ STATUSES = {"planned", "implemented"}
 def collect_config_schema_findings(config: Mapping[str, Any]) -> tuple[HealthFinding, ...]:
     findings: list[HealthFinding] = []
     if "rulesets" in config:
-        _validate_string_list(config["rulesets"], "rulesets", findings, "CONFIG.SCHEMA.RULESETS")
+        _validate_rule_selection(config["rulesets"], "rulesets", findings)
     if _is_nodeset_definition(config):
         _validate_nodeset(config, "nodeset", findings)
         if "nodeset_imports" in config:
@@ -178,7 +179,7 @@ def _validate_nodesets(value: Any, findings: list[HealthFinding]) -> None:
 def _validate_nodeset(item: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
     status = str(item.get("status", "implemented")).strip()
     if "rulesets" in item:
-        _validate_string_list(item["rulesets"], f"{prefix}.rulesets", findings, "CONFIG.SCHEMA.RULESETS")
+        _validate_rule_selection(item["rulesets"], f"{prefix}.rulesets", findings)
     _validate_nodeset_identity(item, prefix, findings, status=status)
     _validate_nodeset_metadata(item, prefix, findings, status=status)
     _validate_nodeset_contract(item, prefix, findings, status=status)

@@ -151,9 +151,9 @@ def variants(f: Any) -> tuple[Variation, ...]:
 
     # Precise text boundaries use real TS files, not fabricated metrics.
     def lines(count):
-        return node + '\n' * (count - len(node.splitlines()))
+        return node.replace('  return ', '  // Implementation line\n' * (count - len(node.splitlines())) + '  return ')
     def bytes_(count):
-        return node + '//' + 'x' * (count - len(node.encode()) - 3) + '\n'
+        return node.replace('  return ', '  //' + 'x' * (count - len(node.encode()) - 5) + '\n  return ')
     for count, code, severity in ((449, '', 'error'), (450, 'NODE.PURITY.SOURCE_NEAR_LIMIT', 'warning'), (500, 'NODE.PURITY.SOURCE_NEAR_LIMIT', 'warning'), (501, 'NODE.PURITY.SOURCE_TOO_LARGE', 'error')):
         add('numeric.lines-' + str(count), '真实 Node 源码行边界 ' + str(count), 'maintainability.source', lines(count), code, severity=severity)
     for count, code, severity in ((53999, '', 'error'), (54000, 'NODE.PURITY.SOURCE_BYTES_NEAR_LIMIT', 'warning'), (60000, 'NODE.PURITY.SOURCE_BYTES_NEAR_LIMIT', 'warning'), (60001, 'NODE.PURITY.SOURCE_BYTES_TOO_LARGE', 'error')):

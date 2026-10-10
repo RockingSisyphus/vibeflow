@@ -916,6 +916,7 @@ function declarationProperty(ts, sourceFile, expression, member, seen = new Set(
     }
   }
   if (expression.expression && !ts.isCallExpression(expression)) return declarationProperty(ts, sourceFile, expression.expression, member, seen);
+  if (ts.isCallExpression(expression)) return declarationProperty(ts, sourceFile, expression.arguments[0], member, seen);
   for (const property of [...(expression.properties || [])].reverse()) {
     if ((property.name?.text || property.name?.getText(sourceFile)) === member) return property;
     if (ts.isSpreadAssignment(property)) {
@@ -1340,6 +1341,121 @@ function implementationEffectScopes(ts, sourceFiles, checker, project, policy, r
     }
   }
   return scopes;
+}
+
+function publicSourceViews(ts, sourceFiles, checker, project, policy, rootFiles, subjectId) {
+  const selected = new Set(), pending = [], imports = new Set(), inherited = new Map();
+  const available = new Set(sourceFiles.filter(file => !file.isDeclarationFile
+    && !file.fileName.includes(`${path.sep}node_modules${path.sep}`)));
+  function top(declaration) {
+    let node = declaration;
+    while (node.parent && node.parent.kind !== ts.SyntaxKind.SourceFile) node = node.parent;
+    if (ts.isVariableStatement(node)) {
+      let current = declaration;
+      while (current.parent && current.parent !== node.declarationList) current = current.parent;
+      if (ts.isVariableDeclaration(current)) return current;
+    }
+    return node;
+  }
+  function enqueue(declaration, implementation = false) {
+    if (!declaration || declaration.kind === ts.SyntaxKind.SourceFile || !available.has(declaration.getSourceFile())) return;
+    const statement = top(declaration), file = statement.getSourceFile();
+    const names = [statement.name?.text];
+    const owned = policy.owners.some(owner => owner.kind === "node" && owner.id === subjectId
+      && path.resolve(owner.path) === path.resolve(file.fileName) && names.includes(owner.export?.split(".")[0]));
+    const foreign = !owned && policy.owners.some(owner => owner.kind === "node" && owner.id !== subjectId
+        && path.resolve(owner.path) === path.resolve(file.fileName) && names.includes(owner.export?.split(".")[0]));
+    if (foreign) {
+      if (!implementation || !ts.isVariableDeclaration(statement) || !ts.isCallExpression(statement.initializer)) return;
+      const object = statement.initializer.arguments[0];
+      const property = object?.properties?.find(property => property === declaration || property.initializer === declaration);
+      if (!property) return;
+      const members = inherited.get(statement) || new Set();
+      if (members.has(property)) return;
+      members.add(property); inherited.set(statement, members);
+      selected.add(statement); pending.push(property);
+      return;
+    }
+    if (selected.has(statement)) return;
+    selected.add(statement); pending.push(statement);
+  }
+  for (const file of sourceFiles) {
+    if (!rootFiles.has(path.resolve(file.fileName))) continue;
+    const owners = policy.owners.filter(owner => owner.kind === "node" && owner.id === subjectId
+      && path.resolve(owner.path) === path.resolve(file.fileName));
+    for (const owner of owners) {
+      const implementation = implementationDeclaration(ts, file, owner.export || "run")
+        || file.statements.find(item => item.name?.text === owner.export);
+      enqueue(implementation, true);
+    }
+  }
+  while (pending.length) {
+    const statement = pending.pop();
+    function visit(node) {
+      if (ts.isIdentifier(node)) {
+        const symbol = checker.getSymbolAtLocation(node);
+        for (const declaration of symbolDeclarationNodes(symbol, project)) {
+          if (declaration.getSourceFile() === statement.getSourceFile()) {
+            const candidate = top(declaration);
+            if (ts.isImportDeclaration(candidate) || ts.isImportEqualsDeclaration(candidate)) imports.add(candidate);
+            else enqueue(declaration);
+          }
+        }
+        if (symbol && checker.getAliasedSymbol) {
+          try { for (const declaration of symbolDeclarationNodes(checker.getAliasedSymbol(symbol), project)) enqueue(declaration); }
+          catch {}
+        }
+        // Properties of namespace imports and inherited implementations have
+        // their own resolved declarations, even when the local alias does not.
+        if (ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) {
+          for (const declaration of symbolDeclarationNodes(symbol, project)) enqueue(declaration);
+        }
+      }
+      visitChildren(ts, node, visit);
+    }
+    visit(statement);
+  }
+  for (const statement of imports) selected.add(statement);
+  return sourceFiles.filter(file => [...selected].some(node => node.getSourceFile() === file)).map(file => {
+    const nodes = [...selected].filter(node => node.getSourceFile() === file);
+    const projected = [];
+    const spans = [];
+    for (const node of nodes) {
+      if (ts.isVariableDeclaration(node) && ts.isVariableStatement(node.parent?.parent)) continue;
+      projected.push(node); spans.push([node.getStart(file, true), node.getEnd()]);
+    }
+    for (const statement of file.statements.filter(node => ts.isVariableStatement(node))) {
+      const originals = statement.declarationList.declarations.filter(node => selected.has(node));
+      const declarations = originals.map(node => {
+        const members = inherited.get(node);
+        if (!members) return node;
+        const initializer = node.initializer, object = initializer.arguments[0];
+        return Object.create(node, {initializer:{value:Object.create(initializer, {
+          arguments:{value:[Object.create(object, {properties:{value:[...members]}})]}})}});
+      });
+      if (!declarations.length) continue;
+      projected.push(Object.create(statement,{declarationList:{value:Object.create(statement.declarationList,{declarations:{value:declarations}})}}));
+      spans.push([statement.getStart(file,true),statement.declarationList.declarations[0].getStart(file)]);
+      for (const declaration of originals) {
+        const members = inherited.get(declaration);
+        if (!members) { spans.push([declaration.getStart(file), declaration.getEnd()]); continue; }
+        const object = declaration.initializer.arguments[0];
+        spans.push([declaration.getStart(file), object.getStart(file) + 1], [object.getEnd() - 1, declaration.getEnd()]);
+        for (const property of members) spans.push([property.getStart(file), property.getEnd()]);
+      }
+      for (let index = 1; index < declarations.length; index++) {
+        const comma = file.text.indexOf(",", declarations[index - 1].getEnd());
+        spans.push([comma, comma + 1]);
+      }
+      if (file.text[statement.getEnd()-1] === ";") spans.push([statement.getEnd()-1,statement.getEnd()]);
+    }
+    const visible = new Uint8Array(file.text.length);
+    for (const [start, end] of spans) visible.fill(1, start, end);
+    const text = file.text.slice(0, Math.max(...spans.map(span => span[1]))).split("").map((char, index) => visible[index] || char === "\n" || char === "\r" ? char : " ").join("");
+    const value = {path: path.resolve(file.fileName), text: text + "\n", owner: subjectId};
+    Object.defineProperty(value,"parsed",{value:Object.create(file,{text:{value:value.text},statements:{value:projected},parseDiagnostics:{value:[]}})});
+    return value;
+  });
 }
 
 function auditModuleRegExpState(ts, sourceFile, policy, ruleParams = {}) {
@@ -2221,8 +2337,8 @@ function collectQualityFacts(ts, program, checker, project, sourceFiles, request
     files.push({
       path: module,
       module,
-      lines: qualityLineCount(text),
-      bytes: Buffer.byteLength(text, "utf8"),
+      lines: request.publicNodeView ? text.split(/\r?\n/).filter(line => line.trim()).length : qualityLineCount(text),
+      bytes: Buffer.byteLength(request.publicNodeView ? text.split(/\r?\n/).filter(line => line.trim()).join("\n") + "\n" : text, "utf8"),
       function_count: parsed.functions.length,
       class_count: parsed.classCount,
       public_api_count: syntax.length ? 0 : qualityPublicApiCount(ts, sourceFile),
@@ -2316,6 +2432,8 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
       if (sourceFile.isDeclarationFile && sourceFile.fileName.includes(`${path.sep}node_modules${path.sep}`)) continue;
       const owned = ownerFor(ts, sourceFile.fileName, policy);
       if (!owned && !rootFiles.has(path.resolve(sourceFile.fileName))) continue;
+      if (!sourceFile.isDeclarationFile) findings.push(...qualitySyntaxDiagnostics(ts, program, sourceFile)
+        .map(item => ({...item, file:item.path})));
       const implementationFile = implementationScope(ts, sourceFile, checker, project, policy);
       if (request.profile === "single-esm") findings.push(...auditSingleEsmConstraints(ts, sourceFile));
       if (topics.has("imports")) {
@@ -2357,9 +2475,14 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
       }
     }
     if (request.command === "rule-check") {
+      const localSources = request.publicNodeView ? publicSourceViews(ts, sourceFiles, checker, project, policy, rootFiles, request.ruleSubjectId) : [];
+      const localQuality = request.publicNodeView ? collectQualityFacts(ts, program, checker, project, localSources.map(source=>source.parsed), {...request,qualityRoot:request.qualityRoot || request.packageRoot,qualityFiles:localSources.map(source=>source.path)}) : null;
       return {
+        local_quality: localQuality,
         findings: findings.map(finding => ({ ...finding, owner: finding.owner || ownerFor(ts, finding.file, policy) })),
+        local_sources: localSources,
         sources: sourceFiles.filter(file => !file.fileName.includes(`${path.sep}node_modules${path.sep}`)).map(file => ({ path: path.resolve(file.fileName), text: file.text,
+          initialization: file.statements.filter(statement => !ts.isFunctionDeclaration(statement) && !(ts.isVariableStatement(statement) && statement.declarationList.declarations.every(declaration => {const value=unwrapExpression(ts,declaration.initializer); return value && (ts.isArrowFunction(value) || ts.isFunctionExpression(value) || isSdkDeclaration(ts,file,value));}))).map(statement => [file.getLineAndCharacterOfPosition(statement.getStart(file)).line, statement.getText(file)]),
           imports: importSpecifiers(ts,file).map(imported => ({specifier:imported.value,
             path:resolvedImportFile(ts,checker,project,imported,file.fileName) || "",
             line:file.getLineAndCharacterOfPosition(imported.node.getStart(file)).line + 1,

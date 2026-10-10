@@ -1,6 +1,8 @@
 # 集成沙盒
 
-这个目录模拟真实业务项目使用 `vibeflow` 的方式：业务侧编写执行 Node、独立 Node 声明、`base_lib`、Rule/Ruleset、生命周期插件和 JSONC 配置。Node 类只保留执行代码；`project/manifests/nodes` 是元数据与契约的权威来源。运行器通过 `pyproject.toml` 与 `src/vibeflow` 自动定位仓库，不会在 Sandbox 中创建内核软链接。
+这个目录模拟真实业务项目使用 `vibeflow` 的方式：业务侧通过代码插件和 SDK 声明执行 Node、`base_lib`、Rule/Ruleset、生命周期插件，再用 JSONC 配置组织。运行器通过 `pyproject.toml` 与 `src/vibeflow` 自动定位仓库，不会在 Sandbox 中创建内核软链接。
+
+入口目前登记 102 项，包括独立的 [综合数学应用](../comprehensive_math/README.md)。该应用合并了七个重复正例的运行；错误路径及其他专项仍单独执行，详见 [逐项替代归档](../../../docs/maintainers/history/audits/comprehensive-sandbox-20261009.md)。Python 与 JavaScript 两个 integration runner 合计 150 项（102+48）；历史 177 项清单保留当时记录。
 
 运行：
 
@@ -14,13 +16,16 @@ PYTHONPATH=src python sandbox/python/integration/run_all.py
 - 对未登记的 workflow，确认返回 `REVIEW.ARCHITECTURE.UNREGISTERED`，不修改已登记架构，也不发布 SVG。
 - 确认审核结果不发布中间 `.mmd`、provenance sidecar 或嵌入式 provenance metadata。
 - 对专用可视化 fixture 先执行真实 `validate` 并要求严格 `PASS`，再执行 `export-svg --expand-nodesets`：确认 external node 同时保留颜色 class、`[EXTERNAL]` 标题和 `7px` non-scaling 粗边框；同一父图中的四个 loop 调用全部连接到同一个 `end`，共享的 nodeset body 只生成一个带调用摘要的详情 fragment。
-- `pass_port_math.jsonc` 通过 fake `vibeflow.port` 验证 Python `receive → base_lib 数学 Node → send`，并核对 `(5 + 2) × 3 = 21` 的输出和发送值。
+- 独立 comprehensive_math 通过注入的 `vibeflow.port` 验证 Python `receive → 两层 Nodeset/数学 Node/BaseLib/Loop → send`，同时检查计算结果、发送值、准确 warning 详情以及修正源码后的 warning 消失。
 - 执行模型专项用例验证普通 Python Node 留在 `MainThread`，`async: result_key` Node 确实进入 `ThreadPoolExecutor` 且 `runtime.run()` 会阻塞到 join；portable plan 同时核对 `immediate/inline/current`、`deferred/thread` 和 `detached/thread`。线程池边界覆盖三任务并行、`async_max_workers: 1` 的排队，以及 `0`、负数、布尔值和小数 worker 数被拒绝。
 - `fail_async_result_key_missing.jsonc` 验证 `result_key` 未出现在 `provides` 时配置阶段失败；原有 result_key join、detached 完成和 trace 用例继续验证图内可见的异步分路。
 - 在全部 case 结束后集中审计所有发布 SVG：`reports/svg` 必须逐一对应 health 无 error 的合法 case，成功运行目录必须包含 `PASS/CONCERNS` 且 errors 为空的 `health_report.json`，review SVG 必须带有各自的成功校验结果。只有 `expected_fail_*` / `expected_runtime_fail_*` 明确错误路径下的诊断 SVG 可以豁免。
-- 使用真实 `delegate-cli -- --input data.yaml --verbose` 启动 graph，确认 argv 原样进入、document 节点读取文件、业务 stdout/stderr 不被内核污染，并由 `cli.exit_code` 控制进程退出。
-- 使用两个真实数值 CLI graph 覆盖多种 Python IO：IO 节点从 stdin 读取数字，两个 document 节点分别从文件读取数字，process 节点求和，再由 document 节点写文件、IO 节点写 stdout/stderr。`pathlib` 用例组合 `input()`、`Path.read_text/write_text`、`open().readline()`、`print()` 和 `sys.stderr.write()`，验证 `7 + 11 + 13 = 31`；标准流用例组合 `sys.stdin.readline()`、`open().read/write()`、`Path.read_text()` 和 `sys.stdout/stderr.write()`，验证 `5 + 17 + 19 = 41`。
-- 两个数值用例都按 UTF-8 字节精确检查 stdout、stderr 和输出文件，并检查退出码；同时确认 architecture/health 不会执行 effectful examples、派生 effect scope 符合节点职责、health 为 `PASS/CONCERNS`、`output_summary.json` 包含 `cli.exit_code`、关键节点各执行一次，以及 `vibeflow.log` 不泄露 stdin、文件内容、业务路径或输出内容。
+- 独立 [cli_addition](../cli_addition/README.md) 使用 YAML、pathlib、标准流三个适配配置执行 `2+3+4=9`。精确检查 stdout/stderr、文件字节、退出码、效果范围、执行次数、日志隔离和架构导出无业务副作用。
+- 独立 [object_addition](../object_addition/README.md) 用 Box 和 Counter 做连续加法，检查原对象身份、非 JSON 报告、Nodeset 导出、绑定参数、固定与条件循环，以及 plan/block/compiled 执行。
+- 独立 [plugin_addition](../plugin_addition/README.md) 检查多文件 Node/BaseLib/Plugin、参数覆盖、编译/运行钩子，并在临时 helper 修改、恢复后确认 `5→6→5`。
+- 此前三个入口接替 11 个旧 Python 任务，完整映射见 [简单数学整合归档](../../../docs/maintainers/history/audits/addition-sandboxes-20261009.md)。
+- 新增 [workflow_math](../workflow_math/README.md) 接替 13 个嵌套、循环和执行/trace 任务，五个配置共 17 组观察；[逐项迁移与验收](../../../docs/maintainers/history/audits/workflow-math-20261010.md)。
+- 新增 [piecewise_math](../piecewise_math/README.md) 接替另外 11 个直线、分支、互斥汇合和数据旁路任务；四个配置共享短小加法节点，包含等号边界、24 组执行观察、真实编译块和源码、trace、运行与导出图检查。详见 [逐项迁移记录](../../../docs/maintainers/history/audits/piecewise-math-20261010.md)。
 
 完整入口还复用独立的跨 root 质检沙箱：从发行最小项目构造 framework/project 双 root，Node 的契约与计算 helper 来自 framework BaseLib，通过真实 `run.py` 对比 `validate`、`quality` 与 `quality --path project`。用例覆盖默认及显式 workspace、直接内核 CLI、所选 root 的扫描范围、真实未声明 BaseLib 错误、workspace policy、独立 root、文件/子目录扫描、禁用 workflow 质检和混合 Target 的隔离子进程。可只运行这一组：
 
@@ -34,7 +39,7 @@ python tools/run_tests.py -- tests/targets/python/test_quality_workspace_sandbox
 - `.artifacts/reports/summary.md`
 - `.artifacts/reports/mermaid/*.mmd`
 - `.artifacts/reports/review/*.svg`
-- `.artifacts/reports/delegate_cli_numeric/*.txt`
+- `.artifacts/{cli_addition,object_addition,plugin_addition,piecewise_math,workflow_math}/report.json`
 - `.artifacts/runs/<case_name>/...`
 
 退出码：
@@ -51,7 +56,7 @@ Node 声明显式选择 `vibeflow.process`、`vibeflow.io`、`vibeflow.document`
 
 普通 `pipeline.edges` 形成环已经被禁止；`project/configs/fail_decision_cycle_forbidden.jsonc` 验证带 decision 和 exit 的旧式 retry 环也会被 `GRAPH.CYCLE.FORBIDDEN` 拒绝。
 
-循环示例请看 `project/configs/pass_loop_while_nodeset_retry.jsonc`、`pass_loop_stop_after_nodeset_training.jsonc` 和 nested loop fixtures：
+循环示例请看 `project/configs/pass_loop_while_nodeset_retry.jsonc`、独立 `object_addition` 的 `fixed.jsonc` 和 nested loop fixtures：
 
 - `vibeflow.loop.while` 调用 nodeset body。
 - 固定轮数用 `loop.stop_after`。

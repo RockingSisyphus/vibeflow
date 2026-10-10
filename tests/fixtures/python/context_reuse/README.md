@@ -24,3 +24,5 @@ CLI 案例使用公开 SDK 定义 12 种 Node 和调用级、源码级两条 Rul
 Core 和双 Target 回归为 1,208 passed / 7 skipped，独立仓库质量为 0 errors / 0 warnings，其自身测试为 46 passed。两个正式 0.15.0 ZIP 已重新构建并验证内核、源码字节、文档与提示词一致性。新发行内核的真实 MNIST 只读校验约 56 秒，诊断逐项一致，见 `mnist-release-observation.json` 与 `mnist-release-report.json`。本轮未重新运行完整发行 gate 或训练。
 
 历史生成报告和截图已移出夹具目录，原始位置与恢复方法见 [证据索引](../../../../docs/maintainers/evidence/index.md)。上文历史成绩不代替当前运行。
+
+当前 Rule v2 的 Node 上下文只包含当前声明与局部源码，历史全量 catalog 身份断言已迁移。CLI 仍执行 24 次检查，同一个 Node 的两条规则共享局部源码视图，12 个 Node 各有独立的视图与声明；同时断言视图中没有其他 Node 或 catalog。

@@ -4,7 +4,8 @@ from functools import wraps
 from typing import Any, Mapping
 from vibeflow.core.rules import RuleContext, RuleRecord, RuleResult
 from vibeflow.core.rules.models import RuleCall
-from vibeflow.builtin.workflow import workflow_rule_checks, workflow_topic_handlers
+from vibeflow.builtin.workflow import workflow_topic_handlers
+from vibeflow.builtin.workflow_plan import workflow_plan_handlers
 from vibeflow.builtin.project_quality import project_quality_handlers
 from vibeflow.builtin.import_policy import normalized_import_policy
 
@@ -66,7 +67,7 @@ def javascript_rule_bindings() -> Mapping[str, Any]:
             "vibeflow.node_architecture": architecture, "vibeflow.input_writes": input_writes,
             "vibeflow.import_side_effects": imports, "vibeflow.maintainability": maintainability,
             **{"vibeflow.implementation." + topic: implementation(topic) for topic in ("node", "base_lib", "dependency_chain")},
-            "vibeflow.workflow": workflow_rule_checks, **workflow_topic_handlers(),
+            **workflow_plan_handlers(), **workflow_topic_handlers(),
             **{key: project_handler(checker) for key, checker in project_quality_handlers().items()}}
 
 

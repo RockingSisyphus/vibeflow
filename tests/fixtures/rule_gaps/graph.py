@@ -308,7 +308,10 @@ def _source_fixture(case, topic, oversized):
             text = (f'import {{step as nextStep}} from "./step{index+1}.ts";\n' if following else '') + 'export function step(value: number): number {return ' + ('nextStep(value)' if following else 'value') + ';}\n'
             file = library / f"step{index}.ts"
         if topic == "base_lib" and oversized:
-            text += ('# measured file line\n' if case.target == "python" else '// measured file line\n') * (501 - len(text.splitlines()))
+            if case.target == "python":
+                text = text.replace("    return ", "    # measured helper line\n" * (501 - len(text.splitlines())) + "    return ")
+            else:
+                text += "// measured file line\n" * (501 - len(text.splitlines()))
         file.write_text(text)
         manifest = resource_ref(case.project, "base_lib", f"gaps.step{index}")
         case.write(manifest, {"kind": "base_lib", "id": f"gaps.step{index}", "display_name": "Step", "description": "Actual pure helper source.",

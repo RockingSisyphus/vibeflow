@@ -102,7 +102,7 @@ def audit(wheel=None):
         failures.extend(_retired_source_references(path.read_text(), str(path.relative_to(ROOT))))
     for directory in ('src', 'tests', 'sandbox', 'distribution', 'tools'):
         for path in (ROOT / directory).rglob('*.py'):
-            if path.is_relative_to(ROOT / 'tests/fixtures/resource_migration') or '__pycache__' in path.parts:
+            if '__pycache__' in path.parts:
                 continue
             try:
                 tree = ast.parse(path.read_text())

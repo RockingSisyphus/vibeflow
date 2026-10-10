@@ -4,9 +4,14 @@
 
 | 使用情境 | 实际验证入口 |
 | --- | --- |
+| 综合数学应用：自定义源码 Rule、typed records、warning 对照、配置覆盖、分支/汇合、Nodeset/Loop、Port 与复用并发 | 两 Target 的 comprehensive_math/run_all.py；各 integration runner 自动执行；[公式与通过判定](../docs/maintainers/comprehensive-math-sandbox.md) |
+| 简单数学使用场景：CLI、对象、插件修改、异步/Port | 五个 addition 独立入口；各 integration runner 自动执行；[替代与通过判定](../docs/maintainers/history/audits/addition-sandboxes-20261009.md) |
+| 嵌套数学工作流：条件/固定的内外层循环、carry/collect、编译源码、hooks、trace、TaskPlan、调度/数据边和超限诊断 | 两 Target 的 workflow_math/run_all.py；integration 自动执行；[19 项替代与通过判定](../docs/maintainers/history/audits/workflow-math-20261010.md) |
+| 分段数学工作流：直线、互斥分支、多终点、按类型汇合、数据旁路、编译源码和 trace | Python piecewise_math/run_all.py；integration 自动执行；[11 项替代与通过判定](../docs/maintainers/history/audits/piecewise-math-20261010.md) |
 | Python 工作流、Nodeset、Loop、异步、规则入口、CLI 与资源释放 | sandbox/python/integration/run_all.py |
 | JS/TS 最小 AOT、Node/browser、Capability 与 Host Extension | sandbox/javascript/minimal/run_e2e.py、sandbox/javascript/integration/run_all.py |
 | Python/JS 外部规则、typed records、局部替换与领域工作流 | 两 Target 的 rule_graph、domain_rules；tests/integration/test_rule_plugin_graph.py 与两个 Target 的领域测试 |
+| Workflow 静态默认与动态替代、Nodeset 接管、Node 调用选择、空选择、本层与整体范围 | 两 Target 的 rule_selection/run_all.py；integration 自动执行；三份配置逐项断言规则标识、负责路径、Records 绑定、执行次数及局部资料边界 |
 | 多文件 Node、BaseLib、Plugin 与 JS Host | 两 Target 的 multifile_resources；tests/fixtures/rule_gaps/run_all.py --group resources |
 | Python 业务日志、状态、成功、运行失败与启动失败 | sandbox/python/runtime_observation/probe.py；tests/targets/python/test_run_observation.py |
 | JS/TS 状态回调、Node/browser 运行、日志与生命周期 | sandbox/javascript/runtime_observation/probe.py；Target 回归与完整门禁的浏览器步骤 |

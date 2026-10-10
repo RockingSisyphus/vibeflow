@@ -180,6 +180,11 @@ def build_execution_plan(
     _contracts_resolved: bool = False,
     _path: tuple[str, ...] = (),
 ) -> ExecutionPlan:
+    if not _path and getattr(registry, "_loaders", {}):
+        # The impending imports belong to this Workflow, including its explicit
+        # per-call choices. A bare registry.get still uses type defaults.
+        from vibeflow.targets.python.project.sources import collect_workflow_source_context
+        collect_workflow_source_context(registry, graph)
     if not _contracts_resolved:
         from vibeflow.targets.python.project.compiler import GraphCompiler
 
@@ -300,7 +305,7 @@ def _frame_for(
     if is_loop:
         nodeset = graph.nodesets[spec.loop.body]
         nested_overrides = nested_node_config_overrides(spec, overrides)
-        subcompiled = _compile_nodeset(nodeset.graph, registry=registry, owner=f"nodeset:{nodeset.type_key}")
+        subcompiled = _compile_nodeset(nodeset.graph, registry=registry, owner=f"nodeset:{nodeset.type_key}", call_path=(*path, spec.id))
         caller_values = {**dict(spec.params), **dict(global_scope.values), **dict(overrides.get(spec.id, {}))}
         caller_scope = node_invocation_scope(caller_values, allow_config_override=spec.allow_config_override)
         child_scope = merge_config_scopes(normalize_config_scope(nodeset.global_config), caller_scope)
@@ -341,7 +346,7 @@ def _frame_for(
     if is_nodeset:
         nodeset = graph.nodesets[nodeset_type_key]
         nested_overrides = nested_node_config_overrides(spec, overrides)
-        subcompiled = _compile_nodeset(nodeset.graph, registry=registry, owner=f"nodeset:{nodeset.type_key}")
+        subcompiled = _compile_nodeset(nodeset.graph, registry=registry, owner=f"nodeset:{nodeset.type_key}", call_path=(*path, spec.id))
         caller_values = {**dict(spec.params), **dict(global_scope.values), **dict(overrides.get(spec.id, {}))}
         caller_scope = node_invocation_scope(caller_values, allow_config_override=spec.allow_config_override)
         child_scope = merge_config_scopes(normalize_config_scope(nodeset.global_config), caller_scope)
@@ -415,7 +420,7 @@ def _frame_for(
         transfer_incoming=transfer_incoming,
         transfer_outgoing=transfer_outgoing,
         flow_kind=flow_kind,
-        effect_scope=compiled.effect_scopes.get(spec.id, "unconstrained"),
+        effect_scope=registry.call_effect_scopes.get((*path, spec.id), compiled.effect_scopes.get(spec.id, "unconstrained")),
         is_terminal=flow_kind == "terminal",
         is_nodeset=False,
         status=frame_status,
@@ -594,10 +599,10 @@ def _nested_lock_key(current: str, requested: str, *, subject: str) -> str:
     return requested
 
 
-def _compile_nodeset(graph: GraphConfig, *, registry: NodeRegistry, owner: str) -> CompiledGraph:
+def _compile_nodeset(graph: GraphConfig, *, registry: NodeRegistry, owner: str, call_path=()) -> CompiledGraph:
     from vibeflow.targets.python.project.compiler import GraphCompiler
 
-    return GraphCompiler().compile(graph, registry=registry, owner=owner)
+    return GraphCompiler().compile(graph, registry=registry, owner=owner, call_path=call_path)
 
 
 __all__ = ["CompiledBlock", "ExecutionPlan", "NodeFrame", "build_execution_plan"]

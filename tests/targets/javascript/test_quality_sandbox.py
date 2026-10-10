@@ -695,6 +695,21 @@ def test_nodeset_depth_project_setting_reaches_validate_quality_and_build(tmp_pa
     assert code == 0, accepted
 
 
+def test_planned_nodeset_depth_respects_explicit_empty_boundary(tmp_path: Path, capsys) -> None:
+    workspace, project, config = _project_case(tmp_path)
+    _add_planned_chain(project, config, 5)
+    code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--json"])
+    rejected = json.loads(capsys.readouterr().out)
+    assert code == 1 and rejected["code"] == "NODESET.NESTING.DEPTH_EXCEEDED"
+    boundary = project / "nodesets/depth-2.jsonc"
+    data = json.loads(boundary.read_text())
+    data["rulesets"] = []
+    boundary.write_text(json.dumps(data))
+    code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--json"])
+    accepted = json.loads(capsys.readouterr().out)
+    assert code == 0 and accepted["status"] in {"PASS", "CONCERNS"}, accepted
+
+
 def test_planned_nodeset_recursion_reaches_javascript_cli(tmp_path: Path, capsys) -> None:
     workspace, project, config = _project_case(tmp_path)
     _add_planned_chain(project, config, 1)
@@ -724,7 +739,7 @@ def test_review_uses_registered_node_and_nodeset_quality_rules(
     project_config.write_text(json.dumps(data), encoding="utf-8")
     if violation == "node_source":
         source = project / "nodes/greet.ts"
-        source.write_text(source.read_text(encoding="utf-8") + "\n" * 501, encoding="utf-8")
+        source.write_text(source.read_text(encoding="utf-8").replace("  return ", "  // Local implementation\n" * 501 + "  return "), encoding="utf-8")
         expected = "NODE.PURITY.SOURCE_TOO_LARGE"
     else:
         _add_planned_chain(project, config, 5)
@@ -882,6 +897,29 @@ def test_registered_node_direct_recursion_reaches_javascript_quality_cli(
     assert not _formal_findings(payload, "error")
 
 
+@pytest.mark.parametrize("unit", ["lines", "bytes"])
+def test_registered_node_physical_source_limits_include_file_padding(tmp_path: Path, unit: str) -> None:
+    _, project, _ = _project_case(tmp_path)
+    source = project / "nodes/greet.ts"
+    original = source.read_text(encoding="utf-8")
+    from vibeflow.core.quality.policy_data import COMMON_POLICY_DATA
+
+    for extra in (0, 1):
+        if unit == "lines":
+            size = 500 + extra
+            text = "\n".join([*original.splitlines(), *([""] * (size - len(original.splitlines()) - 1)), "// pad"])
+            code = "NODE.PURITY.SOURCE_TOO_LARGE" if extra else "NODE.PURITY.SOURCE_NEAR_LIMIT"
+        else:
+            size = 60000 + extra
+            text = original + "\n//" + "x" * (size - len(original.encode("utf-8")) - 3)
+            code = "NODE.PURITY.SOURCE_BYTES_TOO_LARGE" if extra else "NODE.PURITY.SOURCE_BYTES_NEAR_LIMIT"
+        source.write_text(text, encoding="utf-8")
+        report = _registered_rule_report(project, policy_data=COMMON_POLICY_DATA)
+        matches = [item for item in report.findings if item.object_type == "node" and item.rule_id == code]
+        assert len(matches) == 1 and matches[0].details[unit] == size
+        assert matches[0].severity == ("error" if extra else "warning")
+
+
 def test_registered_node_source_limits_preserve_exact_boundaries(tmp_path: Path) -> None:
     _, project, config = _project_case(tmp_path)
     # SDK resource scope is supplied by this explicit workflow.
@@ -899,15 +937,15 @@ def test_registered_node_source_limits_preserve_exact_boundaries(tmp_path: Path)
         return {item.rule_id: item for item in report.findings if item.object_type == "node"}
 
     lines = original.splitlines()
-    at_lines = findings("\n".join([*lines, *([""] * (499 - len(lines))), "// pad"]))
+    at_lines = findings(original.replace("  return ", "  // Local line\n" * (500 - len(lines)) + "  return "))
     assert "NODE.PURITY.SOURCE_TOO_LARGE" not in at_lines
     assert at_lines["NODE.PURITY.SOURCE_NEAR_LIMIT"].severity == "warning"
-    over_lines = findings("\n".join([*lines, *([""] * (500 - len(lines))), "// pad"]))
+    over_lines = findings(original.replace("  return ", "  // Local line\n" * (501 - len(lines)) + "  return "))
     assert over_lines["NODE.PURITY.SOURCE_TOO_LARGE"].details["lines"] == 501
-    at_bytes = findings(original + "\n//" + "x" * (60000 - len(original.encode("utf-8")) - 3))
+    at_bytes = findings(original.replace("  return ", "  //" + "x" * (60000 - len(original.encode("utf-8")) - 5) + "\n  return "))
     assert "NODE.PURITY.SOURCE_BYTES_TOO_LARGE" not in at_bytes
     assert at_bytes["NODE.PURITY.SOURCE_BYTES_NEAR_LIMIT"].severity == "warning"
-    over_bytes = findings(original + "\n//" + "x" * (60001 - len(original.encode("utf-8")) - 3))
+    over_bytes = findings(original.replace("  return ", "  //" + "x" * (60001 - len(original.encode("utf-8")) - 5) + "\n  return "))
     assert over_bytes["NODE.PURITY.SOURCE_BYTES_TOO_LARGE"].details["bytes"] == 60001
 
 
@@ -981,7 +1019,7 @@ def test_selected_metrics_keep_one_file_and_sdk_declaration_attribution(tmp_path
     data["type_key"] = "example.greet.second"
     second.write_text(json.dumps(data), encoding="utf-8")
     source = project / "nodes/greet.ts"
-    source.write_text(source.read_text(encoding="utf-8") + "\n" * 501, encoding="utf-8")
+    source.write_text(source.read_text(encoding="utf-8").replace("  return ", "  // Local implementation\n" * 501 + "  return "), encoding="utf-8")
     code = main(["quality-check", "--workspace", str(workspace), "--json"])
     payload = json.loads(capsys.readouterr().out)
     assert code == 1 and len(payload["reports"]) == 1
