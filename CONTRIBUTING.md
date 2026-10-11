@@ -26,7 +26,7 @@ Stable import families are:
 
 ```python
 from vibeflow.core import ...
-from vibeflow.core.quality import ...
+from vibeflow.targets.shared.quality_support import ...
 from vibeflow.block_compiler import ...
 from vibeflow.targets.python.project import ...
 from vibeflow.targets.python.runtime import ...
@@ -70,15 +70,15 @@ It uses a disposable working directory, the repository `src` tree only, no user-
 For a focused check, run one independent quality profile:
 
 ```bash
-python quality/run.py --profile base
-python quality/run.py --profile core
-python quality/run.py --profile block-compiler
-python quality/run.py --profile python-target
-python quality/run.py --profile javascript-target
-python quality/run.py --profile all
+python repo_check/run.py --profile base
+python repo_check/run.py --profile core
+python repo_check/run.py --profile block-compiler
+python repo_check/run.py --profile python-target
+python repo_check/run.py --profile javascript-target
+python repo_check/run.py --profile all
 ```
 
-The `quality/` project is self-contained, does not import VibeFlow and is not included in the wheel. `python -m vibeflow quality-check` is a different tool: it checks user projects through Tooling file scanning, Target fact extraction and Core Quality evaluation.
+The `repo_check/` project is self-contained, does not import VibeFlow and is not included in the wheel. `python -m vibeflow quality-check` is a different tool: it checks user projects through Tooling file scanning, Target fact extraction and shared Target quality evaluation.
 
 The runnable suites are organized by Target:
 

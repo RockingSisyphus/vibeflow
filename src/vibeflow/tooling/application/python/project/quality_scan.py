@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from dataclasses import replace
 from pathlib import Path
 
-from vibeflow.core.quality import (
+from vibeflow.targets.shared.quality_support import (
     ProjectQualityFacts,
     QualityPolicy,
     QualityReport,
@@ -20,7 +20,7 @@ from vibeflow.targets.python.quality.parse_cache import parse_python_source
 from vibeflow.targets.python.quality.source_context import PythonSourceFile
 from vibeflow.targets.python.quality.policy_parameters import source_rule_defaults
 from vibeflow.targets.shared.bindings import native_binding
-from vibeflow.builtin.project_quality import bound_project_quality_defaults
+from vibeflow.targets.python.rules.project import bound_project_quality_defaults
 from vibeflow.core.descriptors.contributions import contribution_facts
 from vibeflow.core.rules import RuleContext
 from vibeflow.tooling.project.descriptor_loader import load_builtin_plugins

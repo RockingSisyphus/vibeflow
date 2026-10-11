@@ -7,9 +7,9 @@ import inspect
 from typing import Mapping
 
 from vibeflow.core.findings import HealthFinding
-from vibeflow.targets.python.project.node import EFFECT_SCOPE_NONE
-from vibeflow.targets.python.quality.source_analysis.ast_rules import import_aliases
-from vibeflow.targets.python.quality.source_analysis.effects import (
+from vibeflow.targets.python.nodetypes.protocols import EFFECT_SCOPE_NONE
+from vibeflow.targets.python.quality.source_analysis.ast_facts import import_aliases
+from vibeflow.targets.python.rules.node.effect_policy import (
     call_violation,
     from_import_effect_is_forbidden,
     import_violation_code,
@@ -21,7 +21,7 @@ from vibeflow.targets.python.quality.source_analysis.effects import (
     terminal_stream_is_forbidden,
     terminal_stream_reference,
 )
-from vibeflow.targets.python.quality.source_analysis.types import PurityPolicy
+from vibeflow.targets.python.rules.node.policy import PurityPolicy
 
 
 def validate_python_stub_source(

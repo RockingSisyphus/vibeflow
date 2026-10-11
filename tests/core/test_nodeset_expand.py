@@ -6,7 +6,7 @@ import pytest
 
 from vibeflow.core.config.graph import parse_graph_config_data
 from vibeflow.core.flow import GraphConfig, GraphConfigError, NodeSpec, NodesetSpec
-from vibeflow.core.quality.nodesets import nodeset_quality_findings
+from vibeflow.targets.shared.quality_support.nodesets import nodeset_quality_findings
 
 
 def node(identifier, kind):

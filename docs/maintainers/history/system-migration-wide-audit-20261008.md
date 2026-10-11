@@ -1,5 +1,7 @@
 # VibeFlow 多轮系统迁移全范围审计
 
+本页源码位置保留审计时的历史路径；当前文件归属见[仓库目录职责](../directory-layout.md)。
+
 审计日期：2026-10-08。对象是当前 **0.16.0 未提交工作树**，HEAD 为 `9c443f3`，包含 457 项既有文件变更。本文回答的是当前实际文件中的新旧机制是否继续耦合，不能把 HEAD 或历史发行包当成当前工作树。
 
 **主要迁移已经发生，没有证实两个完整的旧、新注册或校验系统仍作为正式主入口并行运行；但仍有 11 类明确的局部残余。** 其中三类涉及正式审查行为或 Rule 参数没有完整接入，六类是产品中的旧辅助代码、死分支或协议碎屑，一类是活动测试仍转换旧输入，一类是维护检查器保留过期版本政策。另有明确保留的原生执行、兼容格式和薄转发入口，它们确实使部分旧表达或文件不能直接删除，但不能全部称为迁移失败。
@@ -38,7 +40,7 @@
 
 ### M01 旧 BaseLib scanner 仍决定正式效果审查
 
-位置：[effects.py](../../../src/vibeflow/targets/python/quality/rules/effects.py#L27) 的 BaseLib 分支与 [base_lib_effects.py](../../../src/vibeflow/targets/python/quality/rules/base_lib_effects.py#L22)。同一个 `vibeflow.no_side_effects`，BaseLib 进入 `_BaseLibAstScanner`；普通源码和 Plugin 进入 ModulePurityVisitor，Node 及其 helper 使用相关共享 visitor。
+位置：effects.py（历史源码位置：`src/vibeflow/targets/python/quality/rules/effects.py#L27`） 的 BaseLib 分支与 base_lib_effects.py（历史源码位置：`src/vibeflow/targets/python/quality/rules/base_lib_effects.py#L22`）。同一个 `vibeflow.no_side_effects`，BaseLib 进入 `_BaseLibAstScanner`；普通源码和 Plugin 进入 ModulePurityVisitor，Node 及其 helper 使用相关共享 visitor。
 
 旧 scanner 的 `visit_ImportFrom` 没有传入具名导入信息，只特殊处理 sys.argv；`visit_Assign` 主要维护 alias，没有共享 visitor 的进程状态赋值检查；`visit_Attribute` 缺少 terminal stream 引用检查。虽然底层部分效果分类函数共用，**决定访问什么、把什么信息交给分类器的 AST 遍历仍是两套**。
 
@@ -58,7 +60,7 @@
 
 ### M02 Plugin 分支仍用旧名称猜测效果
 
-位置：[effects.py](../../../src/vibeflow/targets/python/quality/rules/effects.py#L51)。分支取得了 source_context，却没有向 ModulePurityVisitor 传 `resolved_calls`；Node、BaseLib、普通源码分支已传入它。[effects 分类器](../../../src/vibeflow/targets/python/quality/source_analysis/effects.py#L339) 已实现“真实可见函数体优先于名称猜测”，Plugin 没有接上。
+位置：effects.py（历史源码位置：`src/vibeflow/targets/python/quality/rules/effects.py#L51`）。分支取得了 source_context，却没有向 ModulePurityVisitor 传 `resolved_calls`；Node、BaseLib、普通源码分支已传入它。effects 分类器（历史源码位置：`src/vibeflow/targets/python/quality/source_analysis/effects.py#L339`） 已实现“真实可见函数体优先于名称猜测”，Plugin 没有接上。
 
 Plugin 支撑文件中的 `def write(value): return value`，由 lifecycle hook 调用时，正式 CLI 报 `NODE.EFFECT.CALL_FORBIDDEN`。只把定义和调用改名为 identity，其他声明、参数和函数体不变，就 PASS；同一个 write helper 在 BaseLib 也 PASS。旧 Module visitor 的名称猜测因此仍支配一条新系统正式链。
 
@@ -66,7 +68,7 @@ Plugin 支撑文件中的 `def write(value): return value`，由 lifecycle hook 
 
 ### M03 JS Rule 参数进入新计划但没有完整进入判定
 
-位置：[共享 Rule 声明](../../../src/vibeflow/builtin/effects.py#L7)、[JS 内置绑定](../../../src/vibeflow/targets/javascript/quality/builtin_plugin.py#L21)、[_source_check](../../../src/vibeflow/targets/javascript/build/rule_session.py#L248)。共享声明允许 `policy` 和 `effect_scope`。JS effects 只用 scope 选择 module_state/host_io topics；JS imports 完全不读取 params，固定选择 purity/imports/ownership。
+位置：共享 Rule 声明（历史源码位置：`src/vibeflow/builtin/effects.py#L7`）、JS 内置绑定（历史源码位置：`src/vibeflow/targets/javascript/quality/builtin_plugin.py#L21`）、[_source_check](../../../src/vibeflow/targets/javascript/build/rule_session.py#L248)。共享声明允许 `policy` 和 `effect_scope`。JS effects 只用 scope 选择 module_state/host_io topics；JS imports 完全不读取 params，固定选择 purity/imports/ownership。
 
 正式 SDK Ruleset 参数覆盖进入 Core RulePlan 的有效参数和执行记录，实际 driver 请求仍只取得上下文 importPolicy 与固定 topics，没有 Rule 的 policy。scope=none 改为 terminal，effects 确实取消 host_io 并改变 console.log 诊断；imports 的 effect_scope/policy 覆盖则不改变其请求。这不是整个参数仲裁系统失效，是新接口最后一段仍靠旧 driver 策略。
 
@@ -104,7 +106,7 @@ Plugin 支撑文件中的 `def write(value): return value`，由 lifecycle hook 
 
 ### M09 JS driver 的无效果旧协议残片
 
-[builtin_plugin.py](../../../src/vibeflow/targets/javascript/quality/builtin_plugin.py#L32) 的 imports 仍发送 ownership topic；[toolchain_driver.mjs](../../../src/vibeflow/targets/javascript/resources/toolchain_driver.mjs#L2225) 已没有它的消费者，只消费 imports/purity/completion/module_state/host_io。实际 ownership-only 请求无诊断，completion 对同一异步片段仍有诊断，不能把无诊断误认为旧 ownership 审查通过。
+builtin_plugin.py（历史源码位置：`src/vibeflow/targets/javascript/quality/builtin_plugin.py#L32`） 的 imports 仍发送 ownership topic；[toolchain_driver.mjs](../../../src/vibeflow/targets/javascript/resources/toolchain_driver.mjs#L2225) 已没有它的消费者，只消费 imports/purity/completion/module_state/host_io。实际 ownership-only 请求无诊断，completion 对同一异步片段仍有诊断，不能把无诊断误认为旧 ownership 审查通过。
 
 driver 的 normalizeImportPolicy 还保存 owner.effectScope，当前没有读取；这个字段在 Rule 重建阶段加入，不能说成早期旧 engine 仍执行。两者是失效传输值或字段，清理不会取消当前显式 ownership 关系和实际其他 topic 检查。详见[JS driver 对照](../evidence/index.md#artifact-e87307d1a005ebd5)与[JS 分层报告](../evidence/index.md#artifact-2764afcb6e3d9ddb)。
 
@@ -120,7 +122,7 @@ driver 的 normalizeImportPolicy 还保存 owner.effectScope，当前没有读�
 
 ### M11 维护文档检查器保留过期版本政策
 
-[quality profiles](../../../quality/src/vibeflow_quality/profiles.py#L93) 对两个旧版本号仍固定建议“改为 0.15.0”。当前源码为 0.16.0，默认发行目录为 0.15.2，这个建议两边都不准确；字符串检查还不区分历史对照与当前安装说明。
+quality profiles（历史源码位置：`quality/src/vibeflow_quality/profiles.py#L93`） 对两个旧版本号仍固定建议“改为 0.15.0”。当前源码为 0.16.0，默认发行目录为 0.15.2，这个建议两边都不准确；字符串检查还不区分历史对照与当前安装说明。
 
 本轮独立临时 README 明确写“当前开发版本为 0.16.0；旧版仅作历史对照”，仍得到 error 和改为 0.15.0 的建议。见[准确输入及诊断](../evidence/index.md#artifact-e25884ae95429fab)。这是旧维护政策，不是旧业务执行系统；应从实际版本来源取得建议，并区分历史叙述。独立仓库 quality 的标准库实现边界本身有意保留，不能据此要求它迁成业务插件。
 

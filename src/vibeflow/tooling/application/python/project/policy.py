@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Mapping
 
 from vibeflow.core.findings import HealthFinding
-from vibeflow.core.quality.workflow_rules.schema_findings import schema_finding
+from vibeflow.targets.shared.quality_support.workflow_rules.schema_findings import schema_finding
 from vibeflow.targets.python.project.policy import (
     DEFAULT_POLICY_DATA,
     EffectivePolicy,

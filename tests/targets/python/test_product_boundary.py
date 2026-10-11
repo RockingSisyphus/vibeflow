@@ -4,8 +4,8 @@ import pytest
 from vibeflow.core.contracts import DataProvider, DataRequirement
 from vibeflow.core.descriptors import NodeContractDescriptor, NodeDescriptor
 from vibeflow.core.rules import RuleContext
-from vibeflow.targets.python.quality.rules.effects import no_side_effects
-from vibeflow.targets.python.quality.rules.node_interface import node_interface
+from vibeflow.targets.python.rules.node.effects import no_side_effects
+from vibeflow.targets.python.rules.node.node_interface import node_interface
 from vibeflow.targets.python.quality.source_context import PythonSourceFile, PythonSourceNode, build_python_source_context
 
 
@@ -47,7 +47,7 @@ def test_selected_effect_policy_still_rejects_explicit_file_io():
     ("plugin", False, False), ("plugin", True, True), (None, False, True), ("node", False, True),
 ))
 def test_node_import_ownership_distinguishes_shared_declarations(shared, used, rejected):
-    from vibeflow.targets.python.quality.rules.node_architecture import node_architecture
+    from vibeflow.targets.python.rules.node.node_architecture import node_architecture
     body = "return Foreign().run_pure(inputs, params)" if used else "return {}"
     source = PythonSourceFile.parse("/virtual/task.py", "task",
         "from foreign import Foreign\nclass Task:\n    def run_pure(self, inputs, params):\n        " + body + "\n")

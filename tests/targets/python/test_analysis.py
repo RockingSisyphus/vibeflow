@@ -33,7 +33,7 @@ def test_python_analysis_target_imports_do_not_load_removed_or_tooling() -> None
     _run_isolated(
         """
 import sys
-import vibeflow.targets.python.quality.rules.base_lib_effects
+import vibeflow.targets.python.rules.node.base_lib_effects
 import vibeflow.targets.python.project.planned
 import vibeflow.targets.python.quality.source_analysis
 

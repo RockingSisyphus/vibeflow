@@ -81,8 +81,8 @@ python tests/fixtures/rule_parity/run_all.py --target python \
 最终汇总 `/tmp/vibeflow-rule-parity-variants-verified.json` 使用统一运行的 Core/Tooling/JS 与冻结后的完整 Python 观察，重新执行同一比较器；保留每组报告来源。原始源码、日志和 observations 在上述两个 work 目录内。
 
 - 比较器隔离 pytest：21 passed，含警告漏报、无关失败、误拒、缺失案例、原因/位置/指标、异常状态与明确旧 CLI 崩溃运输；所需 Rule 诊断不会被崩溃代替。
-- 仓库独立质量：`python quality/run.py --profile all` PASS。
-- 独立质量工具：`python quality/test.py`，45 tests OK。
+- 仓库独立质量：`python repo_check/run.py --profile all` PASS。
+- 独立质量工具：`python repo_check/test.py`，45 tests OK。
 - 新 Python 文件语法、空白及 `git diff --check` 通过；生产树 `src/` 和 `pyproject.toml` 无改动。
 
 六条旧非法契约使正式 CLI 在 `contract_payload` 序列化时崩溃，单列为基线局限；对应审查判断另用真实公开 validator 验证。错误不被包装成成功资料，也不混入新回退数量。

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Mapping
 
-from vibeflow.core.quality import QualityReport
+from vibeflow.targets.shared.quality_support import QualityReport
 
 
 def format_quality_summary(
@@ -15,7 +15,7 @@ def format_quality_summary(
 ) -> str:
     payload = report.to_dict()
     summary = payload["summary"]
-    from vibeflow.core.result_scope import add_result_scope, format_result_scope
+    from vibeflow.tooling.application.result_scope import add_result_scope, format_result_scope
 
     scoped_payload = add_result_scope(
         payload,

@@ -80,6 +80,26 @@ import、static、run 是独立阶段。import 阶段没有伪造编译资料；
 
 ## 目录与职责
 
+具体内置资源由各 Target 独立提供，不存放在 Core 或顶层 Builtin 目录：
+
+```text
+targets/python/                 targets/javascript/
+  rules/                          rules/
+    graph/        图检查             graph/
+    node/         节点源码检查         node/
+    project.py    项目源码检查         project.py
+    plugin.py     标准 Plugin 装配     plugin.py
+  rulesets/       组合与默认          rulesets/
+  nodetypes/      节点声明与接口       nodetypes/
+  quality/        事实与执行适配       quality/
+targets/shared/
+  quality_support/ 纯分析、数据与报告
+  rule_support/    共用算法、政策、Records 与装配辅助
+```
+
+共用支持层不贡献资源声明；声明来源属于对应 Target。Core 不依赖 Target，不预置具体规则或质量阈值。Node 的流程类别与公共 Descriptor 模型仍属于 Core 的工作流契约，Node 声明入口和语言实现协议属于 Target。根目录 `repo_check/` 是不导入 VibeFlow 的独立仓库自检工具。
+
+
 ```text
 src/vibeflow/core/rules/
   selection/

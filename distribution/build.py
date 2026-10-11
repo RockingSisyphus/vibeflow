@@ -568,7 +568,7 @@ def _run_core_self_check() -> None:
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     command = [
         sys.executable,
-        "quality/run.py",
+        "repo_check/run.py",
         "--profile",
         "all",
     ]
@@ -738,7 +738,14 @@ def _copy_javascript_sdk(output: Path) -> None:
     target = output / "kernel/javascript"
     target.mkdir(parents=True, exist_ok=True)
     for name in ("sdk.mjs", "sdk.d.ts", "rule_abi.d.ts", "plugin_abi.d.ts"):
-        (target / name).write_bytes((source / name).read_bytes())
+        data = (source / name).read_text(encoding="utf-8")
+        (target / name).write_text(data.replace("../nodetypes/", "./nodetypes/"), encoding="utf-8")
+    node_source = source.parent / "nodetypes"
+    node_target = target / "nodetypes"
+    node_target.mkdir()
+    for name in ("declarations.mjs", "contracts.d.ts"):
+        data = (node_source / name).read_text(encoding="utf-8")
+        (node_target / name).write_text(data.replace("../resources/sdk", "../sdk"), encoding="utf-8")
 
 
 def _copy_mermaid_renderer_config(output: Path) -> None:

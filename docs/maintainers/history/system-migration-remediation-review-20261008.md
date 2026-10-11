@@ -1,5 +1,7 @@
 # 迁移整改代码独立复核
 
+本页源码位置保留审计时的历史路径；当前文件归属见[仓库目录职责](../directory-layout.md)。
+
 复核日期：2026-10-08。对象为当前 0.16.0 未提交工作树，HEAD 为 `9c443f3111e65e6f99842d86d983416a745d391b`，开始时有 545 项既有 Git 状态记录。依据[原全范围审计](system-migration-wide-audit-20261008.md)与[开发者整改说明](system-migration-remediation-20261008.md)，逐项检查 M01–M11，并检查本轮同时退役的 `required=None` 输入行为。
 
 **原 M01–M11 的具体残余和原复现症状已清理；仍有一个 P2 级共享效果判定缺陷，因而不能无保留接受“相关行为已全部修正”的结论。** F01 位于整改后的 Python 共享遍历器：函数体局部绑定被提前用于默认参数检查，终端与进程参数引用可被误放行。它不是旧 scanner 仍存续的证据，但直接影响统一后的判定正确性。
@@ -8,7 +10,7 @@
 
 ## F01：默认参数被错误地当作函数体局部表达式检查（P2）
 
-位置：[共享 visitor](../../../src/vibeflow/targets/python/quality/source_analysis/visitors.py#L212) 的 `visit_FunctionDef`，特别是 215–218 行；`visit_AsyncFunctionDef`、NodePurityVisitor 与 ModulePurityVisitor 也走这段实现。
+位置：共享 visitor（历史源码位置：`src/vibeflow/targets/python/quality/source_analysis/visitors.py#L212`） 的 `visit_FunctionDef`，特别是 215–218 行；`visit_AsyncFunctionDef`、NodePurityVisitor 与 ModulePurityVisitor 也走这段实现。
 
 当前实现在 `generic_visit(node)` 之前把参数和函数体的局部名称全部写入 `_current_local_names`，并删除同名导入别名。随后 `_is_local_reference` 把默认参数里的同名宿主引用当成局部对象，跳过效果检查。
 

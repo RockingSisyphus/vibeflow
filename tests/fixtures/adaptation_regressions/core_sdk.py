@@ -161,7 +161,7 @@ def _rule_identity_cases(work, kernel):
             extra = ', handler="vibeflow.quality.files"' if variant == "handler_with_source" else ''
             body = f'actual_check = rule(id="case.check", source=SourceLocator("file","declared.py","declared_check"){extra})\n'
         if variant == "builtin_alias":
-            body = ('from dataclasses import replace\nfrom vibeflow.builtin import builtin_rule_resources\n'
+            body = ('from dataclasses import replace\nfrom vibeflow.targets.python.rules import builtin_rule_resources\n'
                     'from vibeflow.targets.python.sdk import ResourceDefinition\n'
                     'builtin = next(item for item in builtin_rule_resources()[0] if item.id=="vibeflow.quality.files")\n'
                     'actual_check = ResourceDefinition(replace(builtin,id="case.check",handler=builtin.id))\n')

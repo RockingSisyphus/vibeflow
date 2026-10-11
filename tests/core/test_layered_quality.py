@@ -8,7 +8,7 @@ import ast
 from pathlib import Path
 
 from vibeflow.core.findings import Finding, HealthFinding
-from vibeflow.core.quality import (
+from vibeflow.targets.shared.quality_support import (
     ProjectQualityFacts,
     QualityPolicy,
     QualityThresholds,
@@ -129,7 +129,7 @@ def test_tooling_only_reads_files_and_adapts_target_facts(tmp_path: Path) -> Non
 
 def test_source_scan_contributes_once_and_reuses_syntax_for_selected_effects(tmp_path, monkeypatch):
     from collections import Counter
-    from vibeflow.builtin.plugin import BuiltinPlugin
+    from vibeflow.targets.shared.rule_support.plugin import BuiltinPlugin
     contributions, parses = [], Counter()
     contribute, parse = BuiltinPlugin.contributions, ast.parse
     def counted_contribution(self, config=None):
@@ -174,13 +174,14 @@ def test_selected_source_effects_keep_syntax_diagnostics_and_valid_file_scope(tm
     assert report.status == "FAIL"
 
 
-def test_core_quality_public_modules_do_not_import_targets_or_tooling() -> None:
+def test_shared_quality_support_does_not_import_concrete_targets_or_tooling() -> None:
     quality_root = (
         Path(__file__).resolve().parents[2]
         / "src"
         / "vibeflow"
-        / "core"
-        / "quality"
+        / "targets"
+        / "shared"
+        / "quality_support"
     )
     for path in quality_root.glob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -191,7 +192,8 @@ def test_core_quality_public_modules_do_not_import_targets_or_tooling() -> None:
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imports.append(node.module)
         assert not any(
-            imported.startswith("vibeflow.targets")
+            imported.startswith("vibeflow.targets.python")
+            or imported.startswith("vibeflow.targets.javascript")
             or imported.startswith("vibeflow.tooling")
             for imported in imports
         ), (path, imports)

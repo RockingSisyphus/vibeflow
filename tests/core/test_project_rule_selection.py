@@ -6,10 +6,10 @@ from tests.fixtures.support.project_rules import evaluate_standard_project_quali
 import pytest
 
 from vibeflow.core.findings import HealthFinding
-from vibeflow.core.quality import FileQuality, ProjectQualityFacts, QualityPolicy, QualityThresholds
+from vibeflow.targets.shared.quality_support import FileQuality, ProjectQualityFacts, QualityPolicy, QualityThresholds
 from vibeflow.core.rules import RuleCall, RuleContext, RuleDescriptor, RuleRecord, RuleRelation, RuleResult, RulesetDescriptor, compile_ruleset, execute_rule_plan
-from vibeflow.builtin import project_quality_handlers, project_quality_resources, project_quality_rule_defaults
-from vibeflow.builtin.project_quality import bound_project_quality_defaults
+from vibeflow.targets.python.rules import project_quality_handlers, project_quality_resources, project_quality_rule_defaults
+from vibeflow.targets.python.rules.project import bound_project_quality_defaults
 
 
 def facts(lines=10):
@@ -53,8 +53,8 @@ def test_project_parameters_follow_native_binding_identity_and_alias():
 
 def test_workflow_depth_parameters_follow_native_binding_identity_and_alias():
     from functools import wraps
-    from vibeflow.builtin.workflow import bound_workflow_depth_defaults
-    from vibeflow.builtin.workflow_plan import nodesets as workflow_rule_checks
+    from vibeflow.targets.python.rules.graph import bound_workflow_depth_defaults
+    from vibeflow.targets.python.rules.graph.workflow import nodesets as workflow_rule_checks
     @wraps(workflow_rule_checks, assigned=(), updated=())
     def alias(*args):
         return workflow_rule_checks(*args)
@@ -98,8 +98,8 @@ def test_standard_configuration_requires_actual_declaration_factory_and_callable
 
 @pytest.mark.parametrize("topic", [False, True])
 def test_depth_configuration_preserves_external_defaults_and_requires_declared_field(topic):
-    from vibeflow.builtin.workflow import bound_workflow_depth_defaults, workflow_topic_handlers
-    from vibeflow.builtin.workflow_plan import nodesets as workflow_rule_checks
+    from vibeflow.targets.python.rules.graph import bound_workflow_depth_defaults, workflow_topic_handlers
+    from vibeflow.targets.python.rules.graph.workflow import nodesets as workflow_rule_checks
     native = workflow_topic_handlers()["vibeflow.graph.nodesets"] if topic else workflow_rule_checks
     owned = RuleDescriptor("domain.depth", params_schema={"nodeset_max_depth": {"type": "integer"}},
         params_defaults={"nodeset_max_depth": 2})

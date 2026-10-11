@@ -7,7 +7,7 @@ from dataclasses import replace
 import os
 from pathlib import Path
 
-from vibeflow.core.quality import (
+from vibeflow.targets.shared.quality_support import (
     FileQuality,
     FunctionQuality,
     ImportSite,

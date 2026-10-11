@@ -6,7 +6,7 @@ import ast
 from tests.fixtures.support.rule_inspection import _inspect_node_source, _valid_node_source, node_document
 
 from vibeflow.core.inspection import build_architecture_report
-from vibeflow.targets.python.quality.source_analysis.ast_rules import import_aliases, import_roots, qualified_call_name
+from vibeflow.targets.python.quality.source_analysis.ast_facts import import_aliases, import_roots, qualified_call_name
 
 
 CycleCopyNode_DECLARATION = node_declaration(NodeDescriptor('test.copy_alt', 'Cycle Copy', 'Copies value.out into a distinct value.in-compatible key.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='Value Out'),), provides=(DataProvider('value.copy', 'value.in', display_name='Value Copy'),), input_semantics={'value.out': ('value to copy around the cycle',)}, output_semantics={'value.copy': ('copied value compatible with value.in',)}), rulesets=("vibeflow.process",))

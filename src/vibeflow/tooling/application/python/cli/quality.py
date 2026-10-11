@@ -29,8 +29,8 @@ def add_quality_parser(subparsers) -> None:
 
 
 def handle_quality_check(args: argparse.Namespace) -> int:
-    from vibeflow.core.result_scope import add_result_scope
-    from vibeflow.core.quality import QualityStructureLimits, QualityThresholds
+    from vibeflow.tooling.application.result_scope import add_result_scope
+    from vibeflow.targets.shared.quality_support import QualityStructureLimits, QualityThresholds
     from vibeflow.tooling.application.python.quality_output import format_quality_summary
     from vibeflow.tooling.application.python.project.quality_scan import DEFAULT_EXCLUDED_DIRS, scan_code_quality
     from vibeflow.core.findings import HealthReport
@@ -168,7 +168,7 @@ def _workspace_quality_report(args, thresholds, structure_overrides, structure_e
 
 
 def _format_health_summary(report) -> str:
-    from vibeflow.core.result_scope import add_result_scope, format_result_scope
+    from vibeflow.tooling.application.result_scope import add_result_scope, format_result_scope
     from vibeflow.tooling.application.python.reports import format_finding_text
 
     payload = add_result_scope(

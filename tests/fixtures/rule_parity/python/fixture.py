@@ -60,7 +60,7 @@ def _adapt_source(source, descriptor, spec):
     class_name = descriptor["implementations"][0]["source"]["export"]
     source = re.sub(r"^(class " + re.escape(class_name) + r"(?:\([^\n]*\))?:\n)",
         lambda match: match.group(0) + metadata, source, flags=re.MULTILINE)
-    prefix = "from vibeflow.targets.python.project.node import NodeInfo, NodeContract\nfrom vibeflow.core import DataProvider, DataRequirement\n"
+    prefix = "from vibeflow.targets.python.nodetypes.protocols import NodeInfo, NodeContract\nfrom vibeflow.core import DataProvider, DataRequirement\n"
     if source.startswith("from __future__ import annotations\n"):
         return source.replace("from __future__ import annotations\n", "from __future__ import annotations\n" + prefix, 1)
     return prefix + source

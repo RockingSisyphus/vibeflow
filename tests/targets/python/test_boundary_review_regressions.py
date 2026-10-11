@@ -4,9 +4,9 @@ import pytest
 from tests.targets.python.test_product_boundary import context
 from vibeflow.core.descriptors import NodeContractDescriptor, NodeDescriptor
 from vibeflow.core.rules import RuleContext
-from vibeflow.targets.python.quality.rules.effects import no_side_effects
-from vibeflow.targets.python.quality.rules.input_writes import input_writes
-from vibeflow.targets.python.quality.rules.node_interface import node_interface
+from vibeflow.targets.python.rules.node.effects import no_side_effects
+from vibeflow.targets.python.rules.node.input_writes import input_writes
+from vibeflow.targets.python.rules.node.node_interface import node_interface
 from vibeflow.targets.python.quality.source_context import PythonSourceFile, PythonSourceNode, build_python_source_context
 from vibeflow.targets.python.quality import PythonSource
 

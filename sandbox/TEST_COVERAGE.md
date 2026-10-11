@@ -22,7 +22,7 @@
 
 ```bash
 python tools/verify_project.py --full
-python quality/test.py
+python repo_check/test.py
 ```
 
 完整验证按锁文件在临时工作区安装 TypeScript/esbuild 和 Mermaid/Puppeteer，实际执行图形与浏览器检查。未准备渲染器的普通 pytest 中出现的跳过，不能代替完整图形验收。

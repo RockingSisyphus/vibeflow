@@ -1,5 +1,7 @@
 # Rule、SDK 与资源装配适配审查
 
+本页源码位置保留审计时的历史路径；当前文件归属见[仓库目录职责](../directory-layout.md)。
+
 本轮在当前工作区确认了 10 个问题主题，另记录 3 个优化／简化项，其中贡献装配已有计数依据。Node 与 Rule 的来源不一致归为同一主题；多个入口的重复检查也归为同一主题。这些数量不表示已经确认相同数量的独立根因。
 
 审查沿着公开 SDK、插件贡献、源码资料、规则执行、编译、绑定和命令输出展开。正式复现使用 VibeFlow 自身的临时项目；源码、测试和现有未提交修改保持原状。源码的 336 个文件与上一轮验收冻结版本一致，SHA256 为 `ae80abf25296130cfde83239c6a4b6cf42632353cbb927d561a3711b5f1d7d34`。本报告是一轮有证据的调用链审查，未执行新的全量或发行验收。
@@ -61,7 +63,7 @@ workspace inspect-config 先 validate，再通过 export 装配并检查一次�
 
 JS 构建准备审查直接选择的 Host，之后才通过 `host_extension_closure` 展开实例依赖；正式 validate 则在审查前展开。依赖 Host 的默认 Ruleset 因而可能没有在构建中执行。独立对照中，501 行支撑文件被 validate 正确拒绝，构建准备及正式 `build --target node --profile esm-module` 仍通过，最终使用集合包含父子两个 Host，规则执行 subject 只有父 Host。应提前确定实际资源闭包，供审查、绑定、架构和打包共同消费；这保持 Host 的原有依赖与实例协议。
 
-位置：[Python 结构资料](../../../src/vibeflow/tooling/application/python/project/quality.py)、[JS 结构资料](../../../src/vibeflow/tooling/application/javascript/cli.py)、[Core 分层 Rule](../../../src/vibeflow/core/quality/root_structure.py)、[workspace inspect](../../../src/vibeflow/tooling/application/python/cli/__init__.py)、[project inspect](../../../src/vibeflow/tooling/application/python/cli/config.py)、[Node inspect](../../../src/vibeflow/tooling/application/python/cli/node.py)、[JS 构建装配](../../../src/vibeflow/tooling/application/javascript/build.py)、[JS 正式审查](../../../src/vibeflow/tooling/application/javascript/audit.py)。
+位置：[Python 结构资料](../../../src/vibeflow/tooling/application/python/project/quality.py)、[JS 结构资料](../../../src/vibeflow/tooling/application/javascript/cli.py)、Core 分层 Rule（历史源码位置：`src/vibeflow/core/quality/root_structure.py`）、[workspace inspect](../../../src/vibeflow/tooling/application/python/cli/__init__.py)、[project inspect](../../../src/vibeflow/tooling/application/python/cli/config.py)、[Node inspect](../../../src/vibeflow/tooling/application/python/cli/node.py)、[JS 构建装配](../../../src/vibeflow/tooling/application/javascript/build.py)、[JS 正式审查](../../../src/vibeflow/tooling/application/javascript/audit.py)。
 
 ## 可以同步简化的适配层
 

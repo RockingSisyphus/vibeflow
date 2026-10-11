@@ -9,3 +9,7 @@ def attach_definitions(catalog, definitions):
 
 def load_plugin_definition(source, *, owner, workspace, node_command):
     return load_plugin(source, root=owner.path, project_config=owner.project_config, node_command=node_command)
+
+def load_builtin_definition(*, project_only=False):
+    from vibeflow.targets.javascript.rules.plugin import builtin_plugin
+    return builtin_plugin()

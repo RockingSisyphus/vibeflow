@@ -54,7 +54,7 @@ import vibeflow.targets.python.runtime.compiled
 forbidden = (
     "vibeflow.targets.python.project.compiler",
     "vibeflow.graph_config",
-    "vibeflow.targets.python.project.node",
+    "vibeflow.targets.python.nodetypes.protocols",
     "vibeflow.targets.python.project.plugins",
     "vibeflow.runtime",
     "vibeflow.tooling",

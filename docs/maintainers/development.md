@@ -52,7 +52,7 @@ pytest 使用独立进程，并按文件分组；同一文件内的测试按顺�
 仓库自检器为：
 
 ```bash
-python quality/run.py --profile all
+python repo_check/run.py --profile all
 ```
 
 它检查目录、依赖方向、Target 隔离、生成物、文档链接和发行源。用户项目使用 `python -m vibeflow quality-check` 或发行包装器的 `quality`。

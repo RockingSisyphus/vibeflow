@@ -4,16 +4,32 @@
 | --- | --- |
 | 根目录 | 项目入口、许可证、构建与 Git/CI 元数据；不保存临时脚本或运行输出 |
 | .github | GitHub Actions、Issue 和 Pull Request 模板 |
-| src/vibeflow | Core、BlockCompiler、Builtin、Python/JavaScript Target、Tooling 的核心源码及运行资源 |
+| src/vibeflow | Core、BlockCompiler、Python/JavaScript Target、Target 共用支持与 Tooling 的核心源码及运行资源 |
 | distribution | 构建器、profile 配置、提示词、项目模板、最小项目和 distribution/docs 用户文档原稿 |
 | dist | 最新正式发行目录、对应 ZIP 和校验清单 |
 | archive | 被替换的历史发行 ZIP；同版本不同构建可保存在 history 下 |
 | sandbox/python、sandbox/javascript | 公开 SDK/CLI 与真实宿主环境中的使用项目，直接加载工作区 src |
 | tests | 非沙盒功能、代码、集成、一致性和实现回归；fixtures 保存输入、基线和独立回归 runner |
-| quality | 独立的仓库质检工具及其自身测试，不进入产品发行包 |
+| repo_check | 独立的仓库质检工具及其自身测试，不进入产品发行包 |
 | references | 外来参考项目，不作为生成产物仓库 |
 | tools | 开发、验证、清理和辅助工具 |
 | docs | 当前设计、维护说明、执行计划、历史结论与证据索引；图片及长期阅读工作簿等正文资源放在 assets |
+
+## Rule 与 Node 的源码边界
+
+Core 的 `core/rules/` 负责公共 Rule/Ruleset 模型、资源选择、范围规划、依赖组合、执行与结果复用，不提供具体内置规则、阈值或质量检查算法。
+
+Python 和 JavaScript Target 分别维护 `rules/`、`rulesets/`、`nodetypes/`：
+
+- `rules/graph/` 定义和实现图级检查；`rules/node/` 定义和实现节点源码检查；`rules/project.py` 定义项目源码质量检查。
+- `rulesets/` 定义组合、依赖、阶段入口、Workflow 默认；各 Target 自己表达支持范围，不在装配时修改另一语言的 Ruleset。
+- `nodetypes/` 保存现有节点声明与语言接口；SDK 保持原公开入口，节点仍经 Plugin 贡献资源，不新增隐式默认。
+- Target 的 `quality/` 提供事实、上下文、执行组织和报告，具体规则判断归 `rules/`。
+- `targets/shared/quality_support/` 和 `rule_support/` 提供共用算法、事实数据、Record 契约与装配辅助，不登记 Rule 或 Ruleset，也不依赖具体 Target。
+
+CLI 的结果范围与内置检查说明由 `tooling/application/result_scope.py` 维护，不进入 Core。
+
+资源声明来源和实现来源分别记录：图检查可复用共用算法，但声明的来源仍是对应 Target 的 `rules/`；Ruleset 的来源是对应 `rulesets/`。
 
 ## 产物与证据
 

@@ -10,7 +10,7 @@ from vibeflow.core.flow import GraphConfig, NodeSpec
 from vibeflow.core.rules import RuleContext
 from vibeflow.targets.javascript.build.driver_session import DriverScope
 from vibeflow.targets.javascript.build.analysis_service import JavascriptAnalysis
-from vibeflow.targets.javascript.quality.builtin_plugin import javascript_rule_bindings
+from vibeflow.targets.javascript.rules.plugin import javascript_rule_bindings
 from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
 from vibeflow.targets.javascript.quality.rules import run_javascript_rules
 from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs

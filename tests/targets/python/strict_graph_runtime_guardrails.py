@@ -11,7 +11,7 @@ from vibeflow.targets.python.project import NodeRegistry
 from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from vibeflow.targets.python.quality import validate_graph_health
 from vibeflow.targets.python.runtime import PipelineRuntime, RuntimeOptions
-from vibeflow.targets.python.quality.source_analysis.types import PurityPolicy
+from vibeflow.targets.python.rules.node.policy import PurityPolicy
 from vibeflow.core.rules.models import plain
 
 from tests.fixtures.support.strict_support import INPUT_SPEC, PROV_SPEC, REQ_SPEC, _edge_chain, _node_call, _registry

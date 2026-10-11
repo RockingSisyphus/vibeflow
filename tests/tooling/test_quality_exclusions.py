@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from vibeflow.tooling.application.cli import main as cli_main
-from vibeflow.core.quality import (
+from vibeflow.targets.shared.quality_support import (
     QualityStructureLimits,
     QualityThresholds,
 )

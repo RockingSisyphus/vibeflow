@@ -15,17 +15,17 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     rows = []
     emit = lambda name, title, family, operation, expected, **kw: support.append(rows, name, title, family, operation, expected, **kw)
     codes = support.expectation
-    from vibeflow.core.quality import FileQuality, FunctionQuality, ImportSite, ProjectQualityFacts, QualityPolicy, QualityStructureLimits, QualityStructureRoles, QualityThresholds
-    from vibeflow.core.quality.models import QualityStructureConventions
-    from vibeflow.core.quality.implementation import CallChain, ImplementationLimits, ImplementationMetrics, analyze_call_graph
+    from vibeflow.targets.shared.quality_support import FileQuality, FunctionQuality, ImportSite, ProjectQualityFacts, QualityPolicy, QualityStructureLimits, QualityStructureRoles, QualityThresholds
+    from vibeflow.targets.shared.quality_support.models import QualityStructureConventions
+    from vibeflow.targets.shared.quality_support.implementation import CallChain, ImplementationLimits, ImplementationMetrics, analyze_call_graph
 
     if variant == "baseline":
-        from vibeflow.core.quality import evaluate_project_quality
-        from vibeflow.core.quality.implementation import (evaluate_node_implementation,
+        from vibeflow.targets.shared.quality_support import evaluate_project_quality
+        from vibeflow.targets.shared.quality_support.implementation import (evaluate_node_implementation,
             evaluate_base_lib_implementation, evaluate_base_lib_dependency_chain)
     else:
         from tests.fixtures.rule_parity.core.support import evaluate_standard_project_quality as evaluate_project_quality
-        from vibeflow.builtin.implementation import (check_node_implementation as evaluate_node_implementation,
+        from vibeflow.targets.shared.rule_support.implementation import (check_node_implementation as evaluate_node_implementation,
             check_base_lib_implementation as evaluate_base_lib_implementation, check_base_lib_dependency_chain as evaluate_base_lib_dependency_chain)
 
     def file(path="sample.py", **changes):
@@ -151,7 +151,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             classification="baseline_limitation" if name == "self_cycle" else "preserved",
             notes="Public project evaluation deliberately removes resolved self-import edges; the explicit dependency algorithm is tested separately." if name == "self_cycle" else "",
             evidence="core/quality/dependencies.py:156-191; evaluator local graph resolution")
-    from vibeflow.core.quality.dependencies import dependency_findings
+    from vibeflow.targets.shared.quality_support.dependencies import dependency_findings
     emit("dependencies.self_cycle_direct", "直接公共依赖算法仍识别显式自环", "project.dependencies.variants",
         lambda: dependency_findings({"a": ("a",)}, {}, QualityThresholds())[0], codes(("QUALITY.DEPENDENCY.CYCLE", "error")),
         notes="This checks the direct public algorithm, not a claim that the default evaluator retains self-import edges.", evidence="core/quality/dependencies.py:51-70,186-200")
@@ -179,9 +179,9 @@ def _graph_variants(emit, codes, support, variant):
     from vibeflow.core.contracts import DataProvider, DataRequirement
     from vibeflow.core.flow import EdgeSpec, ExecutionLockSpec, GraphConfig, LoopSpec, NodeMetadata, NodeSpec, NodesetSpec
     from vibeflow.core.models import CoreCompileRequest, ImplementationFact, ImplementationFacts, TargetFeatureSet
-    from vibeflow.core.quality.workflow_rules.flow import append_join_policy_health
-    from vibeflow.core.quality.workflow_rules.flow_data import append_data_contract_warnings
-    from vibeflow.core.quality.workflow_rules.planned import graph_has_blocking_planned, graph_has_planned, planned_health_events
+    from vibeflow.targets.shared.quality_support.workflow_rules.flow import append_join_policy_health
+    from vibeflow.targets.shared.quality_support.workflow_rules.flow_data import append_data_contract_warnings
+    from vibeflow.targets.shared.quality_support.workflow_rules.planned import graph_has_blocking_planned, graph_has_planned, planned_health_events
     from vibeflow.core.planned import PlannedBehavior
 
     def node(name, kind="process", **fields):
@@ -300,7 +300,7 @@ def _graph_variants(emit, codes, support, variant):
             notes="Actual compilation succeeds: the union has consumer↔b while schedule and transfer separately remain acyclic. The one-source requirement warns; all is a normal control.",
             evidence="core/compiler.py schedule/transfer cycle checks; core/quality/workflow_rules/flow_data.py:263-264,361-370")
 
-    from vibeflow.core.quality.nodesets import nodeset_quality_findings
+    from vibeflow.targets.shared.quality_support.nodesets import nodeset_quality_findings
     for invocation in ("nodeset", "loop"):
         def nested_call(name, target):
             return NodeSpec(name, target) if invocation == "nodeset" else NodeSpec(name, "vibeflow.loop.while", loop=LoopSpec(body=target))

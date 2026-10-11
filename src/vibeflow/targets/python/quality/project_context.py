@@ -4,7 +4,7 @@ from dataclasses import replace
 import os
 from pathlib import PurePath
 
-from vibeflow.core.quality import ImportSite, ProjectQualityFacts, QualityPolicy, QualityThresholds
+from vibeflow.targets.shared.quality_support import ImportSite, ProjectQualityFacts, QualityPolicy, QualityThresholds
 from vibeflow.targets.python.quality.source import PythonSource, analyze_python_source_tree, _syntax_error
 
 
@@ -45,7 +45,7 @@ def source_quality_policy(purity_policy=None):
 
 def project_rule_facts(plan,source_context,cache, *, handlers):
     from inspect import unwrap
-    from vibeflow.builtin.project_quality import project_quality_handlers
+    from vibeflow.targets.python.rules.project import project_quality_handlers
     native = tuple(project_quality_handlers().values())
     def needs_facts(invocation):
         handler = handlers.get(invocation.rule.handler or invocation.rule.id, handlers.get(invocation.rule.id))

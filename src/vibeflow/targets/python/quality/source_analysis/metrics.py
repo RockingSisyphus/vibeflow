@@ -3,8 +3,8 @@ from __future__ import annotations
 import ast
 from typing import Any
 
-from vibeflow.core.quality.implementation import analyze_call_graph
-from vibeflow.targets.python.quality.source_analysis.ast_rules import boolop_branch_count, call_name
+from vibeflow.targets.shared.quality_support.implementation import analyze_call_graph
+from vibeflow.targets.python.quality.source_analysis.ast_facts import boolop_branch_count, call_name
 from vibeflow.targets.python.quality.source_analysis.helpers import _fingerprint_function
 from vibeflow.targets.python.quality.source_analysis.types import _CallChainAnalysis
 

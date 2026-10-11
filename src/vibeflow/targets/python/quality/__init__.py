@@ -26,7 +26,7 @@ _EXPORTS = {
         "analyze_python_source",
     ),
     "ModulePurityVisitor": (
-        "vibeflow.targets.python.quality.source_analysis",
+        "vibeflow.targets.python.rules.node.effect_visitors",
         "ModulePurityVisitor",
     ),
     "NodeMetrics": (
@@ -34,11 +34,11 @@ _EXPORTS = {
         "NodeMetrics",
     ),
     "NodePurityVisitor": (
-        "vibeflow.targets.python.quality.source_analysis",
+        "vibeflow.targets.python.rules.node.effect_visitors",
         "NodePurityVisitor",
     ),
     "PurityPolicy": (
-        "vibeflow.targets.python.quality.source_analysis",
+        "vibeflow.targets.python.rules.node.policy",
         "PurityPolicy",
     ),
     "PurityViolation": (

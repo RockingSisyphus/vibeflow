@@ -39,9 +39,15 @@ def materialized_resources():
         yield directory
         return
     with tempfile.TemporaryDirectory(prefix="vibeflow-js-resources-") as temporary:
-        path = Path(temporary)
+        path = Path(temporary) / "resources"
+        path.mkdir()
         for name in RESOURCE_NAMES:
             (path / name).write_bytes(directory.joinpath(name).read_bytes())
+        node_directory = files("vibeflow.targets.javascript.nodetypes")
+        node_path = Path(temporary) / "nodetypes"
+        node_path.mkdir()
+        for name in ("declarations.mjs", "contracts.d.ts"):
+            (node_path / name).write_bytes(node_directory.joinpath(name).read_bytes())
         yield path
 
 

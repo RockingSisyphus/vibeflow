@@ -2282,7 +2282,7 @@ def test_distribution_self_check_uses_standalone_quality_project(monkeypatch) ->
 
     expected_command = [
         sys.executable,
-        "quality/run.py",
+        "repo_check/run.py",
         "--profile",
         "all",
     ]

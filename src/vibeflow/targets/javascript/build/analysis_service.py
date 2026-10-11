@@ -6,7 +6,7 @@ from typing import Any, Mapping
 from vibeflow.core.findings import Finding
 from vibeflow.core.rules import RuleContext, RuleResult
 from vibeflow.core.rules.models import plain
-from vibeflow.core.quality import ProjectQualityFacts
+from vibeflow.targets.shared.quality_support import ProjectQualityFacts
 from vibeflow.targets.javascript.build.toolchain import run_rule_check_driver, run_quality_facts_driver
 from vibeflow.targets.javascript.build.quality_source import _file_fact, _finding_fact
 from vibeflow.targets.javascript.quality.diagnostics import rule_finding

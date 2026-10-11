@@ -59,8 +59,8 @@ def append(rows, case_id, title, family, operation, expected, *, classification=
         "expected": expected, "actual": observe(operation), "classification": classification, "notes": notes, "evidence": evidence})
 
 def evaluate_standard_project_quality(facts, policy=None, **kwargs):
-    from vibeflow.builtin.project_quality import bound_project_quality_defaults
-    from vibeflow.core.quality import evaluate_project_quality
+    from vibeflow.targets.python.rules.project import bound_project_quality_defaults
+    from vibeflow.targets.shared.quality_support import evaluate_project_quality
     from vibeflow.targets.shared.bindings import native_binding
     from vibeflow.tooling.project.descriptor_loader import load_builtin_plugins
     catalog = load_builtin_plugins("project").catalogs

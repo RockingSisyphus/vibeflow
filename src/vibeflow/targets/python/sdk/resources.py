@@ -41,7 +41,7 @@ def _location(value=None):
         return path, line, value.__qualname__
     frame = inspect.currentframe()
     while frame is not None:
-        if not frame.f_globals.get("__name__", "").startswith(__package__):
+        if not frame.f_globals.get("__name__", "").startswith((__package__, "vibeflow.targets.python.nodetypes.declarations")):
             return frame.f_code.co_filename, frame.f_lineno, ""
         frame = frame.f_back
     return "", None, ""
@@ -116,13 +116,6 @@ def _decorator(kind, options, source=None):
     return attach
 
 
-def node(*, type_key: str, contract, flow_kind="process", source=None, **options):
-    """Declare a class implementing run_pure; source enables delayed binding."""
-    options = {"type_key": type_key, "contract": contract, "flow_kind": flow_kind,
-               "display_name": type_key, "description": type_key, "version": "1.0.0", **options}
-    return _decorator("node", options, source)
-
-
 def rule(*, id: str, source=None, **options):
     """Declare an ordinary check(context, inputs, params) function."""
     if options.get("handler") and source is None and not options.get("implementations"):
@@ -157,5 +150,5 @@ def host_extension(*, id: str, **options):
     return _declare("host_extension", {"id": id, **options})
 
 
-__all__ = ["ResourceDefinition", "node", "rule", "ruleset", "data_schema", "capability",
+__all__ = ["ResourceDefinition", "rule", "ruleset", "data_schema", "capability",
            "base_lib", "lifecycle", "host_extension", "RuleCall", "RuleRelation", "SourceLocator", "RulesetDescriptor"]

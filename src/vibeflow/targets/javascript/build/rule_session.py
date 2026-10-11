@@ -11,15 +11,13 @@ import json
 from typing import Any, Mapping
 
 from vibeflow.core.findings import Finding, HealthFinding
-from vibeflow.core.rules import (
-    RuleContext, RuleRecord, RuleResult, compile_ruleset, execute_rule_plan,
-    EFFECT_POLICY_TYPE, RuleGraphError, rule_graph_error_finding,
-)
+from vibeflow.targets.shared.rule_support.effect_records import EFFECT_POLICY_TYPE
+from vibeflow.core.rules import RuleContext, RuleRecord, RuleResult, compile_ruleset, execute_rule_plan, RuleGraphError, rule_graph_error_finding
 from vibeflow.core.rules.models import plain
 from vibeflow.core.rules.selection import resolve_node_selection
 from vibeflow.core.rules.planning import graph_rule_subjects, graph_rule_tasks, scoped_graph
-from vibeflow.builtin.project_quality import bound_project_quality_defaults
-from vibeflow.core.quality import ProjectQualityFacts, QualityPolicy
+from vibeflow.targets.javascript.rules.project import bound_project_quality_defaults
+from vibeflow.targets.shared.quality_support import ProjectQualityFacts, QualityPolicy
 from vibeflow.core.flow import LOOP_NODE_TYPES, STATUS_PLANNED
 from vibeflow.targets.javascript.build.plugin_session import JavascriptPluginSession
 from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
@@ -186,7 +184,7 @@ class _RuleSession:
                 if context.subject.get("kind") == "node" and plan.graph_scope == "effective_subtree":
                     raise ProjectBuildError("RULE.GRAPH_SCOPE.NODE", "Node selections cannot use an effective_subtree Ruleset")
                 from inspect import unwrap
-                from vibeflow.builtin.project_quality import project_quality_handlers
+                from vibeflow.targets.javascript.rules.project import project_quality_handlers
                 project_handlers = tuple(project_quality_handlers().values())
                 bound_rules = {item.rule.id:native_binding(self.catalogs,"rule",item.rule.id) for item in plan.invocations}
                 core_handlers = tuple(binding for rule in self.catalogs.rules

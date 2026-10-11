@@ -4,7 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, Mapping
 
-from vibeflow.core.quality import (
+from vibeflow.targets.shared.quality_support import (
     DirectoryQuality,
     FileQuality,
     PrefixClusterQuality,

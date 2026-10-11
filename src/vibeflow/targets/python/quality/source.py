@@ -7,7 +7,7 @@ import copy
 from dataclasses import dataclass
 from typing import Any
 
-from vibeflow.core.quality import (
+from vibeflow.targets.shared.quality_support import (
     FileQuality,
     FunctionQuality,
     ImportSite,

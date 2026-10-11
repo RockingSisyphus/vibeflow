@@ -5,7 +5,7 @@ import pytest
 
 from vibeflow.core.flow import GraphConfigError
 from vibeflow.core.rules.planning import graph_rule_tasks
-from vibeflow.builtin import builtin_rule_resources
+from vibeflow.targets.python.rules import builtin_rule_resources
 from vibeflow.tooling.project.graph_config import parse_graph_config
 
 

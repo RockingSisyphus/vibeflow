@@ -1,7 +1,7 @@
 """Read JavaScript Rule defaults without loading Node or Rule code."""
 
-from vibeflow.builtin.project_quality import bound_project_quality_defaults
-from vibeflow.builtin.workflow import bound_workflow_depth_defaults
+from vibeflow.targets.javascript.rules.project import bound_project_quality_defaults
+from vibeflow.targets.javascript.rules.graph import bound_workflow_depth_defaults
 from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy
 from vibeflow.targets.shared.bindings import native_binding
 

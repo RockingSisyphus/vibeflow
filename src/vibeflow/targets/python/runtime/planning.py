@@ -20,7 +20,7 @@ from vibeflow.core.flow import (
 from vibeflow.core.nodeset_dependencies import nodeset_depth_violations
 from vibeflow.core.constants import FLOW_KIND_GLOBAL_STATE, FLOW_KIND_PREDEFINED
 from vibeflow.core.flow import ExecutionLockSpec
-from vibeflow.targets.python.project.node import PureNode
+from vibeflow.targets.python.nodetypes.protocols import PureNode
 from vibeflow.targets.python.project.bindings import PythonBindingPlan
 from vibeflow.core.planned import (
     PLANNED_BEHAVIOR_PYTHON_STUB,

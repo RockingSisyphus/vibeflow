@@ -1,19 +1,37 @@
 """Default resources use the same contributions and bindings as SDK resources."""
 from pathlib import Path
 
-from vibeflow.builtin.plugin import project_plugin
-from vibeflow.builtin.implementation import implementation_handlers, implementation_resources
+import pytest
+
+from vibeflow.targets.python.rules.plugin import project_plugin
+from vibeflow.targets.python.rules.node.definitions import implementation_handlers
+from vibeflow.targets.python.rules.node.definitions import implementation_resources
 from vibeflow.core.descriptors import compose_contributions
-from vibeflow.core.quality import FileQuality, ProjectQualityFacts, evaluate_project_quality
-from vibeflow.core.quality.implementation import ImplementationLimits, ImplementationMetrics
+from vibeflow.targets.shared.quality_support import FileQuality, ProjectQualityFacts, evaluate_project_quality
+from vibeflow.targets.shared.quality_support.implementation import ImplementationLimits, ImplementationMetrics
 from vibeflow.core.rules import RuleCall, RuleContext, RuleRelation, RulesetDescriptor, compile_ruleset, execute_rule_plan
 from vibeflow.targets.python.sdk import Plugin, rule
 from vibeflow.tooling.application.plugin_definitions import attach_plugin_definitions
 from vibeflow.targets.shared.bindings import native_binding
 
 
+@pytest.mark.parametrize("target", ["python", "javascript"])
+def test_standard_definitions_are_owned_by_the_selected_target(target):
+    from vibeflow.tooling.project.descriptor_loader import load_builtin_plugins
+    catalogs = load_builtin_plugins(target).catalogs
+    assert len(tuple(catalogs.rules)) == 26
+    assert len(tuple(catalogs.rulesets)) == 12
+    for group, directory, entries in (("rules", "rules", catalogs.rules),
+                                      ("rulesets", "rulesets", catalogs.rulesets)):
+        for entry in entries:
+            origin = catalogs.origins[(group, entry.id)]
+            assert f"/targets/{target}/{directory}/" in origin.path
+    assert [item.id for item in catalogs.rulesets if item.workflow_default] == ["vibeflow.workflow"]
+    assert catalogs.rulesets.require("vibeflow.workflow").graph_scope == "effective_subtree"
+
+
 def test_core_project_evaluator_has_no_implicit_standard_selection(monkeypatch):
-    import vibeflow.builtin.plugin as providers
+    import vibeflow.targets.python.rules.plugin as providers
     monkeypatch.setattr(providers, "project_plugin", lambda: (_ for _ in ()).throw(AssertionError("implicit provider")))
     file = FileQuality("large.py", "large", 10000, 100000, 0, 0, 0, 0, 0, (), ())
     report = evaluate_project_quality(ProjectQualityFacts("/scope", (file,)))
@@ -48,7 +66,7 @@ def test_contributed_native_replacement_is_resolved_by_its_own_origin():
     descriptor = catalog.rules.require("vibeflow.quality.files")
     assert not descriptor.handler
     assert origin.symbol == "project_quality_resources"
-    assert catalog.origins[("rulesets", "vibeflow.quality.project")].symbol == "project_quality_resources"
+    assert catalog.origins[("rulesets", "vibeflow.quality.project")].symbol == "project_quality_ruleset"
     implementation = descriptor.implementations[0].source
     assert implementation.export == "_files"
     assert Path(implementation.ref).is_file()

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import ast
 import json
 
-from vibeflow.core.quality.implementation import CallChain, ImplementationMetrics, analyze_call_graph
+from vibeflow.targets.shared.quality_support.implementation import CallChain, ImplementationMetrics, analyze_call_graph
 from vibeflow.targets.python.quality.source_analysis.metrics import _ComplexityCounter, _analyze_internal_call_chain
 
 

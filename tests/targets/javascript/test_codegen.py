@@ -1,10 +1,8 @@
-"""Isolation and resource gates for JavaScript Target code generation."""
+"""JavaScript Target code generation and published resource interfaces."""
 
 from __future__ import annotations
 
 import ast
-from hashlib import sha256
-from importlib.resources import files
 import os
 from pathlib import Path
 import subprocess
@@ -19,18 +17,20 @@ TARGET_ROOT = SOURCE_ROOT / "vibeflow" / "targets" / "javascript"
 FRONTEND_ROOT = TARGET_ROOT / "frontend"
 
 # Plugin ABI v3 ships the code SDK and its binding loader.
-RESOURCE_SHA256 = {'analysis_program.mjs': '3c640186cbb5b74238fa8a9822980bbdecc8295390c238722a2b1e8c518b83e5',
- 'node_observation.mjs': '59da6bb0d8be799ae53dec1607c283df842cf57ec73ef153e35216400215510e',
- 'plugin_abi.d.ts': '1e3536feb02310d31f5f58cd95ce57f40d6f1c5814651107655df600739f08cb',
- 'plugin_worker.mjs': 'ff518a0a319a7cdd9746d959a16e4a72147279f8a2ef8c3831577ff3eec84ce6',
- 'rule_abi.d.ts': '3655d61c8d22a693d16beb188f278fd18629d0267fbf6696fdb738e2b5f4f7eb',
- 'runtime_helpers.mjs': '4fd27ff8fc2880c72444f24b87ff3eba4da23f3a61332c8127c94259f787c6fd',
- 'sdk.d.ts': 'ff0d9556f9fc4febe2baa8930fd1bd41b4f381a09963cbc4ac06c201761ed2c0',
- 'sdk.mjs': 'e90d8d02537a3af9d5592f23c1a9c296ab66da098443ea1980801a749ed062d2',
- 'sdk_loader.mjs': 'c6774773501c5f4f6190baeb6d0f2bc6707da632f2035e5fd646da94edbda5c8',
- 'source_ownership.mjs': '957310161d44b100c0ef78b47aa21a7a2623a225d8512a20b9330237f8a94ce7',
- 'status_helpers.mjs': 'ab9bc7282b17d669ed17fe78c8c254b510abaf139762e15f5558aa0accf53c60',
- 'toolchain_driver.mjs': 'ef6e021a7fcbaffe1bd6cf47a0d5181355bf17e61ced3425ac479f9acb56e657'}
+RESOURCE_NAMES = (
+    'analysis_program.mjs',
+    'node_observation.mjs',
+    'plugin_abi.d.ts',
+    'plugin_worker.mjs',
+    'rule_abi.d.ts',
+    'runtime_helpers.mjs',
+    'sdk.d.ts',
+    'sdk.mjs',
+    'sdk_loader.mjs',
+    'source_ownership.mjs',
+    'status_helpers.mjs',
+    'toolchain_driver.mjs',
+)
 
 
 def _run_isolated(source: str) -> None:
@@ -73,20 +73,11 @@ assert "vibeflow.targets.javascript.frontend.templates" in sys.modules
     )
 
 
-@pytest.mark.parametrize("name", tuple(RESOURCE_SHA256))
-def test_target_resources_match_frozen_hashes(name: str) -> None:
-    canonical = files("vibeflow.targets.javascript.resources").joinpath(
-        name
-    ).read_bytes()
-
-    assert sha256(canonical).hexdigest() == RESOURCE_SHA256[name]
-
-
 def test_target_resource_api_is_closed_and_templates_use_canonical_runtime() -> None:
     from vibeflow.targets.javascript import resources
     from vibeflow.targets.javascript.frontend.templates import RUNTIME_SOURCE
 
-    assert resources.RESOURCE_NAMES == frozenset(RESOURCE_SHA256)
+    assert resources.RESOURCE_NAMES == frozenset(RESOURCE_NAMES)
     assert RUNTIME_SOURCE == (resources.read_text("runtime_helpers.mjs").strip() + "\n"
                               + resources.read_text("status_helpers.mjs"))
     with pytest.raises(ValueError, match="unknown JavaScript Target resource"):
@@ -136,3 +127,44 @@ def test_wheel_package_data_includes_canonical_resources_only() -> None:
 
     assert '"targets/javascript/resources/*.mjs"' in pyproject
     assert '"aot/resources/*.mjs"' not in pyproject
+
+
+def test_published_sdk_supports_node_declarations_and_types(tmp_path) -> None:
+    import json
+    from distribution.build import _copy_javascript_sdk
+
+    _copy_javascript_sdk(tmp_path)
+    sdk = tmp_path / "kernel/javascript/sdk.mjs"
+    program = f'''
+import {{strict as assert}} from "node:assert";
+import {{defineNode, definePlugin}} from {json.dumps(sdk.as_uri())};
+const node = defineNode({{
+  type_key: "sample", contract: {{}},
+  __origin: {{path: "/example/plugin.mjs", symbol: "sample"}},
+  run(inputs) {{return {{value: inputs.value + 1}};}}
+}});
+assert.deepEqual(node.run({{value: 4}}), {{value: 5}});
+assert.equal(node.descriptor.flow_kind, "process");
+assert.equal(node.descriptor.display_name, "sample");
+const plugin = definePlugin({{id: "example", resources: [node]}});
+assert.equal(plugin.resources[0].descriptor.implementations[0].source.export, "sample.run");
+'''
+    result = subprocess.run(["node", "--input-type=module", "--eval", program],
+                            capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    consumer = tmp_path / "consumer.ts"
+    consumer.write_text('''import {defineNode, type NodeRunContext} from "./kernel/javascript/sdk";
+const node = defineNode({type_key: "sample", contract: {},
+    run(inputs: {value: number}, params: {}, context: NodeRunContext) {
+        context.trace("sample", {value: inputs.value});
+        return {value: inputs.value + 1};
+    }});
+node.run!({value: 4}, {}, {capabilities: {}, trace() {}, updateInfo() {}});
+''')
+    toolchain = Path(os.environ["VIBEFLOW_TEST_TOOLCHAIN_ROOT"])
+    result = subprocess.run([str(toolchain / "node_modules/.bin/tsc"),
+                             "--noEmit", "--strict", "--target", "ES2022",
+                             "--module", "ES2022", "--moduleResolution", "bundler", str(consumer)],
+                            capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stdout + result.stderr

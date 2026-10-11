@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping
 
-from vibeflow.core.quality import QualityStructureLimits
+from vibeflow.targets.shared.quality_support import QualityStructureLimits
 from vibeflow.tooling.project.architecture_types import WorkspaceConfigError
 from vibeflow.tooling.project.config_loader import (
     ConfigLoadError,

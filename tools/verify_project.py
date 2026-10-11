@@ -84,7 +84,7 @@ def _run(
 
 
 def _repository_quality(_scratch: Path) -> None:
-    _run((PYTHON, "quality/run.py", "--profile", "all"))
+    _run((PYTHON, "repo_check/run.py", "--profile", "all"))
 
 
 def _compileall(scratch: Path) -> None:
@@ -97,7 +97,7 @@ def _compileall(scratch: Path) -> None:
         "*.pyc",
         "*.pyo",
     )
-    for name in ("src", "tests", "sandbox", "quality", "tools", "distribution"):
+    for name in ("src", "tests", "sandbox", "repo_check", "tools", "distribution"):
         source = ROOT / name
         if source.exists():
             shutil.copytree(source, compile_root / name, ignore=ignored)
@@ -439,7 +439,7 @@ def _wheel_smoke(scratch: Path) -> None:
             "from vibeflow.targets.python.runtime import PipelineRuntime",
             "from vibeflow.targets.python.sdk import Plugin, node, rule, ruleset",
             "from vibeflow.targets.javascript import JavascriptBindingPlan",
-            "from vibeflow.targets.python.quality.builtin_plugin import builtin_plugin",
+            "from vibeflow.targets.python.rules.plugin import builtin_plugin",
             "assert builtin_plugin().contributions().resources",
             "from vibeflow.tooling.project.config_loader import load_config_document",
             "root = files('vibeflow')",
@@ -449,7 +449,9 @@ def _wheel_smoke(scratch: Path) -> None:
             "    assert root.joinpath('tooling/project/schema', name).is_file()",
             "for name in ('runtime_helpers.mjs', 'toolchain_driver.mjs', 'plugin_worker.mjs', 'plugin_abi.d.ts', 'rule_abi.d.ts', 'sdk.mjs', 'sdk.d.ts', 'sdk_loader.mjs'):",
             "    assert root.joinpath('targets/javascript/resources', name).is_file()",
-            "for removed in ('aot', 'runtime', 'portable', 'config', 'health', 'purity', 'devtools', 'rendering', 'workspace'):",
+            "for name in ('declarations.mjs', 'contracts.d.ts'):",
+            "    assert root.joinpath('targets/javascript/nodetypes', name).is_file()",
+            "for removed in ('aot', 'runtime', 'portable', 'config', 'health', 'purity', 'devtools', 'rendering', 'workspace', 'builtin', 'core/quality'):",
             "    assert not root.joinpath(removed).is_dir(), removed",
         )
     )
