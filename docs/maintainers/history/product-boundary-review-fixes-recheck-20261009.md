@@ -1,5 +1,7 @@
 # 职责边界审核修正的独立复核（2026-10-09）
 
+本页源码位置保留审计时的历史路径；当前文件归属见[仓库目录职责](../directory-layout.md)。
+
 结论：上次 R01—R05 的原反例及文档问题已经处理，但这轮 R03、R04 修正引入了两项可复现的漏检，暂不能认定整改完成。它们均属于已选择的有限质量政策，没有要求 VibeFlow 承担业务正确性、安全或完整语言语义证明。
 
 审核对象是 HEAD `5b9f9763ab7051fc964a4d83a1419d87a621b4c9` 上的当前未提交整改。相对上次独立审核保存的 335 个产品文件哈希，本轮只改变了 `node_interface.py`、`input_tracking.py`、`visitors.py` 三个产品文件。审核期间产品源码没有变化。本次仅保存审核记录、反例和文档索引，没有修复产品或改写现有测试。
@@ -24,7 +26,7 @@ VibeFlow 限制 Node 间的实际关系和 Node 内部所选代码质量政策�
 
 ## R06 — P2：明确共享全局名称的其他绑定语法绕过效果限制
 
-位置：[visitors.py:484](../../../src/vibeflow/targets/python/quality/source_analysis/visitors.py:484)，及同文件的赋值入口和定义入口。
+位置：visitors.py:484（历史源码位置：`src/vibeflow/targets/python/quality/source_analysis/visitors.py:484`），及同文件的赋值入口和定义入口。
 
 当 Node 选择 `vibeflow.no_side_effects` 且 `effect_scope=none` 时，下面代码会写入模块共享变量，但当前正式 validate 返回 PASS：
 
@@ -52,7 +54,7 @@ def run_pure(self, inputs, params):
 
 ## R07 — P2：一个互斥分支的重绑定错误地影响另一分支
 
-位置：[input_tracking.py:136](../../../src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:136)。
+位置：input_tracking.py:136（历史源码位置：`src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:136`）。
 
 Node 明确选择 `vibeflow.input_writes` 时，下面代码在 else 内直接修改入口 inputs，当前正式 validate 却返回 PASS：
 

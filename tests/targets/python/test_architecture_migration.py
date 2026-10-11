@@ -152,7 +152,8 @@ def test_source_visible_helper_constructor_effect_is_checked_without_unused_meth
 def test_effect_preview_recognizes_an_ordinary_rule_by_its_typed_output():
     from vibeflow.core.descriptors import NodeContractDescriptor, NodeDescriptor
     from vibeflow.core.descriptors.contributions import ContributionBuilder, compose_contributions
-    from vibeflow.core.rules import EFFECT_POLICY_TYPE, RuleCall, RuleDescriptor, RulesetDescriptor
+    from vibeflow.targets.shared.rule_support.effect_records import EFFECT_POLICY_TYPE
+    from vibeflow.core.rules import RuleCall, RuleDescriptor, RulesetDescriptor
     from vibeflow.targets.python.project.registry import NodeRegistry
     from vibeflow.targets.python.quality.rule_adapter import selected_effect_scope
     contribution = ContributionBuilder("custom")

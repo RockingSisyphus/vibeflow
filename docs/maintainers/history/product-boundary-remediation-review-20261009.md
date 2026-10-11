@@ -1,5 +1,7 @@
 # 产品职责边界整改独立审核（2026-10-09）
 
+本页源码位置保留审计时的历史路径；当前文件归属见[仓库目录职责](../directory-layout.md)。
+
 **结论：主要整改真实生效，但不能认定已经全部完成。发现 5 项需要修正的问题，其中 2 项经整改前后源码对照确认是新引入的误判；另有旧误判和公开说明残留。**
 
 本审核沿用[职责边界与整改规格](../product-boundary-refactor-spec-20261009.md)：VibeFlow 限制 Node 关系和 Node 内代码质量，不证明业务正确性、代码安全性或通用执行语义。下面的问题是限制器自身认错检查对象、越过已约定边界或交付说明不一致，不要求开发者继续修通用业务语义分析器。
@@ -34,7 +36,7 @@
 
 **性质：本次新增回归。**
 
-位置：[node_interface.py：入口检查](../../../src/vibeflow/targets/python/quality/rules/node_interface.py:37)，根因在[_entry_body_nodes](../../../src/vibeflow/targets/python/quality/rules/node_interface.py:87)，尤其是直接对 method.body 中每个 statement 调用 walk 的路径。
+位置：node_interface.py：入口检查（历史源码位置：`src/vibeflow/targets/python/quality/rules/node_interface.py:37`），根因在_entry_body_nodes（历史源码位置：`src/vibeflow/targets/python/quality/rules/node_interface.py:87`），尤其是直接对 method.body 中每个 statement 调用 walk 的路径。
 
 合法例子：run_pure 内定义 values()，values() 使用 yield；run_pure 调用 list(values()) 后正常 return {}。当前正式 validate 报 NODE.CONTRACT.GENERATOR_RUN_PURE 并失败。原生 Rule 还确认嵌套 async generator 也会被误判。
 
@@ -50,7 +52,7 @@ walk 只在遍历 child 时跳过新函数／类作用域。但 statement 自身
 
 **性质：原本已有的误判，在新实现中保留；不是新增回归。**
 
-位置：[input_tracking.py：visit_AnnAssign](../../../src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:55)。
+位置：input_tracking.py：visit_AnnAssign（历史源码位置：`src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:55`）。
 
 inputs['x']: int 只有注解，没有赋值值。当前分支在 node.value 为 None 时仍调用 _target，产生 NODE.PURITY.INPUT_MUTATION。正式 validate 因此 FAIL；有实际赋值的 inputs['x']: int = 1 对照同样 FAIL，规则没有区分两种情况。
 
@@ -64,7 +66,7 @@ inputs['x']: int 只有注解，没有赋值值。当前分支在 node.value 为
 
 **性质：本次新增回归。**
 
-位置：[input_tracking.py：_compound](../../../src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:113)，尤其是每个 AST field 开始时重新设置 self.references 的处理。
+位置：input_tracking.py：_compound（历史源码位置：`src/vibeflow/targets/python/quality/source_analysis/input_tracking.py:113`），尤其是每个 AST field 开始时重新设置 self.references 的处理。
 
 正式 CLI 对照：
 
@@ -85,7 +87,7 @@ inputs['x']: int 只有注解，没有赋值值。当前分支在 node.value 为
 
 **性质：原逻辑未退役，职责收缩不完整。**
 
-位置：[visitors.py：visit_Global／visit_Nonlocal](../../../src/vibeflow/targets/python/quality/source_analysis/visitors.py:447)。这两个方法与整改前归档对应逻辑一致。
+位置：visitors.py：visit_Global／visit_Nonlocal（历史源码位置：`src/vibeflow/targets/python/quality/source_analysis/visitors.py:447`）。这两个方法与整改前归档对应逻辑一致。
 
 当前只要看见 global 或 nonlocal，且 scope 不是 global_state，就产生 NODE.PURITY.GLOBAL_STATE；不要求出现赋值。
 

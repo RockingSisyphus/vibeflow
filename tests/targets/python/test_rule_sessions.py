@@ -10,13 +10,14 @@ import pytest
 
 from tests.fixtures.support.declarations import node_declaration
 from vibeflow.core.flow import GraphConfig, NodeSpec, NodesetSpec
-from vibeflow.core.rules import EFFECT_POLICY_TYPE, RuleCall, RuleContext, RuleDescriptor, RuleRecord, RuleRelation, RuleResult, RulesetDescriptor
+from vibeflow.targets.shared.rule_support.effect_records import EFFECT_POLICY_TYPE
+from vibeflow.core.rules import RuleCall, RuleContext, RuleDescriptor, RuleRecord, RuleRelation, RuleResult, RulesetDescriptor
 from vibeflow.targets.python.project import NodeRegistry
 from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from vibeflow.targets.python.project.registry import NodeRegistryQueries, NodeRegistryError
 from vibeflow.targets.python.quality.rule_adapter import execute_python_node_rules
-from vibeflow.targets.python.quality.rules.helpers import source_policy
-from vibeflow.targets.python.quality.source_analysis.types import PurityPolicy
+from vibeflow.targets.python.rules.node.helpers import source_policy
+from vibeflow.targets.python.rules.node.policy import PurityPolicy
 from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
 
 
@@ -389,7 +390,7 @@ def test_selected_project_file_rule_has_real_cli_params_and_current_source_scope
 
 
 def test_project_handler_alias_receives_current_source_facts(tmp_path):
-    from vibeflow.builtin import builtin_rule_resources
+    from vibeflow.targets.python.rules import builtin_rule_resources
     builtin = next(item for item in builtin_rule_resources()[0] if item.id == "vibeflow.quality.files")
     alias = replace(builtin,id="test.files.alias",handler=builtin.id)
     selection = RulesetDescriptor("test.files.alias",calls=(RuleCall("files",rule_id=alias.id,params={"max_file_lines":2}),))

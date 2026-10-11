@@ -9,12 +9,12 @@ from typing import Any
 
 from vibeflow.core.descriptors import DescriptorCatalogs
 from vibeflow.core.findings import HealthFinding
-from vibeflow.core.quality.implementation import (
+from vibeflow.targets.shared.quality_support.implementation import (
     ImplementationLimits,
     ImplementationMetrics,
     analyze_call_graph,
 )
-from vibeflow.builtin.implementation import (
+from vibeflow.targets.shared.rule_support.implementation import (
     check_base_lib_dependency_chain, check_base_lib_implementation, check_node_implementation,
 )
 from vibeflow.targets.javascript.build.project_paths import safe_project_path

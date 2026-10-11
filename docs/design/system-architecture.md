@@ -9,8 +9,8 @@ Tooling → targets/python ──────┐
         → targets/javascript ─┴→ Block Compiler → Core
 ```
 
-- **Core**：语言无关模型、契约、有效图、图算法、finding，以及 Rule/Ruleset 的组合、参数覆盖、类型化资料和执行计划。
-- **builtin**：默认资源声明、主题判定和默认参数。具体语言实现及其配对由各 Target 的内置插件定义提供；Application 自动接入。
+- **Core**：语言无关模型、契约、有效图、图算法、finding，以及 Rule/Ruleset 的选择、组合、参数覆盖、类型化资料和执行计划；不定义具体内置规则或质量判断。
+- **Target 共用支持**：跨语言复用的纯检查算法、事实模型、政策、Records 与装配辅助；不贡献资源声明，也不依赖具体语言 Target。
 - **Block Compiler**：把已验证 workflow 编译为公共 `WorkflowPlan` / `BlockPlan`。
 - **Python Target**：Python 插件 SDK、按 workflow 装配的内部 NodeRegistry、直接与延迟绑定、源码服务、Rule handler、BindingPlan 和 Runtime。
 - **JavaScript Target**：JS/TS 插件 SDK、worker 中的声明与函数绑定、源码服务、Rule ABI、BindingPlan、AOT emitter 与工具链协议。
@@ -41,6 +41,8 @@ Python 和 JavaScript Target 使用相同 Core 语义，但分别声明可执行
 ## 规则与 Node 声明
 
 公开规则模型位于 `vibeflow.core.rules`。`selection/static` 与 `selection/dynamic` 只读选择来源，`selection/resolve.py` 统一默认、继承与完整替代，`planning.py` 统一调用路径、范围与接管边界；Targets 负责语言事实与绑定。内置及所选 Plugin 的 `workflow_default` Ruleset 贡献根默认，不向 Config 递归注入规则。
+
+各 Target 的 `rules/graph/` 和 `rules/node/` 分别保存图检查、节点源码检查的声明与实现，`rulesets/` 保存组合与默认，`nodetypes/` 保存现有节点声明与语言接口。`quality/` 负责事实、上下文、检查组织与报告。语言差异直接写在各自定义中；内置 Plugin 装配不再修改另一语言的组合。根目录 `repo_check/` 是独立仓库自检工具，不属于产品资源。
 
 Node 类型声明提供局部默认，调用 Config 缺省使用默认、非空完整替代、`[]` 取消当前调用的局部选择。Workflow 缺省使用静态默认；Nodeset 缺省继承，显式选择接管内部。Node 局部与所属图规则共同生效。父图保留子调用外部契约，内部由子选择负责。
 

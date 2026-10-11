@@ -4,7 +4,8 @@ from types import SimpleNamespace
 
 from tests.targets.python.test_rule_sessions import _registry
 from vibeflow.core.flow import GraphConfig, NodeSpec
-from vibeflow.core.rules import EFFECT_POLICY_TYPE, RuleCall, RuleDescriptor, RuleRecord, RuleResult, RulesetDescriptor
+from vibeflow.targets.shared.rule_support.effect_records import EFFECT_POLICY_TYPE
+from vibeflow.core.rules import RuleCall, RuleDescriptor, RuleRecord, RuleResult, RulesetDescriptor
 from vibeflow.targets.python.project.check_session import current_python_check
 from vibeflow.targets.python.project.compiler import GraphCompiler
 from vibeflow.targets.python.quality.workflow.validation import validate_graph_health

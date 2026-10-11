@@ -149,7 +149,7 @@ def test_distribution_contains_only_user_facing_canonical_docs(
     for maintainer_detail in (
         "src/vibeflow/",
         "sandbox/",
-        "quality/run.py",
+        "repo_check/run.py",
         "distribution/build.py",
     ):
         assert maintainer_detail not in combined

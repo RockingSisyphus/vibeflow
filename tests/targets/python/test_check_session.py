@@ -9,7 +9,7 @@ from vibeflow.core.rules import RuleCall, RuleDescriptor, RuleRecord, RuleRelati
 from vibeflow.targets.python.project.check_session import begin_python_check, current_python_check, end_python_check
 from vibeflow.targets.python.project.source_closure import collect_python_source_facts
 from vibeflow.targets.python.quality.rule_adapter import execute_python_node_rules
-from vibeflow.targets.python.quality.source_analysis.types import PurityPolicy
+from vibeflow.targets.python.rules.node.policy import PurityPolicy
 from vibeflow.tooling.application.python.project.declarations import _bind_node, collect_workflow_source_context, PythonSourceRuleError
 
 

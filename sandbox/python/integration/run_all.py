@@ -1210,8 +1210,8 @@ def _import_rule_findings(entry: Path, *, project_root: Path, source_roots=()):
     """Run an explicitly selected import Rule on the real local source closure."""
     from vibeflow.core.descriptors.models import NodeContractDescriptor, NodeDescriptor
     from vibeflow.core.rules import RuleContext, compile_ruleset, execute_rule_plan
-    from vibeflow.builtin import builtin_rule_resources
-    from vibeflow.targets.python.quality.builtin_plugin import builtin_plugin
+    from vibeflow.targets.python.rules import builtin_rule_resources
+    from vibeflow.targets.python.rules.plugin import builtin_plugin
     from vibeflow.targets.python.quality.source_context import (
         PythonSourceFile, PythonSourceNode, build_python_source_context,
     )
@@ -2464,7 +2464,7 @@ def _health_invalid_node(case: dict[str, Any]) -> CaseResult:
 def _bad_base_lib_report():
     """Review explicit library declarations through the ordinary Rule engine."""
     from vibeflow.core.descriptors.decode import decode_resource
-    from vibeflow.core.quality.implementation import analyze_call_graph
+    from vibeflow.targets.shared.quality_support.implementation import analyze_call_graph
     from vibeflow.core.rules import RuleContext, compile_ruleset, execute_rule_plan
     from vibeflow.targets.python.quality.source_context import PythonSourceFile, build_python_source_context
     from vibeflow.targets.python.quality.source_analysis import PurityPolicy

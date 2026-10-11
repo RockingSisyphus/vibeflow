@@ -107,3 +107,19 @@ def test_support_file_reference_preserves_literal_characters(tmp_path):
     loaded = load_workflow_plugins(workspace, config)
     implementation = loaded.catalogs.nodes.require("actual").implementations[0]
     assert implementation.implementation_files[0].ref == str(helper)
+
+
+def test_source_load_states_exclude_kernel_sdk_and_keep_same_named_user_sources(tmp_path):
+    workspace, config, _ = project(tmp_path, "node")
+    directory = tmp_path / "vibeflow-js-resources-user"
+    directory.mkdir()
+    helper = directory / "sdk.mjs"
+    helper.write_text('export const label = "User SDK helper";\n')
+    plugin = tmp_path / "plugin.ts"
+    plugin.write_text('import {label} from "./vibeflow-js-resources-user/sdk.mjs";\n'
+        + plugin.read_text().replace('type_key:"actual",', 'type_key:"actual",display_name:label,'))
+    loaded = load_workflow_plugins(workspace, config)
+    assert dict(loaded.catalogs.source_load_states) == {
+        str(plugin): "loaded",
+        str(helper): "unknown",
+    }

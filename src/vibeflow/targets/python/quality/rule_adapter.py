@@ -6,7 +6,8 @@ from dataclasses import dataclass, field, fields, replace
 from typing import Mapping
 
 from vibeflow.core.findings import Finding, HealthFinding
-from vibeflow.core.rules import EFFECT_POLICY_TYPE, RuleContext, RuleGraphError, compile_ruleset, execute_rule_plan, rule_graph_error_finding
+from vibeflow.targets.shared.rule_support.effect_records import EFFECT_POLICY_TYPE
+from vibeflow.core.rules import RuleContext, RuleGraphError, compile_ruleset, execute_rule_plan, rule_graph_error_finding
 from vibeflow.targets.python.quality.policy_parameters import complete_source_policy_plan, native_rule_bindings, native_rule_origins
 from vibeflow.core.rules.selection import resolve_node_selection
 from vibeflow.targets.python.quality.node_context import local_sources, bind_native_analysis
@@ -55,7 +56,7 @@ def _rule_resources(registry, *, purity_policy=None, quality_policy=None):
                          "previous_source":origins.get((kind,descriptor.id),"")})
                 target[descriptor.id] = descriptor
                 origins.setdefault((kind,descriptor.id),source)
-    from vibeflow.builtin.project_quality import bound_project_quality_defaults
+    from vibeflow.targets.python.rules.project import bound_project_quality_defaults
     from vibeflow.targets.python.quality.project_context import source_quality_policy
     for rule_id,defaults in bound_project_quality_defaults(native_rule_bindings(registry, rules),
         quality_policy or source_quality_policy(purity_policy), rules=rules, origins=native_rule_origins(registry)).items():

@@ -30,8 +30,5 @@ def normalize_contributions(contribution, bindings, *, owner, workspace):
 
 
 def load_builtin_definition(target):
-    if target == "project":
-        from vibeflow.builtin.plugin import project_plugin
-        return project_plugin()
-    module = import_module(f"vibeflow.targets.{target}.quality.builtin_plugin")
-    return module.builtin_plugin()
+    application = import_module(_APPLICATIONS["python" if target == "project" else target])
+    return application.load_builtin_definition(project_only=target == "project")

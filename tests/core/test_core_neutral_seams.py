@@ -46,7 +46,7 @@ forbidden = (
     'vibeflow.aot',
     'vibeflow.graph_config',
     'vibeflow.health',
-    'vibeflow.targets.python.project.node_config',
+    'vibeflow.targets.python.nodetypes.protocols_config',
     'vibeflow.runtime',
     'vibeflow.targets',
     'vibeflow.tooling',

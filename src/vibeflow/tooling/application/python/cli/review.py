@@ -458,7 +458,7 @@ def _review_finding(
 
 
 def _print_result(result: Mapping[str, object]) -> None:
-    from vibeflow.core.result_scope import add_result_scope
+    from vibeflow.tooling.application.result_scope import add_result_scope
 
     status = str(result.get("status", "ERROR"))
     payload = add_result_scope(

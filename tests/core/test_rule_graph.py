@@ -374,8 +374,8 @@ def test_mutable_dataclass_or_opaque_outputs_fail_before_consumers_run():
 def test_builtin_planned_records_preserve_frozen_event_types():
     from vibeflow.core.flow import GraphConfig, NodeSpec
     from vibeflow.core.planned import PlannedBehavior
-    from vibeflow.core.quality.workflow_rules.planned import PlannedImplementationCheck
-    from vibeflow.builtin.workflow import workflow_topic_resources, workflow_topic_handlers
+    from vibeflow.targets.shared.quality_support.workflow_rules.planned import PlannedImplementationCheck
+    from vibeflow.targets.python.rules.graph import workflow_topic_resources, workflow_topic_handlers
 
     graph = GraphConfig(nodes=(NodeSpec("future", "example.future", status="planned",
         planned_behavior=PlannedBehavior("python_stub", "stubs/future.py")),))

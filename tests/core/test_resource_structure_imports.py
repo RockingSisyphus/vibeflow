@@ -1,8 +1,8 @@
 import pytest
 
-from vibeflow.core.quality import FileQuality, QualityStructureLimits, QualityStructureRoles
-from vibeflow.core.quality.root_structure import analyze_root_structure
-from vibeflow.core.quality.resource_imports import resource_import_violations
+from vibeflow.targets.shared.quality_support import FileQuality, QualityStructureLimits, QualityStructureRoles
+from vibeflow.targets.shared.quality_support.root_structure import analyze_root_structure
+from vibeflow.targets.shared.quality_support.resource_imports import resource_import_violations
 
 
 def owner(kind, identifier, path, *, role="entry", libraries=(), plugin="p", lines=None):
@@ -114,7 +114,7 @@ def test_declared_support_is_not_granted_by_parent_directory():
 
 
 def test_initialization_belongs_to_declaration_without_losing_entry_restrictions():
-    from vibeflow.core.quality.resource_imports import implementation_import_scopes
+    from vibeflow.targets.shared.quality_support.resource_imports import implementation_import_scopes
     node = {**owner("node", "n", "entry.py"), "symbol": "node.run"}
     declaration = owner("plugin_declaration", "p", "entry.py", role="declaration")
     library = owner("base_lib", "lib", "helper.py")
@@ -129,7 +129,7 @@ def test_initialization_belongs_to_declaration_without_losing_entry_restrictions
 
 
 def test_declaration_initialization_selection_is_local_to_workflow():
-    from vibeflow.core.quality.resource_imports import implementation_import_scopes
+    from vibeflow.targets.shared.quality_support.resource_imports import implementation_import_scopes
     node = {**owner("node", "n", "entry.py"), "symbol": "node.run"}
     declaration = owner("plugin_declaration", "p", "entry.py", role="declaration")
     library = owner("base_lib", "lib", "helper.py")

@@ -11,7 +11,7 @@ def _validate_rule_selection(value, prefix, findings, code="CONFIG.SCHEMA.RULESE
 from typing import Any, Mapping
 
 from vibeflow.core.findings import HealthFinding
-from vibeflow.core.quality.workflow_rules.schema_findings import schema_finding
+from vibeflow.targets.shared.quality_support.workflow_rules.schema_findings import schema_finding
 
 
 def _validate_execution_lock(

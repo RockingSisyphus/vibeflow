@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Mapping
 
-from vibeflow.core.quality import QualityStructureLimits
+from vibeflow.targets.shared.quality_support import QualityStructureLimits
 from vibeflow.tooling.project.architecture_types import (
     ArchitectureDocumentSpec,
     WorkspaceConfigError,

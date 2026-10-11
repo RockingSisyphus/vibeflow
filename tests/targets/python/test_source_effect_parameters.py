@@ -9,8 +9,8 @@ from vibeflow.core.descriptors import NodeContractDescriptor, NodeDescriptor
 from vibeflow.core.rules import RuleCall, RuleContext, RulesetDescriptor, compile_ruleset, execute_rule_plan
 from vibeflow.targets.python.quality import PythonSource
 from vibeflow.targets.python.quality.policy_parameters import complete_source_policy_plan
-from vibeflow.targets.python.quality.rules.input_writes import input_writes
-from vibeflow.targets.python.quality.rules.effects import no_side_effects
+from vibeflow.targets.python.rules.node.input_writes import input_writes
+from vibeflow.targets.python.rules.node.effects import no_side_effects
 from vibeflow.targets.python.quality.source_context import PythonSourceFile, PythonSourceNode, build_python_source_context
 from vibeflow.targets.shared.bindings import native_binding
 from vibeflow.tooling.application.python.project.quality_scan import scan_code_quality

@@ -1,6 +1,8 @@
 # 发行与文档装配
 
-VibeFlow 当前发行版本为 0.18.1，按旧 API 直接退役的破坏性升级准备 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目和 Workflow ABI。迁移入口与删除接口见 [统一资源迁移](../../distribution/docs/user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖归档发行包。
+VibeFlow 当前发行版本为 0.18.2，按旧 API 直接退役的破坏性升级准备 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目和 Workflow ABI。迁移入口与删除接口见 [统一资源迁移](../../distribution/docs/user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖归档发行包。
+
+0.18.2 将内置 Rule、Ruleset 与 Node 声明按语言归入 `targets/<language>/rules/`、`rulesets/` 和 `nodetypes/`；图检查与节点源码检查分开保存。Core 保留通用规则机制，共享检查算法归入 Target 共享支持层，现有规则标识、默认选择和公共 SDK 行为保持不变。仓库独立自检工具迁至 `repo_check/`，与产品质量检查入口区分；同步更新构建器对独立 JavaScript SDK 的 Node 声明资源装配。
 
 0.18.1 将 Python 与 JavaScript 的事实视图身份管理抽为共享模块，拆分语言事实适配、分析服务和检查会话职责，移除规则调用中的重复身份计算。Python 固定输入验证显示耗时改善；JavaScript 已消除重复摘要，但尚未证明稳定的端到端提速。同步完善仓库目录说明与文档导航；构建时排除带维护者标记的目录 README，保留发行用户指南。
 

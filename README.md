@@ -60,7 +60,7 @@ node javascript_project/scripts/workflow_execution_probe.mjs
 python tools/verify_project.py --full
 ```
 
-当前开发版本为 `0.18.1`，Workflow ABI 为 `vibeflow.workflow.v5`，AOT manifest 为 `vibeflow.aot-build.v2`。旧计划与构建目录需重新生成；本次本地整改不代表已发布新 Release。
+当前发行包版本为 `0.18.2`，Workflow ABI 为 `vibeflow.workflow.v5`，AOT manifest 为 `vibeflow.aot-build.v2`。旧计划与构建目录需重新生成。
 
 质量检查只覆盖当前实际选择的 Rule；不证明业务正确、代码安全、算法确定性或全部无副作用。有限 Python 输入写入规则独立于效果政策，详见[产品检查边界](distribution/docs/user/product-check-boundaries.md)。
 
@@ -73,7 +73,7 @@ python tools/verify_project.py --full
 | [src](src/README.md) | 产品各模块的核心源码与运行资源 |
 | [tests](tests/README.md) | 非沙盒的功能、代码和集成回归 |
 | [sandbox](sandbox/README.md) | Python / JavaScript 真实使用项目，加载工作区 src |
-| [quality](quality/README.md) | 独立的仓库内部质检工具 |
+| [repo_check](repo_check/README.md) | 独立的仓库内部质检工具 |
 | [tools](tools/README.md) | 开发、验证、清理和辅助工具 |
 | [distribution](distribution/README.md) | 发行构建器、模板、提示词和用户文档原稿 |
 | [dist](dist/README.md) | 最新正式发行目录、ZIP 和校验清单 |

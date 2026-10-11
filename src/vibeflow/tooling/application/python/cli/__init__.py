@@ -166,7 +166,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _handle_validate(args: argparse.Namespace) -> int:
-    from vibeflow.core.result_scope import add_result_scope, format_result_scope
+    from vibeflow.tooling.application.result_scope import add_result_scope, format_result_scope
     from vibeflow.tooling.application.python.cli.config import validate_config_path
     from vibeflow.tooling.application.python.reports import format_finding_text
 
@@ -256,7 +256,7 @@ from vibeflow.tooling.application.python.run_observation import observed_cli_run
 
 @observed_cli_run
 def _handle_run(args: argparse.Namespace) -> int:
-    from vibeflow.core.result_scope import add_result_scope
+    from vibeflow.tooling.application.result_scope import add_result_scope
     from vibeflow.targets.python.project.registry import NodeRegistry
     from vibeflow.tooling.application.python.project.declarations import default_python_registry
     from vibeflow.tooling.application.python.runner import CheckedRunError, run_checked

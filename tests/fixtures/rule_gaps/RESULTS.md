@@ -63,7 +63,7 @@ python tests/fixtures/rule_gaps/run_all.py \
 
 复用目录的两个锁文件与当前仓库逐字节一致；可按 README 不带复用参数重新安装。正式 CLI 缺少完整执行状态时，同项目另用公开 JS Target API 的独立进程取状态，保留第一次 CLI 诊断/退出码和 consumer marker，未用 probe 结果替换命令结果。
 
-报告机制测试 30 passed；仓库独立质量 `--profile all` 为 PASS，`quality/test.py` 45 tests OK，语法与 `git diff --check` 通过。报告机制测试不代表 68 项已修复。浏览器目标的纯数值产物在 Node 中执行，实际浏览器功能仍由原浏览器沙箱验收。
+报告机制测试 30 passed；仓库独立质量 `--profile all` 为 PASS，`repo_check/test.py` 45 tests OK，语法与 `git diff --check` 通过。报告机制测试不代表 68 项已修复。浏览器目标的纯数值产物在 Node 中执行，实际浏览器功能仍由原浏览器沙箱验收。
 
 此前的 1,219 项基线对照及 51 项不匹配保持 [原记录](../rule_parity/RESULTS.md)，不会把新接口用例当成旧版已有能力，也不会把当前红例当作已修复。
 

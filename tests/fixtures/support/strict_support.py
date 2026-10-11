@@ -16,7 +16,7 @@ from vibeflow.core.contracts import DataProvider, DataRequirement
 from vibeflow.core.flow import GraphConfigError
 from vibeflow.core.findings import HealthFinding, HealthReport
 from vibeflow.tooling.project.graph_config import parse_graph_config
-from vibeflow.core.quality import QualityStructureLimits, QualityThresholds
+from vibeflow.targets.shared.quality_support import QualityStructureLimits, QualityThresholds
 from vibeflow.targets.python.project import GraphCompileError, GraphCompiler, NodeRegistry, PluginRegistry
 from vibeflow.targets.python.quality import PurityPolicy, validate_graph_health
 from vibeflow.targets.python.runtime.block_compiler import explain_block_compilation

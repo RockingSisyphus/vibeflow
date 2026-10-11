@@ -12,8 +12,8 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
 from vibeflow.core.findings import HealthFinding
-from vibeflow.core.quality.policy_data import COMMON_POLICY_DATA, merge_policy_data
-from vibeflow.targets.python.quality.source_analysis.types import PurityPolicy
+from vibeflow.targets.shared.quality_support.policy_data import COMMON_POLICY_DATA, merge_policy_data
+from vibeflow.targets.python.rules.node.policy import PurityPolicy
 
 
 DEFAULT_POLICY_DATA: dict[str, Any] = {

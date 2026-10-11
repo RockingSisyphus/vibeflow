@@ -368,7 +368,7 @@ def _select_scoped_file_rule(project: Path, scope: str, *, implementation: str =
 
 @pytest.mark.parametrize("scope", ["node", "workflow"])
 def test_selected_file_rule_uses_real_closure_and_explicit_overrides(domain_project, tmp_path, capsys, scope) -> None:
-    from vibeflow.core.quality import QualityThresholds
+    from vibeflow.targets.shared.quality_support import QualityThresholds
     from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy
     from vibeflow.tooling.application.cli import main
     workspace, project = domain_project

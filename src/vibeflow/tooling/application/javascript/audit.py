@@ -30,7 +30,7 @@ from vibeflow.core.flow import (
 )
 from vibeflow.core.constants import FLOW_KIND_GLOBAL_STATE
 from vibeflow.core.inspection import build_architecture_report
-from vibeflow.core.quality import QualityPolicy
+from vibeflow.targets.shared.quality_support import QualityPolicy
 from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy
 from vibeflow.tooling.application.javascript.rule_defaults import workflow_rule_defaults
 from vibeflow.targets.javascript.build.project_paths import (

@@ -9,7 +9,7 @@ import tempfile
 from typing import Mapping, Sequence
 from xml.etree import ElementTree
 
-from vibeflow.core.result_scope import add_result_scope, format_result_scope
+from vibeflow.tooling.application.result_scope import add_result_scope, format_result_scope
 from vibeflow.targets.javascript.build.driver_session import check_scope
 from vibeflow.tooling.application.quality_options import (
     add_quality_limit_arguments,
@@ -578,7 +578,7 @@ def handle_quality_check(args: argparse.Namespace) -> int:
     source_reports = _project_source_quality(workspace, args, configs, facts_cache=facts_cache, catalog_cache=catalog_cache)
     reports: list[dict[str, object]] = []
     for config in configs:
-        from vibeflow.core.quality import QualityThresholds
+        from vibeflow.targets.shared.quality_support import QualityThresholds
         from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy
         from dataclasses import replace
         configured_root = workspace.root_for_path(config)
@@ -633,7 +633,7 @@ def _handle_standalone_quality(
     *,
     args: argparse.Namespace,
 ) -> int:
-    from vibeflow.core.quality import QualityStructureLimits, QualityThresholds
+    from vibeflow.targets.shared.quality_support import QualityStructureLimits, QualityThresholds
     from vibeflow.tooling.application.javascript.quality_scan import DEFAULT_EXCLUDED_DIRS, scan_javascript_quality
 
     selected = source_path.expanduser().resolve()
@@ -677,7 +677,7 @@ def _handle_standalone_quality(
 def _project_source_quality(workspace, args: argparse.Namespace, configs: Sequence[Path], *, facts_cache: dict[str, object] | None = None, catalog_cache=None) -> list[dict[str, object]]:
     from dataclasses import replace
 
-    from vibeflow.core.quality import QualityStructureLimits, QualityThresholds
+    from vibeflow.targets.shared.quality_support import QualityStructureLimits, QualityThresholds
     from vibeflow.tooling.application.javascript.quality_scan import DEFAULT_EXCLUDED_DIRS, scan_javascript_quality
     from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
     from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
@@ -768,7 +768,7 @@ def _audit_registered_without_workflow(report, catalogs, root, package_root: Pat
 
 
 def _javascript_structure_roles(root, catalogs):
-    from vibeflow.core.quality import QualityStructureRoles
+    from vibeflow.targets.shared.quality_support import QualityStructureRoles
     from vibeflow.tooling.project.source_roles import resource_structure_scopes
     return QualityStructureRoles(
         _resource_scopes=resource_structure_scopes((catalogs,), root.path, language="javascript"),
@@ -780,7 +780,7 @@ def _javascript_structure_limits(limits):
         return None
     from dataclasses import replace
 
-    from vibeflow.core.quality import QualityStructureLimits
+    from vibeflow.targets.shared.quality_support import QualityStructureLimits
 
     default = QualityStructureLimits().allowed_root_code_files
     allowed = (

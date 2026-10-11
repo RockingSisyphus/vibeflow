@@ -4,10 +4,10 @@ from dataclasses import replace
 from inspect import unwrap
 from weakref import WeakKeyDictionary
 
-from vibeflow.builtin.import_policy import normalized_import_policy
-from vibeflow.core.quality.policy_data import merge_policy_data
+from vibeflow.targets.shared.rule_support.import_policy import normalized_import_policy
+from vibeflow.targets.shared.quality_support.policy_data import merge_policy_data
 from vibeflow.core.rules.models import plain
-from vibeflow.targets.python.quality.source_analysis.types import PurityPolicy
+from vibeflow.targets.python.rules.node.policy import PurityPolicy
 
 
 _POLICY_FIELDS = {
@@ -149,5 +149,5 @@ def native_rule_origins(registry):
 
 
 def bound_python_workflow_defaults(handlers, depth, *, rules, origins):
-    from vibeflow.builtin.workflow import bound_workflow_depth_defaults
+    from vibeflow.targets.python.rules.graph import bound_workflow_depth_defaults
     return bound_workflow_depth_defaults(handlers, depth, rules=rules, origins=origins)

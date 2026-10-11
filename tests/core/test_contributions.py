@@ -4,7 +4,7 @@ import pytest
 
 from vibeflow.core.descriptors import ContributionBuilder, ResourceOrigin, compose_contributions
 from vibeflow.core.descriptors.catalogs import DescriptorCatalogError
-from vibeflow.targets.python.quality.builtin_plugin import builtin_plugin
+from vibeflow.targets.python.rules.plugin import builtin_plugin
 from vibeflow.core.descriptors.models import DataSchemaDescriptor, DescriptorModelError
 from vibeflow.core.descriptors.decode import decode_resource
 from vibeflow.core.descriptors.contributions import RESOURCE_GROUPS

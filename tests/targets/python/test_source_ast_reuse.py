@@ -9,8 +9,8 @@ from tests.fixtures.support.declarations import node_declaration
 from vibeflow.core.rules import RuleContext
 from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from vibeflow.targets.python.quality.analysis_metrics import PythonSourceAnalysis
-from vibeflow.targets.python.quality.builtin_plugin import builtin_plugin
-from vibeflow.targets.python.quality.rules.effects import no_side_effects
+from vibeflow.targets.python.rules.plugin import builtin_plugin
+from vibeflow.targets.python.rules.node.effects import no_side_effects
 from vibeflow.targets.python.quality.source_context import (
     PythonSourceFile, PythonSourceNode, PythonSymbol, build_python_source_context,
 )

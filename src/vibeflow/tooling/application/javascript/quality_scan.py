@@ -3,9 +3,9 @@ from collections.abc import Iterable, MutableMapping
 from dataclasses import replace
 from pathlib import Path
 
-from vibeflow.builtin.project_quality import bound_project_quality_defaults
+from vibeflow.targets.javascript.rules.project import bound_project_quality_defaults
 from vibeflow.core.descriptors.contributions import contribution_facts
-from vibeflow.core.quality import ProjectQualityFacts, QualityReport, evaluate_project_quality
+from vibeflow.targets.shared.quality_support import ProjectQualityFacts, QualityReport, evaluate_project_quality
 from vibeflow.core.rules import RuleContext
 from vibeflow.targets.javascript.build.quality_source import (
     DEFAULT_EXCLUDED_DIRS, collect_javascript_quality_facts, javascript_quality_policy,
@@ -31,7 +31,7 @@ def scan_javascript_quality(
         registered_catalogs=registered_catalogs, excluded_dirs=excluded_dirs,
         node_command=node_command, facts_cache=facts_cache)
     if structure_roles is not None and structure_roles._resource_scopes:
-        from vibeflow.core.quality.resource_imports import implementation_import_scopes
+        from vibeflow.targets.shared.quality_support.resource_imports import implementation_import_scopes
         structure_roles = replace(structure_roles, _resource_scopes=
             implementation_import_scopes(structure_roles._resource_scopes, facts.implementations))
     policy = javascript_quality_policy(thresholds=thresholds,

@@ -30,7 +30,7 @@ _export(
     "explicit_flow_cycles",
 )
 _export(
-    "vibeflow.targets.python.project.node",
+    "vibeflow.targets.python.nodetypes.protocols",
     "EFFECT_SCOPE_GLOBAL_STATE",
     "EFFECT_SCOPE_NONE",
     "EFFECT_SCOPE_PYTHON_IO",

@@ -1,6 +1,6 @@
 """Read Python Rule defaults without importing business implementations."""
 
-from vibeflow.builtin.project_quality import bound_project_quality_defaults
+from vibeflow.targets.python.rules.project import bound_project_quality_defaults
 from vibeflow.targets.python.quality.project_context import source_quality_policy
 from vibeflow.targets.python.quality.policy_parameters import source_rule_defaults as configured_source_rules, bound_python_workflow_defaults
 from vibeflow.core.rules.models import plain

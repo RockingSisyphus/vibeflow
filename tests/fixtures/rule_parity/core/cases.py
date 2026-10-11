@@ -20,27 +20,27 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         NodeSpec, NodesetSpec,
     )
     from vibeflow.core.models import CoreCompileRequest, ImplementationFact, ImplementationFacts, TargetFeatureSet
-    from vibeflow.core.quality import (
+    from vibeflow.targets.shared.quality_support import (
         FileQuality, FunctionQuality, ImportSite, ProjectQualityFacts, QualityPolicy,
         QualityStructureLimits, QualityStructureRoles,
         QualityThresholds,
     )
-    from vibeflow.core.quality.implementation import (
+    from vibeflow.targets.shared.quality_support.implementation import (
         ImplementationLimits, ImplementationMetrics, analyze_call_graph,
     )
-    from vibeflow.core.quality.nodesets import nodeset_quality_findings
-    from vibeflow.core.quality.workflow_rules.duplicates import duplicate_logic_findings
-    from vibeflow.core.quality.workflow_rules.flow import append_flowchart_health, append_join_policy_health
-    from vibeflow.core.quality.workflow_rules.flow_data import append_data_contract_warnings
-    from vibeflow.core.quality.workflow_rules.planned import planned_health_events
+    from vibeflow.targets.shared.quality_support.nodesets import nodeset_quality_findings
+    from vibeflow.targets.shared.quality_support.workflow_rules.duplicates import duplicate_logic_findings
+    from vibeflow.targets.shared.quality_support.workflow_rules.flow import append_flowchart_health, append_join_policy_health
+    from vibeflow.targets.shared.quality_support.workflow_rules.flow_data import append_data_contract_warnings
+    from vibeflow.targets.shared.quality_support.workflow_rules.planned import planned_health_events
 
     if variant == "baseline":
-        from vibeflow.core.quality import evaluate_project_quality
-        from vibeflow.core.quality.implementation import (evaluate_node_implementation,
+        from vibeflow.targets.shared.quality_support import evaluate_project_quality
+        from vibeflow.targets.shared.quality_support.implementation import (evaluate_node_implementation,
             evaluate_base_lib_implementation, evaluate_base_lib_dependency_chain)
     else:
         from tests.fixtures.rule_parity.core.support import evaluate_standard_project_quality as evaluate_project_quality
-        from vibeflow.builtin.implementation import (check_node_implementation as evaluate_node_implementation,
+        from vibeflow.targets.shared.rule_support.implementation import (check_node_implementation as evaluate_node_implementation,
             check_base_lib_implementation as evaluate_base_lib_implementation, check_base_lib_dependency_chain as evaluate_base_lib_dependency_chain)
 
     work_root.mkdir(parents=True, exist_ok=True)
@@ -486,7 +486,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
 
     if variant != "baseline":
         from vibeflow.core.rules import compile_ruleset
-        from vibeflow.builtin import builtin_rule_resources
+        from vibeflow.targets.python.rules import builtin_rule_resources
         rules,sets=builtin_rule_resources()
         for selected,phase,count in [("vibeflow.workflow","import",0),("vibeflow.workflow","static",8),("vibeflow.workflow","run",8),
             ("vibeflow.quality.project","import",0),("vibeflow.quality.project","static",4),("vibeflow.quality.project","run",0),

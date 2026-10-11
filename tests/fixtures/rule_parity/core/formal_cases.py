@@ -127,7 +127,7 @@ def _source_consumption_cases(work_root: Path, variant: str) -> list[dict]:
             required = (DataRequirement(required_type, "exactly_one", display_name="Received value"),)
             provided = (DataProvider(output_key, output_key, display_name="Computed value"),)
             if variant == "baseline":
-                source = "from vibeflow.targets.python.project.node import NodeInfo, NodeContract\nfrom vibeflow.core.contracts import DataProvider, DataRequirement\n" + source
+                source = "from vibeflow.targets.python.nodetypes.protocols import NodeInfo, NodeContract\nfrom vibeflow.core.contracts import DataProvider, DataRequirement\n" + source
                 source += f"    NODE_INFO = NodeInfo({key!r}, 'Node', 'probe', 'Declared source fact.', '1.0', {kind!r})\n"
                 source += (f"    CONTRACT = NodeContract(requires=(DataRequirement({required_type!r}, 'exactly_one', display_name='Received value'),), "
                     f"provides=(DataProvider({output_key!r}, {output_key!r}, display_name='Computed value'),), "

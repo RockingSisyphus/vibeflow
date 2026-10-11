@@ -1,3 +1,4 @@
+import {nodeDefinition} from "../nodetypes/declarations.mjs";
 /** Pure declarations: importing a resource does not register it. */
 const ABI = "vibeflow.plugin.v3";
 const directBindings = new WeakMap();
@@ -34,12 +35,7 @@ function define(kind, options, member) {
     descriptor.display_name ??= descriptor.id;
     descriptor.description ??= descriptor.id;
   }
-  if (kind === "node") {
-    descriptor.display_name ??= descriptor.type_key;
-    descriptor.description ??= descriptor.type_key;
-    descriptor.version ??= "1.0.0";
-    descriptor.flow_kind ??= "process";
-  }
+
   const resource = freeze({descriptor, origin: __origin, ...(member && callable ? {[member]: callable} : {})});
   if (member && typeof callable === "function") directBindings.set(resource,
     {member, callable, resolveExport: __resolveExport, sourceRoot: __sourceRoot});
@@ -96,7 +92,7 @@ function implementationFiles(values, origin) {
     return {...source, ref};
   });
 }
-export const defineNode = options => define("node", options, "run");
+export const defineNode = options => nodeDefinition(define, options);
 export const defineRule = options => define("rule", options, "check");
 export const defineRuleset = options => define("ruleset", options);
 export const defineDataSchema = options => define("data_schema", options);

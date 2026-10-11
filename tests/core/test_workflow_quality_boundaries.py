@@ -29,14 +29,14 @@ def _run_isolated(source: str) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_core_config_and_quality_imports_are_boundary_pure() -> None:
+def test_core_config_and_rule_mechanism_imports_are_boundary_pure() -> None:
     _run_isolated(
         """
 import sys
 import vibeflow.core.config.graph
-import vibeflow.core.quality
-import vibeflow.core.quality.workflow_rules.flow_data
-import vibeflow.core.quality.workflow_rules.join_exclusivity
+import vibeflow.core.rules.execution
+import vibeflow.core.rules.planning
+import vibeflow.core.rules.selection
 
 forbidden_prefixes = (
     'vibeflow.targets',

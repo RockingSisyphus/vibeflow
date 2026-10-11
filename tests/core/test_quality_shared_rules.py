@@ -6,20 +6,20 @@ from dataclasses import replace
 
 import pytest
 
-from vibeflow.core.quality import (
+from vibeflow.targets.shared.quality_support import (
     FileQuality,
     FunctionQuality,
     ProjectQualityFacts,
     QualityPolicy,
     QualityThresholds,
 )
-from vibeflow.core.quality.implementation import (
+from vibeflow.targets.shared.quality_support.implementation import (
     ImplementationLimits,
     ImplementationMetrics,
     analyze_call_graph,
 )
 
-from vibeflow.builtin.implementation import check_node_implementation, check_base_lib_implementation, check_base_lib_dependency_chain
+from vibeflow.targets.shared.rule_support.implementation import check_node_implementation, check_base_lib_implementation, check_base_lib_dependency_chain
 
 
 def _file(**changes) -> FileQuality:

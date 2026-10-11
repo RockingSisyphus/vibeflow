@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from vibeflow.core.quality import ProjectQualityFacts, QualityPolicy, QualityThresholds
+from vibeflow.targets.shared.quality_support import ProjectQualityFacts, QualityPolicy, QualityThresholds
 from tests.fixtures.support.project_rules import evaluate_standard_project_quality
-from vibeflow.core.quality.implementation import analyze_call_graph
+from vibeflow.targets.shared.quality_support.implementation import analyze_call_graph
 from vibeflow.targets.javascript.build.toolchain import run_quality_facts_driver
 from vibeflow.tooling.application.javascript.quality_scan import scan_javascript_quality
 from vibeflow.targets.python.quality import PythonSource, analyze_python_source
@@ -205,7 +205,7 @@ def test_every_handwritten_javascript_extension_has_distinct_file_identity(quali
 
 
 def test_target_source_facts_do_not_assemble_default_rules(quality_case, monkeypatch):
-    from vibeflow.builtin.plugin import BuiltinPlugin
+    from vibeflow.targets.shared.rule_support.plugin import BuiltinPlugin
     from vibeflow.targets.javascript.quality.source import collect_javascript_quality_facts
     root = quality_case({"large.ts":"export const value = 1;\n" + "\n" * 500})
     def unexpected(*args, **kwargs):
@@ -220,7 +220,7 @@ def test_target_source_facts_do_not_assemble_default_rules(quality_case, monkeyp
 
 
 def test_application_source_scan_reuses_supplied_catalog_and_bindings(quality_case, monkeypatch):
-    from vibeflow.builtin.plugin import BuiltinPlugin
+    from vibeflow.targets.shared.rule_support.plugin import BuiltinPlugin
     from vibeflow.tooling.project.descriptor_loader import load_builtin_plugins
     root = quality_case({"large.ts":"export const value = 1;\n" + "\n" * 500})
     contributed = []
@@ -420,7 +420,7 @@ def test_mixed_workspace_cli_forwards_quality_limits_to_both_targets(tmp_path: P
 
 
 def test_project_no_workflow_and_multiple_workflows_scan_source_once(tmp_path: Path, capsys, monkeypatch) -> None:
-    from vibeflow.builtin.plugin import BuiltinPlugin
+    from vibeflow.targets.shared.rule_support.plugin import BuiltinPlugin
     contributions = []
     original = BuiltinPlugin.contributions
     def counted(self, config=None):
@@ -793,7 +793,7 @@ def test_registered_node_base_lib_dependency_chain_uses_shared_policy(tmp_path: 
         'export function normalizeName(value: string): string { return step1(value); }\n',
         encoding="utf-8",
     )
-    from vibeflow.core.quality.policy_data import COMMON_POLICY_DATA
+    from vibeflow.targets.shared.quality_support.policy_data import COMMON_POLICY_DATA
     from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
 
     def check(steps: int):
@@ -902,7 +902,7 @@ def test_registered_node_physical_source_limits_include_file_padding(tmp_path: P
     _, project, _ = _project_case(tmp_path)
     source = project / "nodes/greet.ts"
     original = source.read_text(encoding="utf-8")
-    from vibeflow.core.quality.policy_data import COMMON_POLICY_DATA
+    from vibeflow.targets.shared.quality_support.policy_data import COMMON_POLICY_DATA
 
     for extra in (0, 1):
         if unit == "lines":
@@ -925,7 +925,7 @@ def test_registered_node_source_limits_preserve_exact_boundaries(tmp_path: Path)
     # SDK resource scope is supplied by this explicit workflow.
     source = project / "nodes/greet.ts"
     original = source.read_text(encoding="utf-8")
-    from vibeflow.core.quality.policy_data import COMMON_POLICY_DATA
+    from vibeflow.targets.shared.quality_support.policy_data import COMMON_POLICY_DATA
     from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
     catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/greeting.jsonc")
 
@@ -967,7 +967,7 @@ def test_registered_base_lib_optional_limits_reach_javascript_quality(
         encoding="utf-8",
     )
     from copy import deepcopy
-    from vibeflow.core.quality.policy_data import COMMON_POLICY_DATA
+    from vibeflow.targets.shared.quality_support.policy_data import COMMON_POLICY_DATA
     from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
     catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/greeting.jsonc")
     facts = run_quality_facts_driver({
