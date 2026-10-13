@@ -30,6 +30,13 @@ def graph_rule_subjects(graph, *, global_config=None):
         for node in current.nodes:
             if node.status == STATUS_PLANNED:
                 continue
+            from vibeflow.core.tasks import task_graph
+            for slot, target in node.task_targets.items():
+                nested = task_graph(current, target)
+                path = (*prefix, node.id, "tasks", slot)
+                found.append(GraphRuleSubject("task:" + slot, nested, path, node,
+                    parent_path=prefix, global_config=config, available_nodesets=definitions))
+                walk(nested, definitions, path, active, config, {})
             key = node.loop.body if node.type_used in LOOP_NODE_TYPES else node.type_used
             if key in definitions and key not in active:
                 nested, path = definitions[key].graph, (*prefix, node.id)

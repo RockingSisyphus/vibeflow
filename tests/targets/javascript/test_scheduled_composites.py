@@ -35,8 +35,8 @@ def _body(input_type, output_type, leaf_type):
 
 
 @pytest.mark.parametrize("kind", ("nodeset", "loop"))
-@pytest.mark.parametrize("async_mode", ("result_key", "detached"))
-def test_native_composite_task_builds_and_returns_numeric_result(tmp_path, kind, async_mode):
+@pytest.mark.parametrize("mode", ("join", "background"))
+def test_native_composite_task_builds_and_returns_numeric_result(tmp_path, kind, mode):
     project = tmp_path / "project"
     project.mkdir()
     toolchain = Path(os.environ["VIBEFLOW_TEST_TOOLCHAIN_ROOT"])
@@ -44,6 +44,18 @@ def test_native_composite_task_builds_and_returns_numeric_result(tmp_path, kind,
     for name in ("package.json", "package-lock.json"):
         shutil.copy2(toolchain / name, project / name)
     (project / "nodes.mjs").write_text('''
+export async function manager(inputs,params,context) {
+ const ref=context.tasks.start('work',Object.fromEntries(Object.entries(inputs).map(([key,item])=>[key,item.value])));
+ const result=(await context.tasks.waitAllExited([ref]))[0];
+ if(result.status!=='succeeded')throw new Error(result.error.message);
+ return {answer: Object.values(result.outputs)[0]};
+}
+export async function backgroundManager(inputs,params,context) {
+ const ref=context.tasks.start('work',Object.fromEntries(Object.entries(inputs).map(([key,item])=>[key,item.value])));
+ const result=(await context.tasks.waitAllExited([ref]))[0];
+ if(result.status!=='succeeded')throw new Error(result.error.message);
+ return {};
+}
 export function terminal() { return {}; }
 export function double(inputs) { return {answer: inputs["number.in"].value * 2}; }
 export function mainline(inputs) { return {"mainline.answer": inputs["number.in"].value * 2}; }
@@ -64,6 +76,10 @@ export function increment(inputs) { return {"loop.next": inputs["loop.current"].
                 "output_semantics": {item["key"]: ["Numeric result."] for item in provides}},
             "implementations": [{"language": "javascript", "targets": ["node"], "completion": "immediate",
                 "source": {"kind": "file", "ref": "nodes.mjs", "export": export}}]})
+    input_type, output_type = ("number.in", "number.out") if kind=="nodeset" else ("loop.current", "loop.final")
+    resources.append({"kind":"node","type_key":"fixture.manager","display_name":"Manager","description":"Starts a declared composite task","version":"1","flow_kind":"task_manager","rulesets":[],
+        "contract":{"requires":[_requires(input_type)],"input_semantics":{input_type:["Task input"]},"output_semantics":{"answer":["Task output"]} if mode=="join" else {},"provides":[_provides("answer",output_type)] if mode=="join" else [],"params_schema":{"join":{"type":"boolean"}},"params_defaults":{"join":mode=="join"}},
+        "implementations":[{"language":"javascript","targets":["node"],"completion":"suspend","source":{"kind":"file","ref":"nodes.mjs","export":"manager" if mode=="join" else "backgroundManager"}}]})
     selection = write_plugin(project, resources, target="javascript")
     project_config = project / "vibeflow_project.jsonc"
     project_config.write_text(json.dumps({"project_target": "javascript", "quality_enabled": False,
@@ -76,26 +92,23 @@ export function increment(inputs) { return {"loop.next": inputs["loop.current"].
         "requires": [_requires(input_type)],
         "provides": [_provides("answer", output_type)] if kind == "nodeset" else [_provides(output_type)],
         "pipeline": _body(input_type, output_type, leaf_type)}
-    call_options = {"async": async_mode}
-    result_key = "answer" if kind == "nodeset" else "loop.final"
-    if async_mode == "result_key":
-        call_options["result_key"] = result_key
+    call_options = {}
     if kind == "loop":
         call_options.update(requires=[_requires("loop.current")], provides=[_provides("loop.final")],
             loop={"body": "fixture.body", "max_iterations": 5, "stop_after": 3,
                 "carry": [{"from": "loop.current", "as": "loop.current", "update": "loop.next"}],
                 "outputs": [{"from": "loop.current", "as": "loop.final"}]})
     calls = [_call("start", "fixture.terminal"),
-             _call("composite", "fixture.body" if kind == "nodeset" else "vibeflow.loop.while", **call_options),
+             _call("composite", "fixture.manager", task_targets={"work":_call("execute","fixture.body" if kind == "nodeset" else "vibeflow.loop.while", **call_options)}),
              _call("end", "fixture.terminal")]
     edges = [["start", "composite"], ["composite", "end"]]
     public_type = "number.out" if kind == "nodeset" else "loop.final"
-    if async_mode == "detached":
+    if mode == "background":
         calls.insert(2, _call("value", "fixture.mainline"))
-        edges = [["start", "composite"], ["start", "value"], ["value", "end"]]
+        edges = [["start", "composite"], ["start", "value"], ["composite","end"], ["value", "end"]]
         public_type = "number.mainline"
     inputs = [{**_provides(input_type), "required": True}]
-    if async_mode == "detached" and kind == "loop":
+    if mode == "background" and kind == "loop":
         inputs.append({**_provides("number.in"), "required": True})
     config = project / "workflow.jsonc"
     (project / "body.jsonc").write_text(json.dumps(nodeset))
@@ -109,18 +122,18 @@ export function increment(inputs) { return {"loop.next": inputs["loop.current"].
     assert root.tasks[0].executor == "event_loop"
     assert root.node("start").executor == root.node("end").executor == "current"
     runtime_inputs = {input_type: 2}
-    if async_mode == "detached" and kind == "loop":
+    if mode == "background" and kind == "loop":
         runtime_inputs["number.in"] = 2
     script = f'''
 import {{runWorkflowAsync}} from {json.dumps(result.entry.as_uri())};
 const trace = [];
 const outputs = await runWorkflowAsync({json.dumps(runtime_inputs)}, {{trace: "full", onTrace: item => trace.push(item)}});
-console.log(JSON.stringify({{outputs, tasks: trace.filter(item => item.kind.startsWith("async_"))}}));
+console.log(JSON.stringify({{outputs, tasks: trace.filter(item => item.kind.startsWith("task_"))}}));
 '''
     completed = subprocess.run(["node", "--input-type=module", "-e", script],
         cwd=tmp_path, capture_output=True, text=True, check=True)
     observed = json.loads(completed.stdout)
-    assert observed["outputs"] == {"result": 5 if kind == "loop" and async_mode == "result_key" else 4}
-    expected = ("async_result", "async_result_join") if async_mode == "result_key" else ("async_detached", "async_detached_done")
+    assert observed["outputs"] == {"result": 5 if kind == "loop" and mode == "join" else 4}
+    expected = ("task_started", "task_exited")
     assert {item["kind"] for item in observed["tasks"]} == set(expected), observed["tasks"]
     assert all(item["nodePath"] == "composite" for item in observed["tasks"])

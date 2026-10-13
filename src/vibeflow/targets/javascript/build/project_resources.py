@@ -345,6 +345,7 @@ def target_neutral_import_policy(
         kind: str,
         resource_id: str,
         default_export: str,
+        flow_kind: str = "",
     ) -> None:
         if implementation.language not in {"javascript", "typescript"}:
             return
@@ -362,7 +363,7 @@ def target_neutral_import_policy(
                 allowed_roots=catalogs.source_roots)
             owner = {"path":str(source), "kind":kind, "id":resource_id,
                      "export":(locator.export or default_export) if role == "entry" else "",
-                     "role":role, "completion":getattr(implementation,"completion","immediate")}
+                     "role":role, "flowKind":flow_kind, "completion":getattr(implementation,"completion","immediate")}
             previous = owners_by_path.setdefault(source, [])
             if owner not in previous:
                 previous.append(owner)
@@ -424,6 +425,7 @@ def target_neutral_import_policy(
                 kind="node",
                 resource_id=descriptor.type_key,
                 default_export="run",
+                flow_kind=descriptor.flow_kind,
             )
     for descriptor in selected_base_libs:
         allowed_external.update(descriptor.external_packages)

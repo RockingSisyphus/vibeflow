@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 
 COMPLETIONS = frozenset({"immediate", "suspend"})
-SCHEDULES = frozenset({"inline", "deferred", "detached"})
+SCHEDULES = frozenset({"inline"})
 EXECUTORS = frozenset({"current", "event_loop", "thread"})
 TARGETS = frozenset({"browser", "node"})
 PROFILES = frozenset({"esm-module", "single-esm", "web-app"})

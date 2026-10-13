@@ -128,7 +128,7 @@ HARD_PROCESS_STATE_PREFIXES = (
     "sys.path",
     "sys.path_hooks",
 )
-PROCESS_CONTROL_CALLS = frozenset({"time.sleep"})
+
 
 
 PURE_PATH_CLASSES = frozenset({"PurePath", "PurePosixPath", "PureWindowsPath"})
@@ -322,7 +322,7 @@ def _policy_bans_import(module: str, policy: PurityPolicy) -> bool:
 def _is_python_io_call(candidate: str) -> bool:
     """Only named external operations; unknown receivers are outside coverage."""
     return (candidate in BUILTIN_OPEN_CALLS or candidate in BANNED_ATTR_CALLS
-        or candidate in PROCESS_CONTROL_CALLS or candidate in COMMON_LIBRARY_IO_CALLS
+        or candidate in COMMON_LIBRARY_IO_CALLS
         or candidate in THREAD_PROCESS_CALLS
         or any(candidate.startswith(prefix) for prefix in PYTHON_IO_CALL_PREFIXES))
 

@@ -4,7 +4,7 @@ import json
 from collections.abc import Mapping
 
 
-RUN_STATES = frozenset({"starting", "running", "succeeded", "failed"})
+RUN_STATES = frozenset({"starting", "running", "stopping", "succeeded", "failed"})
 
 
 def snapshot_info(info: object) -> list[dict[str, object]]:
@@ -25,7 +25,7 @@ def snapshot_info(info: object) -> list[dict[str, object]]:
 def run_status_record(state: str, error: str | None, updated_at: str,
                       info: list[dict[str, object]] | None = None) -> dict[str, object]:
     if state not in RUN_STATES:
-        raise ValueError("run state must be starting, running, succeeded or failed")
+        raise ValueError("run state must be starting, running, stopping, succeeded or failed")
     if error is not None and not isinstance(error, str):
         raise ValueError("run error must be a string or null")
     record = {"state": state, "error": error, "updated_at": updated_at}

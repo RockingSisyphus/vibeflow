@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from inspect import signature
 from typing import Any, Mapping
 
 from vibeflow.targets.python.runtime.block_compiler import CompiledBlock, compile_blocks
@@ -74,6 +75,8 @@ class NodeFrame:
     result_key: str = ""
     execution_lock: ExecutionLockSpec | None = None
     subplan: "ExecutionPlan | None" = None
+    task_plans: Mapping[str, "ExecutionPlan"] = field(default_factory=dict)
+    accepts_context: bool = False
     planned_behavior: PlannedBehavior = field(default_factory=blocking_planned_behavior)
     planned_stub_module: str = ""
     planned_stub_path: str = ""
@@ -180,6 +183,11 @@ def build_execution_plan(
     _contracts_resolved: bool = False,
     _path: tuple[str, ...] = (),
 ) -> ExecutionPlan:
+    if not _path:
+        from vibeflow.core.nodeset_dependencies import analyze_nodeset_dependencies, nodeset_dependency_cycles
+        cycles = nodeset_dependency_cycles(analyze_nodeset_dependencies(graph))
+        if cycles:
+            raise PipelineRuntimeError("GRAPH.NODESET.DEPENDENCY_CYCLE: " + " -> ".join(cycles[0]))
     if not _path and getattr(registry, "_loaders", {}):
         # The impending imports belong to this Workflow, including its explicit
         # per-call choices. A bare registry.get still uses type defaults.
@@ -405,6 +413,19 @@ def _frame_for(
         )
     node_cls = registry.get(spec.type_used)
     node = node_cls()
+    parameters = tuple(signature(node.run_pure).parameters.values())
+    accepts_context = len(parameters) == 3
+    if flow_kind == "task_manager" and not accepts_context:
+        raise PipelineRuntimeError("VF_TASK_CONTEXT_REQUIRED: task_manager must accept context")
+    from vibeflow.core.tasks import task_graph
+    from vibeflow.targets.python.project.compiler import GraphCompiler
+    task_plans = {}
+    for key, target in spec.task_targets.items():
+        child_graph = task_graph(graph, target)
+        compilation = GraphCompiler().compile_with_findings(child_graph, registry=registry)
+        task_plans[key] = build_execution_plan(compilation.workflow.graph, compilation.compiled_graph,
+            registry=registry, global_config=global_scope, runtime_options=runtime_options,
+            _contracts_resolved=True, _path=(*path, spec.id, "tasks", key))
     config_spec = registry.get_config_spec(spec.type_used)
     scoped_params = scoped_node_params(spec.params, global_scope, declared_keys=set(config_spec.schema))
     node_params = registry.merge_config(spec.type_used, {**scoped_params, **dict(overrides.get(spec.id, {}))})
@@ -412,6 +433,8 @@ def _frame_for(
         id=spec.id,
         type_used=spec.type_used,
         node=node,
+        accepts_context=accepts_context,
+        task_plans=task_plans,
         requires=spec.requires,
         provides=spec.provides,
         params=attach_global_config(node_params, global_scope.values),
@@ -491,7 +514,8 @@ def _frames_contain_global_state(frames: Mapping[str, NodeFrame]) -> bool:
     return any(
         not frame.is_planned
         and (
-            frame.flow_kind == FLOW_KIND_GLOBAL_STATE
+            any(plan.contains_global_state for plan in frame.task_plans.values())
+            or frame.flow_kind == FLOW_KIND_GLOBAL_STATE
             or (
                 frame.subplan is not None
                 and frame.subplan.contains_global_state
@@ -505,7 +529,8 @@ def _frames_contain_execution_locks(frames: Mapping[str, NodeFrame]) -> bool:
     return any(
         not frame.is_planned
         and (
-            frame.execution_lock is not None
+            any(plan.contains_execution_locks for plan in frame.task_plans.values())
+            or frame.execution_lock is not None
             or (
                 frame.subplan is not None
                 and frame.subplan.contains_execution_locks
@@ -536,56 +561,14 @@ def _validate_execution_lock_scopes(
             subject=f"node '{frame.name}'",
         )
         frame_protected = root_protected or bool(frame_key)
-        if frame_protected and frame.async_mode == "detached":
-            raise PipelineRuntimeError(
-                f"protected execution scope cannot contain detached node '{frame.name}'"
-            )
-        if (
-            frame_protected
-            and frame.async_mode == "result_key"
-            and not _frame_has_static_result_consumer(plan, frame)
-        ):
-            raise PipelineRuntimeError(
-                f"protected execution scope cannot contain unjoined result_key node '{frame.name}'"
-            )
+        for task_plan in frame.task_plans.values():
+            _validate_execution_lock_scopes(task_plan, inherited_key=nested_key, protected=frame_protected)
         if frame.subplan is not None:
             _validate_execution_lock_scopes(
                 frame.subplan,
                 inherited_key=nested_key,
                 protected=frame_protected,
             )
-
-
-def _frame_has_static_result_consumer(
-    plan: ExecutionPlan,
-    source: NodeFrame,
-) -> bool:
-    provider = next(
-        (item for item in source.provides if item.key == source.result_key),
-        None,
-    )
-    if provider is None:
-        return False
-    pending = [
-        edge.target for edge in source.outgoing if not edge.when
-    ]
-    seen: set[str] = set()
-    while pending:
-        node_name = pending.pop(0)
-        if node_name in seen:
-            continue
-        seen.add(node_name)
-        candidate = plan.frames.get(node_name)
-        if candidate is None:
-            continue
-        if any(item.type == provider.type for item in candidate.requires):
-            return True
-        pending.extend(
-            edge.target
-            for edge in candidate.outgoing
-            if not edge.when and edge.target not in seen
-        )
-    return False
 
 
 def _nested_lock_key(current: str, requested: str, *, subject: str) -> str:

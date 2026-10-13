@@ -40,7 +40,6 @@ class RuntimeExecutionLockMixin:
         self._lease_context_token = None
         self._root_protection_context_token = None
         self._run_lock_tokens: list[tuple[_HeldExecutionLock, str]] = []
-        self._protected_futures: list[object] = []
         self._global_state_started = False
         self._global_state_nodes: list[str] = []
 
@@ -318,56 +317,31 @@ class RuntimeExecutionLockMixin:
             "scope": effective_scope,
         }
 
-    def _track_protected_future(
-        self,
-        future: object,
-        *,
-        force: bool = False,
-    ) -> None:
-        if force or self._execution_scope_is_protected():
-            self._protected_futures.append(future)
-
-    def _untrack_protected_future(self, future: object) -> None:
-        self._protected_futures = [
-            item for item in self._protected_futures if item is not future
-        ]
-
     @staticmethod
-    def _execution_scope_is_protected() -> bool:
+    def _execution_scope_is_protected():
         return _CURRENT_EXECUTION_PROTECTION_DEPTH.get() > 0
 
-    def _drain_protected_tasks(
-        self,
-        *,
-        fail_on_unjoined: bool = False,
-    ) -> None:
-        pending = self._protected_futures
-        self._protected_futures = []
-        first_error: BaseException | None = None
-        for future in pending:
-            result = getattr(future, "result", None)
-            if not callable(result):
-                continue
-            try:
-                # No timeout is intentional: a protected task may not escape
-                # its lease. Static validation prevents detached/unjoined work;
-                # this is the runtime fail-safe for failures and cancellation.
-                result()
-            except BaseException as exc:
-                # The normal join/flush path owns task error reporting and the
-                # original pipeline failure must remain authoritative.
-                if first_error is None:
-                    first_error = exc
-        if not fail_on_unjoined or not pending:
-            return
-        if first_error is not None:
-            raise PipelineRuntimeError(
-                "protected async task failed before its scheduled join: "
-                f"{first_error}"
-            ) from first_error
-        raise PipelineRuntimeError(
-            "protected async task reached cleanup without its scheduled join"
-        )
+    def _retain_task_execution_locks(self):
+        """Keep inherited domains held while a managed invocation is queued or running.
+
+        Coordinator tokens are thread-independent. ContextVar stack tokens stay
+        with their original frame and are never transferred across threads.
+        """
+        retained = []
+        try:
+            for key in dict.fromkeys(key for key, _ in _CURRENT_EXECUTION_LOCK_STACK.get()):
+                acquisition = PROCESS_EXECUTION_LOCK_COORDINATOR.acquire(key,
+                    mode="shared", lease=self._lease, allow_reentrant=True)
+                retained.append(acquisition.token)
+        except BaseException:
+            self._release_task_execution_locks(retained)
+            raise
+        return retained
+
+    @staticmethod
+    def _release_task_execution_locks(retained):
+        for token in reversed(retained):
+            PROCESS_EXECUTION_LOCK_COORDINATOR.release(token)
 
 
 __all__ = ["RuntimeExecutionLockMixin"]

@@ -36,6 +36,6 @@ VibeFlow 检查工程结构、源码健康度与所选领域约束。项目测�
 - **collaborative**：使用变更清单、planned 架构审核、正式 SVG 和人工批准门。
 - **autonomous**：AI 直接维护真实 source，自动更新架构并完成适用门禁。
 
-两个 profile 使用同一 Core、quality policy、项目模板和 Workflow ABI `vibeflow.workflow.v5`。profile 只改变开发协议、提示词和随包文档选择。
+两个 profile 使用同一 Core、quality policy、项目模板和 Workflow ABI `vibeflow.workflow.v6`。profile 只改变开发协议、提示词和随包文档选择。
 
 从发行包开始开发时，先阅读[快速开始](user/quickstart.md)，再按任务进入对应接口文档。

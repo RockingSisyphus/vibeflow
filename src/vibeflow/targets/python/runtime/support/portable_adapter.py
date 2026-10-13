@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
+from dataclasses import replace
 
 from vibeflow.block_compiler.compiler import (
     _block,
     _block_id,
-    _executor,
     _execution_lock_plan,
     _graph_source,
     _loop_plan,
@@ -16,7 +16,6 @@ from vibeflow.block_compiler.compiler import (
     _requirements,
     _root_inputs,
     _root_outputs,
-    _schedule,
     _workflow_id,
     compile_graph_plan,
 )
@@ -143,8 +142,11 @@ class _ExecutionPlanAdapter:
                     frame,
                     compiled=execution_plan.compiled,
                     child_block=child_block,
+                    task_targets=tuple((key, _block_id((*child_path,"tasks",key))) for key in frame.task_plans),
                 )
             )
+            for key, task_plan in frame.task_plans.items():
+                children.append((task_plan, (*child_path, "tasks", key), "task", None))
             if frame.subplan is not None and not frame.is_planned:
                 child_kind = "loop" if frame.is_loop else "nodeset"
                 child_loop = _loop_plan(spec.loop) if frame.is_loop else None
@@ -166,6 +168,8 @@ class _ExecutionPlanAdapter:
                 contains_global_state=execution_plan.contains_global_state,
             )
         )
+        block = self.blocks[-1]
+        self.blocks[-1] = replace(block, tasks=tuple(replace(task, executor="thread") for task in block.tasks))
         for subplan, child_path, child_kind, child_loop in children:
             self.add_block(
                 subplan,
@@ -181,6 +185,7 @@ class _ExecutionPlanAdapter:
         *,
         compiled: CompiledGraph,
         child_block: str,
+        task_targets: tuple,
     ) -> NodeCallPlan:
         is_receive = (
             spec.type_used == IO_NODE_TYPE
@@ -188,6 +193,7 @@ class _ExecutionPlanAdapter:
         )
         return NodeCallPlan(
             id=spec.id,
+            task_targets=task_targets,
             type_used=spec.type_used,
             implementation=self.source_by_type.get(
                 spec.type_used,
@@ -219,9 +225,9 @@ class _ExecutionPlanAdapter:
             display_name=spec.metadata.display_name,
             description=spec.metadata.description,
             completion="suspend" if is_receive else "immediate",
-            schedule=_schedule(frame.async_mode),
+            schedule="inline",
             executor=(
-                "event_loop" if is_receive else _executor(frame.async_mode)
+                "event_loop" if is_receive else "current"
             ),
             io_operation=spec.io.operation,
             io_port=spec.io.port if spec.io.operation else "",

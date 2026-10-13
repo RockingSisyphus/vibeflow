@@ -183,6 +183,8 @@ class NodeSpec:
     execution_lock: ExecutionLockSpec | None = None
     rulesets: tuple | None = None
 
+    task_targets: dict[str, "NodeSpec"] = field(default_factory=dict)
+
     def __post_init__(self) -> None:
         from vibeflow.core.rules.selection.models import selection_refs
         object.__setattr__(self, "rulesets", selection_refs(self.rulesets, optional=True))
@@ -257,6 +259,7 @@ class GraphConfig:
     source_path: str = ""
     execution_lock: ExecutionLockSpec | None = None
     rulesets: tuple | None = None
+    task_entry: str = ""
 
     def __post_init__(self) -> None:
         from vibeflow.core.rules.selection.models import selection_refs
@@ -271,6 +274,7 @@ class GraphConfig:
 @dataclass
 class GraphConfigError(ValueError):
     detail: str
+    rule_id: str = ""
 
     def __str__(self) -> str:
         return f"Graph config error: {self.detail}"

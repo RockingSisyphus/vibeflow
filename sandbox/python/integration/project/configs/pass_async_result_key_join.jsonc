@@ -8,13 +8,25 @@
         "description": "Runs start."
       },
       {
-        "async": "result_key",
-        "result_key": "value.in",
-        "value": 7,
         "id": "seed",
-        "type_used": "sandbox.constant",
-        "display_name": "Seed",
-        "description": "Runs seed."
+        "type_used": "task.launch.sandbox_constant.waited",
+        "display_name": "任务管理：Seed",
+        "description": "Starts an explicitly declared workflow-owned task.",
+        "task_targets": {
+          "work": {
+            "value": 7,
+            "id": "work",
+            "type_used": "sandbox.constant",
+            "display_name": "Seed",
+            "description": "Runs seed."
+          }
+        }
+      },
+      {
+        "id": "seed_join",
+        "type_used": "task.join.sandbox_constant",
+        "display_name": "任务管理：等待 Seed",
+        "description": "Waits for actual task execution and cleanup, then returns its declared outputs."
       },
       {
         "delta": 5,
@@ -36,12 +48,16 @@
         "to": "seed"
       },
       {
-        "from": "seed",
+        "from": "seed_join",
         "to": "add"
       },
       {
         "from": "add",
         "to": "end"
+      },
+      {
+        "from": "seed",
+        "to": "seed_join"
       }
     ],
     "outputs": [

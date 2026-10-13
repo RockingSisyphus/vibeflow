@@ -48,6 +48,12 @@ class SchedulerCodegenMixin:
             ),
         ]
         for node in workflow.nodes:
+            targets = {key: code.children[(node.id,key)] for key in node.task_plans}
+            if targets:
+                lines.append(f"    setOwn(state.taskExecutors, {js(node.id)}, dictionary());")
+                for key, child in targets.items():
+                    lines.append(f"    setOwn(state.taskExecutors[{js(node.id)}], {js(key)}, (inputs, root, path) => {child.function_name}(inputs, root, path));")
+        for node in workflow.nodes:
             lines.append(f"    initializeInbox(state, {js(node.id)});")
         for node in workflow.nodes:
             node_incoming = incoming[node.id]
@@ -93,8 +99,7 @@ class SchedulerCodegenMixin:
                 "          break;",
                 "      }",
                 "    }",
-                "    abandonPending(state);",
-                "    const publicOutputs = finalizeOutputs(state);",
+                '    const publicOutputs = state.workflow.kind === "task" ? state.taskOutputs : finalizeOutputs(state);',
                 (
                     f"    {hook}(root, \"afterBlock\", {{ "
                     "blockPath: formatBlockPath(path), path: [...path] });"
@@ -130,8 +135,6 @@ class SchedulerCodegenMixin:
         )
         lines = [f"        case {js(node.id)}: {{"]
         node_by_id = {item.id: item for item in code.workflow.nodes}
-        if code.workflow.entry_mode == "async":
-            self._emit_pending_joins(lines, code, incoming, node_by_id)
         availability = self._availability_tests(
             code,
             node,
@@ -161,6 +164,7 @@ class SchedulerCodegenMixin:
         self._emit_node_invocation(lines, code, node)
         lines.extend(
             [
+                "            state.taskOutputs = outputs;",
                 "            state.stepCount += 1;",
                 (
                     f"            const targets = {code.activate_names[node.id]}("
@@ -210,25 +214,6 @@ class SchedulerCodegenMixin:
             ]
         )
         return lines
-
-    @staticmethod
-    def _emit_pending_joins(
-        lines: list[str],
-        code: WorkflowCode,
-        incoming: list[Any],
-        node_by_id: dict[str, EmissionNode],
-    ) -> None:
-        seen_sources: set[str] = set()
-        for route in incoming:
-            if route.source in seen_sources:
-                continue
-            seen_sources.add(route.source)
-            source = node_by_id[route.source]
-            lines.append(
-                f"          await joinStaticPending("
-                f"{code.node_names[source.id]}, state, "
-                f"{code.activate_names[source.id]});"
-            )
 
     @staticmethod
     def _availability_tests(
@@ -309,81 +294,12 @@ class SchedulerCodegenMixin:
         code: WorkflowCode,
         node: EmissionNode,
     ) -> None:
-        if node.schedule == "deferred":
-            lines.extend(
-                [
-                    (
-                        f"            const pending = "
-                        f"{code.execute_names[node.id]}(inputs, state);"
-                    ),
-                    "            pending.catch(() => {});",
-                    f"            state.pending.set({js(node.id)}, pending);",
-                    "            outputs = dictionary();",
-                    "            deferred = true;",
-                    "            emitTrace(state.root, \"async_result\", {",
-                    f"              nodeId: {js(node.id)},",
-                    f"              nodePath: nodePath(state, {js(node.id)}),",
-                    "              blockPath: formatBlockPath(state.path),",
-                    f"              resultKey: {js(node.result_key)},",
-                    "            });",
-                ]
-            )
-        elif node.schedule == "detached":
-            lines.extend(
-                [
-                    (
-                        f"            const pending = "
-                        f"{code.execute_names[node.id]}(inputs, state);"
-                    ),
-                    "            pending.catch(() => {});",
-                    "            const detachedItem = {",
-                    f"              node: {code.node_names[node.id]},",
-                    f"              nodePath: nodePath(state, {js(node.id)}),",
-                    "              blockPath: formatBlockPath(state.path),",
-                    "              workflow: state.workflow,",
-                    "              promise: pending,",
-                    "            };",
-                    "            state.root.detached.add(detachedItem);",
-                    "            pending.then(() => {",
-                    "              state.root.detached.delete(detachedItem);",
-                    "              emitTrace(state.root, \"async_detached_done\", {",
-                    f"                nodeId: {js(node.id)},",
-                    f"                nodePath: nodePath(state, {js(node.id)}),",
-                    "                blockPath: formatBlockPath(state.path),",
-                    "              });",
-                    "            }, (cause) => {",
-                    "              state.root.detached.delete(detachedItem);",
-                    "              state.root.detachedFailure ||= "
-                    "cause instanceof VibeFlowWorkflowError ? cause : vfError(",
-                    '                "VF_NODE_FAILED",',
-                    f"                {js(f'detached node {node.id!r} failed')},",
-                    "                state.workflow,",
-                    f"                {{ nodePath: nodePath(state, {js(node.id)}), "
-                    "blockPath: formatBlockPath(state.path), cause },",
-                    "              );",
-                    "            });",
-                    "            outputs = dictionary();",
-                    "            deferred = true;",
-                    "            emitTrace(state.root, \"async_detached\", {",
-                    f"              nodeId: {js(node.id)},",
-                    f"              nodePath: nodePath(state, {js(node.id)}),",
-                    "              blockPath: formatBlockPath(state.path),",
-                    "            });",
-                ]
-            )
-        else:
-            await_prefix = (
-                "await " if code.workflow.entry_mode == "async" else ""
-            )
-            lines.extend(
-                [
-                    (
-                        f"            outputs = {await_prefix}"
-                        f"{code.execute_names[node.id]}(inputs, state);"
-                    ),
-                    f"            finishStaticNode({code.node_names[node.id]}, state);",
-                ]
-            )
+        await_prefix = "await " if code.workflow.entry_mode == "async" else ""
+        lines.extend([
+            f"            outputs = {await_prefix}{code.execute_names[node.id]}(inputs, state);",
+            f"            finishStaticNode({code.node_names[node.id]}, state);",
+        ])
+
 
 
 __all__ = ["SchedulerCodegenMixin"]

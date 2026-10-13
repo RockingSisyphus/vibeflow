@@ -69,6 +69,14 @@ def prepare_graph(
     state.used_types.update(item.type for item in graph.inputs)
     state.used_types.update(item.type for item in graph.outputs)
     for spec in graph.nodes:
+        from vibeflow.core.tasks import task_graph
+        for key, target in spec.task_targets.items():
+            child_path = (*path, spec.id, "tasks", key)
+            child_graph = task_graph(graph, target)
+            child_compiled = state.compile_graph(child_graph, set(child_graph.nodesets), ".".join(child_path))
+            state.compiled_by_path[child_path] = child_compiled
+            prepare_graph(child_graph, child_compiled, state=state, path=child_path,
+                overrides={}, global_scope=global_scope, active_nodesets=active_nodesets)
         call_path = (*path, spec.id)
         state.used_types.update(item.type for item in spec.requires)
         state.used_types.update(item.type for item in spec.provides)

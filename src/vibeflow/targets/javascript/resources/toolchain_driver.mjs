@@ -237,6 +237,7 @@ function normalizeImportPolicy(raw, packageRoot) {
         export: String(item.export ?? "run"),
         role: String(item.role || "entry"),
         completion: String(item.completion || "immediate"),
+        flowKind: String(item.flowKind || item.flow_kind || ""),
       }))
       .sort((left, right) => right.path.length - left.path.length)
     : [];
@@ -980,7 +981,7 @@ function promiseLikeType(ts, checker, type, fallbackText = "") {
   return promiseLikeTypeText(fallbackText);
 }
 
-function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy) {
+function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy, project) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
   if (!owner || owner.role === "support" || !["node", "host_extension", "plugin"].includes(owner.kind)) return [];
   const declaration = implementationDeclaration(ts, sourceFile, owner.export);
@@ -1118,7 +1119,110 @@ function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy) {
     return "";
   }
 
+  if (owner.flowKind === "task_manager" && (declaration.parameters?.length || 0) < 3)
+    findings.push(importFinding(sourceFile, declaration, "VF_TASK_CONTEXT_REQUIRED",
+      `task_manager '${owner.id}' must accept context as its third parameter`));
+  function nativeTimerName(expression, seen = new Set()) {
+    if (!expression || seen.has(expression)) return "";
+    seen.add(expression);
+    let symbol=checker.getSymbolAtLocation(ts.isPropertyAccessExpression(expression) ? expression.name : expression);
+    if(symbol && (symbol.flags & ts.SymbolFlags.Alias))symbol=checker.getAliasedSymbol(symbol);
+    for (const item of symbolDeclarationNodes(symbol,project)) {
+      const file=item.getSourceFile().fileName.replaceAll("\\", "/");
+      if (/\/lib\.[^/]+\.d\.ts$/.test(file) || file.includes("/node_modules/@types/node/")) {
+        return item.name?.text || "";
+      }
+      if ((ts.isVariableDeclaration(item) || ts.isPropertyAssignment(item)) && item.initializer) {
+        const original=nativeTimerName(unwrapExpression(ts,item.initializer),seen);
+        if(original)return original;
+      }
+    }
+    return "";
+  }
+  function timerClearedInFinally(call, clearName) {
+    const assignment=call.parent;
+    const variable=ts.isVariableDeclaration(assignment) ? assignment.name :
+      ts.isBinaryExpression(assignment) && assignment.operatorToken.kind===ts.SyntaxKind.EqualsToken ? assignment.left : null;
+    if(!variable)return false;
+    function sameHandle(left,right) {
+      left=unwrapExpression(ts,left);right=unwrapExpression(ts,right);
+      if(!left || !right)return false;
+      if(ts.isIdentifier(left) && ts.isIdentifier(right))return checker.getSymbolAtLocation(left)===checker.getSymbolAtLocation(right);
+      if(ts.isPropertyAccessExpression(left) && ts.isPropertyAccessExpression(right))
+        return left.name.text===right.name.text && sameHandle(left.expression,right.expression);
+      return left.kind===ts.SyntaxKind.ThisKeyword && right.kind===ts.SyntaxKind.ThisKeyword;
+    }
+    let cleared = false;
+    function scan(node, inFinally = false) {
+      if (ts.isTryStatement(node)) {
+        if (node.finallyBlock) scan(node.finallyBlock, true);
+        scan(node.tryBlock, inFinally);
+        if (node.catchClause) scan(node.catchClause, inFinally);
+        return;
+      }
+      if (inFinally && ts.isCallExpression(node) && nativeTimerName(node.expression) === clearName
+          && node.arguments.length > 0 && sameHandle(node.arguments[0],variable)) cleared = true;
+      visitChildren(ts, node, child=>scan(child,inFinally));
+    }
+    scan(declaration);
+    return cleared;
+  }
+  const contextParameter = declaration.parameters?.[2]?.name;
+  const contextSymbol = contextParameter && checker.getSymbolAtLocation(contextParameter);
+  function listenerReleased(call) {
+    const receiver = ts.isPropertyAccessExpression(call.expression) ? call.expression.expression : null;
+    // The invocation signal is aborted when this Node actually exits. A once
+    // abort listener therefore belongs to the invocation, including success.
+    if (receiver && ts.isPropertyAccessExpression(unwrapExpression(ts,receiver)) && unwrapExpression(ts,receiver).name.text === "signal"
+        && checker.getSymbolAtLocation(unwrapExpression(ts,receiver).expression) === contextSymbol
+        && call.arguments[0]?.text === "abort"
+        && call.arguments[2]?.getText(sourceFile).match(/once\s*:\s*true/)) return true;
+    let released = false;
+    const same = (left, right) => left && right && left.getText(sourceFile) === right.getText(sourceFile);
+    function scan(item, inFinally = false) {
+      if (ts.isTryStatement(item)) {
+        if (item.finallyBlock) scan(item.finallyBlock, true);
+        scan(item.tryBlock, inFinally);
+        if (item.catchClause) scan(item.catchClause, inFinally);
+        return;
+      }
+      if (inFinally && ts.isCallExpression(item)
+          && ["removeEventListener", "off", "removeListener"].includes(nativeTimerName(item.expression))
+          && (receiver ? ts.isPropertyAccessExpression(item.expression) && same(item.expression.expression, receiver) : ts.isIdentifier(item.expression))
+          && same(item.arguments[0], call.arguments[0])
+          && same(item.arguments[1], call.arguments[1])) released = true;
+      visitChildren(ts, item, child => scan(child, inFinally));
+    }
+    scan(declaration);
+    return released;
+  }
+  function auditPromiseResources(creation) {
+    if(nativeTimerName(creation.expression)!=='Promise')return;
+    const executor=creation.arguments?.[0];
+    if(!executor || !(ts.isArrowFunction(executor)||ts.isFunctionExpression(executor)))return;
+    const owned=ts.isAwaitExpression(creation.parent)||ts.isReturnStatement(creation.parent);
+    function scan(item) {
+      if(item!==executor && (ts.isArrowFunction(item)||ts.isFunctionExpression(item)||ts.isFunctionDeclaration(item)))return;
+      if(ts.isCallExpression(item)) {
+        const resource=nativeTimerName(item.expression);
+        if(resource==='setInterval' || resource==='setTimeout' && !owned) {
+          if(!timerClearedInFinally(item,resource==='setTimeout'?'clearTimeout':'clearInterval'))
+            findings.push(importFinding(sourceFile,item,'VF_NODE_RESOURCE_UNOWNED',`node '${owner.id}' must own and release its timer`));
+        }
+        if(['addEventListener','on','once','addListener'].includes(resource) && !listenerReleased(item))
+          findings.push(importFinding(sourceFile,item,'VF_NODE_RESOURCE_UNOWNED',`node '${owner.id}' must release its event listener in finally`));
+      }
+      visitChildren(ts,item,scan);
+    }
+    scan(executor);
+  }
   function visit(node) {
+    if (ts.isPropertyAccessExpression(node) && node.name.text === "tasks"
+        && owner.flowKind !== "task_manager" && contextSymbol
+        && checker.getSymbolAtLocation(node.expression) === contextSymbol) {
+      findings.push(importFinding(sourceFile, node, "VF_TASK_CONTROL_FORBIDDEN",
+        `node '${owner.id}' must be task_manager to use the controller`));
+    }
     if (node !== declaration
         && (ts.isFunctionDeclaration(node)
           || ts.isFunctionExpression(node)
@@ -1151,6 +1255,16 @@ function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy) {
     }
     if (ts.isCallExpression(node)) {
       const name = callName(node);
+      const timer = nativeTimerName(node.expression);
+      if (["addEventListener", "on", "once", "addListener"].includes(timer) && !listenerReleased(node)) {
+        findings.push(importFinding(sourceFile, node, "VF_NODE_RESOURCE_UNOWNED",
+          `node '${owner.id}' must release its event listener in finally`));
+      }
+      if (["setTimeout", "setInterval"].includes(timer)
+          && !timerClearedInFinally(node, timer === "setTimeout" ? "clearTimeout" : "clearInterval")) {
+        findings.push(importFinding(sourceFile, node, "VF_NODE_RESOURCE_UNOWNED",
+          `node '${owner.id}' must await its timer or release its handle in finally`));
+      }
       let callReturnsPromise = false;
       try {
         const callType = checker.getTypeAtLocation(node);
@@ -1163,21 +1277,6 @@ function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy) {
       } catch {
         // The syntax checks below remain authoritative when a checker cannot
         // expose a type for this expression.
-      }
-      if (new Set([
-        "addEventListener",
-        "eventOn",
-        "on",
-        "once",
-        "setInterval",
-        "setTimeout",
-      ]).has(name)) {
-        findings.push(importFinding(
-          sourceFile,
-          node,
-          "VF_NODE_LONG_LIVED_LISTENER",
-          `node '${owner.id}' cannot register listeners or timers outside an explicit TaskPlan or host_extension`,
-        ));
       }
       const isPromiseChain = ts.isPropertyAccessExpression(node.expression)
         && new Set(["then", "catch", "finally"]).has(node.expression.name.text);
@@ -1214,6 +1313,14 @@ function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy) {
           `immediate node '${owner.id}' cannot create or chain Promise work`,
         ));
       }
+    }
+    if (ts.isNewExpression(node)) auditPromiseResources(node);
+    if (completion !== "immediate" && ts.isNewExpression(node)
+        && ts.isExpressionStatement(node.parent)) {
+      const type = checker.getTypeAtLocation(node);
+      if (promiseLikeType(ts, checker, type, checker.typeToString(type)))
+        findings.push(importFinding(sourceFile,node,"VF_PROMISE_UNOWNED",
+          `node '${owner.id}' cannot discard constructed Promise work`));
     }
     if (completion === "immediate"
         && (ts.isAwaitExpression(node)
@@ -2444,7 +2551,7 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
       if (topics.has("architecture")) findings.push(...auditImportOwnership(ts, implementationFile, checker, project, policy));
       if (sourceFile.isDeclarationFile) continue;
       if (topics.has("purity")) findings.push(...auditTopLevelPurity(ts, sourceFile, policy, ruleParams));
-      if (topics.has("completion")) findings.push(...auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy));
+      if (topics.has("completion")) findings.push(...auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy, project));
       for (const effect of effectScopes.get(normalizedRealPath(ts, sourceFile.fileName)) || []) {
         const scoped = [];
         if (topics.has("module_state")) {
@@ -2467,7 +2574,7 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
           owners: [alternate, ...policy.owners.filter((item) => item !== alternate)],
         };
         findings.push(...auditCompletionAndPromiseOwnership(
-          ts, sourceFile, checker, alternatePolicy,
+          ts, sourceFile, checker, alternatePolicy, project,
         ).map((finding) => ({
           ...finding,
           owner: { id: alternate.id, kind: alternate.kind, path: alternate.path },

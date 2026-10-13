@@ -14,7 +14,7 @@ from vibeflow.targets.javascript.frontend.errors import AotPlanError
 
 def _plan(schema: object) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v5",
+        "abi_version": "vibeflow.workflow.v6",
         "workflow_id": "schema-fail-closed",
         "schemas": {"value.in": schema},
         "inputs": [

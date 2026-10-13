@@ -106,3 +106,5 @@ python run.py inspect-resources --config python_project/configs/main.jsonc --jso
 上例在 `run_pure` 中调用 `update_run_info`，同时照常返回契约声明的输出。函数从当前运行上下文取得状态缓存，Node 的方法签名与 `rulesets` 选择沿用原声明。训练 Node 可以在每轮结束后用同一接口提交轮次和指标。
 
 每次调用替换完整 `info` 数组。需要同时保留训练进度和指标时，在一次调用中提供两个对象；`[]` 清空信息。内核在下一次定时刷新、状态变化或结束时写入最新缓存。默认间隔为 60 秒，命令行用 `--status-interval` 调整。完整数据格式、日志位置和监控配置见[运行日志与状态接口](runtime-observation.md)。
+
+并发启动、任务引用、停止与实际收尾合同见[原生任务管理](task-management.md)。

@@ -259,7 +259,8 @@ const nodeRuns = Object.create(null);
 const edgeRuns = Object.create(null);
 const taskEventKeys = new Set();
 const taskKinds = new Set([
-  "async_result",
+  "task_started",
+  "task_exited",
   "async_result_join",
   "async_result_abandoned",
   "async_detached",
@@ -270,8 +271,6 @@ const taskKinds = new Set([
 for (const event of trace) {{
   if (
     event.kind === "node_end"
-    || event.kind === "async_result"
-    || event.kind === "async_detached"
   ) {{
     const key = String(event.nodePath || event.nodeId || "");
     nodeRuns[key] = (nodeRuns[key] || 0) + 1;
@@ -384,7 +383,8 @@ def _javascript_bindings(portable_plan):
 
 _TASK_EVENT_KINDS = frozenset(
     {
-        "async_result",
+        "task_started",
+  "task_exited",
         "async_result_join",
         "async_result_abandoned",
         "async_detached",

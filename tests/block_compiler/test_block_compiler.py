@@ -284,7 +284,7 @@ def test_abi_v5_serializes_global_state_and_locks_without_dispatch() -> None:
     payload = plan.to_dict()
     root = plan.block(plan.entry_block)
 
-    assert plan.abi_version == WORKFLOW_ABI_VERSION == "vibeflow.workflow.v5"
+    assert plan.abi_version == WORKFLOW_ABI_VERSION == "vibeflow.workflow.v6"
     assert plan.contains_global_state is True
     assert "root_exclusive" not in payload
     assert payload["execution_lock"] == {"key": "trainer", "scope": "root"}
@@ -305,11 +305,12 @@ def test_abi_v5_serializes_global_state_and_locks_without_dispatch() -> None:
         replace(plan, abi_version="vibeflow.workflow.v3")
 
 
-def test_nested_global_state_propagates_without_restricting_unlocked_async() -> None:
+def test_nested_global_state_and_declared_tasks_have_independent_plan_facts() -> None:
     facts = ImplementationFacts(
         (
             ImplementationFact("fixture.state", flow_kind=FLOW_KIND_GLOBAL_STATE),
             ImplementationFact("fixture.side", flow_kind="process"),
+            ImplementationFact("fixture.manager", flow_kind="task_manager"),
         ),
         strict=True,
     )
@@ -335,13 +336,16 @@ def test_nested_global_state_propagates_without_restricting_unlocked_async() -> 
     graph = GraphConfig(
         nodes=(
             NodeSpec("group", "fixture.group"),
-            NodeSpec("side", "fixture.side", async_mode="detached"),
+            NodeSpec("manager", "fixture.manager", task_targets={"side":NodeSpec("side", "fixture.side")}),
         ),
         nodesets={nodeset.type_key: nodeset},
     )
 
     unlocked = _compile_global(graph, facts)
-    assert unlocked.block(unlocked.entry_block).node("side").schedule == "detached"
+    root = unlocked.block(unlocked.entry_block)
+    assert root.node("manager").flow_kind == "task_manager"
+    assert root.tasks[0].key == "side"
+    assert unlocked.block(root.tasks[0].block_id).kind == "task"
 
 
 @pytest.mark.parametrize("planned_definition", (False, True))
@@ -452,50 +456,18 @@ def test_composite_invocation_locks_use_block_scope() -> None:
     assert root.node("loop").execution_lock.scope == "block"
 
 
-def test_protected_result_key_requires_and_accepts_static_consumer_path() -> None:
-    facts = ImplementationFacts(
-        (
-            ImplementationFact("fixture.state", flow_kind=FLOW_KIND_GLOBAL_STATE),
-            ImplementationFact(
-                "fixture.async",
-                flow_kind="process",
-                provides=(DataProvider("value", "fixture.value", display_name="Value"),),
-            ),
-            ImplementationFact(
-                "fixture.consume",
-                flow_kind="process",
-                requires=(DataRequirement("fixture.value", "exactly_one", display_name="Fixture Value"),),
-            ),
-        ),
-        strict=True,
-    )
-    async_node = NodeSpec(
-        "async",
-        "fixture.async",
-        provides=(DataProvider("value", "fixture.value", display_name="value"),),
-        async_mode="result_key",
-        result_key="value",
-    )
-    unjoined = GraphConfig(
-        nodes=(NodeSpec("state", "fixture.state"), async_node),
-        execution_lock=ExecutionLockSpec("trainer"),
-    )
-    with pytest.raises(GraphCompileError) as exc_info:
-        _compile_global(unjoined, facts)
-    assert exc_info.value.rule_id == "GRAPH.EXECUTION_LOCK.RESULT_UNJOINABLE"
-
-    joined = GraphConfig(
-        nodes=(
-            NodeSpec("state", "fixture.state"),
-            async_node,
-            NodeSpec(
-                "consume",
-                "fixture.consume",
-                requires=(DataRequirement("fixture.value", "exactly_one", display_name="fixture.value"),),
-            ),
-        ),
-        edges=(EdgeSpec("async", "consume"),),
-        execution_lock=ExecutionLockSpec("trainer"),
-    )
-    plan = _compile_global(joined, facts)
-    assert plan.block(plan.entry_block).node("async").schedule == "deferred"
+def test_protected_task_plan_records_manager_target_and_executor() -> None:
+    facts = ImplementationFacts((ImplementationFact("fixture.manager",flow_kind="task_manager"),
+        ImplementationFact("fixture.work",flow_kind="process",
+            provides=(DataProvider("value","fixture.value",display_name="Value"),))),strict=True)
+    graph = GraphConfig(nodes=(NodeSpec("manager","fixture.manager",
+        task_targets={"work":NodeSpec("work","fixture.work")}),),execution_lock=ExecutionLockSpec("trainer"))
+    plan = _compile_global(graph, facts)
+    root = plan.block(plan.entry_block)
+    task = root.tasks[0]
+    assert task.manager_node_id == "manager" and task.key == "work"
+    assert task.executor == "thread"
+    assert plan.block(task.block_id).node("work").provides[0].key == "value"
+    # Legacy positive plans cannot bypass the explicit ownership contract.
+    with pytest.raises(GraphCompileError, match="GRAPH.ASYNC.MIGRATION"):
+        _compile_global(GraphConfig(nodes=(NodeSpec("work","fixture.work",async_mode="result_key",result_key="value"),)),facts)

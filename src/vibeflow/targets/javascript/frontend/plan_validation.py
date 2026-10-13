@@ -14,6 +14,8 @@ def validate_javascript_plan(plan: WorkflowPlan) -> None:
         for task in block.tasks:
             _supported(task, task.id)
         for node in block.nodes:
+            if node.flow_kind == "task_manager" and plan.entry_mode == "sync":
+                raise AotPlanError("JavaScript task management requires an async workflow", code="VF_ENTRY_MODE_TASK_IN_SYNC")
             if node.status != "planned":
                 _supported(node, ".".join((*block.path, node.id)))
             if node.status == "planned" or node.planned_behavior not in ("", "blocking"):
@@ -58,7 +60,7 @@ def _validate_block(block: BlockPlan) -> None:
     _unique(block.entries, "workflow entry")
     incoming = {route.target for route in block.routes if route.schedule}
     invalid = [entry for entry in block.entries if entry not in ids or entry in incoming
-               or not block.node(entry).is_terminal]
+               or (block.kind != "task" and not block.node(entry).is_terminal)]
     if invalid:
         raise AotPlanError(f"workflow entries must be terminal nodes without incoming routes: {invalid}",
                            code="VF_WORKFLOW_ENTRY")

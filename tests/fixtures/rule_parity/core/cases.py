@@ -91,7 +91,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
                     "positions": [plain(item.source_location) for item in findings if getattr(item, "source_location", {})],
                     "metrics": metrics, "message": "; ".join(item.message for item in findings if hasattr(item, "message"))}
         except Exception as error:
-            code = str(getattr(error, "rule_id", getattr(error, "code", type(error).__name__)))
+            code = str((getattr(error, "rule_id", None) or getattr(error, "code", None) or type(error).__name__))
             actual = {"status": "ERROR", "codes": [{"code": code, "severity": "error"}], "positions": [],
                 "metrics": {"details": plain(getattr(error, "details", {})), "exception": type(error).__name__}, "message": str(error)}
         observations.append({"id": "core." + case_id, "title": title, "family": family,
@@ -294,18 +294,18 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     emit("native.decision_missing_when","Decision边缺when","native.routing",
         lambda:compile_graph(GraphConfig((node("route","decision"),node("end","terminal")),(EdgeSpec("route","end"),))),codes(("GRAPH.DECISION.MISSING_EDGE_CONDITION","error")),evidence=native_evidence)
     emit("native.async_result_contract","result_key未在实际provides声明","native.async",
-        lambda:compile_graph(GraphConfig((node("worker",async_mode="result_key",result_key="value"),))),codes(("GRAPH.ASYNC.RESULT_KEY_CONTRACT","error")),evidence=native_evidence)
+        lambda:compile_graph(GraphConfig((node("worker",async_mode="result_key",result_key="value"),))),codes((("GRAPH.ASYNC.RESULT_KEY_CONTRACT" if variant == "baseline" else "GRAPH.ASYNC.MIGRATION"),"error")),classification="approved_change",notes="ABI v6 rejects retired concurrency entrances before route and lock analysis.",evidence=native_evidence)
     result_node=node("worker",provides=(DataProvider("value","value"),),async_mode="result_key",result_key="value")
     emit("native.async_result_route","result只有transfer边没有schedule消费者","native.async",
-        lambda:compile_graph(GraphConfig((result_node,node("consumer")),(EdgeSpec("worker","consumer",schedule=False,transfer=True),))),codes(("GRAPH.ASYNC.RESULT_UNJOINABLE","error")),evidence=native_evidence)
+        lambda:compile_graph(GraphConfig((result_node,node("consumer")),(EdgeSpec("worker","consumer",schedule=False,transfer=True),))),codes((("GRAPH.ASYNC.RESULT_UNJOINABLE" if variant == "baseline" else "GRAPH.ASYNC.MIGRATION"),"error")),classification="approved_change",notes="ABI v6 rejects retired concurrency entrances before route and lock analysis.",evidence=native_evidence)
     for kind in ("global_state","lock"):
         graph=(GraphConfig((node("state","global_state"),)) if kind == "global_state"
             else GraphConfig((node("work"),),execution_lock=ExecutionLockSpec("resource")))
         emit("native.feature."+kind,"Target缺少"+kind+"真实执行能力","native.features",lambda graph=graph:compile_graph(graph,supported=TargetFeatureSet()),codes(("TARGET.FEATURE.UNSUPPORTED","error")),evidence=native_evidence)
     emit("native.lock.detached","锁域内detached无法受保护","native.execution_lock",
-        lambda:compile_graph(GraphConfig((node("background",async_mode="detached"),),execution_lock=ExecutionLockSpec("resource"))),codes(("GRAPH.EXECUTION_LOCK.DETACHED_FORBIDDEN","error")),evidence=native_evidence)
+        lambda:compile_graph(GraphConfig((node("background",async_mode="detached"),),execution_lock=ExecutionLockSpec("resource"))),codes((("GRAPH.EXECUTION_LOCK.DETACHED_FORBIDDEN" if variant == "baseline" else "GRAPH.ASYNC.MIGRATION"),"error")),classification="approved_change",notes="ABI v6 rejects retired concurrency entrances before route and lock analysis.",evidence=native_evidence)
     emit("native.lock.result_unjoined","锁域内result无静态消费者","native.execution_lock",
-        lambda:compile_graph(GraphConfig((result_node,),execution_lock=ExecutionLockSpec("resource"))),codes(("GRAPH.EXECUTION_LOCK.RESULT_UNJOINABLE","error")),evidence=native_evidence)
+        lambda:compile_graph(GraphConfig((result_node,),execution_lock=ExecutionLockSpec("resource"))),codes((("GRAPH.EXECUTION_LOCK.RESULT_UNJOINABLE" if variant == "baseline" else "GRAPH.ASYNC.MIGRATION"),"error")),classification="approved_change",notes="ABI v6 rejects retired concurrency entrances before route and lock analysis.",evidence=native_evidence)
     emit("native.lock.conflicting_nested_keys","继承锁与不同子锁冲突","native.execution_lock",
         lambda:compile_graph(GraphConfig((node("work",execution_lock=ExecutionLockSpec("other")),),execution_lock=ExecutionLockSpec("resource"))),codes(("GRAPH.EXECUTION_LOCK.NESTED_KEY_CONFLICT","error")),evidence=native_evidence)
     emit("native.lock.same_key","同key继承锁合法","native.execution_lock",
@@ -495,7 +495,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         rules,sets=builtin_rule_resources()
         for selected,phase,count in [("vibeflow.workflow","import",0),("vibeflow.workflow","static",8),("vibeflow.workflow","run",8),
             ("vibeflow.quality.project","import",0),("vibeflow.quality.project","static",4),("vibeflow.quality.project","run",0),
-            ("vibeflow.process","import",1),("vibeflow.process","static",5),("vibeflow.process","run",5)]:
+            ("vibeflow.process","import",1),("vibeflow.process","static",6),("vibeflow.process","run",6)]:
             def inspect_plan(selected=selected,phase=phase):
                 plan=compile_ruleset(selected,rules={r.id:r for r in rules},rulesets={s.id:s for s in sets},entrypoint=phase)
                 return {"status":"PASS","codes":[],"positions":[],"metrics":{"invocation_count":len(plan.invocations),"rules":[item.rule.id for item in plan.invocations]},"message":"No business Node was imported or executed."}

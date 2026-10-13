@@ -405,6 +405,19 @@ JAVASCRIPT_EXPORTS = {
     "vibeflow.loop.while": "unusedComposite",
 }
 
+JAVASCRIPT_SOURCE += """
+export async function taskManager(inputs,params,context) {
+ const values=Object.fromEntries(Object.entries(inputs).map(([key,value])=>[key,Array.isArray(value)?value.map(item=>item.value):value.value]));
+ const ref=context.tasks.start('work',values);
+ const outcome=(await context.tasks.waitAllExited([ref]))[0];
+ if(outcome.status!=='succeeded')throw new Error(outcome.error.message);
+ return outcome.outputs;
+}
+"""
+for _key in ('fixture.async_route','fixture.double','fixture.async_double','fixture.detached_audit'):
+    JAVASCRIPT_EXPORTS['manage.'+_key]='taskManager'
+    JAVASCRIPT_COMPLETIONS['manage.'+_key]='suspend'
+
 
 def _registry() -> NodeRegistry:
     registry = NodeRegistry()
@@ -453,6 +466,16 @@ def _registry() -> NodeRegistry:
         ("fixture.detached_audit", _DetachedAuditNode),
     ):
         registry.register(declarations[type_key], node)
+    class TaskManager:
+        def run_pure(self,inputs,params,context):
+            values={key:[item['value'] for item in value] if isinstance(value,list) else value['value'] for key,value in inputs.items()}
+            ref=context.tasks.start('work',values)
+            outcome=context.tasks.wait_all_exited([ref])[0]
+            if outcome['status']!='succeeded':raise RuntimeError(outcome['error']['message'])
+            return outcome['outputs']
+    for key in ('fixture.async_route','fixture.double','fixture.async_double','fixture.detached_audit'):
+        descriptor=registry.descriptor(key)
+        registry.register(replace(descriptor,type_key='manage.'+key,flow_kind='task_manager',rulesets=()),TaskManager)
     return registry
 
 
@@ -520,6 +543,11 @@ def _node(
     return node
 
 
+def _task_call(node_id,type_key,*,requires=None,provides=None,**options):
+    target=_node('execution',type_key,requires=requires,provides=provides,**options)
+    return _node(node_id,'manage.'+type_key,requires=requires,provides=provides,task_targets={'work':target})
+
+
 def _edge(
     source: str,
     target: str,
@@ -553,23 +581,20 @@ def _case(
 
 def _branch_document(
     *,
-    async_result: bool = False,
+    managed: bool = False,
     optional_targets: bool = False,
 ) -> dict[str, object]:
     route_fields: dict[str, object] = {}
     route_type = "fixture.route"
-    if async_result:
-        route_type = "fixture.async_route"
-        route_fields = {
-            "async": "result_key",
-            "result_key": "branch.left",
-        }
+    if managed:
+        route_type = "manage.fixture.async_route"
+        route_fields = {"task_targets":{"work":_node("execution","fixture.async_route")}}
     branch_cardinality = "optional_one" if optional_targets else "exactly_one"
     left_type = "fixture.optional_left" if optional_targets else "fixture.left"
     right_type = "fixture.optional_right" if optional_targets else "fixture.right"
     return {
         "pipeline": {
-            "entry_mode": "async" if async_result else "sync",
+            "entry_mode": "async" if managed else "sync",
             "inputs": [_pipeline_input("number")],
             "nodes": [
                 _node("start", "fixture.terminal"),
@@ -1080,7 +1105,7 @@ def test_python_result_key_async_node_rechecks_conditional_routes(
     execution: str,
 ) -> None:
     graph = parse_graph_config(
-        _branch_document(async_result=True, optional_targets=True)
+        _branch_document(managed=True, optional_targets=True)
     )
 
     result = PipelineRuntime(
@@ -1105,16 +1130,7 @@ def test_python_result_key_activates_unconditional_route_once(
                 "inputs": [_pipeline_input("number")],
                 "nodes": [
                     _node("start", "fixture.terminal"),
-                    _node(
-                        "calculate",
-                        "fixture.async_double",
-                        requires=[_requirement("number")],
-                        provides=[_provider("answer")],
-                        **{
-                            "async": "result_key",
-                            "result_key": "answer",
-                        },
-                    ),
+                    _task_call('calculate', 'fixture.async_double', requires=[_requirement('number')], provides=[_provider('answer')]),
                     _node("end", "fixture.terminal"),
                 ],
                 "edges": [
@@ -1142,15 +1158,13 @@ def test_python_result_key_activates_unconditional_route_once(
 def test_portable_conformance_immediate_implementation_scheduled_as_task(
     tmp_path: Path, async_mode: str, public_output: bool,
 ) -> None:
-    call = {"async": async_mode}
-    if async_mode == "result_key":
-        call["result_key"] = "answer"
+    call = {}
     document = {"pipeline": {
         "entry_mode": "async",
         "inputs": [_pipeline_input("number")],
         "nodes": [
             _node("start", "fixture.terminal"),
-            _node("calculate", "fixture.detached_audit" if async_mode == "detached" else "fixture.double", **call),
+            _task_call("calculate", "fixture.detached_audit" if async_mode == "detached" else "fixture.double", **call),
             _node("end", "fixture.terminal"),
         ],
         "edges": [_edge("start", "calculate"),
@@ -1175,7 +1189,9 @@ def test_portable_conformance_immediate_implementation_scheduled_as_task(
     assert python_root["tasks"][0]["executor"] == "thread"
     assert javascript_root["tasks"][0]["executor"] == "event_loop"
     calls = {node["id"]: node for node in javascript_root["nodes"]}
-    assert calls["calculate"]["completion"] == "immediate"
+    assert calls["calculate"]["completion"] == "suspend"
+    child=next(block for block in result.javascript_plan["blocks"] if block["id"]==javascript_root["tasks"][0]["block_id"])
+    assert child["nodes"][0]["completion"]=="immediate"
     assert calls["start"]["executor"] == calls["end"]["executor"] == "current"
 
 
@@ -1185,7 +1201,7 @@ def test_portable_conformance_result_key_async_conditional_route(
     result = run_portable_conformance(
         _case(
             "conformance.async_condition",
-            _branch_document(async_result=True, optional_targets=True),
+            _branch_document(managed=True, optional_targets=True),
             {"number": 5},
         ),
         work_dir=tmp_path,
@@ -1197,8 +1213,8 @@ def test_portable_conformance_result_key_async_conditional_route(
     assert node_runs["left"] == 1
     assert "right" not in node_runs
     assert result.python.task_events == (
-        ("async_result", "route"),
-        ("async_result_join", "route"),
+        ("task_exited", "route"),
+        ("task_started", "route"),
     )
     root_block = next(
         block
@@ -1206,13 +1222,7 @@ def test_portable_conformance_result_key_async_conditional_route(
         if block["id"] == "block:/"
     )
     assert root_block["tasks"] == [
-        {
-            "id": "block:/:task:route",
-            "node_id": "route",
-            "schedule": "deferred",
-            "executor": "thread",
-            "result_key": "branch.left",
-        }
+        {'id': 'block:/:task:route:work', 'manager_node_id': 'route', 'key': 'work', 'block_id': 'block:/route/tasks/work', 'executor': 'thread'},
     ]
 
 
@@ -1224,11 +1234,7 @@ def test_portable_conformance_detached_task_is_settled_before_return(
             "entry_mode": "async",
             "nodes": [
                 _node("start", "fixture.terminal"),
-                _node(
-                    "audit",
-                    "fixture.detached_audit",
-                    **{"async": "detached"},
-                ),
+                _task_call('audit', 'fixture.detached_audit'),
                 _node(
                     "value",
                     "fixture.left_item",
@@ -1252,8 +1258,8 @@ def test_portable_conformance_detached_task_is_settled_before_return(
 
     _assert_success(result, {"value": 1})
     assert result.python.task_events == (
-        ("async_detached", "audit"),
-        ("async_detached_done", "audit"),
+        ("task_exited", "audit"),
+        ("task_started", "audit"),
     )
     root_block = next(
         block
@@ -1261,12 +1267,7 @@ def test_portable_conformance_detached_task_is_settled_before_return(
         if block["id"] == "block:/"
     )
     assert root_block["tasks"] == [
-        {
-            "id": "block:/:task:audit",
-            "node_id": "audit",
-            "schedule": "detached",
-            "executor": "thread",
-        }
+        {'id': 'block:/:task:audit:work', 'manager_node_id': 'audit', 'key': 'work', 'block_id': 'block:/audit/tasks/work', 'executor': 'thread'},
     ]
 
 
@@ -1414,16 +1415,7 @@ def test_portable_conformance_nested_nodeset_deferred_result_key(
                     "inputs": [_pipeline_input("number")],
                     "nodes": [
                         _node("start", "fixture.terminal"),
-                        _node(
-                            "calculate",
-                            "fixture.async_double",
-                            requires=[_requirement("number")],
-                            provides=[_provider("answer")],
-                            **{
-                                "async": "result_key",
-                                "result_key": "answer",
-                            },
-                        ),
+                        _task_call('calculate', 'fixture.async_double', requires=[_requirement('number')], provides=[_provider('answer')]),
                         _node("end", "fixture.terminal"),
                     ],
                     "edges": [
@@ -1472,8 +1464,8 @@ def test_portable_conformance_nested_nodeset_deferred_result_key(
 
     _assert_success(result, {"doubled": 12})
     assert result.python.task_events == (
-        ("async_result", "composite.calculate"),
-        ("async_result_join", "composite.calculate"),
+        ("task_exited", "composite.calculate"),
+        ("task_started", "composite.calculate"),
     )
     child = next(
         block
@@ -1481,13 +1473,7 @@ def test_portable_conformance_nested_nodeset_deferred_result_key(
         if block["path"] == ["composite"]
     )
     assert child["tasks"] == [
-        {
-            "id": "block:/composite:task:calculate",
-            "node_id": "calculate",
-            "schedule": "deferred",
-            "executor": "thread",
-            "result_key": "answer",
-        }
+        {'id': 'block:/composite:task:calculate:work', 'manager_node_id': 'calculate', 'key': 'work', 'block_id': 'block:/composite/calculate/tasks/work', 'executor': 'thread'},
     ]
 
 
@@ -1505,11 +1491,7 @@ def test_portable_conformance_nested_nodeset_detached_cleanup(
                 "pipeline": {
                     "nodes": [
                         _node("start", "fixture.terminal"),
-                        _node(
-                            "audit",
-                            "fixture.detached_audit",
-                            **{"async": "detached"},
-                        ),
+                        _task_call('audit', 'fixture.detached_audit'),
                         _node(
                             "value",
                             "fixture.left_item",
@@ -1562,8 +1544,8 @@ def test_portable_conformance_nested_nodeset_detached_cleanup(
 
     _assert_success(result, {"value": 1})
     assert result.python.task_events == (
-        ("async_detached", "composite.audit"),
-        ("async_detached_done", "composite.audit"),
+        ("task_exited", "composite.audit"),
+        ("task_started", "composite.audit"),
     )
     child = next(
         block
@@ -1571,12 +1553,7 @@ def test_portable_conformance_nested_nodeset_detached_cleanup(
         if block["path"] == ["composite"]
     )
     assert child["tasks"] == [
-        {
-            "id": "block:/composite:task:audit",
-            "node_id": "audit",
-            "schedule": "detached",
-            "executor": "thread",
-        }
+        {'id': 'block:/composite:task:audit:work', 'manager_node_id': 'audit', 'key': 'work', 'block_id': 'block:/composite/audit/tasks/work', 'executor': 'thread'},
     ]
 
 

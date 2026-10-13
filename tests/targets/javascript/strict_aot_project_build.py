@@ -1017,8 +1017,8 @@ def test_javascript_mermaid_composes_planned_custom_and_external_styles(
                     description="Combines custom colours and the external boundary.",
                 ),
                 style=NodeStyle(
-                    fill="#fce7f3",
-                    stroke="#be185d",
+                    fill="#fbc8e2",
+                    stroke="#b81759",
                     text="#500724",
                 ),
             ),
@@ -1078,7 +1078,7 @@ def test_javascript_mermaid_composes_planned_custom_and_external_styles(
     for node_id in ("vf_external", "vf_external_custom"):
         assert f"class {node_id} externalDependency;" in mermaid
         assert f"class {node_id} externalBoundary;" in mermaid
-    assert "style vf_external_custom fill:#fce7f3,stroke:#be185d,color:#500724;" in mermaid
+    assert "style vf_external_custom fill:#fbc8e2,stroke:#b81759,color:#500724;" in mermaid
 
     if not is_mermaid_svg_renderer_available():
         pytest.skip("Mermaid SVG renderer is not installed")
@@ -1099,8 +1099,8 @@ def test_javascript_mermaid_composes_planned_custom_and_external_styles(
         assert "fill:#fef08a !important" in svg
         assert "stroke-dasharray:6 3 !important" in svg
         assert "externalDependency externalBoundary" in svg
-        assert "fill:#fce7f3 !important" in svg
-        assert "stroke:#be185d !important" in svg
+        assert "fill:#fbc8e2 !important" in svg
+        assert "stroke:#b81759 !important" in svg
         assert "stroke-width:7px !important" in svg
 
 
@@ -1115,8 +1115,8 @@ def test_javascript_audit_carries_descriptor_external_and_config_style_to_mermai
     _write(descriptor_path, descriptor)
     config = json.loads(Path(request.config).read_text(encoding="utf-8"))
     config["pipeline"]["nodes"][0]["style"] = {
-        "fill": "#fce7f3",
-        "stroke": "#be185d",
+        "fill": "#fbc8e2",
+        "stroke": "#b81759",
         "text": "#500724",
     }
     _write(Path(request.config), config)
@@ -1134,7 +1134,7 @@ def test_javascript_audit_carries_descriptor_external_and_config_style_to_mermai
     assert "external: true" in mermaid
     assert "class vf_start externalDependency;" in mermaid
     assert "class vf_start externalBoundary;" in mermaid
-    assert "style vf_start fill:#fce7f3,stroke:#be185d,color:#500724;" in mermaid
+    assert "style vf_start fill:#fbc8e2,stroke:#b81759,color:#500724;" in mermaid
 
 
 @pytest.mark.parametrize(

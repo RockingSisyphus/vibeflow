@@ -49,7 +49,7 @@ def variants(f: Any) -> tuple[Variation, ...]:
     add('completion.nested-uncalled', '未调用的局部 async 函数不属于当前完成协议', 'completion.boundary', body(f.NODE, 'async function deferred() { return 1; } void deferred;'), case_options={'classification': 'baseline_limitation', 'notes': 'Node visitor 在嵌套函数边界停止；此处不宣称它审核了未调用异步函数的内部工作。'})
     add('completion.nested-escape', '将局部 async 函数保存到局部对象仍是旧分析边界', 'completion.boundary', body(f.NODE, 'const escaped = {callback: async () => 1}; void escaped;'), case_options={'classification': 'baseline_limitation'})
     add('completion.shadow-promise', '同名局部 Promise 触发旧语法启发式', 'completion.boundary', body(f.NODE, 'const Promise = {resolve: (value: number) => value}; Promise.resolve(1);'), 'VF_COMPLETION_IMMEDIATE_PROMISE', case_options={'classification': 'baseline_limitation'})
-    add('completion.shadow-on', '局部纯 on 函数触发旧 listener 名称启发式', 'completion.boundary', body(f.NODE, 'function on() { return 1; } on();'), 'VF_NODE_LONG_LIVED_LISTENER', case_options={'classification': 'baseline_limitation'})
+    add('completion.shadow-on', '局部纯 on 函数不应被当作原生 listener', 'completion.boundary', body(f.NODE, 'function on() { return 1; } on();'),'VF_NODE_LONG_LIVED_LISTENER',case_options={'current_code':'','classification':'approved_change','notes':'The historical name-only false positive is preserved only for the baseline.'})
     add('completion.plugin-promise-hook', 'immediate Plugin hook 同步返回 Promise', 'completion.signature', plugin.replace('BODY', '').replace('void context.abiVersion;', 'void context.abiVersion; return Promise.resolve();'), 'VF_COMPLETION_IMMEDIATE_PROMISE', role='plugin')
     add('completion.plugin-suspend-hook', 'suspend Plugin 允许 async hook 且工厂同步', 'completion.signature', plugin.replace('beforeRun()', 'async beforeRun()'), role='plugin', case_options={'completion': 'suspend'})
     add('completion.plugin-async-factory', 'Plugin 工厂自身 async 不等于可 suspend hook', 'completion.signature', plugin.replace('function createPlugin', 'async function createPlugin'), 'VF_PLUGIN_FACTORY', role='plugin')
@@ -247,12 +247,47 @@ def _task_route(fixture, root, variant, document, mode):
         call['async'] = 'detached'
     document['pipeline']['nodes'].append(call)
     document['pipeline']['edges'] = [{'from': 'calculate', 'to': 'consume'}]
+    if variant == 'current':
+        source_file = root / 'nodes/manage.ts'
+        manager = fixture._node_descriptor(variant,'parity.manager','nodes/manage.ts',fixture.Case('manager','','control'))
+        manager['flow_kind']='task_manager'
+        manager['rulesets']=['vibeflow.task_manager']
+        manager['implementations'][0]['completion']='suspend'
+        if mode=='result_key':
+            manager['contract']['requires'][0]['type']='parity.value'
+            manager['contract']['input_semantics']={'parity.value':['Input for the finite target.']}
+            body="const ref=context.tasks.start('work',{'parity.value':inputs['parity.value'].value}); const outcome=(await context.tasks.waitAllExited([ref]))[0]; if(outcome.status!=='succeeded')throw new Error(JSON.stringify(outcome.error)); return {result:outcome.outputs!.result};"
+            current_call=document['pipeline']['nodes'][0]
+            current_call.pop('async',None);current_call.pop('result_key',None)
+            current_call['type_used']='parity.manager'
+            current_call['task_targets']={'work':{'type_used':'parity.calc'}}
+        else:
+            manager['contract'].update(requires=[],provides=[],input_semantics={},output_semantics={})
+            body="const ref=context.tasks.start('work',{}); await context.tasks.waitAllExited([ref]); return {};"
+            current_call=document['pipeline']['nodes'][-1]
+            current_call.pop('async',None);current_call['type_used']='parity.manager'
+            current_call['task_targets']={'work':{'type_used':'parity.consume'}}
+        source_file.write_text('import type {TaskManagerContext} from "@vibeflow/plugin";\nexport async function run(inputs:any,params:any,context:TaskManagerContext){'+body+'}\n')
+        fixture._write_json(fixture.definition(root,variant,'node','parity.manager','nodes/manage.jsonc'),manager)
+        terminal=fixture._node_descriptor(variant,'parity.terminal','nodes/terminal.ts',fixture.Case('terminal','','control'))
+        terminal['contract'].update(requires=[],provides=[],input_semantics={},output_semantics={})
+        terminal['flow_kind']='terminal'
+        fixture._write_json(fixture.definition(root,variant,'node','parity.terminal','nodes/terminal.jsonc'),terminal)
+        (root/'nodes/terminal.ts').write_text('export function run(){return {};}\n')
+        nodes=document['pipeline']['nodes'];last=nodes[-1]['id']
+        nodes.insert(0,{'id':'start','type_used':'parity.terminal','display_name':'Start','description':'Enter explicit task management'})
+        nodes.append({'id':'end','type_used':'parity.terminal','display_name':'End','description':'Exit after all owned work'})
+        document['pipeline']['edges'].extend([{'from':'start','to':'calculate'},{'from':last,'to':'end'}])
 
 
 def run_variants(work_root: Path, variant: str, toolchain: Path, *, fixture: Any) -> list[dict[str, Any]]:
     observations = []
     for index, item in enumerate(variants(fixture)):
         case = item.case
+        if variant=='current' and case.id.startswith('js.variant.task.') and case.id.endswith('.sync'):
+            case=replace(case,entrypoint='build',current_code='VF_ENTRY_MODE_TASK_IN_SYNC',classification='approved_change',notes='Finite task management requires an async JavaScript workflow.')
+        if variant=='current' and case.id=='js.variant.task.result-missing-contract':
+            case=replace(case,current_code='GRAPH.ASYNC.MIGRATION',classification='approved_change',notes='Retired result_key is rejected before its former output contract.')
         root = Path(work_root) / f'{index:02d}-{case.id}'
         workspace, config, source = fixture._project(root, variant, toolchain, case)
         document = json.loads(config.read_text())

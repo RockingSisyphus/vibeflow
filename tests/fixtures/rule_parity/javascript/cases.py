@@ -80,7 +80,7 @@ def _cases() -> tuple[Case, ...]:
         Case('js.node.suspend-async.normal', 'suspend Node 正确返回 Promise', 'completion.control', source=normal_node.replace('function run', 'async function run'), completion='suspend'),
         Case('js.node.discarded-promise', 'Node 丢弃 Promise chain', 'async.ownership', source=_body(NODE, 'Promise.resolve(1).then(value => value + 1);'), code='VF_PROMISE_UNOWNED'),
         Case('js.node.void-promise', 'Node 使用 void 丢弃 Promise', 'async.ownership', source=_body(NODE, 'void Promise.resolve(1);'), code='VF_PROMISE_UNOWNED'),
-        Case('js.node.timer', 'Node 创建长驻 timer', 'async.ownership', source=_body(NODE, 'setTimeout(() => 1, 1);'), code='VF_NODE_LONG_LIVED_LISTENER'),
+        Case('js.node.timer', 'Node 创建长驻 timer', 'async.ownership', source=_body(NODE, 'setTimeout(() => 1, 1);'), code='VF_NODE_LONG_LIVED_LISTENER', current_code='VF_NODE_RESOURCE_UNOWNED',classification='approved_change',notes='Native resource binding replaces the old method-name rejection.'),
         Case('js.node.module-write', 'Node 写入模块持有对象', 'effects.module_state', source='const shared = Object.freeze({count: 0});\n' + _body(NODE, '(shared as {count: number}).count += 1;'), code='VF_MODULE_STATE'),
         Case('js.node.regexp-state', 'Node 模块持有全局 RegExp 状态', 'effects.module_state', source='const matcher = /value/g;\n' + _body(NODE, 'matcher.test("value");'), code='VF_MODULE_STATE'),
         Case('js.node.console', 'Process 默认无副作用规则检测 console', 'effects.console', source=_body(NODE, 'console.log("parity");'), current_code='VF_BASE_LIB_HOST_IO', classification='new_feature', notes='基线未把 console 纳入 Node host-I/O；当前显式默认 none 补强。'),

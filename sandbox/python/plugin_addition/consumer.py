@@ -26,7 +26,7 @@ for config_name, expected_values in PLUGIN_EXPECTED[work.name].items():
     assert value(checked.context, "result") == result
     hooks = events(marker)[before:]
     kinds = [item["hook"] for item in hooks]
-    assert "after_compile" in kinds and kinds.count("before_nodeset") == 1 and kinds.count("after_run") == 2
+    assert "after_compile" in kinds and kinds.count("before_nodeset") == 1 and kinds.count("after_run") == 1
     assert kinds.count("before_node") == kinds.count("after_node") == 5, hooks
     assert_artifacts(checked.run_dir)
     environment = build_workspace_environment(loaded, config_path=config)

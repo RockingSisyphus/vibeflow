@@ -463,7 +463,12 @@ def _load_initial_input(path: Path) -> dict[str, object]:
     return {str(key): value for key, value in payload.items()}
 
 
+def _removed_async_flush_timeout(value):
+    raise argparse.ArgumentTypeError("GRAPH.ASYNC.MIGRATION: async flush timeout was removed; workflow waits for actual cleanup")
+
+
 def _add_runtime_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--async-flush-timeout", type=_removed_async_flush_timeout, help=argparse.SUPPRESS)
     parser.add_argument("--status-interval", type=_positive_finite_float, default=None,
                         help="seconds between status.json heartbeats (default: 60)")
     parser.add_argument("--status-file", default=None, help="fixed monitor JSON path (default: run_dir/status.json)")
@@ -474,12 +479,6 @@ def _add_runtime_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--node-hooks", action=argparse.BooleanOptionalAction, default=None, help="enable or disable node-level runtime plugin hooks")
     parser.add_argument("--nodeset-hooks", action=argparse.BooleanOptionalAction, default=None, help="enable or disable nodeset-level runtime plugin hooks")
     parser.add_argument("--block-hooks", action=argparse.BooleanOptionalAction, default=None, help="enable or disable block-level runtime plugin hooks")
-    parser.add_argument(
-        "--async-flush-timeout",
-        type=_non_negative_finite_float,
-        default=None,
-        help="non-negative finite seconds to wait for detached async tasks at run end",
-    )
     parser.add_argument("--allow-planned-stub", action="store_true", help="development only: execute planned python_stub nodes")
 
 
@@ -515,7 +514,6 @@ def _runtime_options_from_args(args: argparse.Namespace):
                 "nodeset_hooks": False,
                 "block_hooks": True,
                 "execution": "compiled",
-                "async_flush_timeout": 30.0,
             }
         )
     elif args.runtime_profile == "debug":
@@ -532,8 +530,6 @@ def _runtime_options_from_args(args: argparse.Namespace):
         values["nodeset_hooks"] = args.nodeset_hooks
     if args.block_hooks is not None:
         values["block_hooks"] = args.block_hooks
-    if args.async_flush_timeout is not None:
-        values["async_flush_timeout"] = args.async_flush_timeout
     if args.allow_planned_stub:
         values["allow_planned_stub"] = True
     return values

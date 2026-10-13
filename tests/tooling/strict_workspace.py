@@ -335,8 +335,8 @@ def test_workspace_project_config_override_and_missing_project_config(tmp_path) 
 
 def test_workspace_project_runtime_config_and_override_precedence(tmp_path) -> None:
     workspace_path, project_root, framework_root = _workspace_fixture(tmp_path)
-    _write_project_config(framework_root, runtime={"async_max_workers": 2, "async_flush_timeout": 5, "nodeset_max_depth": 2})
-    _write_project_config(project_root, runtime={"async_max_workers": 8, "async_flush_timeout": 30, "nodeset_max_depth": 8})
+    _write_project_config(framework_root, runtime={"async_max_workers": 2, "nodeset_max_depth": 2})
+    _write_project_config(project_root, runtime={"async_max_workers": 8, "nodeset_max_depth": 8})
     framework_config = framework_root / "configs" / "main.jsonc"
     project_config = project_root / "configs" / "main.jsonc"
     framework_config.parent.mkdir(parents=True)
@@ -351,7 +351,7 @@ def test_workspace_project_runtime_config_and_override_precedence(tmp_path) -> N
     sparse_override = _workspace_runtime_options(
         project_config,
         workspace=workspace,
-        overrides={"trace": "boundary", "async_flush_timeout": 1.5},
+        overrides={"trace": "boundary", "nodeset_max_depth": 5},
     )
     full_override = _workspace_runtime_options(
         project_config,
@@ -360,17 +360,14 @@ def test_workspace_project_runtime_config_and_override_precedence(tmp_path) -> N
     )
 
     assert framework_options.async_max_workers == 2
-    assert framework_options.async_flush_timeout == 5
     assert framework_options.nodeset_max_depth == 2
     assert project_options.async_max_workers == 8
-    assert project_options.async_flush_timeout == 30
     assert project_options.nodeset_max_depth == 8
     assert sparse_override.async_max_workers == 8
-    assert sparse_override.async_flush_timeout == 1.5
-    assert sparse_override.nodeset_max_depth == 8
+    assert sparse_override.nodeset_max_depth == 5
+    assert sparse_override.async_max_workers == 8
     assert sparse_override.trace == "boundary"
     assert full_override.async_max_workers == 3
-    assert full_override.async_flush_timeout is None
     assert full_override.nodeset_max_depth == 4
 
 
@@ -387,7 +384,7 @@ def test_run_workspace_checked_uses_one_effective_root_runtime_options_object(tm
             ("test.in_end", "InEndNode", {}, {}),
         ],
     )
-    _write_project_config(project_root, runtime={"async_max_workers": 7, "async_flush_timeout": 20, "nodeset_max_depth": 7})
+    _write_project_config(project_root, runtime={"async_max_workers": 7, "nodeset_max_depth": 7})
     config_path = project_root / "configs" / "main.jsonc"
     config_path.parent.mkdir(parents=True)
     config_path.write_text(
@@ -426,14 +423,14 @@ def test_run_workspace_checked_uses_one_effective_root_runtime_options_object(tm
         config_path,
         workspace=load_workspace_config(workspace_path),
         run_root=tmp_path / "runs",
-        runtime_options={"trace": "boundary", "async_flush_timeout": 1.25},
+        runtime_options={"trace": "boundary", "nodeset_max_depth": 6},
     )
 
     assert result.context.get("value.in")["value"] == 1
     assert seen["refuse"] is seen["execute"]
     assert seen["execute"].async_max_workers == 7
-    assert seen["execute"].async_flush_timeout == 1.25
-    assert seen["execute"].nodeset_max_depth == 7
+    assert seen["execute"].nodeset_max_depth == 6
+    assert seen["execute"].trace == "boundary"
     assert seen["execute"].trace == "boundary"
 
 

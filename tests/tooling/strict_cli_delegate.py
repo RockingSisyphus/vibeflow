@@ -3,6 +3,7 @@ from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from tests.fixtures.support.declarations import node_declaration, configured_declaration, native_registry
 
 import sys
+from threading import Event
 from pathlib import Path
 
 import pytest
@@ -206,6 +207,43 @@ def _runtime_registry() -> NodeRegistry:
     registry.register(configured_declaration(_NormalExitNode_DECLARATION, {}, {}), _NormalExitNode)
     registry.register(_AsyncDiagnosticExitNode_DECLARATION, _AsyncDiagnosticExitNode)
     registry.register(configured_declaration(_ExitEndNode_DECLARATION, {}, {}), _ExitEndNode)
+    ready={}
+    for key,base in (('delegate.detached_exit',_DetachedExitNode),('delegate.second_detached_exit',_SecondDetachedExitNode),
+                     ('delegate.detached_failure',_DetachedFailureNode),('delegate.successful_side',_SuccessfulSideNode)):
+        event=Event();ready[key]=event
+        def wrapper(parent,entered):
+            class Worker(parent):
+                def run_pure(self,inputs,params,context):
+                    entered.set()
+                    return super().run_pure(inputs,params)
+            return Worker
+        registry.register(registry.descriptor(key),wrapper(base,event),overwrite=True)
+    class Manager:
+        def run_pure(self,inputs,params,context):
+            refs=[context.tasks.start(key,{'cli.argv':inputs['cli.argv']['value']} if key=='work' else {})
+                  for key in params["keys"]]
+            for key in params.get('ready_types',[]):assert ready[key].wait(2)
+            if params.get('unconsumed'):return {'cli.exit_code':0}
+            results=context.tasks.wait_all_exited(refs)
+            failures=[item['error'] for item in results if item['status']=='failed' and item['error']['code']!='VF_TASK_BUSINESS_EXIT']
+            if failures:raise RuntimeError(failures[0]['message'])
+            exits=[item['error']['exit_code'] for item in results if item['status']=='failed' and item['error']['code']=='VF_TASK_BUSINESS_EXIT']
+            if len(exits)>1:raise PipelineRuntimeError('multiple business exits')
+            if exits:raise SystemExit(exits[0])
+            return {'cli.exit_code':next((item['outputs']['cli.exit_code'] for item in results if 'cli.exit_code' in item.get('outputs',{})),0)}
+    contract=NodeContractDescriptor(requires=(DataRequirement('cli.argv','exactly_one',display_name='Arguments'),),
+        provides=(DataProvider('cli.exit_code','cli.exit_code',display_name='Status'),),
+        input_semantics={'cli.argv':('Business arguments',)},output_semantics={'cli.exit_code':('Chosen parent exit status',)},
+        params_schema={'keys':{'type':'array','items':{'type':'string'}},'ready_types':{'type':'array','items':{'type':'string'}},'unconsumed':{'type':'boolean'}},
+        params_defaults={'keys':[],'ready_types':[],'unconsumed':False})
+    registry.register(NodeDescriptor('delegate.manager','Task manager','Explicitly handles final task results','1','task_manager',contract=contract,rulesets=()),Manager)
+    class Launch:
+        def run_pure(self,inputs,params,context):
+            context.tasks.start('work',{})
+            assert ready[params['kind']].wait(2)
+            return {}
+    registry.register(NodeDescriptor('delegate.launch_pending','Launch','Starts owned pending work','1','task_manager',
+        contract=NodeContractDescriptor(params_schema={'kind':{'type':'string'}},params_defaults={'kind':'delegate.successful_side'}),rulesets=()),Launch)
     return registry
 
 
@@ -263,134 +301,37 @@ def _graph(*, include_argv: bool = True, exit_cardinality: str = "exactly_one"):
     )
 
 
-def _multiple_detached_graph(second_node_type: str):
-    return parse_graph_config(
-        {
-            "pipeline": {
-                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
-                "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
-                "nodes": [
-                    {"id": "start", "type_used": "delegate.start", "display_name": "Start", "description": "Exercises start in the delegated CLI test workflow."},
-                    {"id": "first", "type_used": "delegate.detached_exit", "async": "detached", "display_name": "First", "description": "Exercises first in the delegated CLI test workflow."},
-                    {"id": "second", "type_used": second_node_type, "async": "detached", "display_name": "Second", "description": "Exercises second in the delegated CLI test workflow."},
-                    {
-                        "id": "normal_exit",
-                        "type_used": "delegate.normal_exit",
-                        "display_name": "Normal Exit",
-                        "description": "Exercises normal_exit in the delegated CLI test workflow.",
-                    },
-                    {"id": "end", "type_used": "delegate.exit_end", "display_name": "End", "description": "Exercises end in the delegated CLI test workflow."},
-                ],
-                "edges": [["start", "first"], ["first", "second"], ["second", "normal_exit"], ["normal_exit", "end"]],
-            }
-        }
-    )
+def _managed_cli_graph(node_types,*,unconsumed=False):
+    targets={('work' if key=='delegate.authorized_exit' else 'side_'+str(index)):
+        {'type_used':key} for index,key in enumerate(node_types)}
+    ready_types=[key for key in node_types if key in ('delegate.detached_exit','delegate.second_detached_exit','delegate.detached_failure','delegate.successful_side')]
+    return parse_graph_config({'pipeline':{'inputs':[{'key':'cli.argv','type':'cli.argv','required':True,'display_name':'Arguments'}],
+        'outputs':[{'type':'cli.exit_code','cardinality':'exactly_one','display_name':'Status'}],
+        'nodes':[{'id':'start','type_used':'delegate.start','display_name':'Start','description':'Start'},
+            {'id':'manage','type_used':'delegate.manager','display_name':'Manage tasks','description':'Handle actual outcomes',
+             'config':{'keys':list(targets),'ready_types':ready_types,'unconsumed':unconsumed},'task_targets':targets},
+            {'id':'end','type_used':'delegate.exit_end','display_name':'End','description':'End'}],
+        'edges':[['start','manage'],['manage','end']]}})
 
 
-def _parallel_result_graph(second_node_type: str):
-    second_result_key = "async.pending" if second_node_type == "delegate.detached_failure" else "async.second"
-    join_type = "delegate.parallel_join_failure" if second_node_type == "delegate.detached_failure" else "delegate.parallel_join_exit"
-    return parse_graph_config(
-        {
-            "pipeline": {
-                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
-                "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
-                "nodes": [
-                    {"id": "start", "type_used": "delegate.start", "display_name": "Start", "description": "Exercises start in the delegated CLI test workflow."},
-                    {
-                        "id": "first",
-                        "type_used": "delegate.detached_exit",
-                        "async": "result_key",
-                        "result_key": "async.first",
-                        "display_name": "First",
-                        "description": "Exercises first in the delegated CLI test workflow.",
-                    },
-                    {
-                        "id": "second",
-                        "type_used": second_node_type,
-                        "async": "result_key",
-                        "result_key": second_result_key,
-                        "display_name": "Second",
-                        "description": "Exercises second in the delegated CLI test workflow.",
-                    },
-                    {
-                        "id": "join",
-                        "type_used": join_type,
-                        "display_name": "Join",
-                        "description": "Exercises join in the delegated CLI test workflow.",
-                    },
-                ],
-                "edges": [["start", "first"], ["start", "second"], ["first", "join"], ["second", "join"]],
-            }
-        }
-    )
+def _multiple_detached_graph(second_node_type):
+    return _managed_cli_graph(['delegate.detached_exit',second_node_type])
+
+
+
+def _parallel_result_graph(second_node_type):
+    return _managed_cli_graph(['delegate.detached_exit',second_node_type])
+
 
 
 def _async_diagnostic_graph():
-    return parse_graph_config(
-        {
-            "pipeline": {
-                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
-                "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
-                "nodes": [
-                    {"id": "start", "type_used": "delegate.start", "display_name": "Start", "description": "Exercises start in the delegated CLI test workflow."},
-                    {
-                        "id": "output",
-                        "type_used": "delegate.async_diagnostic_exit",
-                        "async": "result_key",
-                        "result_key": "cli.exit_code",
-                        "display_name": "Output",
-                        "description": "Exercises output in the delegated CLI test workflow.",
-                    },
-                    {"id": "end", "type_used": "delegate.exit_end", "display_name": "End", "description": "Exercises end in the delegated CLI test workflow."},
-                ],
-                "edges": [["start", "output"], ["output", "end"]],
-            }
-        }
-    )
+    return _managed_cli_graph(['delegate.async_diagnostic_exit'])
 
 
-def _unconsumed_result_graph(*node_types: str):
-    result_keys = {
-        "delegate.detached_exit": "async.first",
-        "delegate.second_detached_exit": "async.second",
-        "delegate.detached_failure": "async.pending",
-    }
-    async_nodes = [
-        {
-            "id": f"side_{index}",
-            "type_used": node_type,
-            "async": "result_key",
-            "result_key": result_keys[node_type],
-            "display_name": f"Side {index}",
-            "description": f"Exercises side_{index} in the delegated CLI test workflow.",
-        }
-        for index, node_type in enumerate(node_types)
-    ]
-    return parse_graph_config(
-        {
-            "pipeline": {
-                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
-                "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
-                "nodes": [
-                    {"id": "start", "type_used": "delegate.start", "display_name": "Start", "description": "Exercises start in the delegated CLI test workflow."},
-                    *async_nodes,
-                    {
-                        "id": "normal_exit",
-                        "type_used": "delegate.normal_exit",
-                        "display_name": "Normal Exit",
-                        "description": "Exercises normal_exit in the delegated CLI test workflow.",
-                    },
-                    {"id": "end", "type_used": "delegate.exit_end", "display_name": "End", "description": "Exercises end in the delegated CLI test workflow."},
-                ],
-                "edges": [
-                    *[["start", node["id"]] for node in async_nodes],
-                    ["start", "normal_exit"],
-                    ["normal_exit", "end"],
-                ],
-            }
-        }
-    )
+
+def _unconsumed_result_graph(*node_types):
+    return _managed_cli_graph(node_types,unconsumed=True)
+
 
 
 def _exit_with_pending_pipeline(
@@ -399,19 +340,8 @@ def _exit_with_pending_pipeline(
     async_mode: str,
     exit_node_type: str = "delegate.authorized_exit",
 ):
-    pending_node = {
-        "id": "a_pending",
-        "type_used": pending_node_type,
-        "async": async_mode,
-        "display_name": "A Pending",
-        "description": "Exercises a_pending in the delegated CLI test workflow.",
-    }
-    if async_mode == "result_key":
-        pending_node.update(
-            {
-                "result_key": "async.pending",
-            }
-        )
+    pending_node={'id':'a_pending','type_used':'delegate.launch_pending','display_name':'Launch','description':'Own pending task',
+        'config':{'kind':pending_node_type},'task_targets':{'work':{'type_used':pending_node_type}}}
     return {
         "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
         "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
@@ -1138,36 +1068,12 @@ def test_delegate_cli_contract_rejects_reserved_argv_key_or_type_conflicts(input
     assert [finding.rule_id for finding in report.errors] == ["CLI.DELEGATE.ARGV_INPUT"]
 
 
-def test_delegate_cli_contract_rejects_detached_exit_provider() -> None:
-    graph = parse_graph_config(
-        {
-            "pipeline": {
-                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
-                "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
-                "nodes": [
-                    {
-                        "id": "output",
-                        "type_used": "delegate.output",
-                        "provides": [
-                            {"key": "cli.exit_code", "type": "cli.exit_code", "display_name": "CLI exit code"}
-                        ],
-                        "async": "detached",
-                        "display_name": "Output",
-                        "description": "Exercises output in the delegated CLI test workflow.",
-                        "status": "planned",
-                        "flow_kind": "process",
-                        "requires": [],
-                    }
-                ],
-            }
-        }
-    )
+def test_delegate_cli_contract_rejects_removed_concurrency_entry():
+    from vibeflow.core.flow import GraphConfigError
+    with pytest.raises(GraphConfigError,match='GRAPH.ASYNC.MIGRATION'):
+        parse_graph_config({'pipeline':{'nodes':[{'id':'output','type_used':'delegate.output','display_name':'Output','description':'Removed entry','async':'detached'}]}})
 
-    report = validate_delegate_cli_graph_contract(graph, HealthReport(status="PASS"))
 
-    assert report.status == "FAIL"
-    assert [finding.rule_id for finding in report.errors] == ["CLI.DELEGATE.EXIT_PROVIDER"]
-    assert report.errors[0].details["providers"][0]["async"] == "detached"
 
 
 def test_delegate_cli_exit_extraction_requires_reserved_envelope() -> None:
@@ -1379,66 +1285,21 @@ def test_normal_runtime_plugin_system_exit_is_pipeline_failure(tmp_path) -> None
     assert "SystemExit outside delegate CLI mode" in runtime.trace.exception
 
 
-def test_async_authorized_system_exit_stops_outer_runtime(tmp_path) -> None:
-    graph = parse_graph_config(
-        {
-            "pipeline": {
-                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
-                "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
-                "nodes": [
-                    {"id": "start", "type_used": "delegate.start", "display_name": "Start", "description": "Exercises start in the delegated CLI test workflow."},
-                    {
-                        "id": "exit",
-                        "type_used": "delegate.authorized_exit",
-                        "async": "result_key",
-                        "result_key": "cli.exit_code",
-                        "display_name": "Exit",
-                        "description": "Exercises exit in the delegated CLI test workflow.",
-                    },
-                    {"id": "end", "type_used": "delegate.exit_end", "display_name": "End", "description": "Exercises end in the delegated CLI test workflow."},
-                ],
-                "edges": [["start", "exit"], ["exit", "end"]],
-            }
-        }
-    )
-
-    result = PipelineRuntime(graph, registry=_runtime_registry(), run_dir=tmp_path, delegate_cli=True).run(
-        {"cli.argv": ["--help"]}
-    )
-
-    assert result.get("cli.exit_code")["value"] == 2
-    assert result.get("runtime.stop_reason") == "business_exit"
+def test_managed_authorized_exit_is_data_until_parent_manager_chooses_exit(tmp_path):
+    runtime=PipelineRuntime(_managed_cli_graph(['delegate.authorized_exit']),registry=_runtime_registry(),run_dir=tmp_path,delegate_cli=True)
+    result=runtime.run({'cli.argv':['--help']})
+    assert result.get('cli.exit_code')['value']==2
+    assert runtime.trace.stop_reason=='business_exit'
 
 
-def test_normal_runtime_async_node_system_exit_is_pipeline_failure(tmp_path) -> None:
-    graph = parse_graph_config(
-        {
-            "pipeline": {
-                "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
-                "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
-                "nodes": [
-                    {"id": "start", "type_used": "delegate.start", "display_name": "Start", "description": "Exercises start in the delegated CLI test workflow."},
-                    {
-                        "id": "exit",
-                        "type_used": "delegate.authorized_exit",
-                        "async": "result_key",
-                        "result_key": "cli.exit_code",
-                        "display_name": "Exit",
-                        "description": "Exercises exit in the delegated CLI test workflow.",
-                    },
-                    {"id": "end", "type_used": "delegate.exit_end", "display_name": "End", "description": "Exercises end in the delegated CLI test workflow."},
-                ],
-                "edges": [["start", "exit"], ["exit", "end"]],
-            }
-        }
-    )
-    runtime = PipelineRuntime(graph, registry=_runtime_registry(), run_dir=tmp_path)
 
-    with pytest.raises(PipelineRuntimeError, match="attempted SystemExit outside delegate CLI mode"):
-        runtime.run({"cli.argv": []})
 
-    assert runtime.trace.stop_reason == "node_failed"
-    assert "SystemExit outside delegate CLI mode" in runtime.trace.exception
+def test_normal_managed_node_system_exit_is_pipeline_failure(tmp_path):
+    runtime=PipelineRuntime(_managed_cli_graph(['delegate.authorized_exit']),registry=_runtime_registry(),run_dir=tmp_path)
+    with pytest.raises(RuntimeError,match='attempted SystemExit outside delegate CLI mode'):runtime.run({'cli.argv':[]})
+    assert runtime.trace.stop_reason=='node_failed'
+
+
 
 
 @pytest.mark.parametrize("async_mode", ["detached", "result_key"])
@@ -1567,8 +1428,9 @@ def test_nested_business_exit_prioritizes_pending_framework_failure(tmp_path, as
         runtime.run({"cli.argv": []})
 
     child_trace = runtime._nodeset_runtimes["inner"].trace
-    assert child_trace.stop_reason == "node_failed"
-    assert "late detached failure" in child_trace.exception
+    assert child_trace.stop_reason == "business_exit"
+    assert runtime.trace.stop_reason == "node_failed"
+    assert "late detached failure" in runtime.trace.exception
 
 
 def test_nested_business_exit_propagates_after_successful_pending_result(tmp_path) -> None:
@@ -1639,18 +1501,13 @@ def test_delegate_cli_drains_parallel_result_futures_before_deciding_exit(
         runtime.run({"cli.argv": []})
 
 
-def test_delegate_cli_observes_unconsumed_result_key_business_exit(tmp_path) -> None:
-    runtime = PipelineRuntime(
-        _unconsumed_result_graph("delegate.detached_exit"),
-        registry=_runtime_registry(),
-        run_dir=tmp_path,
-        delegate_cli=True,
-    )
+def test_delegate_cli_reports_unconsumed_child_exit_as_structured_failure(tmp_path):
+    runtime=PipelineRuntime(_unconsumed_result_graph('delegate.detached_exit'),registry=_runtime_registry(),run_dir=tmp_path,delegate_cli=True)
+    with pytest.raises(PipelineRuntimeError,match='VF_TASK_UNOBSERVED') as caught:runtime.run({'cli.argv':[]})
+    assert caught.value.task_errors[0]['exit_code']==11
+    assert caught.value.task_errors[0]['code']=='VF_TASK_BUSINESS_EXIT'
 
-    result = runtime.run({"cli.argv": []})
 
-    assert result.get("cli.exit_code")["value"] == 11
-    assert result.get("runtime.stop_reason") == "business_exit"
 
 
 def test_delegate_cli_observes_unconsumed_result_key_failure(tmp_path) -> None:
@@ -1665,13 +1522,8 @@ def test_delegate_cli_observes_unconsumed_result_key_failure(tmp_path) -> None:
         runtime.run({"cli.argv": []})
 
 
-def test_delegate_cli_rejects_multiple_unconsumed_result_key_business_exits(tmp_path) -> None:
-    runtime = PipelineRuntime(
-        _unconsumed_result_graph("delegate.detached_exit", "delegate.second_detached_exit"),
-        registry=_runtime_registry(),
-        run_dir=tmp_path,
-        delegate_cli=True,
-    )
-
-    with pytest.raises(PipelineRuntimeError, match="multiple business exits"):
-        runtime.run({"cli.argv": []})
+def test_delegate_cli_retains_all_unconsumed_child_exits(tmp_path):
+    runtime=PipelineRuntime(_unconsumed_result_graph('delegate.detached_exit','delegate.second_detached_exit'),registry=_runtime_registry(),run_dir=tmp_path,delegate_cli=True)
+    with pytest.raises(PipelineRuntimeError,match='VF_TASK_UNOBSERVED') as caught:runtime.run({'cli.argv':[]})
+    assert len(caught.value.task_errors)==2
+    assert all(error['code']=='VF_TASK_BUSINESS_EXIT' for error in caught.value.task_errors)

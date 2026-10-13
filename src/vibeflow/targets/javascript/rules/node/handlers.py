@@ -25,7 +25,9 @@ def javascript_source_bindings() -> Mapping[str, Any]:
     def input_writes(context, inputs, params):
         return RuleResult(state="unavailable")
     def interface(context: RuleContext, inputs: Mapping[str, RuleRecord], params: Mapping[str, Any]) -> RuleResult:
-        return RuleResult(findings=source_check(context, ("completion",), "vibeflow.node_interface"))
+        return RuleResult()
+    def asynchronous(context, inputs, params):
+        return RuleResult(findings=source_check(context, ("completion",), "vibeflow.async_lifecycle"))
     def imports(context: RuleContext, inputs: Mapping[str, RuleRecord], params: Mapping[str, Any]) -> RuleResult:
         _effect_parameters(params)
         return RuleResult(findings=source_check(context, ("purity", "imports"), "vibeflow.import_side_effects", params=params))
@@ -48,7 +50,7 @@ def javascript_source_bindings() -> Mapping[str, Any]:
                 "suggested_fix_type":item.suggested_fix_type,"details":dict(item.details)} for item in found]
             return RuleResult({"diagnostics": RuleRecord("vibeflow.implementation_diagnostics.v1", records)}, tuple(found))
         return check
-    return {"vibeflow.no_side_effects": effects, "vibeflow.node_interface": interface,
+    return {"vibeflow.async_lifecycle": asynchronous, "vibeflow.no_side_effects": effects, "vibeflow.node_interface": interface,
             "vibeflow.node_architecture": architecture, "vibeflow.input_writes": input_writes,
             "vibeflow.import_side_effects": imports, "vibeflow.maintainability": maintainability,
             **{"vibeflow.implementation." + topic: implementation(topic) for topic in ("node", "base_lib", "dependency_chain")}}

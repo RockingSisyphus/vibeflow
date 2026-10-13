@@ -341,7 +341,6 @@ def _project_runtime_options(
         )
     allowed = {
         "async_max_workers",
-        "async_flush_timeout",
         "nodeset_max_depth",
         "status_interval",
         "status_file",
@@ -379,17 +378,6 @@ def _project_runtime_value(name: str, value: object, *, path: Path) -> object:
             f"runtime.{name} must be a positive integer",
             {"path": str(path)},
         )
-    if value is None or (
-        isinstance(value, (int, float))
-        and not isinstance(value, bool)
-        and value >= 0
-    ):
-        return value
-    raise WorkspaceConfigError(
-        "WORKSPACE.PROJECT_CONFIG.RUNTIME",
-        "runtime.async_flush_timeout must be null or a non-negative number",
-        {"path": str(path)},
-    )
 
 
 def _project_quality_structure(

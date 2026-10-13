@@ -224,10 +224,11 @@ def _join_label_lines(lines: tuple[str, ...] | list[str]) -> str:
         out.extend(_wrap_label_line(line))
     return "\n".join(out)
 
-def _join_label_sections(sections: list[list[str]]) -> str:
+def _join_label_sections(sections: list[list[str]], *, full: bool = False) -> str:
     out: list[str] = []
     for section in sections:
-        lines = _join_label_lines(section).splitlines()
+        lines = ([part for line in section for part in textwrap.wrap(str(line), width=56, break_long_words=True, break_on_hyphens=False)]
+                 if full else _join_label_lines(section).splitlines())
         if not lines:
             continue
         if out:

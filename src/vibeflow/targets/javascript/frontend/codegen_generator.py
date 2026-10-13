@@ -89,7 +89,7 @@ class StaticWorkflowEmitter(
             node.id: f"__vf_execute_w{index}_n{node_index}"
             for node_index, node in enumerate(workflow.nodes)
         }
-        children: dict[str, WorkflowCode] = {}
+        children: dict[tuple[str, str | None], WorkflowCode] = {}
         payload_nodes = payload.get("nodes")
         if not isinstance(payload_nodes, list):
             raise ValueError("serialized portable workflow must contain nodes")
@@ -98,6 +98,8 @@ class StaticWorkflowEmitter(
             payload_nodes,
             strict=True,
         ):
+            for key, task in node.task_plans.items():
+                children[(node.id, key)] = self._register(task, node_payload["task_plans"][key])
             if node.subplan is None:
                 continue
             if not isinstance(node_payload, Mapping):
@@ -105,7 +107,7 @@ class StaticWorkflowEmitter(
             child_payload = node_payload.get("subplan")
             if not isinstance(child_payload, Mapping):
                 raise ValueError(f"composite node '{node.id}' lost its subplan")
-            children[node.id] = self._register(
+            children[(node.id, None)] = self._register(
                 node.subplan,
                 child_payload,
             )
@@ -126,6 +128,8 @@ class StaticWorkflowEmitter(
     def _emit_constants(self, code: WorkflowCode) -> list[str]:
         workflow = code.workflow
         metadata = {
+            "kind": workflow.kind,
+            "task_input_cardinalities": {item.type:item.cardinality for node in workflow.nodes for item in node.requires} if workflow.kind=="task" else {},
             "abi_version": workflow.abi_version,
             "workflow_id": workflow.workflow_id,
             "inputs": [item.to_dict() for item in workflow.inputs],
@@ -148,7 +152,9 @@ class StaticWorkflowEmitter(
             assert isinstance(node_payload, Mapping)
             node_metadata: dict[str, Any] = {
                 "id": node.id,
+                "flow_kind": node.flow_kind,
                 "type_used": node.type_used,
+                "source": node.implementation.to_dict() if node.implementation else {},
                 "requires": [item.to_dict() for item in node.requires],
                 "provides": [item.to_dict() for item in node.provides],
                 "params": dict(node.params),
@@ -210,6 +216,8 @@ class StaticWorkflowEmitter(
                         requirement.id,
                         set(),
                     ).update(operations)
+                for task in node.task_plans.values():
+                    visit(task)
                 if node.subplan is not None:
                     visit(node.subplan)
 

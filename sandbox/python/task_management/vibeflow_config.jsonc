@@ -1,0 +1,8 @@
+{
+  "roots": [
+    {
+      "id": "task_management",
+      "path": "project"
+    }
+  ]
+}

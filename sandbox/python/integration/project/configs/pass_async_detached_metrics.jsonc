@@ -16,11 +16,18 @@
         "description": "Runs start."
       },
       {
-        "async": "detached",
         "id": "metrics",
-        "type_used": "sandbox.batch_metrics",
-        "display_name": "Metrics",
-        "description": "Runs metrics."
+        "type_used": "task.launch.sandbox_batch_metrics.background",
+        "display_name": "任务管理：Metrics",
+        "description": "Starts an explicitly declared workflow-owned task.",
+        "task_targets": {
+          "work": {
+            "id": "work",
+            "type_used": "sandbox.batch_metrics",
+            "display_name": "Metrics",
+            "description": "Runs metrics."
+          }
+        }
       },
       {
         "value": 4,
@@ -58,6 +65,10 @@
       },
       {
         "from": "add",
+        "to": "end"
+      },
+      {
+        "from": "metrics",
         "to": "end"
       }
     ],

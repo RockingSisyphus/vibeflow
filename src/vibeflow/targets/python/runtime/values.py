@@ -8,15 +8,23 @@ from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
 def _store_output(result: RunResult, result_key: str, envelope: DataEnvelope) -> None:
     result.set(result_key, envelope.to_input())
 
+class _InitialValues(dict):
+    """Internal envelope transport; public inputs stay ordinary mappings."""
+    def __init__(self):
+        super().__init__()
+        self.multiple = {}
+
+
 def _nodeset_inputs_to_initial(inputs: Mapping[str, object], graph_inputs: tuple[PipelineInputSpec, ...]) -> dict[str, object]:
-    initial: dict[str, object] = {}
+    initial = _InitialValues()
     input_items = list(_iter_input_items(inputs))
     for provider in graph_inputs:
-        for item in input_items:
-            if isinstance(item, Mapping) and item.get("type") == provider.type:
-                initial[provider.key] = item.get("value")
-                break
+        matches=[item for item in input_items if isinstance(item,Mapping) and item.get('type')==provider.type]
+        if matches:
+            initial[provider.key]=matches[0].get('value')
+            initial.multiple[provider.key]=[item.get('value') for item in matches]
     return initial
+
 
 def _initial_loop_values(inputs: Mapping[str, object], carry: tuple[object, ...]) -> dict[str, object]:
     values: dict[str, object] = {}

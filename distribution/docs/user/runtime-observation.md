@@ -24,7 +24,7 @@ Python 文件默认位于 `runs/<run_id>/`。Node.js AOT 每次调用在当前�
 }
 ```
 
-`state`、`error`、`updated_at` 由内核填写。`state` 为 `starting`、`running`、`succeeded` 或 `failed`；`error` 无错误时为 `null`，失败时为字符串。通知判断使用 `state`。`updated_at` 是带 UTC 时区的 ISO 8601 时间。
+`state`、`error`、`updated_at` 由内核填写。`state` 为 `starting`、`running`、`stopping`、`succeeded` 或 `failed`；`error` 无错误时为 `null`，失败时为字符串。通知判断使用 `state`。`updated_at` 是带 UTC 时区的 ISO 8601 时间。
 
 默认每 60 秒更新一次。启动、进入执行和结束时立即写入；配置或实现加载失败也写入失败状态。每次新运行重新生成状态，清空旧 `info`。结束后保留最终文件。写入通过同目录临时文件原子替换完成，监控程序可以反复读取完整 JSON。
 
@@ -106,3 +106,7 @@ Node.js 构建自动写入文件，并通过独立线程维持文件更新时间
 ## 监控判读
 
 独立工作流正常结束写为 `succeeded`；执行异常、取消或非零委托退出写为 `failed`。Host 正常停止写为 `succeeded`，生命周期异常写为 `failed`。`info` 只描述业务进度，不改变内核状态。进程被强制终止、机器断电或存储不可写时，最后文件可能仍是 `running`；监控程序可结合更新时间和自身进程检查判断是否失联。
+
+并发启动、任务引用、停止与实际收尾合同见[原生任务管理](task-management.md)。
+
+`stopping` 表示停止已请求但所属执行或资源仍在收尾。任务、Host.stop、插件释放和执行锁均以实际收尾完成为结束边界；取消对等待的关注不会冒充退出。

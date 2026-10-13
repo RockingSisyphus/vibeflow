@@ -1,5 +1,6 @@
 """Language source facts for the current Python command's declaration closure."""
 import inspect
+from vibeflow.core.tasks import call_specs
 import sys
 from pathlib import Path
 
@@ -13,7 +14,7 @@ def workflow_node_types(graph):
     from vibeflow.core.rules.planning import graph_rule_subjects
     selected = set()
     for subject in graph_rule_subjects(graph):
-        for node in subject.graph.nodes:
+        for node in call_specs(subject.graph.nodes):
             if node.status != STATUS_PLANNED and node.type_used not in LOOP_NODE_TYPES and node.type_used != IO_NODE_TYPE and node.type_used not in subject.graph.nodesets:
                 selected.add(node.type_used)
     return tuple(sorted(selected))
@@ -111,6 +112,10 @@ def collect_workflow_source_context(registry, graph):
             call_facts.append(PythonSourceCall(subject.owner,call_id,spec.type_used,spec.params,subject.graph.source_path,spec.id,path,spec.rulesets))
             if path in subjects:
                 collect(subjects[path])
+            for slot in spec.task_targets:
+                task_path = (*path, "tasks", slot)
+                if task_path in subjects:
+                    collect(subjects[task_path])
     collect(subjects[()])
     from dataclasses import replace
     context = analyze_node_source_context(registry, workflow_node_types(graph), calls=calls)

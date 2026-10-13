@@ -144,6 +144,8 @@ def node_contract_check(
                     ]
                 )
                 check_index += 1
+            for task in node.task_plans.values():
+                visit(task)
             if node.subplan is not None:
                 visit(node.subplan)
 
@@ -252,6 +254,8 @@ def _capability_descriptors(
         for descriptor in plan.capabilities:
             descriptors.setdefault(descriptor.id, descriptor)
         for node in plan.nodes:
+            for task in node.task_plans.values():
+                visit(task)
             if node.subplan is not None:
                 visit(node.subplan)
 
@@ -318,8 +322,10 @@ def _node_context_type(
         if capability_members
         else "Readonly<Record<never, never>>"
     )
+    task_type = 'tasks: import("@vibeflow/plugin").TaskController; ' if node.flow_kind == "task_manager" else ""
     return (
         "Readonly<{ "
+        + task_type +
         "signal?: VibeFlowAbortSignal; "
         f"capabilities: {capabilities_type}; "
         "trace(kind: string, details?: Readonly<Record<string, unknown>>): void; "

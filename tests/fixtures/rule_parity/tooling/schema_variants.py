@@ -16,6 +16,9 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
 
     def emit(name, data, codes=(), *, severity="error", message="", classification="preserved", baseline_codes=None):
         expected_codes = baseline_codes if variant == "baseline" and baseline_codes is not None else codes
+        if variant == "current" and (name.startswith("async.") or name=="io.async"):
+            expected_codes=("GRAPH.ASYNC.MIGRATION",)
+            classification="approved_change"
         try:
             findings = collect_config_schema_findings(data)
             actual = {"status": "FAIL" if any(f.severity == "error" for f in findings) else "CONCERNS" if findings else "PASS",

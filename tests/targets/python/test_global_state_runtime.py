@@ -800,61 +800,58 @@ def test_base_exception_cancellation_reports_state_change_and_releases_lease(
         ).result(timeout=3)
 
 
-def test_global_state_root_keeps_joined_managed_workers_parallel(
-    tmp_path: Path,
-) -> None:
+
+def _managed_graph(registry, targets, *, mode="all", end_type="test.start", root_lock=""):
+    """Author an explicit management call and finite target declarations."""
+    providers = tuple(provider for target in targets.values()
+        for provider in registry.descriptor(target["type_used"]).contract.provides) if mode == "all" else ()
+    class Manager:
+        def run_pure(self, inputs, params, context):
+            refs = [context.tasks.start(key,{}) for key in targets]
+            if mode == "none":
+                return {}
+            if mode == "first":
+                context.tasks.wait_any(refs)
+                return {}
+            if mode == "first_failure":
+                outcome = context.tasks.wait_any(refs)
+                if outcome["status"] == "failed":
+                    raise RuntimeError(outcome["error"]["message"])
+                return {}
+            outcomes = context.tasks.wait_all_exited(refs)
+            outputs = {}
+            for outcome in outcomes:
+                if outcome["status"] != "succeeded":
+                    raise RuntimeError(outcome["error"]["message"])
+                outputs.update(outcome["outputs"])
+            return outputs
+    registry.register(NodeDescriptor("test.task_manager", "Task manager", "Owns declared tasks", "1", "task_manager",
+        contract=NodeContractDescriptor(provides=providers,output_semantics={p.key:("Managed output",) for p in providers}),
+        rulesets=()),Manager)
+    pipeline = {"nodes":[_node_call("start","test.start","Starts the caller"),
+        {**_node_call("manager","test.task_manager","Manages actual execution"),"task_targets":targets},
+        _node_call("join",end_type,"Returns after the management call")],
+        "edges":_edge_chain("start","manager","join")}
+    if root_lock:
+        pipeline["execution_lock"]={"key":root_lock}
+    return parse_graph_config({"pipeline":pipeline})
+
+def test_global_state_root_keeps_joined_managed_workers_parallel(tmp_path: Path) -> None:
     registry = _registry()
-    register_node(registry, GlobalWorkerLeftNode_DECLARATION, GlobalWorkerLeftNode)
-    register_node(registry, GlobalWorkerRightNode_DECLARATION, GlobalWorkerRightNode)
-    register_node(registry, WorkerJoinNode_DECLARATION, WorkerJoinNode)
-    graph = parse_graph_config(
-        {
-            "pipeline": {
-                "nodes": [
-                    _node_call("start", "test.start", "Starts both workers."),
-                    _node_call(
-                        "left",
-                        "test.global_worker_left",
-                        "Runs the left worker.",
-
-                        result_key="worker.left",
-                        **{"async": "result_key"},
-                    ),
-                    _node_call(
-                        "right",
-                        "test.global_worker_right",
-                        "Runs the right worker.",
-
-                        result_key="worker.right",
-                        **{"async": "result_key"},
-                    ),
-                    _node_call(
-                        "join",
-                        "test.worker_join",
-                        "Joins both workers.",
-
-                        join_policy="all",
-                    ),
-                ],
-                "edges": [
-                    {"from": "start", "to": "left"},
-                    {"from": "start", "to": "right"},
-                    {"from": "left", "to": "join"},
-                    {"from": "right", "to": "join"},
-                ],
-            }
-        }
-    )
-    runtime = PipelineRuntime(graph, registry=registry, run_dir=tmp_path / "parallel")
-
+    for declaration, implementation in ((GlobalWorkerLeftNode_DECLARATION,GlobalWorkerLeftNode),
+        (GlobalWorkerRightNode_DECLARATION,GlobalWorkerRightNode),(WorkerJoinNode_DECLARATION,WorkerJoinNode)):
+        register_node(registry,declaration,implementation)
+    graph = _managed_graph(registry,{"left":_node_call("left","test.global_worker_left","Left worker"),
+        "right":_node_call("right","test.global_worker_right","Right worker")},end_type="test.worker_join")
+    runtime = PipelineRuntime(graph,registry=registry,run_dir=tmp_path/"parallel")
     _GateState.reset(parties=2)
-    result = runtime.run()
-
+    result=runtime.run()
     assert _GateState.maximum == 2
-    kinds = [event["kind"] for event in _events(result)]
-    assert kinds.count("async_result_join") == 2
-    assert "lock_released" not in kinds
-    assert kinds[-1] == "runtime_summary"
+    kinds=[event["kind"] for event in _events(result)]
+    assert kinds.count("task_exited")==2 and "lock_released" not in kinds
+    assert kinds[-1]=="runtime_summary"
+
+
 
 
 @pytest.mark.parametrize(
@@ -864,128 +861,42 @@ def test_global_state_root_keeps_joined_managed_workers_parallel(
         ("project.left", "project.right", 2),
     ),
 )
-def test_parallel_sibling_node_locks_use_logical_scope_reentrancy(
-    tmp_path: Path,
-    left_key: str,
-    right_key: str,
-    expected_maximum: int,
-) -> None:
-    registry = _registry()
-    register_node(registry, GlobalWorkerLeftNode_DECLARATION, GlobalWorkerLeftNode)
-    register_node(registry, GlobalWorkerRightNode_DECLARATION, GlobalWorkerRightNode)
-    register_node(registry, WorkerJoinNode_DECLARATION, WorkerJoinNode)
-    graph = parse_graph_config(
-        {
-            "pipeline": {
-                "nodes": [
-                    _node_call("start", "test.start", "Starts both workers."),
-                    {
-                        **_node_call(
-                            "left",
-                            "test.global_worker_left",
-                            "Runs the left locked worker.",
-
-                            result_key="worker.left",
-                            **{"async": "result_key"},
-                        ),
-                        "execution_lock": {"key": left_key},
-                    },
-                    {
-                        **_node_call(
-                            "right",
-                            "test.global_worker_right",
-                            "Runs the right locked worker.",
-
-                            result_key="worker.right",
-                            **{"async": "result_key"},
-                        ),
-                        "execution_lock": {"key": right_key},
-                    },
-                    _node_call(
-                        "join",
-                        "test.worker_join",
-                        "Joins both locked workers.",
-
-                        join_policy="all",
-                    ),
-                ],
-                "edges": [
-                    {"from": "start", "to": "left"},
-                    {"from": "start", "to": "right"},
-                    {"from": "left", "to": "join"},
-                    {"from": "right", "to": "join"},
-                ],
-            }
-        }
-    )
-    runtime = PipelineRuntime(
-        graph,
-        registry=registry,
-        run_dir=tmp_path / f"{left_key}-{right_key}",
-    )
-
-    _GateState.reset(parties=2 if expected_maximum == 2 else 0)
+def test_parallel_sibling_node_locks_use_logical_scope_reentrancy(tmp_path: Path,left_key: str,right_key: str,expected_maximum: int) -> None:
+    registry=_registry()
+    for declaration,implementation in ((GlobalWorkerLeftNode_DECLARATION,GlobalWorkerLeftNode),
+        (GlobalWorkerRightNode_DECLARATION,GlobalWorkerRightNode),(WorkerJoinNode_DECLARATION,WorkerJoinNode)):
+        register_node(registry,declaration,implementation)
+    graph=_managed_graph(registry,{
+        "left":{**_node_call("left","test.global_worker_left","Left worker"),"execution_lock":{"key":left_key}},
+        "right":{**_node_call("right","test.global_worker_right","Right worker"),"execution_lock":{"key":right_key}}},
+        end_type="test.worker_join")
+    runtime=PipelineRuntime(graph,registry=registry,run_dir=tmp_path/"sibling-locks")
+    _GateState.reset(parties=2 if expected_maximum==2 else 0)
     runtime.run()
+    assert _GateState.maximum==expected_maximum
 
-    assert _GateState.maximum == expected_maximum
 
 
-def test_ordinary_async_hooks_keep_scheduler_thread_and_join_order(
-    tmp_path: Path,
-) -> None:
-    registry = _registry()
-    register_node(registry, OrdinaryWorkerNode_DECLARATION, OrdinaryWorkerNode)
-    register_node(registry, WorkerLeftJoinNode_DECLARATION, WorkerLeftJoinNode)
-    calls: list[tuple[str, str, str]] = []
 
+def test_managed_worker_hooks_follow_its_actual_execution_thread(tmp_path: Path) -> None:
+    registry=_registry()
+    register_node(registry,OrdinaryWorkerNode_DECLARATION,OrdinaryWorkerNode)
+    register_node(registry,WorkerLeftJoinNode_DECLARATION,WorkerLeftJoinNode)
+    calls=[]
     class HookPlugin:
-        name = "thread_probe"
+        name="thread_probe"
+        def before_node(self,name,node_type,input_summary):
+            calls.append(("before",name,threading.current_thread().name))
+        def after_node(self,name,node_type,output_summary):
+            calls.append(("after",name,threading.current_thread().name))
+    plugins=PluginRegistry();plugins.register(HookPlugin(),plugin_type="runtime")
+    graph=_managed_graph(registry,{"worker":_node_call("worker","test.ordinary_worker","Worker")},end_type="test.worker_left_join")
+    PipelineRuntime(graph,registry=registry,plugin_registry=plugins,run_dir=tmp_path/"hooks").run()
+    worker=[call for call in calls if call[1]=="worker"]
+    assert [call[0] for call in worker]==["before","after"]
+    assert worker[0][2]==worker[1][2] and worker[0][2].startswith("vibeflow-task")
 
-        def before_node(self, name, node_type, input_summary):
-            del node_type, input_summary
-            calls.append(("before", name, threading.current_thread().name))
 
-        def after_node(self, name, node_type, output_summary):
-            del node_type, output_summary
-            calls.append(("after", name, threading.current_thread().name))
-
-    plugins = PluginRegistry()
-    plugins.register(HookPlugin(), plugin_type="runtime")
-    graph = parse_graph_config(
-        {
-            "pipeline": {
-                "nodes": [
-                    _node_call("start", "test.start", "Starts the worker."),
-                    _node_call(
-                        "worker",
-                        "test.ordinary_worker",
-                        "Runs an ordinary result task.",
-
-                        result_key="worker.left",
-                        **{"async": "result_key"},
-                    ),
-                    _node_call(
-                        "join",
-                        "test.worker_left_join",
-                        "Joins the ordinary task.",
-
-                    ),
-                ],
-                "edges": _edge_chain("start", "worker", "join"),
-            }
-        }
-    )
-
-    PipelineRuntime(
-        graph,
-        registry=registry,
-        plugin_registry=plugins,
-        run_dir=tmp_path / "ordinary-hooks",
-    ).run()
-
-    worker_calls = [item for item in calls if item[1] == "worker"]
-    assert [item[0] for item in worker_calls] == ["before", "after"]
-    assert all(item[2] == threading.current_thread().name for item in worker_calls)
 
 
 def test_trace_failures_do_not_leak_acquired_domains(
@@ -1188,359 +1099,89 @@ def test_dynamic_nested_runtime_rejects_a_different_user_lock_and_releases(
         executor.submit(recovered.run).result(timeout=3)
 
 
-def test_inherited_root_protection_drains_nested_failure_tasks_before_release(
-    tmp_path: Path,
-) -> None:
-    lock_key = "project.nested-protected"
-    registry = _registry()
-    register_node(registry, GlobalNoopNode_DECLARATION, GlobalNoopNode)
-    register_node(
-        registry,
-        ProtectedSlowResultNode_DECLARATION,
-        ProtectedSlowResultNode,
-    )
-    register_node(registry, ProtectedJoinNode_DECLARATION, ProtectedJoinNode)
-    register_node(
-        registry,
-        CoordinatedFailureNode_DECLARATION,
-        CoordinatedFailureNode,
-    )
-    graph = parse_graph_config(
-        {
-            "nodesets": [
-                _nodeset_config(
-                    "test.protected_child",
-                    provides=["protected.result"],
-                    pipeline={
-                        "nodes": [
-                            _node_call(
-                                "start",
-                                "test.start",
-                                "Starts child branches.",
-                            ),
-                            _node_call(
-                                "bb_slow",
-                                "test.protected_slow_result",
-                                "Runs a protected child result task.",
+def test_inherited_root_protection_drains_nested_failure_tasks_before_release(tmp_path: Path) -> None:
+    from vibeflow.core.flow import GraphConfig,NodeSpec,NodesetSpec,EdgeSpec,ExecutionLockSpec
+    key="project.nested-protected"
+    registry=_registry()
+    register_node(registry,ProtectedSlowResultNode_DECLARATION,ProtectedSlowResultNode)
+    register_node(registry,CoordinatedFailureNode_DECLARATION,CoordinatedFailureNode)
+    body=_managed_graph(registry,{"slow":_node_call("slow","test.protected_slow_result","Owns cleanup"),
+        "bad":_node_call("bad","test.coordinated_failure","Fails after the sibling starts")},mode="first_failure")
+    definition=NodesetSpec("test.child","Child","Nested failure",(),(),body)
+    graph=GraphConfig(nodes=(NodeSpec("start","test.start"),NodeSpec("child","test.child"),NodeSpec("end","test.start")),
+        edges=(EdgeSpec("start","child"),EdgeSpec("child","end")),nodesets={"test.child":definition},execution_lock=ExecutionLockSpec(key))
+    outer=PipelineRuntime(graph,registry=registry,run_dir=tmp_path/"outer")
+    competitor=_runtime("test.following_normal",tmp_path/"competitor",root_lock=key)
+    _ProtectedTaskState.reset();_WriterPreferenceState.reset()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        running=pool.submit(outer.run)
+        assert _ProtectedTaskState.entered.wait(2)
+        other=pool.submit(competitor.run)
+        try:
+            assert not _WriterPreferenceState.follower_entered.wait(.1) and not running.done()
+        finally:
+            _ProtectedTaskState.release.set()
+        with pytest.raises(RuntimeError,match="coordinated boom"):running.result(3)
+        other.result(3)
+    assert _ProtectedTaskState.finished.is_set() and _WriterPreferenceState.follower_entered.is_set()
 
-                                result_key="protected.result",
-                                **{"async": "result_key"},
-                            ),
-                            _node_call(
-                                "aa_bad",
-                                "test.coordinated_failure",
-                                "Fails before the result can join.",
 
-                                result_key="value.out",
-                                **{"async": "result_key"},
-                            ),
-                            _node_call(
-                                "join",
-                                "test.protected_join",
-                                "Would join both child branches.",
 
-                                join_policy="all",
-                            ),
-                        ],
-                        "edges": [
-                            {"from": "start", "to": "aa_bad"},
-                            {"from": "start", "to": "bb_slow"},
-                            {"from": "aa_bad", "to": "join"},
-                            {"from": "bb_slow", "to": "join"},
-                        ],
-                        "outputs": [REQ_SPEC("protected.result")],
-                    },
-                )
-            ],
-            "pipeline": {
-                "execution_lock": {"key": lock_key},
-                "nodes": [
-                    _node_call("start", "test.start", "Starts the root."),
-                    _node_call(
-                        "global",
-                        "test.global_noop",
-                        "Acquires the root global-state domain.",
-                    ),
-                    _node_call(
-                        "child",
-                        "test.protected_child",
-                        "Runs the failing child block.",
 
-                    ),
-                    _node_call(
-                        "end",
-                        "test.out_end",
-                        "Consumes the child result.",
+def test_early_terminal_retains_lock_until_every_owned_task_exits(tmp_path: Path) -> None:
+    key="project.early-terminal"
+    registry=_registry()
+    register_node(registry,EarlyQuickResultNode_DECLARATION,EarlyQuickResultNode)
+    register_node(registry,EarlySlowResultNode_DECLARATION,EarlySlowResultNode)
+    graph=_managed_graph(registry,{"quick":_node_call("quick","test.early_quick_result","Completes first"),
+        "slow":_node_call("slow","test.early_slow_result","Still owns execution")},mode="first",root_lock=key)
+    outer=PipelineRuntime(graph,registry=registry,run_dir=tmp_path/"outer")
+    competitor=_runtime("test.following_normal",tmp_path/"competitor",root_lock=key)
+    _ProtectedTaskState.reset();_WriterPreferenceState.reset()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        running=pool.submit(outer.run)
+        assert _ProtectedTaskState.entered.wait(2)
+        other=pool.submit(competitor.run)
+        try:
+            assert not _WriterPreferenceState.follower_entered.wait(.1) and not running.done()
+        finally:_ProtectedTaskState.release.set()
+        running.result(3);other.result(3)
+    assert _ProtectedTaskState.finished.is_set() and _WriterPreferenceState.follower_entered.is_set()
 
-                    ),
-                ],
-                "edges": _edge_chain("start", "global", "child", "end"),
-            },
-        }
-    )
-    outer = PipelineRuntime(
-        graph,
-        registry=registry,
-        run_dir=tmp_path / "nested-protected",
-    )
-    competitor = _runtime(
-        "test.following_normal",
-        tmp_path / "nested-competitor",
-        root_lock=lock_key,
-    )
-    _ProtectedTaskState.reset()
-    _WriterPreferenceState.reset()
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        outer_future = executor.submit(outer.run)
-        assert _ProtectedTaskState.entered.wait(timeout=2)
-        competitor_future = executor.submit(competitor.run)
-        assert not _WriterPreferenceState.follower_entered.wait(timeout=0.1)
-        assert not outer_future.done()
 
-        _ProtectedTaskState.release.set()
-        with pytest.raises(RuntimeError, match="coordinated boom"):
-            outer_future.result(timeout=3)
-        competitor_future.result(timeout=3)
 
+def test_unrelated_owned_sibling_has_its_own_lock_but_cannot_escape_workflow(tmp_path: Path) -> None:
+    registry=_registry()
+    register_node(registry,ParallelProbeNode_DECLARATION,ParallelProbeNode)
+    register_node(registry,UnrelatedDetachedNode_DECLARATION,UnrelatedDetachedNode)
+    graph=_managed_graph(registry,{
+        "locked":{**_node_call("locked","test.parallel_probe","Own named domain"),"execution_lock":{"key":"project.localized"}},
+        "background":_node_call("background","test.unrelated_detached","Independent sibling")},mode="none")
+    runtime=PipelineRuntime(graph,registry=registry,run_dir=tmp_path/"siblings")
+    _ProtectedTaskState.reset();_GateState.reset()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        running=pool.submit(runtime.run)
+        assert _ProtectedTaskState.entered.wait(2)
+        try:assert not running.done() and not _ProtectedTaskState.finished.is_set()
+        finally:_ProtectedTaskState.release.set()
+        running.result(3)
     assert _ProtectedTaskState.finished.is_set()
-    assert _WriterPreferenceState.follower_entered.is_set()
 
 
-def test_early_terminal_fails_closed_and_retains_lock_until_result_finishes(
-    tmp_path: Path,
-) -> None:
-    lock_key = "project.early-terminal"
-    registry = _registry()
-    register_node(registry, EarlyQuickResultNode_DECLARATION, EarlyQuickResultNode)
-    register_node(registry, EarlySlowResultNode_DECLARATION, EarlySlowResultNode)
-    register_node(registry, EarlyQuickEndNode_DECLARATION, EarlyQuickEndNode)
-    register_node(registry, EarlySlowEndNode_DECLARATION, EarlySlowEndNode)
-    graph = parse_graph_config(
-        {
-            "pipeline": {
-                "execution_lock": {"key": lock_key},
-                "nodes": [
-                    _node_call("start", "test.start", "Starts both branches."),
-                    _node_call(
-                        "quick",
-                        "test.early_quick_result",
-                        "Completes the selected result branch.",
-
-                        result_key="early.quick",
-                        **{"async": "result_key"},
-                    ),
-                    _node_call(
-                        "slow",
-                        "test.early_slow_result",
-                        "Runs the result branch left behind by early exit.",
-
-                        result_key="early.slow",
-                        **{"async": "result_key"},
-                    ),
-                    _node_call(
-                        "quick_end",
-                        "test.early_quick_end",
-                        "Ends after the quick branch.",
-
-                    ),
-                    _node_call(
-                        "slow_end",
-                        "test.early_slow_end",
-                        "Makes the slow join statically reachable.",
-
-                    ),
-                ],
-                "edges": [
-                    {"from": "start", "to": "quick"},
-                    {"from": "start", "to": "slow"},
-                    {"from": "quick", "to": "quick_end"},
-                    {"from": "slow", "to": "slow_end"},
-                ],
-            }
-        }
-    )
-    outer = PipelineRuntime(
-        graph,
-        registry=registry,
-        run_dir=tmp_path / "early-terminal",
-        runtime_options={"async_max_workers": 2},
-    )
-    competitor = _runtime(
-        "test.following_normal",
-        tmp_path / "early-terminal-competitor",
-        root_lock=lock_key,
-    )
-    _ProtectedTaskState.reset()
-    _WriterPreferenceState.reset()
-
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        outer_future = executor.submit(outer.run)
-        if not _ProtectedTaskState.entered.wait(timeout=2):
-            outer_future.result(timeout=0)
-            pytest.fail("slow protected task did not start")
-        competitor_future = executor.submit(competitor.run)
-        assert not _WriterPreferenceState.follower_entered.wait(timeout=0.1)
-        assert not outer_future.done()
-
-        _ProtectedTaskState.release.set()
-        with pytest.raises(
-            PipelineRuntimeError,
-            match=(
-                "protected async task reached cleanup without its scheduled join"
-            ),
-        ):
-            outer_future.result(timeout=3)
-        competitor_future.result(timeout=3)
-
-    assert _ProtectedTaskState.finished.is_set()
-    assert _WriterPreferenceState.follower_entered.is_set()
 
 
-def test_unrelated_detached_sibling_does_not_inherit_node_lock_protection(
-    tmp_path: Path,
-) -> None:
-    registry = _registry()
-    register_node(registry, ParallelProbeNode_DECLARATION, ParallelProbeNode)
-    register_node(
-        registry,
-        UnrelatedDetachedNode_DECLARATION,
-        UnrelatedDetachedNode,
-    )
-    graph = parse_graph_config(
-        {
-            "pipeline": {
-                "nodes": [
-                    _node_call("start", "test.start", "Starts both branches."),
-                    {
-                        **_node_call(
-                            "locked",
-                            "test.parallel_probe",
-                            "Uses a call-site execution lock.",
-                        ),
-                        "execution_lock": {"key": "project.localized"},
-                    },
-                    _node_call(
-                        "background",
-                        "test.unrelated_detached",
-                        "Runs outside the sibling lock scope.",
-                        **{"async": "detached"},
-                    ),
-                    _node_call("end", "test.start", "Ends the main branch."),
-                ],
-                "edges": [
-                    {"from": "start", "to": "locked"},
-                    {"from": "start", "to": "background"},
-                    {"from": "locked", "to": "end"},
-                ],
-            }
-        }
-    )
-    runtime = PipelineRuntime(
-        graph,
-        registry=registry,
-        run_dir=tmp_path / "localized-protection",
-        runtime_options={"async_flush_timeout": 0.01},
-    )
-    _ProtectedTaskState.reset()
-    _GateState.reset()
-
-    started = time.monotonic()
-    try:
-        runtime.run()
-        elapsed = time.monotonic() - started
-        assert _ProtectedTaskState.entered.is_set()
-        assert not _ProtectedTaskState.finished.is_set()
-        assert elapsed < 0.5
-    finally:
-        _ProtectedTaskState.release.set()
-        assert _ProtectedTaskState.finished.wait(timeout=2)
-
-
-def test_failure_warning_includes_global_task_started_during_final_drain(
-    tmp_path: Path,
-) -> None:
-    lock_key = "project.late-drain"
-    registry = _registry()
-    register_node(registry, DelayedResultNode_DECLARATION, DelayedResultNode)
-    register_node(
-        registry,
-        LateGlobalResultNode_DECLARATION,
-        LateGlobalResultNode,
-    )
-    register_node(registry, LateJoinNode_DECLARATION, LateJoinNode)
-    graph = parse_graph_config(
-        {
-            "pipeline": {
-                "execution_lock": {"key": lock_key},
-                "nodes": [
-                    _node_call("start", "test.start", "Starts queued work."),
-                    _node_call(
-                        "aa_slow",
-                        "test.delayed_result",
-                        "Occupies the worker.",
-
-                        result_key="late.normal",
-                        **{"async": "result_key"},
-                    ),
-                    _node_call(
-                        "bb_late_global",
-                        "test.late_global_result",
-                        "Runs after the main failure begins.",
-
-                        result_key="late.global",
-                        **{"async": "result_key"},
-                    ),
-                    _node_call(
-                        "zz_bad",
-                        "test.runtime_fail",
-                        "Fails before the queued global task starts.",
-
-                        config={"fail": True},
-                        result_key="value.out",
-                        **{"async": "result_key"},
-                    ),
-                    _node_call(
-                        "join",
-                        "test.late_join",
-                        "Would join every result.",
-
-                        join_policy="all",
-                    ),
-                ],
-                "edges": [
-                    {"from": "start", "to": "aa_slow"},
-                    {"from": "start", "to": "bb_late_global"},
-                    {"from": "start", "to": "zz_bad"},
-                    {"from": "aa_slow", "to": "join"},
-                    {"from": "bb_late_global", "to": "join"},
-                    {"from": "zz_bad", "to": "join"},
-                ],
-            }
-        }
-    )
-    runtime = PipelineRuntime(
-        graph,
-        registry=registry,
-        run_dir=tmp_path / "late-drain",
-        runtime_options={"async_max_workers": 1},
-    )
-
-    with pytest.raises(RuntimeError, match="boom"):
-        runtime.run()
-
-    events = [
-        json.loads(line)
-        for line in (tmp_path / "late-drain" / "runtime_trace.jsonl")
-        .read_text(encoding="utf-8")
-        .splitlines()
-        if line
-    ]
-    kinds = [event["kind"] for event in events]
-    assert kinds.count("global_state_may_have_changed") == 1
-    assert kinds.index("global_state_enter") < kinds.index(
-        "global_state_may_have_changed"
-    )
-    assert kinds.index("global_state_may_have_changed") < kinds.index(
-        "lock_released"
-    )
+def test_failure_warning_includes_global_task_before_actual_lease_release(tmp_path: Path) -> None:
+    key="project.late-drain"
+    registry=_registry()
+    register_node(registry,DelayedResultNode_DECLARATION,DelayedResultNode)
+    register_node(registry,LateGlobalResultNode_DECLARATION,LateGlobalResultNode)
+    graph=_managed_graph(registry,{"slow":_node_call("slow","test.delayed_result","Occupies the sole worker"),
+        "global":_node_call("global","test.late_global_result","Executes before final failure"),
+        "bad":_node_call("bad","test.runtime_fail","Fails",config={"fail":True})},root_lock=key)
+    runtime=PipelineRuntime(graph,registry=registry,run_dir=tmp_path/"late",runtime_options={"async_max_workers":1})
+    with pytest.raises(RuntimeError,match="boom"):runtime.run()
+    events=[json.loads(line) for line in (tmp_path/"late/runtime_trace.jsonl").read_text().splitlines()]
+    kinds=[event["kind"] for event in events]
+    assert kinds.count("global_state_may_have_changed")==1
+    assert kinds.index("global_state_enter")<kinds.index("global_state_may_have_changed")<kinds.index("lock_released")

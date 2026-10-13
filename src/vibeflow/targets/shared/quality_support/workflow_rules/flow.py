@@ -36,7 +36,8 @@ def _flowchart_health_facts(
         name
         for name in active_names
         if (
-            compiled.flow_kinds.get(name) == FLOW_KIND_TERMINAL
+            name == getattr(graph, "task_entry", "")
+            or compiled.flow_kinds.get(name) == FLOW_KIND_TERMINAL
             or _is_io_boundary(node_by_name[name], "receive")
         )
         and not incoming[name]
@@ -45,7 +46,8 @@ def _flowchart_health_facts(
         name
         for name in active_names
         if (
-            compiled.flow_kinds.get(name) == FLOW_KIND_TERMINAL
+            name == getattr(graph, "task_entry", "")
+            or compiled.flow_kinds.get(name) == FLOW_KIND_TERMINAL
             or _is_io_boundary(node_by_name[name], "send")
             or _is_permanent_loop(node_by_name[name])
         )

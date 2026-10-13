@@ -149,7 +149,8 @@ def _dependencies_for_nodes(
     owner: str,
 ) -> tuple[NodesetDependency, ...]:
     dependencies: list[NodesetDependency] = []
-    for node in nodes:
+    from vibeflow.core.tasks import call_specs
+    for node in call_specs(nodes):
         if node.type_used in LOOP_NODE_TYPES and node.loop.body:
             dependencies.append(
                 NodesetDependency(owner, node.id, node.loop.body, "loop_body")

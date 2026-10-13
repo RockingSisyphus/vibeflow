@@ -1,6 +1,6 @@
 # 0.16 统一资源与旧 API 退役
 
-自 0.15.0 起，VibeFlow 使用代码插件声明资源。升级时将旧登记转换为所属语言的 SDK 声明和 workflow 插件选择。当前公开契约为 Rule ABI v2、Plugin ABI v3、Workflow ABI v5；原生数据路由、Nodeset、Loop 和业务执行协议保持原有语义。
+自 0.15.0 起，VibeFlow 使用代码插件声明资源。升级时将旧登记转换为所属语言的 SDK 声明和 workflow 插件选择。当前公开契约为 Rule ABI v2、Plugin ABI v3、Workflow ABI v6；原生数据路由、Nodeset、Loop 和业务执行协议保持原有语义。
 
 0.16 完成内部迁移，直接移除旧公开 API。默认资源由自动接入的内置插件贡献，无需在 Config 中声明；内置和外部插件共用贡献校验、来源、冲突处理和实现绑定。资源进入 Catalog 不表示选中了它的规则，显式空 Ruleset 仍只提供资料。
 
@@ -119,7 +119,9 @@ BaseLib、Plugin、HostExtension 通过 `rulesets` 选择审查，插件包声�
 3. Node Rule 迁为只读取自己的符号、继承实现和实际 helper。文件整体、跨资源或多 Node 检查移到 Workflow/Nodeset。共享源文件不会让一个 Node Rule 看到其他实现。领域示例把模型文件整体归属放在 `example.model_layout` 图规则中，局部模型定义检查保留在 Node Ruleset。
 4. 需要整体检查时在外层 Ruleset 声明 `graph_scope="effective_subtree"`；嵌套组合不填写范围即可继承。完整计划不能混合 current_graph 与 effective_subtree。使用 facts.graphs 遍历负责图，用 global_graph 查询背景，遵守 boundaries；删除 handler 内的隐式递归。
 5. source Rule 不再收到其他调用或当前调用参数。依赖参数的规则使用 call 范围；共享分析通过同一计划的 Records 与 requires/bindings 实现。
-6. JavaScript 插件按 `vibeflow.rule.v2` 的公开类型更新。sources 对未知路径报 RULE.SOURCE.UNAVAILABLE；不再使用文件系统回退。Plugin ABI v3 与 Workflow ABI v5 保持各自原生协议。
+6. JavaScript 插件按 `vibeflow.rule.v2` 的公开类型更新。sources 对未知路径报 RULE.SOURCE.UNAVAILABLE；不再使用文件系统回退。Plugin ABI v3 与 Workflow ABI v6 保持各自原生协议。
 7. 规则字符串只引用 Ruleset。直接 Rule 改写为 `{rule_id, params}` 对象；参数不作为 Node 业务 params 传入。核对具体调用的有效选择、负责范围与执行记录，不只看 Node 类型摘要。
 
 `review-rules` 可在不执行检查时预览来源、替代、范围和依赖。实际验收仍需 validate、quality、首次加载与运行。迁移不会让空选择绕过真实解析、绑定和编译错误。
+
+并发启动、任务引用、停止与实际收尾合同见[原生任务管理](task-management.md)。

@@ -193,7 +193,15 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         item.get("execution_lock"),
         field=f"pipeline.nodes[{index}].execution_lock",
     )
-    reserved = {"rulesets", "id", "type_used", "requires", "provides", "config", "node_configs", "allow_config_override", "override_child_config", "status", "flow_kind", "planned_behavior", "async", "result_key", "execution_lock", "display_name", "description", "style", "similar_to", "join_policy", "loop", "io"}
+    targets = item.get("task_targets", {})
+    if not isinstance(targets, Mapping):
+        raise GraphConfigError(f"node '{node_id}'.task_targets must be an object")
+    parsed_targets = {}
+    for key, value in targets.items():
+        if not isinstance(key, str) or not key or not isinstance(value, Mapping):
+            raise GraphConfigError(f"node '{node_id}'.task_targets requires named call objects")
+        parsed_targets[key] = _parse_node({"display_name": key, "description": f"Task target {key}", **value, "id": key}, index=index)
+    reserved = {"task_targets", "rulesets", "id", "type_used", "requires", "provides", "config", "node_configs", "allow_config_override", "override_child_config", "status", "flow_kind", "planned_behavior", "async", "result_key", "execution_lock", "display_name", "description", "style", "similar_to", "join_policy", "loop", "io"}
     return NodeSpec(
         id=node_id,
         rulesets=_parse_rulesets(item.get("rulesets"), explicit="rulesets" in item),
@@ -215,6 +223,7 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         async_mode=async_mode,
         result_key=result_key,
         execution_lock=execution_lock,
+        task_targets=parsed_targets,
     )
 
 
@@ -445,13 +454,9 @@ def _parse_status(value: Any, *, field: str) -> str:
 
 
 def _parse_node_async(item: Mapping[str, Any], *, index: int, provides: tuple[DataProvider, ...]) -> tuple[str, str]:
-    async_mode = _parse_async_mode(item.get("async", ""), field=f"pipeline.nodes[{index}].async")
-    result_key = str(item.get("result_key", "")).strip()
-    if async_mode == "result_key" and not result_key:
-        raise GraphConfigError(f"pipeline.nodes[{index}].result_key is required for async result_key")
-    if async_mode != "result_key" and result_key:
-        raise GraphConfigError(f"pipeline.nodes[{index}].result_key requires async='result_key'")
-    return async_mode, result_key
+    if "async" in item or "result_key" in item:
+        raise GraphConfigError("GRAPH.ASYNC.MIGRATION: use a task_manager node with task_targets and context.tasks.start; async/result_key/detached calls have been removed", "GRAPH.ASYNC.MIGRATION")
+    return "", ""
 
 
 def _parse_join_policy(value: Any, *, field: str) -> str:
@@ -459,13 +464,6 @@ def _parse_join_policy(value: Any, *, field: str) -> str:
     if policy not in JOIN_POLICIES:
         raise GraphConfigError(f"{field} must be one of {sorted(JOIN_POLICIES)}")
     return policy
-
-
-def _parse_async_mode(value: Any, *, field: str) -> str:
-    mode = str(value).strip()
-    if mode in {"", "detached", "result_key"}:
-        return mode
-    raise GraphConfigError(f"{field} must be 'detached' or 'result_key'")
 
 
 def _parse_node_params(item: Mapping[str, Any], *, reserved: set[str], field: str) -> dict[str, Any]:

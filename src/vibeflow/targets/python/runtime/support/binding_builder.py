@@ -36,6 +36,7 @@ def build_python_binding_plan(
         binding = _python_call_binding(frame, path=(*path, node_id))
         if binding is not None:
             calls.append(binding)
+        children.extend(plan.python_bindings for plan in frame.task_plans.values())
         if frame.subplan is not None:
             children.append(frame.subplan.python_bindings)
     return PythonBindingPlan(

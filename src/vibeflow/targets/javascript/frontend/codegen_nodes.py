@@ -172,7 +172,7 @@ class NodeCodegenMixin:
         node: EmissionNode,
     ) -> str:
         assert node.subplan is not None
-        child = code.children[node.id]
+        child = code.children[(node.id, None)]
         is_async = code.workflow.entry_mode == "async"
         hook = (
             "await invokeRuntimeHookAsync"
@@ -303,7 +303,7 @@ class NodeCodegenMixin:
         node: EmissionNode,
     ) -> str:
         assert node.subplan is not None
-        child = code.children[node.id]
+        child = code.children[(node.id, None)]
         spec = node.loop
         is_async = code.workflow.entry_mode == "async"
         lines = [

@@ -16,15 +16,10 @@ class _RuntimeState:
     last_inputs: dict[str, dict[str, object]] = field(default_factory=dict)
     active_edges: set[tuple[str, str]] = field(default_factory=set)
 
-@dataclass(frozen=True)
-class _AsyncOutputs:
-    outputs: Mapping[str, object]
-    child_trace: RuntimeTrace | None = None
-
 class _NestedRuntimeFailure(PipelineRuntimeError):
     def __init__(self, message: str, child_trace: RuntimeTrace) -> None:
         super().__init__(message)
         self.child_trace = child_trace
 
 
-__all__ = ["_AsyncOutputs", "_NestedRuntimeFailure", "_RuntimeState"]
+__all__ = ["_NestedRuntimeFailure", "_RuntimeState"]

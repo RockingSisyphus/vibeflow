@@ -8,7 +8,7 @@ from vibeflow.block_compiler import compile_graph_plan
 from vibeflow.core.compiler import compile_core
 from vibeflow.core.contracts import DataProvider
 from vibeflow.core.descriptors import NodeCatalog, NodeDescriptor
-from vibeflow.core.flow import GraphConfig, NodeSpec
+from vibeflow.core.flow import GraphConfig, NodeSpec, EdgeSpec
 from vibeflow.core.models import CoreCompileRequest, ImplementationFact, ImplementationFacts, TargetFeatureSet
 from vibeflow.targets.javascript.frontend.facts import (
     implementation_facts_from_catalog,
@@ -88,26 +88,24 @@ def test_target_mismatch_keeps_contract_fact_for_precise_frontend_error() -> Non
     assert fact.source_ref == ""
 
 
-@pytest.mark.parametrize("async_mode,schedule,executor", (
-    ("", "inline", "current"),
-    ("result_key", "deferred", "event_loop"),
-    ("detached", "detached", "event_loop"),
-))
+@pytest.mark.parametrize("managed", (False, True))
 @pytest.mark.parametrize("neutral", (False, True))
 def test_immediate_javascript_implementation_scheduling_uses_target_facts(
-    async_mode, schedule, executor, neutral,
+    managed, neutral,
 ) -> None:
     descriptor = _descriptor()
     descriptor = replace(descriptor, contract=replace(descriptor.contract,
         provides=(DataProvider("value", "value", display_name="Value"),),
         output_semantics={"value": ("The fetched value",)}))
-    catalog = NodeCatalog((descriptor,))
+    manager=replace(descriptor,type_key="demo.manager",flow_kind="task_manager",implementations=tuple(replace(item,completion="suspend") for item in descriptor.implementations))
+    start=replace(_descriptor(),type_key="demo.start")
+    catalog = NodeCatalog((descriptor, manager, start) if managed else (descriptor,))
     facts = (target_neutral_implementation_facts_from_catalog(catalog) if neutral
              else implementation_facts_from_catalog(catalog, target="browser"))
     graph = GraphConfig(
-        nodes=(NodeSpec("fetch", "demo.fetch", async_mode=async_mode,
-                        result_key="value" if async_mode == "result_key" else ""),),
-        entry_mode="async" if async_mode else "sync",
+        nodes=(NodeSpec("start","demo.start"),NodeSpec("fetch", "demo.manager", task_targets={"work":NodeSpec("execution","demo.fetch")}),NodeSpec("end","demo.start")) if managed else (NodeSpec("fetch","demo.fetch"),),
+        edges=(EdgeSpec("start","fetch"),EdgeSpec("fetch","end")) if managed else (),
+        entry_mode="async" if managed else "sync",
     )
     features = TargetFeatureSet(target="browser")
     compilation = compile_core(CoreCompileRequest(graph=graph, implementation_facts=facts, target_features=features))
@@ -116,15 +114,15 @@ def test_immediate_javascript_implementation_scheduling_uses_target_facts(
         native_execution_facts=ImplementationFacts((ImplementationFact("demo.fetch",
             executor="thread", async_executor="thread"),)))
     root = plan.block(plan.entry_block)
-    assert root.node("fetch").completion == "immediate"
-    assert (root.node("fetch").schedule, root.node("fetch").executor) == (schedule, executor)
-    assert [task.executor for task in root.tasks] == ([executor] if async_mode else [])
+    assert root.node("fetch").completion == ("suspend" if managed else "immediate")
+    assert (root.node("fetch").schedule, root.node("fetch").executor) == ("inline", "event_loop" if managed else "current")
+    assert [task.executor for task in root.tasks] == (["event_loop"] if managed else [])
     bound_workflow_view(plan, build_javascript_binding_plan(plan))
 
-    if async_mode:
-        threaded = replace(plan, blocks=(replace(root,
-            nodes=(replace(root.node("fetch"), executor="thread"),),
-            tasks=tuple(replace(task, executor="thread") for task in root.tasks)),))
+    if managed:
+        threaded = replace(plan, blocks=tuple(replace(root,
+            nodes=tuple(replace(node,executor="thread") if node.id=="fetch" else node for node in root.nodes),
+            tasks=tuple(replace(task, executor="thread") for task in root.tasks)) if block.id==root.id else block for block in plan.blocks))
         with pytest.raises(AotPlanError, match="thread_executor") as error:
             bound_workflow_view(threaded, build_javascript_binding_plan(threaded))
         assert error.value.code == "TARGET.FEATURE.UNSUPPORTED"

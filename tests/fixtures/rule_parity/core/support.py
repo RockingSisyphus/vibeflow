@@ -46,7 +46,7 @@ def observe(operation):
                 for item in diagnostics if getattr(item, "source_location", {})],
             "metrics": metrics, "message": "; ".join(item.message for item in diagnostics)}
     except Exception as error:
-        return {"status": "ERROR", "codes": [{"code": str(getattr(error, "rule_id", getattr(error, "code", type(error).__name__))), "severity": "error"}],
+        return {"status": "ERROR", "codes": [{"code": str((getattr(error, "rule_id", None) or getattr(error, "code", None) or type(error).__name__)), "severity": "error"}],
             "positions": [], "metrics": {"exception": type(error).__name__, "details": plain(getattr(error, "details", {}))}, "message": str(error)}
 
 

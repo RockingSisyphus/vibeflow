@@ -441,7 +441,7 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
         "indirect_node_builtin": "VF_IMPORT_OWNER",
         "module_promise": "VF_IMPORT_SIDE_EFFECT",
         "discarded_promise": "VF_PROMISE_UNOWNED",
-        "long_lived_listener": "VF_NODE_LONG_LIVED_LISTENER",
+        "long_lived_listener": "VF_NODE_RESOURCE_UNOWNED",
         "global_state": "VF_IMPORT_SIDE_EFFECT",
     }
     precise = {
@@ -533,7 +533,7 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
                     ),
                     expected_code=code,
                     expected_definition_id=(
-                        "vibeflow.node_interface"
+                        "vibeflow.async_lifecycle"
                         if name in {"discarded_promise", "long_lived_listener"}
                         else "vibeflow.node_architecture"
                         if name in {"barrel_import", "alias_import", "symlink_import",
@@ -635,6 +635,18 @@ def _rule_selection_case():
     return json.loads((work / "report.json").read_text())
 
 
+def _task_management_case(puppeteer_root):
+    work = _RUNTIME_ROOT / "task_management"
+    command = [sys.executable, str(_SOURCE_SANDBOX_ROOT.parent / "task_management/run_all.py"),
+               "--work-dir", str(work), "--toolchain-root", str(PROJECT_ROOT),
+               "--puppeteer-root", str(puppeteer_root)]
+    completed = subprocess.run(command, capture_output=True, text=True,
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+    if completed.returncode:
+        raise AssertionError(completed.stdout + completed.stderr)
+    return json.loads((work / "report.json").read_text())
+
+
 def _comprehensive_math_case(puppeteer_root: Path, *, skip_browser: bool):
     work = _RUNTIME_ROOT / "comprehensive_math"
     command = [sys.executable, str(_SOURCE_SANDBOX_ROOT.parent / "comprehensive_math/run_all.py"),
@@ -712,6 +724,7 @@ def main() -> int:
         cases: list[tuple[str, Any]] = [
             ("rules:selection-and-boundaries", _rule_selection_case),
             ("math:workflow-nesting-and-trace", lambda: _addition_case("workflow_math")),
+            ("tasks:workflow-owned-management", lambda: _task_management_case(puppeteer_root)),
             ("math:plugin-addition", lambda: _addition_case("plugin_addition")),
             ("math:async-addition", lambda: _addition_case("async_addition")),
             ("math:comprehensive-plugin-rules", lambda: _comprehensive_math_case(
@@ -733,7 +746,7 @@ def main() -> int:
             ("capability:missing-and-cancel", lambda: capability_error_case(
                 async_capability().entry
             )),
-            ("async:detached-cleanup-and-timeout", lambda: detached_case(
+            ("async:owned-task-cleanup-and-stop", lambda: detached_case(
                 detached().entry
             )),
             ("error:node-cause-and-path", lambda: runtime_error_case(

@@ -187,6 +187,8 @@ def _bind_implementations(
                     modules.append(module)
             node_payload["implementation_id"] = binding
             node_payload["implementation"] = implementation.to_dict()
+        for key, task in node.task_plans.items():
+            bind_workflow(task, node_payload["task_plans"][key], (*path, node.id, "tasks", key))
         if node.subplan is None:
             return
         child_payload = node_payload.get("subplan")

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import html
 import json
+import math
+import unicodedata
 import os
 import re
 import shutil
@@ -66,6 +68,7 @@ def render_mermaid_svg(
             max_text_size=max_text_size,
             max_edges=max_edges,
             html_labels=html_labels,
+            node_padding=_doublecircle_padding(mermaid_text),
         )
         for label, executable_path in _puppeteer_launch_options():
             if output.exists():
@@ -153,7 +156,25 @@ def _write_puppeteer_config(path: Path, *, executable_path: str | None = None) -
     path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def _write_mermaid_config(path: Path, *, max_text_size: int, max_edges: int, html_labels: bool) -> None:
+def _doublecircle_padding(mermaid_text: str) -> int:
+    """Native dbl-circ uses label width for its radius, overlooking height.
+
+    Supply native flowchart padding before layout, so edges and all bounds are
+    computed by Mermaid. Half the full label height also fits the corners of
+    its rectangle inside the circle; no SVG geometry or labels are replaced.
+    """
+    labels = re.findall(r'shape:\s*dbl-circ,\s*label:\s*"((?:\\.|[^"\\])*)"', mermaid_text, re.S)
+    padding = 8
+    for label in labels:
+        rows = 0
+        for line in html.unescape(label).replace(r"\n", "\n").splitlines():
+            columns = sum(2 if unicodedata.east_asian_width(char) in {"W", "F"} else 1 for char in line)
+            rows += max(1, math.ceil(columns * 10 / DEFAULT_FLOWCHART_WRAPPING_WIDTH))
+        padding = max(padding, rows * 12 + 24)
+    return padding
+
+
+def _write_mermaid_config(path: Path, *, max_text_size: int, max_edges: int, html_labels: bool, node_padding: int = 8) -> None:
     # foreignObject labels disappear in several SVG viewers/chat renderers.
     # Native SVG text is less fancy but reliably visible.
     config = {
@@ -162,6 +183,7 @@ def _write_mermaid_config(path: Path, *, max_text_size: int, max_edges: int, htm
         "htmlLabels": html_labels,
         "flowchart": {
             "htmlLabels": html_labels,
+            "padding": node_padding,
             "nodeSpacing": DEFAULT_FLOWCHART_NODE_SPACING,
             "rankSpacing": DEFAULT_FLOWCHART_RANK_SPACING,
             "wrappingWidth": DEFAULT_FLOWCHART_WRAPPING_WIDTH,

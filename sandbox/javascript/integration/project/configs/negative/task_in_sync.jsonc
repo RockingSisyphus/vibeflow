@@ -18,11 +18,17 @@
       },
       {
         "id": "invalid",
-        "type_used": "sandbox.math",
-        "display_name": "Deferred node in sync workflow",
-        "description": "Must fail because a sync entry cannot contain a deferred TaskPlan.",
-        "async": "result_key",
-        "result_key": "result"
+        "type_used": "task.launch.sandbox_async_double.waited",
+        "display_name": "Task manager in sync",
+        "description": "Cannot launch workflow tasks from a synchronous JS workflow.",
+        "task_targets": {
+          "work": {
+            "id": "work",
+            "type_used": "sandbox.math",
+            "display_name": "Deferred node in sync workflow",
+            "description": "Must fail because a sync entry cannot contain a deferred TaskPlan."
+          }
+        }
       },
       {
         "id": "end",
