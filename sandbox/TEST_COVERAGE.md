@@ -7,6 +7,7 @@
 | 综合数学应用：自定义源码 Rule、typed records、warning 对照、配置覆盖、分支/汇合、Nodeset/Loop、Port 与复用并发 | 两 Target 的 comprehensive_math/run_all.py；各 integration runner 自动执行；[公式与通过判定](../docs/maintainers/comprehensive-math-sandbox.md) |
 | 简单数学使用场景：CLI、对象、插件修改、异步/Port | 五个 addition 独立入口；各 integration runner 自动执行；[替代与通过判定](../docs/maintainers/history/audits/addition-sandboxes-20261009.md) |
 | 嵌套数学工作流：条件/固定的内外层循环、carry/collect、编译源码、hooks、trace、TaskPlan、调度/数据边和超限诊断 | 两 Target 的 workflow_math/run_all.py；integration 自动执行；[19 项替代与通过判定](../docs/maintainers/history/audits/workflow-math-20261010.md) |
+| 同一起终点的不同条件边：成功/失败均收尾，顺序无关，完全重复与重叠条件不重复执行 | JavaScript workflow_math/conditional_routes.py；八次真实 AOT 构建、二十四次 Node.js 调用；integration 与根目录 `--full` 自动执行；[场景与判定](javascript/workflow_math/README.md) |
 | 分段数学工作流：直线、互斥分支、多终点、按类型汇合、数据旁路、编译源码和 trace | Python piecewise_math/run_all.py；integration 自动执行；[11 项替代与通过判定](../docs/maintainers/history/audits/piecewise-math-20261010.md) |
 | Python 工作流、Nodeset、Loop、异步、规则入口、CLI 与资源释放 | sandbox/python/integration/run_all.py |
 | JS/TS 最小 AOT、Node/browser、Capability 与 Host Extension | sandbox/javascript/minimal/run_e2e.py、sandbox/javascript/integration/run_all.py |

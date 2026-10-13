@@ -7,7 +7,8 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 from vibeflow.core.descriptors.contributions import PluginContributions, ResourceDeclaration, ResourceOrigin, PLUGIN_ABI, resource_kind
-from vibeflow.core.descriptors.models import SourceLocator, _freeze_mapping
+from vibeflow.core.descriptors.json_values import freeze_mapping
+from vibeflow.core.descriptors.models import SourceLocator
 from vibeflow.targets.python.sdk.resources import _declare, _location, definition, _implementation_files
 
 
@@ -58,8 +59,8 @@ class Plugin:
         object.__setattr__(self, "resources", resources)
         object.__setattr__(self, "rulesets", tuple(self.rulesets))
         object.__setattr__(self, "source", _location()[0])
-        object.__setattr__(self, "config_schema", _freeze_mapping(self.config_schema, field_name="plugin.config_schema"))
-        object.__setattr__(self, "config_defaults", _freeze_mapping(self.config_defaults, field_name="plugin.config_defaults"))
+        object.__setattr__(self, "config_schema", freeze_mapping(self.config_schema, field_name="plugin.config_schema"))
+        object.__setattr__(self, "config_defaults", freeze_mapping(self.config_defaults, field_name="plugin.config_defaults"))
         resources = tuple(ResourceDeclaration(resource.descriptor, ResourceOrigin(self.id, resource.path or self.source,
                           resource.line, symbol=resource.symbol)) for resource in self.resources)
         declaration = {"kind":"plugin_declaration", "id":self.id, "display_name":self.display_name or self.id,

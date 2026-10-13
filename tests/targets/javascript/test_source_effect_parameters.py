@@ -75,6 +75,27 @@ def test_builtin_prototype_mutation_stays_forbidden_for_every_scope(domain_proje
     assert any(item.definition_id == "vibeflow.no_side_effects" and item.code == "VF_MODULE_STATE" for item in report.findings)
 
 
+@pytest.mark.parametrize("slot", ['"probeAdapter"', 'key'])
+@pytest.mark.parametrize("scope,denied", [("python_io", False), ("none", True), ("terminal", True)])
+def test_host_slot_read_and_local_alias_follow_effect_scope(domain_project, slot, scope, denied):
+    _, project = domain_project
+    _select(project, {"effect_scope": scope, "policy": {}},
+            'const key = String(7); const candidate = (globalThis as Record<string, unknown>)['
+            + slot + ']; const alias = candidate; void alias;')
+    report = _review(project)
+    assert bool([item for item in report.findings if item.code == "VF_BASE_LIB_HOST_IO"]) == denied
+
+
+@pytest.mark.parametrize("body", [
+    'const candidate = globalThis.process; candidate.exit(0);',
+    'const key = String(7); const candidate = (globalThis as any)[key]; candidate.prototype.evil = 1;',
+])
+def test_host_slot_permission_keeps_process_and_prototype_protections(domain_project, body):
+    _, project = domain_project
+    _select(project, {"effect_scope": "python_io", "policy": {}}, body)
+    assert any(item.code in {"VF_BASE_LIB_HOST_IO", "VF_MODULE_STATE"} for item in _review(project).findings)
+
+
 @pytest.mark.parametrize("policy,denied", [
     ({"imports":{"banned_roots":["fs"]}}, True),
     ({"imports":{"banned_roots":["node:fs"], "allowed_roots":["fs"]}}, False),

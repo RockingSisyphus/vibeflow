@@ -25,9 +25,9 @@ def _flow(context, inputs, params):
 
 
 def _join(context, inputs, params):
-    from vibeflow.targets.shared.quality_support.workflow_rules.flow import _join_policy_facts
+    from vibeflow.targets.shared.quality_support.workflow_rules.joins import append_join_policy_health
     state = _Findings()
-    _join_policy_facts(context.require("graph"), context.require("compiled"), state, owner=context.facts.get("owner", "pipeline"))
+    append_join_policy_health(context.require("graph"), context.require("compiled"), state, owner=context.facts.get("owner", "pipeline"))
     return RuleResult(findings=tuple((*state.errors, *state.warnings)))
 
 

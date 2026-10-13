@@ -1,8 +1,20 @@
 # 发行与文档装配
 
-VibeFlow 当前发行版本为 0.18.2，按旧 API 直接退役的破坏性升级准备 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目和 Workflow ABI。迁移入口与删除接口见 [统一资源迁移](../../distribution/docs/user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖归档发行包。
+VibeFlow 当前发行版本为 0.18.3，准备 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目和 Workflow ABI。迁移入口与删除接口见 [统一资源迁移](../../distribution/docs/user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖归档发行包。
+
+0.18.3 汇总条件边保留、嵌套插件配置导出及相关规则修复，并加入永久沙箱与运行回归。只读 JSON 的冻结与副本转换统一由独立公共模块提供；配置语法与 Workflow ABI 保持不变。具体修复见下文。
+
+GitHub 发布说明按上一正式 Release v0.13.2 的 Git 历史整理，见 [0.18.3 中英文更新说明](history/release-0.18.3.md)。
 
 0.18.2 将内置 Rule、Ruleset 与 Node 声明按语言归入 `targets/<language>/rules/`、`rulesets/` 和 `nodetypes/`；图检查与节点源码检查分开保存。Core 保留通用规则机制，共享检查算法归入 Target 共享支持层，现有规则标识、默认选择和公共 SDK 行为保持不变。仓库独立自检工具迁至 `repo_check/`，与产品质量检查入口区分；同步更新构建器对独立 JavaScript SDK 的 Node 声明资源装配。
+
+0.18.2 修复包按节点首次引用顺序构造规则检查的 Nodeset 边界，消除跨进程哈希随机化造成的 planned 诊断与 events 排列变化，避免未修改的 Architecture 被误报过期。两种 profile 的 ZIP 回归覆盖不同 `PYTHONHASHSEED` 下立即检查通过、完整文档逐字节一致，以及真实 workflow 改动仍能检出。
+
+同版本修复 JavaScript `python_io` 动态宿主槽读取的误报，并统一数据规则对初始输入的资格判断：按调度边识别空起点，不再遗漏纯控制边。多来源数据与混合 `safe_any` 汇合共用完整调度路径的互斥判断；中间节点不再丢失祖先条件，存在旁路、重叠条件或无法证明的跨字段关系时仍保留冲突诊断。拓扑、汇合、运行输入和路径条件算法按职责拆分，公开 Rule 标识与选择方式不变，未修改 Core 调度语义。
+
+后续条件边修复将 Core 去重收窄为完整 `EdgeSpec` 相等：不合成条件、不合并角色、不推断条件等价。同端点的不同声明完整进入计划，各自保留调度与传输权限；Python 数据投递直接遍历传输路线，不再借用同端点调度路线的条件或权限。供数与汇合按前驱节点统计，重复声明诊断与 Core 精确去重保持一致，不再把不同条件诊断为 `GRAPH.EDGE.CONFLICTING_DUPLICATE`，不同角色也不再触发旧的合并冲突。公开配置语法和 ABI 不变。
+
+嵌套插件配置修复将只读 JSON 与普通 JSON 副本的双向转换归入独立公共模块 `vibeflow.core.descriptors.json_values`，所有声明与插件配置调用统一入口。Python 资源导出递归转换配置、选择和展示字段，避免内层 mappingproxy 泄漏到 `compiled_graph.json`，导致公开运行入口在业务 Node 执行前失败。转换保留配置结构和值，运行时仍保持只读，原 `DescriptorModelError` 公开入口及校验规则保留。回归覆盖 plan/compiled/block、默认与覆盖值、空对象、对象数组及副本隔离。
 
 0.18.1 将 Python 与 JavaScript 的事实视图身份管理抽为共享模块，拆分语言事实适配、分析服务和检查会话职责，移除规则调用中的重复身份计算。Python 固定输入验证显示耗时改善；JavaScript 已消除重复摘要，但尚未证明稳定的端到端提速。同步完善仓库目录说明与文档导航；构建时排除带维护者标记的目录 README，保留发行用户指南。
 

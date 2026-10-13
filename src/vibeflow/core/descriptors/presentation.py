@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from vibeflow.core.descriptors.models import (
-    DescriptorModelError, _freeze_mapping, _required_text,
-)
+from vibeflow.core.descriptors.json_values import freeze_mapping
+from vibeflow.core.descriptors.models import DescriptorModelError, _required_text
 from vibeflow.core.style import NODE_SHAPES, is_hex_color, is_reserved_system_color
 
 
@@ -14,7 +13,7 @@ PRESENTATION_FIELDS = frozenset({"fill", "stroke", "text", "shape", "icon"})
 
 
 def normalize_presentation(value: object, *, field_name: str) -> Mapping[str, Any]:
-    result = _freeze_mapping(value, field_name=field_name)
+    result = freeze_mapping(value, field_name=field_name)
     unknown = set(result) - PRESENTATION_FIELDS
     if unknown:
         raise DescriptorModelError(f"{field_name} has unknown fields: {sorted(unknown)}")

@@ -5,7 +5,8 @@ from dataclasses import dataclass, field as dataclass_field
 from pathlib import Path
 from typing import Any, Mapping
 
-from vibeflow.core.descriptors.models import SourceLocator, _thaw_json
+from vibeflow.core.descriptors.json_values import freeze_json, thaw_json
+from vibeflow.core.descriptors.models import SourceLocator
 from vibeflow.core.descriptors.contributions import compose_contributions, resource_kind
 from vibeflow.core.descriptors.catalogs import DescriptorCatalogError
 from vibeflow.core.descriptors.plugin_selection import _validate_plugin_config
@@ -133,7 +134,7 @@ def _load_workflow_plugins(workspace, config_path, *, node_command, definitions)
             overrides = spec.get("config", {})
             if not isinstance(overrides, Mapping):
                 raise ValueError("plugin config must be an object")
-            config = {**_thaw_json(defaults), **dict(overrides)}
+            config = {**thaw_json(defaults), **dict(overrides)}
             _validate_plugin_config(config, schema, plugin_id=plugin_id)
             contribution = _resolved_contributions(make_contributions(config), owner.path)
             from vibeflow.tooling.application.plugin_definitions import normalize_contributions
@@ -142,7 +143,7 @@ def _load_workflow_plugins(workspace, config_path, *, node_command, definitions)
                 from dataclasses import replace
                 export = source.export or "plugin"
                 if any(item["source"].get("export") != export for item in contribution.declaration["implementations"]):
-                    declaration = _thaw_json(contribution.declaration)
+                    declaration = thaw_json(contribution.declaration)
                     for implementation in declaration["implementations"]:
                         # The selected export is the actual declaration entry.
                         implementation["source"]["export"] = export
@@ -177,13 +178,12 @@ def _load_workflow_plugins(workspace, config_path, *, node_command, definitions)
                                   "previous_source": exc.previous_source, **exc.details}) from exc
     lifecycle.extend({key:value for key,value in record.items() if key not in {"source","root","enabled","loaded"}} for record in records if record.get("status") == "planned")
     from dataclasses import replace
-    from vibeflow.core.descriptors.models import _freeze_json
     source_roots = tuple(str(item.path) for item in workspace.roots)
     for name in ("nodes", "base_libs", "host_extensions", "plugins", "rules"):
         getattr(catalogs, name).source_roots = source_roots
-    catalogs = replace(catalogs, plugin_records=_freeze_json(records, field_name="plugins"),
-                       lifecycle_selections=_freeze_json(lifecycle, field_name="plugins.lifecycle"),
-                       source_load_states=_freeze_json(load_states, field_name="plugins.sources"),
+    catalogs = replace(catalogs, plugin_records=freeze_json(records, field_name="plugins"),
+                       lifecycle_selections=freeze_json(lifecycle, field_name="plugins.lifecycle"),
+                       source_load_states=freeze_json(load_states, field_name="plugins.sources"),
                        source_roots=source_roots)
     from vibeflow.tooling.application.plugin_definitions import attach_plugin_definitions
     attach_plugin_definitions(catalogs, definitions)

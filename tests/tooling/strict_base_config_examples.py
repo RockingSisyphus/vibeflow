@@ -97,9 +97,12 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
         graph = parse_graph_config(case["config"])
         report = validate_graph_health(graph, registry=registry, purity_policy=PurityPolicy(max_source_lines=1000))
         rule_ids = {finding.rule_id for finding in (*report.errors, *report.warnings)}
-        expected_rule = str(case["expected_rule_id"])
-        assert expected_rule in rule_ids
-        observed.add(expected_rule)
+        if "expected_rule_id" in case:
+            expected_rule = str(case["expected_rule_id"])
+            assert expected_rule in rule_ids
+            observed.add(expected_rule)
+        if "expected_absent_rule_id" in case:
+            assert str(case["expected_absent_rule_id"]) not in rule_ids
 
     for case in manifest["rule_cases"]:
         registry = _registry()
@@ -152,7 +155,6 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
         "VF_IMPORT_LAYER",
         "GRAPH.CYCLE.FORBIDDEN",
         "GRAPH.EDGE.DUPLICATE",
-        "GRAPH.EDGE.CONFLICTING_DUPLICATE",
         "GRAPH.SMELL.CONFUSING_NODE_NAME",
         "QUALITY.FUNCTION.TOO_MANY_PARAMS",
         "QUALITY.SIDE_EFFECT.CALL",

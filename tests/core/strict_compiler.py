@@ -71,6 +71,7 @@ def test_compiler_merges_duplicate_explicit_edges_with_when() -> None:
                 ],
                 "edges": [
                     {"from": "add", "to": "copy", "when": "flow.route == 'again'"},
+                    {"from": "add", "to": "copy", "when": "flow.route == 'again'"},
                 ],
             }
         }

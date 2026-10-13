@@ -3,7 +3,7 @@
 from dataclasses import replace
 import inspect
 from pathlib import Path
-from types import MappingProxyType
+from vibeflow.core.descriptors.json_values import freeze_mapping
 
 from vibeflow.targets.python.project.plugins import PluginRegistry
 from vibeflow.tooling.application.python.project.resource_selection import select_python_resources
@@ -32,8 +32,8 @@ def lifecycle_registry(registry, *, workflow_id, config_path, plugin_types=("com
                 root = registry.resource_roots[("plugins", descriptor.id)]
                 source = descriptor.implementations[0].source
                 factory = _load_rule_handler(_implementation_path(source.kind, source.ref, root.path, registry.source_roots), source.export, root, registry)
-            config = MappingProxyType(dict(selection["config"]))
-            context = MappingProxyType({"config": config, "workflow_id": workflow_id, "config_path": str(config_path)})
+            config = freeze_mapping(selection["config"], field_name="plugin.config")
+            context = freeze_mapping({"config": config, "workflow_id": workflow_id, "config_path": str(config_path)}, field_name="plugin.context")
             from vibeflow.targets.python.sdk.loading import source_paths
             with source_paths(registry.source_roots):
                 instance = factory(context)

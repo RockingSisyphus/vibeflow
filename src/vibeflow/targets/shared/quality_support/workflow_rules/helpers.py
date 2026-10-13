@@ -61,3 +61,18 @@ def _literal_value(value: str) -> object:
 
 
 __all__: list[str] = []
+
+def _provider_source_details(nodes) -> list[dict[str, object]]:
+    return [
+        {
+            "node": node.name,
+            "provides": [
+                {
+                    "key": provider.key,
+                    "type": provider.type,
+                }
+                for provider in node.provides
+            ],
+        }
+        for node in nodes
+    ]

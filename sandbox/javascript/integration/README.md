@@ -7,6 +7,10 @@ The runner now includes the independent [comprehensive math application](../comp
 
 Positive workflows:
 
+- The independent [workflow_math conditional route case](../workflow_math/project/configs/conditional_routes.jsonc)
+  routes both `done` and `failed` from `receive_event` to the same `finish_call`.
+  Its runner builds sync/async variants with reversed order, an identical duplicate,
+  and overlapping conditions, then checks results, single execution and an unknown-status control;
 - `project/configs/linear.jsonc` computes `(x + a) - b` with two TypeScript
   nodes importing the registered pure `sandbox.math` base_lib;
 - `project/configs/fanout_join.jsonc` fans out into add/subtract branches and
@@ -103,7 +107,7 @@ python run.py build --config javascript_project/configs/linear.jsonc \
   --target node --profile single-esm --out-dir output/javascript
 ```
 
-The complete 48-case integration runner, including its browser installation,
+The complete 49-case integration runner, including its browser installation,
 remains in this source repository.  The release example keeps its own locked
 TypeScript/esbuild toolchain and does not share dependencies with the Python
 example root.
@@ -119,11 +123,11 @@ with `--keep-artifacts`, stable JSON and Markdown summaries are written under
 
 ## Additional simple arithmetic scenarios
 
-The runner now registers 48 tasks. `math:plugin-addition` checks multi-file resources, compile/runtime hooks, synchronous repeated calls, local overrides, and a real helper edit/restore (`5→6→5`). `math:async-addition` holds two per-invocation Capability requests, checks `5/30` and separate traces, then checks permanent Port receive/send and Host cleanup. Its browser ESM build is checked; the existing real-browser Host/profile tasks remain independent.
+The runner now registers 49 tasks. `math:plugin-addition` checks multi-file resources, compile/runtime hooks, synchronous repeated calls, local overrides, and a real helper edit/restore (`5→6→5`). `math:async-addition` holds two per-invocation Capability requests, checks `5/30` and separate traces, then checks permanent Port receive/send and Host cleanup. Its browser ESM build is checked; the existing real-browser Host/profile tasks remain independent.
 
 These replace seven previous normal tasks. See [the complete replacement table](../../../docs/maintainers/history/audits/addition-sandboxes-20261009.md). Error, cancellation, detached, taskplan, type and browser regressions remain registered.
 
-The independent [workflow_math](../workflow_math/README.md) replaces six nested Nodeset, loop, route and execution metadata tasks. Eight observation groups use small integer formulas, including a two-level +1 loop and a shared build across full/boundary/off trace. Original fixtures still used by pytest and architecture review remain. See the [migration and validation record](../../../docs/maintainers/history/audits/workflow-math-20261010.md).
+The independent [workflow_math](../workflow_math/README.md) replaces six nested Nodeset, loop, route and execution metadata tasks. Sixteen observation groups use small integer formulas, including a two-level +1 loop, a shared build across full/boundary/off trace, and eight conditional-route builds. Original fixtures still used by pytest and architecture review remain. See the [migration and validation record](../../../docs/maintainers/history/audits/workflow-math-20261010.md).
 
 ## 目录用途与边界
 

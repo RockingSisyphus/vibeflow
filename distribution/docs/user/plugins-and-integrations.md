@@ -21,6 +21,20 @@
 
 不同 workflow 拥有独立的资源集合、插件配置和生命周期实例。`enabled: false` 跳过加载；`status: "planned"` 保存规划记录。Nodeset 的结构由导入文件提供，所需插件统一在顶层 workflow 选择。
 
+Python 的只读 JSON 配置转换由独立模块 `vibeflow.core.descriptors.json_values` 提供，也可从 `vibeflow.core.descriptors` 导入：
+
+```python
+from vibeflow.core.descriptors.json_values import freeze_json, thaw_json
+
+settings = {"labels": {"phase": "prepare"}, "stages": [{"name": "train"}]}
+readonly_settings = freeze_json(settings)
+editable_settings = thaw_json(readonly_settings)
+editable_settings["labels"]["phase"] = "evaluate"
+assert readonly_settings["labels"]["phase"] == "prepare"
+```
+
+`freeze_json(value, field_name="value")` 递归复制合法 JSON 数据，将对象变成只读映射、数组变成 tuple；无效值抛出 `DescriptorModelError` 并标注字段路径。`freeze_mapping(...)` 用于要求顶层为对象的配置，`None` 表示空对象。`thaw_json(value)` 递归生成普通 dict/list 副本，用于编辑或 `json.dumps`；它同时支持普通 list 内的只读对象。两个转换都保留嵌套结构和值，不改变输入对象，修改导出副本不影响原只读配置。插件的嵌套默认值和 workflow 覆盖值可直接使用，运行前 JSON 记录也保持其结构。
+
 ## Plugin 如何贡献和使用规则
 
 把 Python 的 `@rule` 函数与 `ruleset(...)` 对象，或 JS/TS 的 `defineRule(...)` 与 `defineRuleset(...)` 对象，全部放进插件 `resources`。然后在顶层 Workflow 的 `plugins` 中选择这个固定导出。

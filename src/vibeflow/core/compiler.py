@@ -116,7 +116,7 @@ def compile_core(request: CoreCompileRequest) -> CoreCompilation:
         input_keys=set(provider_keys(graph.inputs)),
     )
     consumers = _collect_consumers(graph)
-    effective_edges = _merge_edges(graph.edges)
+    effective_edges = _deduplicate_edges(graph.edges)
     flow_kinds = _node_flow_kinds(
         nodes_by_name,
         implementations=implementations,
@@ -452,45 +452,9 @@ def _collect_consumers(graph: GraphConfig) -> dict[str, tuple[str, ...]]:
     return {key: tuple(values) for key, values in consumers.items()}
 
 
-def _merge_edges(edges: tuple[EdgeSpec, ...]) -> tuple[EdgeSpec, ...]:
-    merged: dict[tuple[str, str], EdgeSpec] = {}
-    for edge in edges:
-        _merge_edge_into(merged, edge)
-    return tuple(merged.values())
-
-
-def _merge_edge_into(merged: dict[tuple[str, str], EdgeSpec], edge: EdgeSpec) -> None:
-    existing = merged.get(edge.pair)
-    if existing is None:
-        merged[edge.pair] = edge
-        return
-    merged[edge.pair] = EdgeSpec(
-        edge.source,
-        edge.target,
-        existing.when or edge.when,
-        _merge_edge_role(existing.schedule, edge.schedule, edge=edge, role="schedule"),
-        _merge_edge_role(existing.transfer, edge.transfer, edge=edge, role="transfer"),
-    )
-
-
-def _merge_edge_role(
-    existing: bool | None,
-    incoming: bool | None,
-    *,
-    edge: EdgeSpec,
-    role: str,
-) -> bool | None:
-    if existing is None:
-        return incoming
-    if incoming is None or incoming == existing:
-        return existing
-    raise GraphCompileError(
-        (
-            f"duplicate edge {edge.source}->{edge.target} declares conflicting "
-            f"{role} roles"
-        ),
-        "GRAPH.EDGE.ROLE_CONFLICT",
-    )
+def _deduplicate_edges(edges: tuple[EdgeSpec, ...]) -> tuple[EdgeSpec, ...]:
+    """Collapse only identical declarations; never combine conditions or roles."""
+    return tuple(dict.fromkeys(edges))
 
 
 def _validate_effective_edge_roles(
@@ -499,10 +463,10 @@ def _validate_effective_edge_roles(
     schedule_edges: tuple[EdgeSpec, ...],
     transfer_edges: tuple[EdgeSpec, ...],
 ) -> None:
-    schedule_pairs = {edge.pair for edge in schedule_edges}
-    transfer_pairs = {edge.pair for edge in transfer_edges}
+    scheduled = set(schedule_edges)
+    transferred = set(transfer_edges)
     for edge in edges:
-        if edge.pair in schedule_pairs or edge.pair in transfer_pairs:
+        if edge in scheduled or edge in transferred:
             continue
         raise GraphCompileError(
             (
@@ -624,7 +588,7 @@ def _validate_protected_async_scope(
         if nodeset is None or nodeset.status == STATUS_PLANNED:
             continue
         child_graph = nodeset.graph
-        child_effective_edges = _merge_edges(child_graph.edges)
+        child_effective_edges = _deduplicate_edges(child_graph.edges)
         child_flow_kinds = _node_flow_kinds(
             {child.id: child for child in child_graph.nodes},
             implementations=implementations,

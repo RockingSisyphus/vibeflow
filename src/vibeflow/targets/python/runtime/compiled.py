@@ -23,15 +23,13 @@ def run_compiled_steps(runtime, state) -> None:
         runtime.trace.step_count += 1
         runtime._clear_conditional_outgoing(node_name, state)
         active_edges = runtime._activated_edges(node_name, outputs, state)
-        active_pairs = {edge.pair for edge in active_edges}
         for edge in active_edges:
             runtime._activate_edge(edge, state)
-            runtime._deliver_outputs(edge, outputs, state)
         for target in runtime._scheduled_targets(node_name, active_edges):
             if target not in queued:
                 ready.append(target)
                 queued.add(target)
-        runtime._deliver_transfer_only_edges(node_name, outputs, state, active_pairs)
+        runtime._deliver_transfer_edges(node_name, outputs, state)
         if runtime._is_end_terminal(node_name):
             runtime.trace.stop_reason = "completed"
             return

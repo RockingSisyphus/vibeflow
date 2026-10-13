@@ -2,7 +2,7 @@
 from dataclasses import dataclass, field
 from typing import Mapping
 from pathlib import Path
-from types import MappingProxyType
+from vibeflow.core.descriptors.json_values import freeze_mapping, thaw_json
 
 
 @dataclass(frozen=True)
@@ -17,8 +17,8 @@ class PythonResourceBinding:
     selection: Mapping[str, object] = field(default_factory=dict)
 
     def __post_init__(self):
-        object.__setattr__(self, "config", MappingProxyType(dict(self.config)))
-        object.__setattr__(self, "selection", MappingProxyType(dict(self.selection)))
+        object.__setattr__(self, "config", freeze_mapping(self.config, field_name="resource.config"))
+        object.__setattr__(self, "selection", freeze_mapping(self.selection, field_name="resource.selection"))
         if self.descriptor is None and self.status != "planned":
             raise ValueError("implemented resources require an SDK descriptor")
 
@@ -70,4 +70,4 @@ class PythonResourceBinding:
         if self.config:
             payload["config"] = dict(self.config)
         payload["config_keys"] = list(self.config_keys)
-        return payload
+        return thaw_json(payload)

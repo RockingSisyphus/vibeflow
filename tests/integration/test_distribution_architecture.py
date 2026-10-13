@@ -32,20 +32,23 @@ def distribution(releases, request, tmp_path):
     return root
 
 
-def _command(root, arguments, *, expected=0):
+def _command(root, arguments, *, expected=0, hash_seed=None):
     environment = os.environ.copy()
     environment.pop("PYTHONPATH", None)
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    if hash_seed is not None:
+        environment["PYTHONHASHSEED"] = str(hash_seed)
     completed = subprocess.run(arguments, cwd=root, env=environment,
                                text=True, capture_output=True, check=False)
     assert completed.returncode == expected, completed.stdout + completed.stderr
     return completed
 
 
-def _architecture(root, *, check=False):
-    return _command(root, [sys.executable, "-I", "run.py", "architecture",
-        "--config", "javascript_project/configs/main.jsonc",
-        "--output", "javascript_project/ARCHITECTURE.jsonc", *(["--check"] if check else [])])
+def _architecture(root, *, check=False, config="main.jsonc", output="ARCHITECTURE.jsonc", hash_seed=None):
+    # -I ignores PYTHONHASHSEED; the launcher already pins its own ZIP kernel.
+    return _command(root, [sys.executable, "run.py", "architecture",
+        "--config", "javascript_project/configs/" + config,
+        "--output", "javascript_project/" + output, *(["--check"] if check else [])], hash_seed=hash_seed)
 
 
 def test_javascript_architecture_immediate_check_passes(distribution):
@@ -75,3 +78,40 @@ def test_javascript_architecture_still_detects_workflow_changes(distribution):
         "--config", "javascript_project/configs/main.jsonc",
         "--output", "javascript_project/ARCHITECTURE.jsonc", "--check"], expected=1)
     assert json.loads(completed.stdout)["code"] == "ARCHITECTURE.DOCUMENT.STALE"
+
+
+def test_planned_nodeset_architecture_is_identical_across_hash_seeds(distribution):
+    # Call order differs from both import order and alphabetical order.
+    names = ("zeta", "alpha", "epsilon", "beta", "gamma", "delta")
+    project = distribution / "javascript_project"
+    directory = project / "configs/planned_nodesets"
+    directory.mkdir()
+    nodes = [{"id": "start", "type_used": "minimal.start", "display_name": "Start",
+              "description": "Starts the planned Nodeset order regression."}]
+    for name in names:
+        document = {"type_key": "repro." + name, "display_name": name,
+            "description": "Transparent planned Nodeset for order regression.",
+            "status": "planned", "planned_behavior": "transparent", "requires": [], "provides": []}
+        (directory / (name + ".jsonc")).write_text(json.dumps(document), encoding="utf-8")
+        nodes.append({"id": name, "type_used": document["type_key"], "display_name": name,
+            "description": document["description"], "status": "planned", "planned_behavior": "transparent",
+            "flow_kind": "process", "requires": [], "provides": []})
+    nodes.append({"id": "end", "type_used": "minimal.end", "display_name": "End",
+                  "description": "Ends the planned Nodeset order regression."})
+    document = {"pipeline": {"inputs": [], "outputs": [], "nodes": nodes,
+        "edges": [[left["id"], right["id"]] for left, right in zip(nodes, nodes[1:])]},
+        "plugins": [{"source": {"kind": "file", "ref": "plugins/code_plugin.ts", "export": "plugin"}}],
+        "nodeset_imports": [{"path": "planned_nodesets/" + name + ".jsonc"} for name in reversed(names)]}
+    (project / "configs/planned_order.jsonc").write_text(json.dumps(document), encoding="utf-8")
+    options = {"config": "planned_order.jsonc", "output": "PLANNED_ORDER_ARCHITECTURE.jsonc"}
+    _architecture(distribution, hash_seed=1, **options)
+    output = project / options["output"]
+    first = output.read_bytes()
+    checks = json.loads(strip_jsonc_comments(first.decode("utf-8")))["rule_checks"]
+    assert [finding["object_id"] for finding in checks["findings"]
+            if finding["code"] == "GRAPH.PLANNED.NODESET"] == ["repro." + name for name in names]
+    for seed in (1, 2, 3, "random"):
+        _architecture(distribution, check=True, hash_seed=seed, **options)
+        _architecture(distribution, hash_seed=seed, **options)
+        # Compare the whole document, including every subject, Rule finding and events record.
+        assert output.read_bytes() == first

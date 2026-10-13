@@ -6,7 +6,8 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Mapping
 
 from vibeflow.tooling.project.resource_helpers import _finding
-from vibeflow.core.descriptors.models import _freeze_json, _string_tuple
+from vibeflow.core.descriptors.json_values import freeze_json
+from vibeflow.core.descriptors.models import _string_tuple
 from vibeflow.core.flow import STATUS_IMPLEMENTED, STATUS_PLANNED
 from vibeflow.core.findings import HealthFinding
 
@@ -39,7 +40,7 @@ class HostExtensionResource:
 
     def __post_init__(self):
         object.__setattr__(self, "rulesets", selection_refs(self.rulesets, field_name="host_extension.rulesets"))
-        object.__setattr__(self, "style", _freeze_json(self.style, field_name="host_extension.style"))
+        object.__setattr__(self, "style", freeze_json(self.style, field_name="host_extension.style"))
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {

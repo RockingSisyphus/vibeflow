@@ -1,5 +1,7 @@
 """Language-neutral resource descriptors and in-memory catalogs."""
 
+from vibeflow.core.descriptors.json_values import freeze_json, freeze_mapping, thaw_json
+
 from vibeflow.core.descriptors.catalogs import (
     BaseLibCatalog,
     CapabilityCatalog,
@@ -47,6 +49,7 @@ from vibeflow.core.descriptors.plugin_selection import (
 )
 
 __all__ = [
+    "freeze_json", "freeze_mapping", "thaw_json",
     "ContributionBuilder", "PluginContributions", "ResourceOrigin", "compose_contributions",
     "RuleCatalog", "RulesetCatalog",
     "IMPLEMENTATION_COMPLETIONS",

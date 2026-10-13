@@ -131,6 +131,56 @@ def test_colocated_rule_and_node_use_native_execution(tmp_path):
     assert result.health.status == "PASS"
 
 
+@pytest.mark.parametrize("execution", ["plan", "compiled", "block"])
+@pytest.mark.parametrize("defaults,overrides", [
+    ({"labels": {"phase": "prepare"}}, {}),
+    ({"labels": {}}, {}),
+    ({"phases": [{"name": "prepare"}]}, {}),
+    ({"phases": ["prepare", "train"]}, {}),
+    ({"phase": "prepare"}, {}),
+    ({}, {"labels": {"phase": "prepare"}}),
+])
+def test_nested_plugin_config_exports_and_runs(tmp_path, execution, defaults, overrides):
+    from vibeflow.targets.python.runtime import RuntimeOptions
+    from vibeflow.tooling.application.python.workspace_service import run_workspace_checked
+
+    expected = {**defaults, **overrides}
+    factory = f'''
+from vibeflow.core.descriptors.json_values import thaw_json
+class Monitor:
+    def before_run(self, context):
+        pass
+def create_runtime(context):
+    assert thaw_json(context["config"]) == {expected!r}
+    try:
+        context["config"]["unexpected"] = True
+    except TypeError:
+        pass
+    else:
+        raise AssertionError("Runtime plugin configuration must remain read-only")
+    return Monitor()
+'''
+    source = EXECUTABLE.replace(
+        'plugin=Plugin(id="demo",resources=[Start,Demo,check,rules],config_defaults={"value":1})',
+        factory + f'plugin=Plugin(id="demo",resources=[Start,Demo,check,rules],runtime=create_runtime,config_defaults={defaults!r},config_schema={{"type":"object"}})',
+    )
+    workspace, config = executable_project(tmp_path, source)
+    data = json.loads(config.read_text())
+    data.pop("rulesets")  # Keep the default workflow rules for this regression.
+    data["pipeline"]["nodes"].append({"id": "end", "type_used": "demo.start", "display_name": "End", "description": "Finish the regression workflow."})
+    data["pipeline"]["edges"].append(["demo", "end"])
+    data["plugins"][0]["config"] = overrides
+    config.write_text(json.dumps(data))
+    status_path = tmp_path / "status.json"
+    result = run_workspace_checked(config, workspace=workspace, run_root=tmp_path / "runs",
+        runtime_options=RuntimeOptions(execution=execution, trace="off", status_file=str(status_path)))
+    assert result.context.get("result")["value"] == 7
+    assert json.loads(status_path.read_text())["state"] == "succeeded"
+    compiled = json.loads((result.run_dir / "compiled_graph.json").read_text())
+    selected = next(item for item in compiled["resources"]["plugins"] if "config" in item)
+    assert selected["config"] == expected
+
+
 def test_resource_query_does_not_call_business_checks_or_factories(tmp_path, capsys):
     from vibeflow.tooling.application.cli import main
     workspace, config = project(tmp_path,SOURCE.replace('resources=[Demo,check,rules]', 'resources=[Demo,check,rules],runtime=lambda context: (_ for _ in ()).throw(RuntimeError("factory invoked"))'))

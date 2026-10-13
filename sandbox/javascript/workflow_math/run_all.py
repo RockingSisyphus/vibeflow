@@ -8,6 +8,7 @@ ROOT = FIXTURE.parents[2]
 sys.path[:0] = [str(ROOT), str(ROOT / "src"), str(ROOT / "sandbox/javascript/integration")]
 from tests.fixtures.support.addition_sandboxes import main, workspace
 from vibeflow.targets.javascript.build.driver_session import check_scope
+from conditional_routes import run_conditional_routes
 
 
 @check_scope
@@ -59,6 +60,7 @@ for (const level of ["full","boundary","off"]) {
 process.stdout.write(JSON.stringify(rows));
 ''')
     observations.append(dict(config="trace_matrix",result=result,checks={"same_build_three_trace_modes":"PASS"}))
+    observations.extend(run_conditional_routes(cache, work, run_node))
     return dict(status="PASS",observations=observations)
 
 
