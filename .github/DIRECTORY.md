@@ -1,6 +1,8 @@
 <!-- vibeflow-directory-purpose -->
 # .github
 
+本文件使用 DIRECTORY.md，避免被 GitHub 优先选为仓库首页 README。
+
 ## 目录用途与边界
 
 仅用于：GitHub 的 CI、Issue 与 Pull Request 配置；不放本地执行输出或产品实现。
