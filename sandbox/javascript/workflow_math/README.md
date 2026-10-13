@@ -12,6 +12,7 @@
 | task_metadata | 同步 `(10+8)-3=15`、等待能力后 `6*2=12`；区分同步返回与 Promise，核对 TaskPlan 与 event_loop executor；数据释放前不得完成 |
 | loop_max_failure | 从 1 开始加 1，目标无法在两次内达到；应报 VF_MAX_STEPS，错误包含 workflow/节点/块路径，end 不执行 |
 | trace_matrix | 同一 nested_override 构建分别 full/boundary/off 调用，数字不变；full 有节点事件，boundary 保留 Nodeset 边界，off 不输出事件 |
+| conditional_routes | `receive_event → finish_call` 同时声明 `done` 和 `failed` 两条条件边；两个状态均得到 `42+1=43`，收尾节点恰好执行一次。同步/异步各检查原顺序、反顺序、完全重复边及条件重叠；未知状态作为对照，只有重叠条件明确覆盖时才执行 |
 
 保留旧断言的公共辅助函数，避免重复编写任务元数据和错误路径检查。新增双层循环直接复用单层的 +1 body。正常源码使用标准 vibeflow.process；自定义 Rule 专项由原 comprehensive_math 和其他保留入口验证。
 
@@ -20,7 +21,9 @@ python sandbox/javascript/workflow_math/run_all.py --work-dir /tmp/workflow-math
   --toolchain-root /path/to/project-with-installed-node_modules
 ```
 
-共八组观察，其中 trace_matrix 包含三次独立调用。入口自动纳入 JS integration，接替六项旧任务。原配置仍被 pytest 和架构审查使用，继续保留。详见 [整合归档](../../../docs/maintainers/history/audits/workflow-math-20261010.md)。
+共十六组观察，其中 trace_matrix 包含三次独立调用，conditional_routes 包含八次 AOT 构建、二十四次真实 Node.js 调用。入口自动纳入 JS integration，并由根目录 `python tools/verify_project.py --full` 执行。原配置仍被 pytest 和架构审查使用，继续保留。详见 [整合归档](../../../docs/maintainers/history/audits/workflow-math-20261010.md)。
+
+条件边回归的固定配置是 [conditional_routes.jsonc](project/configs/conditional_routes.jsonc)。修改内核时不要把两个不同条件改成一条边来使测试通过：本例保护的正是同一起点和终点允许多条独立条件边。旧的按起终点合并行为会让 `failed` 丢失；交换顺序后则让 `done` 丢失。完全重复和重叠用例额外检查不会重复执行或重复传入同一份数据。变体配置仅生成在临时工作区；保留默认 Workflow/Node Rules。
 
 ## 目录用途与边界
 

@@ -116,7 +116,8 @@ def scoped_graph(task, subject=None):
     """
     subject = subject or task.subject
     graph = subject.graph
-    keys = {node.loop.body if node.type_used in LOOP_NODE_TYPES else node.type_used for node in graph.nodes}
+    # Keep first-reference order so Rule findings and event records are stable across processes.
+    keys = dict.fromkeys(node.loop.body if node.type_used in LOOP_NODE_TYPES else node.type_used for node in graph.nodes)
     definitions = {}
     for key in keys:
         definition = subject.available_nodesets.get(key)

@@ -1,0 +1,22 @@
+{
+  "pipeline": {
+    "inputs": [{ "key": "event", "type": "sandbox.call.event", "display_name": "Call status", "required": true }],
+    "nodes": [
+      { "id": "start", "type_used": "sandbox.terminal", "display_name": "Start", "description": "Starts the call status workflow." },
+      { "id": "receive_event", "type_used": "sandbox.receive_event", "display_name": "Receive event", "description": "Produces a status and a numeric payload." },
+      { "id": "finish_call", "type_used": "sandbox.finish_call", "display_name": "Finish call", "description": "Finishes both successful and failed calls." },
+      { "id": "end", "type_used": "sandbox.terminal", "display_name": "End", "description": "Ends after finishing the call." }
+    ],
+    "edges": [
+      { "from": "start", "to": "receive_event" },
+      { "from": "receive_event", "to": "finish_call", "when": "route == 'done'" },
+      { "from": "receive_event", "to": "finish_call", "when": "route == 'failed'" },
+      { "from": "finish_call", "to": "end" }
+    ],
+    "outputs": [{ "type": "sandbox.math.result", "cardinality": "exactly_one", "display_name": "Final result", "as": "result" }]
+  },
+  "plugins": [
+    { "source": { "kind": "file", "ref": "code_plugin.ts", "export": "plugin" } },
+    { "source": { "kind": "file", "ref": "conditional_routes_plugin.ts", "export": "plugin" } }
+  ]
+}

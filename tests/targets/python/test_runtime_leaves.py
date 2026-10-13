@@ -97,8 +97,9 @@ def test_python_block_compiler_source_is_deterministic_golden() -> None:
     assert first[0].name == "graph:start"
     assert first[0].nodes == ("start", "finish")
     assert first[0].source == second[0].source
+    # Transfer routes are evaluated independently of scheduling routes.
     assert sha256(first[0].source.encode("utf-8")).hexdigest() == (
-        "8f4020800294f513cb8c113e9b62c62bcb5a8e65eabd87e075a364e67df9473c"
+        "7d29ba1a73373a04d1c4c98ccaf2f06381d2131e796f7d8c3369b08801dd6fa5"
     )
 
 

@@ -508,23 +508,23 @@ def _block(
 def _routes(compiled: CompiledGraph) -> tuple[RoutePlan, ...]:
     schedule_edges = compiled.resolved_schedule_edges
     transfer_edges = compiled.resolved_transfer_edges
-    schedule_pairs = {edge.pair for edge in schedule_edges}
-    transfer_pairs = {edge.pair for edge in transfer_edges}
-    explicit_pairs = {edge.pair for edge in compiled.explicit_edges}
-    mainline_pairs = {edge.pair for edge in compiled.mainline_edges}
-    bypass_pairs = {edge.pair for edge in compiled.data_bypass_edges}
-    async_pairs = {edge.pair for edge in compiled.async_edges}
+    scheduled = set(schedule_edges)
+    transferred = set(transfer_edges)
+    explicit = set(compiled.explicit_edges)
+    mainline = set(compiled.mainline_edges)
+    bypass = set(compiled.data_bypass_edges)
+    asynchronous = set(compiled.async_edges)
     return tuple(
         RoutePlan(
             source=edge.source,
             target=edge.target,
             condition=normalize_condition(edge.when),
-            schedule=edge.pair in schedule_pairs,
-            transfer=edge.pair in transfer_pairs,
-            explicit=edge.pair in explicit_pairs,
-            mainline=edge.pair in mainline_pairs,
-            data_bypass=edge.pair in bypass_pairs,
-            asynchronous=edge.pair in async_pairs,
+            schedule=edge in scheduled,
+            transfer=edge in transferred,
+            explicit=edge in explicit,
+            mainline=edge in mainline,
+            data_bypass=edge in bypass,
+            asynchronous=edge in asynchronous,
         )
         for edge in compiled.effective_edges
     )

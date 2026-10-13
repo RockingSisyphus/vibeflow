@@ -3,32 +3,29 @@ from __future__ import annotations
 from typing import Mapping
 
 from vibeflow.core.contracts import CARDINALITY_ALL, CARDINALITY_EXACTLY_ONE, CARDINALITY_OPTIONAL_ONE, DataEnvelope
+from vibeflow.core.flow import EdgeSpec
 from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
 from vibeflow.targets.python.runtime.helpers import condition_matches
 from vibeflow.targets.python.runtime.types import _RuntimeState
 from vibeflow.targets.python.runtime.values import _store_output
 
 class RuntimeOutputMixin:
-    def _deliver_transfer_only_edges(self, node_name: str, outputs: Mapping[str, object], state: _RuntimeState, scheduled_pairs: set[tuple[str, str]]) -> None:
+    def _deliver_transfer_edges(self, node_name: str, outputs: Mapping[str, object], state: _RuntimeState) -> None:
         # Deferred result-key tasks have not produced transferable values yet.
         # Their routes and data are delivered once the task is joined.
         if node_name in self._async_results:
             return
         values = self._condition_values(node_name, outputs, state)
-        for edge in self._frames[node_name].transfer_outgoing:
-            if edge.pair in scheduled_pairs:
-                continue
+        source = self._frames[node_name]
+        for edge in source.transfer_outgoing:
             if edge.when and not condition_matches(edge.when, values):
                 continue
-            self._record_edge(edge)
+            if edge not in source.outgoing:
+                self._record_edge(edge)
             self._deliver_outputs(edge, outputs, state)
 
     def _deliver_outputs(self, edge: EdgeSpec, outputs: Mapping[str, object], state: _RuntimeState) -> None:
         source = self._frames[edge.source]
-        if edge.pair not in {
-            candidate.pair for candidate in source.transfer_outgoing
-        }:
-            return
         target = self._frames[edge.target]
         providers_by_key = {provider.key: provider for provider in source.provides}
         required_types = {requirement.type for requirement in target.requires}

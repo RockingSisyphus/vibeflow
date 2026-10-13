@@ -6,16 +6,8 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Mapping
 
-from vibeflow.core.descriptors.models import (
-    JSON_SCHEMA_2020_12,
-    DescriptorModelError,
-    ImplementationDescriptor,
-    _freeze_mapping,
-    _required_text,
-    _string_tuple,
-    _thaw_json,
-    _validate_implementation_coverage,
-)
+from vibeflow.core.descriptors.json_values import freeze_mapping, thaw_json
+from vibeflow.core.descriptors.models import JSON_SCHEMA_2020_12, DescriptorModelError, ImplementationDescriptor, _required_text, _string_tuple, _validate_implementation_coverage
 
 
 PLUGIN_TYPES = frozenset({"compiler", "runtime"})
@@ -101,7 +93,7 @@ class BaseLibDescriptor:
     def to_dict(self) -> dict[str, object]:
         return {
             "kind": "base_lib",
-            **({"presentation": _thaw_json(self.presentation)} if self.presentation else {}),
+            **({"presentation": thaw_json(self.presentation)} if self.presentation else {}),
             "rulesets": selection_data(self.rulesets),
             "id": self.id,
             "display_name": self.display_name,
@@ -153,7 +145,7 @@ class DataSchemaDescriptor:
         object.__setattr__(
             self,
             "schema",
-            _freeze_mapping(schema, field_name="data_schema.schema"),
+            freeze_mapping(schema, field_name="data_schema.schema"),
         )
         object.__setattr__(self, "representation", representation)
         object.__setattr__(
@@ -178,7 +170,7 @@ class DataSchemaDescriptor:
             "representation": self.representation,
             "display_name": self.display_name,
             "description": self.description,
-            "schema": _thaw_json(self.schema),
+            "schema": thaw_json(self.schema),
         }
 
 
@@ -395,7 +387,7 @@ class HostExtensionDescriptor:
     def to_dict(self) -> dict[str, object]:
         return {
             "kind": "host_extension",
-            **({"presentation": _thaw_json(self.presentation)} if self.presentation else {}),
+            **({"presentation": thaw_json(self.presentation)} if self.presentation else {}),
             **({"base_libs": list(self.base_libs)} if self.base_libs else {}),
             "rulesets": selection_data(self.rulesets),
             "id": self.id,
@@ -512,7 +504,7 @@ class PluginDescriptor:
         object.__setattr__(
             self,
             "config_schema",
-            _freeze_mapping(
+            freeze_mapping(
                 self.config_schema,
                 field_name="plugin.config_schema",
             ),
@@ -520,7 +512,7 @@ class PluginDescriptor:
         object.__setattr__(
             self,
             "config_defaults",
-            _freeze_mapping(
+            freeze_mapping(
                 self.config_defaults,
                 field_name="plugin.config_defaults",
             ),
@@ -533,7 +525,7 @@ class PluginDescriptor:
     def to_dict(self) -> dict[str, object]:
         return {
             "kind": "plugin",
-            **({"presentation": _thaw_json(self.presentation)} if self.presentation else {}),
+            **({"presentation": thaw_json(self.presentation)} if self.presentation else {}),
             **({"base_libs": list(self.base_libs)} if self.base_libs else {}),
             "rulesets": selection_data(self.rulesets),
             "id": self.id,
@@ -550,7 +542,7 @@ class PluginDescriptor:
             "dependencies": list(self.dependencies),
             "external_packages": list(self.external_packages),
             "config": {
-                "schema": _thaw_json(self.config_schema),
-                "defaults": _thaw_json(self.config_defaults),
+                "schema": thaw_json(self.config_schema),
+                "defaults": thaw_json(self.config_defaults),
             },
         }

@@ -179,7 +179,7 @@ def _graph_variants(emit, codes, support, variant):
     from vibeflow.core.contracts import DataProvider, DataRequirement
     from vibeflow.core.flow import EdgeSpec, ExecutionLockSpec, GraphConfig, LoopSpec, NodeMetadata, NodeSpec, NodesetSpec
     from vibeflow.core.models import CoreCompileRequest, ImplementationFact, ImplementationFacts, TargetFeatureSet
-    from vibeflow.targets.shared.quality_support.workflow_rules.flow import append_join_policy_health
+    from vibeflow.targets.shared.quality_support.workflow_rules.joins import append_join_policy_health
     from vibeflow.targets.shared.quality_support.workflow_rules.flow_data import append_data_contract_warnings
     from vibeflow.targets.shared.quality_support.workflow_rules.planned import graph_has_blocking_planned, graph_has_planned, planned_health_events
     from vibeflow.core.planned import PlannedBehavior

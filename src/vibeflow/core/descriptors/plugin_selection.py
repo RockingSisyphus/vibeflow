@@ -12,14 +12,8 @@ from vibeflow.core.descriptors._resource_models import (
     PluginDescriptor,
 )
 from vibeflow.core.descriptors.catalogs import PluginCatalog
-from vibeflow.core.descriptors.models import (
-    IMPLEMENTATION_TARGETS,
-    ImplementationDescriptor,
-    _freeze_mapping,
-    _required_text,
-    _string_tuple,
-    _thaw_json,
-)
+from vibeflow.core.descriptors.json_values import freeze_mapping, thaw_json
+from vibeflow.core.descriptors.models import IMPLEMENTATION_TARGETS, ImplementationDescriptor, _required_text, _string_tuple
 from vibeflow.core.flow import STATUS_IMPLEMENTED, STATUS_PLANNED, STATUSES
 
 
@@ -71,7 +65,7 @@ class PluginSelection:
                 self.dependencies,
                 field_name="plugin selection dependencies",
             )
-            config = _freeze_mapping(
+            config = freeze_mapping(
                 self.config,
                 field_name="plugin selection config",
             )
@@ -137,7 +131,7 @@ class PluginSelection:
         payload: dict[str, object] = {
             "id": self.id,
             "status": self.status,
-            "config": _thaw_json(self.config),
+            "config": thaw_json(self.config),
         }
         if self.plugin_type:
             payload["type"] = self.plugin_type
@@ -177,7 +171,7 @@ class ResolvedPluginSelection:
         object.__setattr__(
             self,
             "config",
-            _freeze_mapping(
+            freeze_mapping(
                 self.config,
                 field_name=f"resolved plugin '{self.selection.id}' config",
             ),
@@ -198,7 +192,7 @@ class ResolvedPluginSelection:
             "status": self.status,
             "targets": list(self.targets),
             "dependencies": list(self.dependencies),
-            "config": _thaw_json(self.config),
+            "config": thaw_json(self.config),
             "priority": self.priority,
         }
         if self.implementation is not None:
@@ -249,7 +243,7 @@ class PluginReviewRecord:
         object.__setattr__(
             self,
             "config",
-            _freeze_mapping(
+            freeze_mapping(
                 self.config,
                 field_name=f"plugin review record '{self.id}' config",
             ),
@@ -263,7 +257,7 @@ class PluginReviewRecord:
             "status": self.status,
             "targets": list(self.targets),
             "dependencies": list(self.dependencies),
-            "config": _thaw_json(self.config),
+            "config": thaw_json(self.config),
             "config_keys": sorted(self.config),
             "priority": self.priority,
             "display_name": self.display_name,
@@ -306,11 +300,11 @@ def review_plugin_selections(
         if descriptor is not None:
             _validate_selection_contract(selection, descriptor)
         config = (
-            dict(_thaw_json(descriptor.config_defaults))
+            dict(thaw_json(descriptor.config_defaults))
             if descriptor is not None
             else {}
         )
-        config.update(_thaw_json(selection.config))
+        config.update(thaw_json(selection.config))
         if descriptor is not None:
             _validate_plugin_config(
                 config,
@@ -448,8 +442,8 @@ def resolve_plugin_selections(
             descriptor,
             target=normalized_target,
         )
-        config = dict(_thaw_json(descriptor.config_defaults))
-        config.update(_thaw_json(selection.config))
+        config = dict(thaw_json(descriptor.config_defaults))
+        config.update(thaw_json(selection.config))
         _validate_plugin_config(
             config,
             descriptor.config_schema,
@@ -504,11 +498,11 @@ def _resolve_planned(
     descriptor: PluginDescriptor | None,
 ) -> ResolvedPluginSelection:
     defaults = (
-        dict(_thaw_json(descriptor.config_defaults))
+        dict(thaw_json(descriptor.config_defaults))
         if descriptor is not None
         else {}
     )
-    defaults.update(_thaw_json(selection.config))
+    defaults.update(thaw_json(selection.config))
     if descriptor is not None:
         _validate_plugin_config(
             defaults,

@@ -33,12 +33,11 @@ class MainlineAnalysis:
     findings: tuple[MainlineFinding, ...] = ()
 
     def edge_class(self, edge: EdgeSpec) -> str:
-        pair = edge.pair
-        if pair in {item.pair for item in self.async_edges}:
+        if edge in self.async_edges:
             return EDGE_CLASS_ASYNC
-        if pair in {item.pair for item in self.data_bypass_edges}:
+        if edge in self.data_bypass_edges:
             return EDGE_CLASS_DATA_BYPASS
-        if pair in {item.pair for item in self.mainline_edges}:
+        if edge in self.mainline_edges:
             return EDGE_CLASS_MAINLINE
         return ""
 
@@ -76,13 +75,10 @@ def analyze_mainline(graph: GraphConfig, edges: Sequence[EdgeSpec], flow_kinds: 
         for edge in sync_edges
         if _is_data_bypass_candidate(edge, sync_edges, flow_kinds)
     )
-    inferred_data_bypass_pairs = {
-        edge.pair for edge in inferred_data_bypass_edges
-    }
-    inferred_schedule_pairs = {
-        edge.pair
+    inferred_scheduled = {
+        edge
         for edge in all_edges
-        if edge in async_edges or edge.pair not in inferred_data_bypass_pairs
+        if edge in async_edges or edge not in inferred_data_bypass_edges
     }
     scheduled_sync_edges = tuple(
         edge
@@ -90,7 +86,7 @@ def analyze_mainline(graph: GraphConfig, edges: Sequence[EdgeSpec], flow_kinds: 
         if (
             edge.schedule
             if edge.schedule is not None
-            else edge.pair in inferred_schedule_pairs
+            else edge in inferred_scheduled
         )
     )
     scheduled_async_edges = tuple(
@@ -99,7 +95,7 @@ def analyze_mainline(graph: GraphConfig, edges: Sequence[EdgeSpec], flow_kinds: 
         if (
             edge.schedule
             if edge.schedule is not None
-            else edge.pair in inferred_schedule_pairs
+            else edge in inferred_scheduled
         )
     )
     schedule_edges = (*scheduled_sync_edges, *scheduled_async_edges)
@@ -108,13 +104,13 @@ def analyze_mainline(graph: GraphConfig, edges: Sequence[EdgeSpec], flow_kinds: 
         for edge in all_edges
         if (edge.transfer if edge.transfer is not None else True)
     )
-    schedule_pairs = {edge.pair for edge in schedule_edges}
-    transfer_pairs = {edge.pair for edge in transfer_edges}
+    scheduled = set(schedule_edges)
+    transferred = set(transfer_edges)
     mainline_edges = scheduled_sync_edges
     data_bypass_edges = tuple(
         edge
         for edge in sync_edges
-        if edge.pair not in schedule_pairs and edge.pair in transfer_pairs
+        if edge not in scheduled and edge in transferred
     )
     mainline_nodes = tuple(
         node.name
@@ -204,7 +200,7 @@ def _mainline_findings(
         if node.name in async_nodes:
             continue
         outgoing = schedule_outgoing.get(node.name, ())
-        if len(outgoing) <= 1 or flow_kinds.get(node.name) == FLOW_KIND_DECISION:
+        if len({edge.target for edge in outgoing}) <= 1 or flow_kinds.get(node.name) == FLOW_KIND_DECISION:
             continue
         if _fanout_has_explicit_join(outgoing, schedule_outgoing, {item.name: item for item in graph.nodes}):
             continue

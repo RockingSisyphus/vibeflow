@@ -197,8 +197,8 @@
       }
     },
     {
-      "name": "conflicting_duplicate_explicit_edge",
-      "expected_rule_id": "GRAPH.EDGE.CONFLICTING_DUPLICATE",
+      "name": "alternative_conditions_same_endpoints",
+      "expected_absent_rule_id": "GRAPH.EDGE.CONFLICTING_DUPLICATE",
       "config": {
         "pipeline": {
           "nodes": [

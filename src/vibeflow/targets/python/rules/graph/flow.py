@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from vibeflow.targets.shared.quality_support.workflow_rules.flow import (
     append_flowchart_health as _append_core_flowchart_health,
-    append_join_policy_health,
 )
+from vibeflow.targets.shared.quality_support.workflow_rules.joins import append_join_policy_health
 from vibeflow.targets.python.rules.graph.flow_data import (
     _append_nodeset_flow_health,
     append_data_contract_warnings,

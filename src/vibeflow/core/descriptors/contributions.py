@@ -8,7 +8,8 @@ from types import MappingProxyType
 from typing import Any, Mapping
 
 from vibeflow.core.descriptors.catalogs import DescriptorCatalogs, DescriptorCatalogError
-from vibeflow.core.descriptors.models import DescriptorModelError, _freeze_mapping, _required_text
+from vibeflow.core.descriptors.json_values import freeze_mapping
+from vibeflow.core.descriptors.models import DescriptorModelError, _required_text
 
 
 PLUGIN_ABI = "vibeflow.plugin.v3"
@@ -75,8 +76,8 @@ class PluginContributions:
     def __post_init__(self) -> None:
         object.__setattr__(self, "id", _required_text(self.id, field_name="plugin.id"))
         object.__setattr__(self, "resources", tuple(self.resources))
-        object.__setattr__(self, "config", _freeze_mapping(self.config, field_name="plugin.config"))
-        object.__setattr__(self, "declaration", _freeze_mapping(self.declaration, field_name="plugin.declaration"))
+        object.__setattr__(self, "config", freeze_mapping(self.config, field_name="plugin.config"))
+        object.__setattr__(self, "declaration", freeze_mapping(self.declaration, field_name="plugin.declaration"))
         if self.declaration:
             from vibeflow.core.descriptors.source_bundle import declaration_descriptor
             declaration_descriptor(self.declaration)
@@ -89,7 +90,7 @@ class PluginContributions:
     def _with_config(self, config: Mapping[str, Any] | None = None) -> PluginContributions:
         """Bind one workflow's settings; fixed fields were checked at construction."""
         snapshot = copy(self)
-        object.__setattr__(snapshot, "config", _freeze_mapping({} if config is None else config, field_name="plugin.config"))
+        object.__setattr__(snapshot, "config", freeze_mapping({} if config is None else config, field_name="plugin.config"))
         return snapshot
 
 

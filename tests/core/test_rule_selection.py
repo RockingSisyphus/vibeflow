@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from vibeflow.core.flow import GraphConfig, NodeSpec, NodesetSpec
+from vibeflow.core.flow import GraphConfig, LoopSpec, NodeSpec, NodesetSpec
 from vibeflow.core.rules import RuleCall, RuleDescriptor, RulesetDescriptor, compile_ruleset, RuleGraphError
 from vibeflow.core.rules.planning import graph_rule_tasks, scoped_graph
 from vibeflow.core.rules.selection import resolve_node_selection, selection_data
@@ -74,3 +74,18 @@ def test_current_graph_retains_inherited_nodeset_external_contract():
     task = next(item for item in graph_rule_tasks(root,{rule.id:rule}) if item.subject.call_path == ("outer",))
     assert set(scoped_graph(task).nodesets) == {"inner"}
     assert scoped_graph(task).nodesets["inner"].graph.nodes == ()
+
+
+def test_scoped_graph_preserves_first_reference_order_with_repeated_calls_and_loops():
+    rule = RulesetDescriptor("default", workflow_default=True)
+    definitions = {key: definition(key, GraphConfig((NodeSpec("leaf", "node"),)))
+                   for key in ("alpha", "beta", "gamma")}
+    graph = GraphConfig((NodeSpec("first", "gamma"),
+        NodeSpec("loop", "vibeflow.loop.while", loop=LoopSpec(body="beta")),
+        NodeSpec("again", "gamma"), NodeSpec("last", "alpha"), NodeSpec("plain", "node")),
+        nodesets=definitions)
+    task = graph_rule_tasks(graph, {rule.id: rule})[0]
+    scoped = scoped_graph(task)
+    assert tuple(scoped.nodesets) == ("gamma", "beta", "alpha")
+    assert all(not value.graph.nodes for value in scoped.nodesets.values())
+    assert all(value.graph.nodes for value in graph.nodesets.values())

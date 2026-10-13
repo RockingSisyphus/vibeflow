@@ -208,11 +208,9 @@ class RuntimeAsyncMixin:
         self._record_node_output_candidates(frame.name, outputs, state)
         self._clear_conditional_outgoing(frame.name, state)
         active_edges = self._activated_edges(frame.name, outputs, state)
-        active_pairs = {edge.pair for edge in active_edges}
         for edge in active_edges:
             self._activate_edge(edge, state)
-            self._deliver_outputs(edge, outputs, state)
-        self._deliver_transfer_only_edges(frame.name, outputs, state, active_pairs)
+        self._deliver_transfer_edges(frame.name, outputs, state)
         if frame.execution_lock is None or frame.is_planned:
             self._call_runtime_plugins(
                 "after_node",

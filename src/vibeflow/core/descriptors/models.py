@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Mapping
 
+from vibeflow.core.descriptors.json_values import DescriptorModelError, freeze_mapping, thaw_json
 from vibeflow.core.constants import FLOW_KINDS
 from vibeflow.core.contracts import CARDINALITIES, DataProvider, DataRequirement
 
@@ -14,10 +14,6 @@ IMPLEMENTATION_LANGUAGES = frozenset({"python", "javascript", "typescript"})
 IMPLEMENTATION_TARGETS = frozenset({"python", "node", "browser"})
 IMPLEMENTATION_COMPLETIONS = frozenset({"immediate", "suspend"})
 SOURCE_LOCATOR_KINDS = frozenset({"module", "file", "package", "generated"})
-
-
-class DescriptorModelError(ValueError):
-    """Raised when a descriptor cannot be normalized safely."""
 
 
 class ResourceImplementationConflict(DescriptorModelError):
@@ -57,48 +53,6 @@ def _string_tuple(value: object, *, field_name: str, unique: bool = True) -> tup
     if unique and len(set(normalized)) != len(normalized):
         raise DescriptorModelError(f"{field_name} contains duplicate values")
     return normalized
-
-
-def _freeze_json(value: Any, *, field_name: str) -> Any:
-    if isinstance(value, Mapping):
-        frozen: dict[str, Any] = {}
-        for key, item in value.items():
-            if not isinstance(key, str):
-                raise DescriptorModelError(f"{field_name} object keys must be strings")
-            frozen[key] = _freeze_json(item, field_name=f"{field_name}.{key}")
-        return MappingProxyType(frozen)
-    if isinstance(value, (tuple, list)):
-        return tuple(
-            _freeze_json(item, field_name=f"{field_name}[{index}]")
-            for index, item in enumerate(value)
-        )
-    if value is None or isinstance(value, (str, bool, int)):
-        return value
-    if isinstance(value, float):
-        if not math.isfinite(value):
-            raise DescriptorModelError(f"{field_name} must contain finite JSON numbers")
-        return value
-    raise DescriptorModelError(
-        f"{field_name} must contain JSON values, got {type(value).__name__}"
-    )
-
-
-def _freeze_mapping(value: object, *, field_name: str) -> Mapping[str, Any]:
-    if value in (None, {}):
-        return MappingProxyType({})
-    if not isinstance(value, Mapping):
-        raise DescriptorModelError(f"{field_name} must be an object")
-    frozen = _freeze_json(value, field_name=field_name)
-    assert isinstance(frozen, Mapping)
-    return frozen
-
-
-def _thaw_json(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        return {str(key): _thaw_json(item) for key, item in value.items()}
-    if isinstance(value, tuple):
-        return [_thaw_json(item) for item in value]
-    return value
 
 
 def _semantic_mapping(
@@ -319,7 +273,7 @@ class NodeContractDescriptor:
                 "contract.output_semantics must cover exactly every provided key"
             )
         examples = tuple(
-            _freeze_mapping(item, field_name=f"contract.examples[{index}]")
+            freeze_mapping(item, field_name=f"contract.examples[{index}]")
             for index, item in enumerate(self.examples)
         )
         object.__setattr__(self, "requires", requires)
@@ -329,7 +283,7 @@ class NodeContractDescriptor:
         object.__setattr__(
             self,
             "params_schema",
-            _freeze_mapping(
+            freeze_mapping(
                 self.params_schema,
                 field_name="contract.params_schema",
             ),
@@ -337,7 +291,7 @@ class NodeContractDescriptor:
         object.__setattr__(
             self,
             "params_defaults",
-            _freeze_mapping(
+            freeze_mapping(
                 self.params_defaults,
                 field_name="contract.params_defaults",
             ),
@@ -354,9 +308,9 @@ class NodeContractDescriptor:
             "output_semantics": {
                 key: list(value) for key, value in self.output_semantics.items()
             },
-            "params_schema": _thaw_json(self.params_schema),
-            "params_defaults": _thaw_json(self.params_defaults),
-            "examples": [_thaw_json(item) for item in self.examples],
+            "params_schema": thaw_json(self.params_schema),
+            "params_defaults": thaw_json(self.params_defaults),
+            "examples": [thaw_json(item) for item in self.examples],
         }
 
 
@@ -478,7 +432,7 @@ class NodeDescriptor:
         object.__setattr__(self, "rulesets", selection_refs(self.rulesets, field_name="node.rulesets"))
         from vibeflow.core.descriptors.presentation import normalize_presentation
         object.__setattr__(self, "presentation", normalize_presentation(self.presentation, field_name="node.presentation"))
-        object.__setattr__(self, "metadata", _freeze_mapping(self.metadata, field_name="node.metadata"))
+        object.__setattr__(self, "metadata", freeze_mapping(self.metadata, field_name="node.metadata"))
 
     @property
     def id(self) -> str:
@@ -516,8 +470,8 @@ class NodeDescriptor:
         if self.rulesets is not None:
             from vibeflow.core.rules.selection.models import selection_data
             payload["rulesets"] = selection_data(self.rulesets)
-        payload["presentation"] = _thaw_json(self.presentation)
-        payload["metadata"] = _thaw_json(self.metadata)
+        payload["presentation"] = thaw_json(self.presentation)
+        payload["metadata"] = thaw_json(self.metadata)
         return payload
 
 def _validate_implementation_coverage(

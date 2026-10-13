@@ -30,7 +30,8 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     )
     from vibeflow.targets.shared.quality_support.nodesets import nodeset_quality_findings
     from vibeflow.targets.shared.quality_support.workflow_rules.duplicates import duplicate_logic_findings
-    from vibeflow.targets.shared.quality_support.workflow_rules.flow import append_flowchart_health, append_join_policy_health
+    from vibeflow.targets.shared.quality_support.workflow_rules.flow import append_flowchart_health
+    from vibeflow.targets.shared.quality_support.workflow_rules.joins import append_join_policy_health
     from vibeflow.targets.shared.quality_support.workflow_rules.flow_data import append_data_contract_warnings
     from vibeflow.targets.shared.quality_support.workflow_rules.planned import planned_health_events
 
@@ -286,8 +287,10 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             codes(("GRAPH.CYCLE.FORBIDDEN" if role == "schedule" else "GRAPH.DATA.CYCLE.FORBIDDEN","error")),evidence=native_evidence)
     emit("native.no_edge_role","显式边既不调度也不传输","native.routing",
         lambda:compile_graph(GraphConfig((node("a"),node("b")),(EdgeSpec("a","b",schedule=False,transfer=False),))),codes(("GRAPH.EDGE.NO_ROLE","error")),evidence=native_evidence)
-    emit("native.conflicting_edge_roles","重复边给出矛盾role","native.routing",
-        lambda:compile_graph(GraphConfig((node("a"),node("b")),(EdgeSpec("a","b",schedule=True),EdgeSpec("a","b",schedule=False)))),codes(("GRAPH.EDGE.ROLE_CONFLICT","error")),evidence=native_evidence)
+    emit("native.conflicting_edge_roles","同端点不同role保留为独立路线","native.routing",
+        lambda:compile_graph(GraphConfig((node("a"),node("b")),(EdgeSpec("a","b",schedule=True),EdgeSpec("a","b",schedule=False)))),
+        codes(("GRAPH.EDGE.ROLE_CONFLICT","error")) if variant == "baseline" else {"should_accept":True},
+        classification="approved_change", notes="仅完整声明相同才去重；不同role不再合并或拒绝。", evidence=native_evidence)
     emit("native.decision_missing_when","Decision边缺when","native.routing",
         lambda:compile_graph(GraphConfig((node("route","decision"),node("end","terminal")),(EdgeSpec("route","end"),))),codes(("GRAPH.DECISION.MISSING_EDGE_CONDITION","error")),evidence=native_evidence)
     emit("native.async_result_contract","result_key未在实际provides声明","native.async",
@@ -390,8 +393,10 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     for duplicate in (False,True):
         graph=healthy((node("work"),))
         graph=replace(graph,edges=(*graph.edges,replace(graph.edges[0],when="route == 1" if duplicate else "")))
-        emit("workflow.duplicate_edge."+str(duplicate),"重复边条件"+("冲突" if duplicate else "相同"),"workflow.flow",lambda graph=graph:workflow(graph),
-            codes(("GRAPH.EDGE.CONFLICTING_DUPLICATE" if duplicate else "GRAPH.EDGE.DUPLICATE","warning")),evidence=workflow_evidence)
+        emit("workflow.duplicate_edge."+str(duplicate),"同端点条件"+("不同" if duplicate else "相同"),"workflow.flow",lambda graph=graph:workflow(graph),
+            codes() if duplicate and variant != "baseline" else codes(("GRAPH.EDGE.CONFLICTING_DUPLICATE" if duplicate else "GRAPH.EDGE.DUPLICATE","warning")),
+            classification="approved_change" if duplicate else "preserved",
+            notes="不同条件完整保留，不再诊断为重复声明。" if duplicate else "", evidence=workflow_evidence)
     graph=healthy((node("join",join_policy="all"),))
     emit("workflow.join.redundant","单前驱all join冗余","workflow.join",lambda:workflow(graph,"join"),codes(("GRAPH.JOIN.REDUNDANT_ALL","warning")),evidence=workflow_evidence)
     graph=GraphConfig((node("start","terminal"),node("route","decision"),node("left"),node("right"),node("join",join_policy="all"),node("end","terminal")),

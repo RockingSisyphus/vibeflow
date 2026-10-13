@@ -2033,7 +2033,7 @@ function auditHostIo(ts, sourceFile, checker, project, policy, ruleParams = {}) 
           // value itself is a harmless read for general I/O; dynamic selection
           // stays bounded, and builtin/prototype writes are checked separately.
           const customState = namespace && primitive && !members.includes("prototype") && !members.includes("__proto__");
-          if (!(namespace && scope === "python_io" && primitive === undefined)
+          if (!(namespace && scope === "python_io" && primitive == null && members.length === 0)
               && !(customState && ["python_io", "global_state"].includes(scope))) reportHostGlobal(node, node.text);
         } else if (primitive === "process" && hardProcessMembers.has(name)) {
           reportHostGlobal(node, `process.${name}`);
