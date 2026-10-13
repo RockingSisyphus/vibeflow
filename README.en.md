@@ -60,4 +60,4 @@ Run the complete source-repository gate with:
 python tools/verify_project.py --full
 ```
 
-Current distribution package version: `0.18.2`. Workflow ABI: `vibeflow.workflow.v5`.
+Current distribution package version: `0.18.3`. Workflow ABI: `vibeflow.workflow.v5`.

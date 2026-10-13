@@ -53,6 +53,8 @@ CLI 的结果范围与内置检查说明由 `tooling/application/result_scope.py
 
 仓库自行维护的每层目录用 README.md 说明唯一用途、禁止混入的内容和生成物去向。现有案例的 README 保留运行方法与验收说明，并补充目录边界；新增子目录时同步维护说明。目录职责随实际架构调整，不能把目录名当作自动判断文件用途的依据。
 
+`.github/` 的目录说明使用 `DIRECTORY.md`：GitHub 优先展示该目录的 README，保留此例外才能让仓库首页展示根目录的项目说明。其子目录仍可使用 README.md。
+
 dist 中的发行树、archive/history 中的版本资产和 references 中的第三方项目由其上层说明约束，不逐层添加维护者文件。Git 内部目录、工具缓存和临时工作区也不属于源码目录说明的覆盖范围。
 
 新增的维护者目录说明以 `<!-- vibeflow-directory-purpose -->` 开头。发行构建跳过带此前缀的 README，避免将开发路径或维护要求带入内核和用户模板；原有用户指南及 distribution/docs 中被 profile 选中的正文仍正常分发。

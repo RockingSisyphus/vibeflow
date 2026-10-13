@@ -60,7 +60,7 @@ node javascript_project/scripts/workflow_execution_probe.mjs
 python tools/verify_project.py --full
 ```
 
-当前发行包版本为 `0.18.2`，Workflow ABI 为 `vibeflow.workflow.v5`，AOT manifest 为 `vibeflow.aot-build.v2`。旧计划与构建目录需重新生成。
+当前发行包版本为 `0.18.3`，Workflow ABI 为 `vibeflow.workflow.v5`，AOT manifest 为 `vibeflow.aot-build.v2`。旧计划与构建目录需重新生成。
 
 质量检查只覆盖当前实际选择的 Rule；不证明业务正确、代码安全、算法确定性或全部无副作用。有限 Python 输入写入规则独立于效果政策，详见[产品检查边界](distribution/docs/user/product-check-boundaries.md)。
 
@@ -80,6 +80,6 @@ python tools/verify_project.py --full
 | [archive](archive/README.md) | 被替换的历史正式发行包 |
 | [docs](docs/README.md) | 设计、维护、历史结论和正文附件 |
 | [references](references/README.md) | 外来参考项目 |
-| [.github](.github/README.md) | GitHub CI 与协作模板 |
+| [.github](.github/DIRECTORY.md) | GitHub CI 与协作模板 |
 
 新建自行维护的子目录时同步写明职责。过时且不再使用的文件直接删除；运行产物在仓库外临时工作区使用并及时清理。详细规则见[仓库目录职责](docs/maintainers/directory-layout.md)。
