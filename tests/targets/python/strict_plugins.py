@@ -763,7 +763,7 @@ def test_nodeset_detail_groups_direct_calls_by_kind_in_first_occurrence_order(tm
                 "nodes": [
                     {'id': 'a', 'type_used': 'detail.shared', 'display_name': 'A', 'description': 'Exercises a in the plugin test workflow.'},
                     {'id': 'other', 'type_used': 'detail.other', 'display_name': 'Other', 'description': 'Exercises other in the plugin test workflow.'},
-                    {'id': 'b', 'type_used': 'detail.shared', 'async': 'result_key', 'result_key': 'value.out', 'display_name': 'B', 'description': 'Exercises b in the plugin test workflow.'},
+                    {'id': 'b', 'type_used': 'detail.shared', 'display_name': 'B', 'description': 'Exercises b in the plugin test workflow.'},
                     {'id': 'c', 'type_used': 'detail.shared', 'config': {'delta': 2}, 'node_configs': {'inner': {'delta': 3}}, 'display_name': 'C', 'description': 'Exercises c in the plugin test workflow.'},
                     {'id': 'd', 'type_used': 'detail.shared', 'display_name': 'D', 'description': 'Exercises d in the plugin test workflow.'},
                     {'id': 'loop', 'type_used': 'vibeflow.loop.while', 'loop': {'body': 'detail.shared', 'stop_after': 1}, 'requires': [], 'provides': [], 'display_name': 'Loop', 'description': 'Exercises loop in the plugin test workflow.'},
@@ -782,7 +782,7 @@ def test_nodeset_detail_groups_direct_calls_by_kind_in_first_occurrence_order(tm
     assert [node.id for node in groups[0].nodes] == ["a", "b", "c", "d"]
     group_title = review_fragments._nodeset_group_fragment_title(groups[0])
     assert group_title == (
-            "Detail Shared (calls: 4 [a, b{async=result_key,result_key=value.out}, "
+            "Detail Shared (calls: 4 [a, b, "
         "c{config=1,node_configs=1}, +1], type_key: detail.shared)"
     )
     assert "delta" not in group_title

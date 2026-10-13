@@ -34,7 +34,7 @@ Core 在拓扑分析前解析调用契约：
 
 ## 公共计划
 
-Workflow ABI 为 `vibeflow.workflow.v5`。公共计划只保存稳定 ID、可移植值、端口、路由、合流、TaskPlan、Loop、SourceRef、effect scope 与 execution-lock 事实。Target BindingPlan 保存语言实现。
+Workflow ABI 为 `vibeflow.workflow.v6`。公共计划只保存稳定 ID、可移植值、端口、路由、合流、TaskPlan、Loop、SourceRef、effect scope 与 execution-lock 事实。Target BindingPlan 保存语言实现。
 
 Python 和 JavaScript Target 使用相同 Core 语义，但分别声明可执行 feature。Target 不支持的 implemented 语义以稳定 finding 拒绝；planned 内容仍可进入架构审核。
 
@@ -73,3 +73,5 @@ Architecture JSONC 的 implementation_graph 保存当前项目的资源、源码
 `review-rules` 加载选中插件取得声明，展开规则计划；框架不调用 Rule、Node、Host 或生命周期工厂。插件直接导入可能已初始化业务模块，源码服务如实记录 loaded/not_loaded/unknown。尚未加载的延迟实现先执行所选 import 检查，再由 Target 绑定。
 
 公开状态范围模型位于 Core/Tooling 共享边界，使 Python 与 JavaScript presenter 使用相同 coverage ID，同时只报告本次命令实际完成的检查。
+
+原生 task_manager 声明有限 task_targets；编译计划保存启动槽及目标绑定，TaskRef 数组作为普通数据传递。运行器每次 workflow 统一登记实际执行、协作停止与最终结果，完成通知只在实际收尾后产生。普通 Node 无控制接口；规则按真实接口绑定检查身份与资源归属，源码使用检查和图关系检查分工。默认 taskManagerNode 为 dbl-circ，填充 #FCE7F3、边框 #BE185D、文字 #831843，完整标签包含“任务管理”；错误／警告覆盖颜色时仍保留形状和身份。Decision 不变。

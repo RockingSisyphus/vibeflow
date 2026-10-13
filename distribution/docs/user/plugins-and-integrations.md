@@ -122,3 +122,5 @@ python run.py review-rules --config <root>/configs/main.jsonc --json
 ```
 
 升级已有项目时，按[一次迁移说明](rule-system-migration.md)把旧登记改为代码插件与显式选择。
+
+一次 workflow 的 before_run／after_run／run_failed 生命周期只由其所属运行触发；内部 Nodeset 和受管任务使用各自的 Node／Nodeset hooks。after_run、dispose 及最终状态均在所属任务实际收尾后发生。

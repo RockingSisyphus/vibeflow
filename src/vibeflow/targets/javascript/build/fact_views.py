@@ -28,7 +28,7 @@ def closure_import_policy(policy: Mapping[str, Any], catalogs: Any, sources: lis
                     continue
                 owner = {"path":path, "kind":kind, "id":resource_id, "role":role,
                          "export":(locator.export or ("run" if kind == "node" else "")) if role == "entry" else "",
-                         "completion":implementation.completion}
+                         "completion":implementation.completion, "flowKind":getattr(descriptor,"flow_kind","")}
                 if owner not in owners:
                     owners.append(owner)
             if kind == "node":

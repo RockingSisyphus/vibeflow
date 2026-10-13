@@ -182,9 +182,9 @@ try {
         "sandbox.storage": {
           read(_request, context) {
             liveCalls += 1;
-            liveSignal = context.signal === live.signal;
+            liveSignal = context.signal !== live.signal && typeof context.signal.addEventListener === "function";
             queueMicrotask(() => live.abort(new Error("cancel in flight")));
-            return new Promise(() => {});
+            return new Promise(resolve=>context.signal.addEventListener("abort",()=>resolve({value:"cancelled"}),{once:true}));
           },
         },
       },

@@ -105,12 +105,13 @@ def compile_core(request: CoreCompileRequest) -> CoreCompilation:
     )
     nodesets = set(request.known_nodesets or graph.nodesets)
     nodes_by_name = {node.id: node for node in graph.nodes}
+    _validate_resolved_node_contracts(graph, implementations=implementations)
+    from vibeflow.core.tasks import call_specs
     _validate_node_types(
-        graph.nodes,
+        tuple(call_specs(graph.nodes)),
         implementations=implementations,
         nodesets=nodesets,
     )
-    _validate_resolved_node_contracts(graph)
     providers = _collect_providers(
         graph,
         input_keys=set(provider_keys(graph.inputs)),
@@ -160,19 +161,6 @@ def compile_core(request: CoreCompileRequest) -> CoreCompilation:
         effective_edges,
         schedule_edges=mainline.schedule_edges,
         transfer_edges=mainline.transfer_edges,
-    )
-    _validate_async_result_routes(
-        graph,
-        effective_edges=effective_edges,
-        schedule_edges=mainline.schedule_edges,
-    )
-    _validate_protected_async_scope(
-        graph,
-        schedule_edges=mainline.schedule_edges,
-        protect_entire_graph=graph.execution_lock is not None,
-        owner=request.owner,
-        implementations=implementations,
-        known_nodesets=nodesets,
     )
     _validate_no_explicit_cycles(
         nodes_by_name,
@@ -285,6 +273,7 @@ def _resolve_effective_nodes(
 
     resolved_nodes: list[NodeSpec] = []
     for node in nodes:
+        node = replace(node, task_targets={key: _resolve_effective_nodes((target,), definition_by_key=definition_by_key, facts_by_type=facts_by_type)[0] for key, target in node.task_targets.items()})
         if node.status == STATUS_PLANNED or node.type_used in LOOP_NODE_TYPES or node.type_used == IO_NODE_TYPE:
             resolved_nodes.append(node)
             continue
@@ -315,6 +304,7 @@ def _resolve_effective_nodes(
 def _validate_resolved_node_contracts(
     graph: GraphConfig,
     *,
+    implementations: ImplementationFacts,
     visited: set[int] | None = None,
     visited_nodesets: set[str] | None = None,
 ) -> None:
@@ -323,23 +313,20 @@ def _validate_resolved_node_contracts(
     if id(graph) in visited:
         return
     visited.add(id(graph))
-    for node in graph.nodes:
-        if node.async_mode == "result_key" and node.result_key not in provider_keys(node.provides):
-            raise GraphCompileError(
-                f"node '{node.id}' result_key must be declared by its effective provides",
-                "GRAPH.ASYNC.RESULT_KEY_CONTRACT",
-                details={
-                    "node": node.id,
-                    "result_key": node.result_key,
-                    "provides": sorted(provider_keys(node.provides)),
-                },
-            )
+    from vibeflow.core.tasks import call_specs
+    for node in call_specs(graph.nodes):
+        if node.async_mode or node.result_key:
+            raise GraphCompileError("use task_manager/task_targets instead of async/result_key/detached", "GRAPH.ASYNC.MIGRATION")
+        fact = implementations.get(node.type_used)
+        if node.task_targets and (fact.flow_kind if fact else node.flow_kind) != "task_manager":
+            raise GraphCompileError("task_targets requires a task_manager", "GRAPH.TASK.CONTROL_FORBIDDEN")
     for type_key, nodeset in graph.nodesets.items():
         if type_key in visited_nodesets:
             continue
         visited_nodesets.add(type_key)
         _validate_resolved_node_contracts(
             nodeset.graph,
+            implementations=implementations,
             visited=visited,
             visited_nodesets=visited_nodesets,
         )
@@ -481,177 +468,6 @@ def _validate_effective_edge_roles(
                 "transfer": False,
             },
         )
-
-
-def _validate_async_result_routes(
-    graph: GraphConfig,
-    *,
-    effective_edges: tuple[EdgeSpec, ...],
-    schedule_edges: tuple[EdgeSpec, ...],
-) -> None:
-    outgoing_sources = {edge.source for edge in effective_edges}
-    scheduled_sources = {edge.source for edge in schedule_edges}
-    for node in graph.nodes:
-        if not _node_is_executable(node, graph):
-            continue
-        if node.async_mode != "result_key":
-            continue
-        if node.id not in outgoing_sources or node.id in scheduled_sources:
-            continue
-        raise GraphCompileError(
-            (
-                f"async result_key node '{node.id}' has no scheduled outgoing "
-                "edge to join its result"
-            ),
-            "GRAPH.ASYNC.RESULT_UNJOINABLE",
-            details={
-                "node": node.id,
-                "async": node.async_mode,
-                "result_key": node.result_key,
-                "suggestion": (
-                    "add a schedule edge to a result consumer or use "
-                    "async='detached' for side work"
-                ),
-            },
-        )
-
-
-def _validate_protected_async_scope(
-    graph: GraphConfig,
-    *,
-    schedule_edges: tuple[EdgeSpec, ...],
-    protect_entire_graph: bool,
-    owner: str,
-    implementations: ImplementationFacts,
-    known_nodesets: set[str],
-    nodeset_registry: dict[str, NodesetSpec] | None = None,
-    active_nodesets: frozenset[str] = frozenset(),
-) -> None:
-    local_registry = dict(nodeset_registry or {})
-    local_registry.update(graph.nodesets)
-    available_nodesets = set(known_nodesets) | set(local_registry)
-    protected = {
-        node.id
-        for node in graph.nodes
-        if protect_entire_graph or node.execution_lock is not None
-    }
-    for node in graph.nodes:
-        if not _node_is_executable(
-            node,
-            graph,
-            nodeset_registry=local_registry,
-        ):
-            continue
-        if (
-            node.id in protected
-            and node.async_mode == "detached"
-        ):
-            raise GraphCompileError(
-                (
-                    f"{owner} is protected by execution_lock; "
-                    f"node '{node.id}' cannot use async='detached'"
-                ),
-                "GRAPH.EXECUTION_LOCK.DETACHED_FORBIDDEN",
-                details={
-                    "owner": owner,
-                    "node": node.id,
-                    "async": node.async_mode,
-                },
-            )
-        if (
-            node.id in protected
-            and node.async_mode == "result_key"
-            and not _has_static_result_consumer(
-                graph,
-                node,
-                schedule_edges=schedule_edges,
-            )
-        ):
-            raise GraphCompileError(
-                (
-                    f"{owner} is protected by execution_lock; "
-                    f"async result_key node '{node.id}' has no statically "
-                    "provable scheduled consumer path"
-                ),
-                "GRAPH.EXECUTION_LOCK.RESULT_UNJOINABLE",
-                details={
-                    "owner": owner,
-                    "node": node.id,
-                    "async": node.async_mode,
-                    "result_key": node.result_key,
-                },
-            )
-        target = _executed_nodeset_target(node, local_registry)
-        if not target or target in active_nodesets:
-            continue
-        nodeset = local_registry.get(target)
-        if nodeset is None or nodeset.status == STATUS_PLANNED:
-            continue
-        child_graph = nodeset.graph
-        child_effective_edges = _deduplicate_edges(child_graph.edges)
-        child_flow_kinds = _node_flow_kinds(
-            {child.id: child for child in child_graph.nodes},
-            implementations=implementations,
-            nodesets=available_nodesets,
-        )
-        child_mainline = analyze_mainline(
-            child_graph,
-            child_effective_edges,
-            child_flow_kinds,
-            owner=f"{owner}.{node.id}",
-        )
-        _validate_protected_async_scope(
-            child_graph,
-            schedule_edges=child_mainline.schedule_edges,
-            protect_entire_graph=(
-                protect_entire_graph
-                or node.execution_lock is not None
-                or child_graph.execution_lock is not None
-            ),
-            owner=f"{owner}.{node.id}",
-            implementations=implementations,
-            known_nodesets=available_nodesets,
-            nodeset_registry=local_registry,
-            active_nodesets=active_nodesets | {target},
-        )
-
-
-def _has_static_result_consumer(
-    graph: GraphConfig,
-    source: NodeSpec,
-    *,
-    schedule_edges: tuple[EdgeSpec, ...],
-) -> bool:
-    result_provider = next(
-        (item for item in source.provides if item.key == source.result_key),
-        None,
-    )
-    if result_provider is None:
-        return False
-    adjacency: dict[str, set[str]] = {}
-    for edge in schedule_edges:
-        if not edge.when:
-            adjacency.setdefault(edge.source, set()).add(edge.target)
-    nodes_by_id = {node.id: node for node in graph.nodes}
-    pending = list(sorted(adjacency.get(source.id, ())))
-    seen: set[str] = set()
-    while pending:
-        node_id = pending.pop(0)
-        if node_id in seen:
-            continue
-        seen.add(node_id)
-        candidate = nodes_by_id.get(node_id)
-        if candidate is not None and any(
-            requirement.type == result_provider.type
-            for requirement in candidate.requires
-        ):
-            return True
-        pending.extend(
-            target
-            for target in sorted(adjacency.get(node_id, ()))
-            if target not in seen
-        )
-    return False
 
 
 def explicit_flow_cycles(nodes_by_name: dict[str, NodeSpec], edges: tuple[EdgeSpec, ...], *, owner: str = "pipeline") -> tuple[dict[str, object], ...]:
@@ -875,6 +691,12 @@ def _collect_implemented_global_state_lock_keys(
         effective_lock_key = node_lock_key or active_lock_key
         if flow_kinds.get(node.id) == FLOW_KIND_GLOBAL_STATE:
             found[".".join(node_path)] = effective_lock_key
+        from vibeflow.core.tasks import task_graph
+        for slot, task_target in node.task_targets.items():
+            found.update(_collect_implemented_global_state_lock_keys(task_graph(graph, task_target),
+                implementations=implementations, known_nodesets=available_nodesets,
+                nodeset_registry=local_registry, path=(*node_path,"tasks",slot),
+                inherited_lock_key=effective_lock_key, active_nodesets=active_nodesets))
         target = _executed_nodeset_target(node, local_registry)
         if not target or target in active_nodesets:
             continue
@@ -948,6 +770,11 @@ def _validate_execution_lock_nesting(
             node_key,
             subject=f"node '{'.'.join(node_path)}'",
         )
+        from vibeflow.core.tasks import task_graph
+        for slot, task_target in node.task_targets.items():
+            _validate_execution_lock_nesting(task_graph(graph, task_target), known_nodesets=available_nodesets,
+                owner=owner, inherited_key=nested_key, nodeset_registry=local_registry,
+                path=(*node_path,"tasks",slot), active_nodesets=active_nodesets)
         target = _executed_nodeset_target(node, local_registry)
         if not target or target in active_nodesets:
             continue
@@ -1010,6 +837,11 @@ def _collect_implemented_execution_lock_paths(
         qualified_node = ".".join(node_path)
         if node.execution_lock is not None:
             found.add(qualified_node)
+        from vibeflow.core.tasks import task_graph
+        for slot, task_target in node.task_targets.items():
+            found.update(_collect_implemented_execution_lock_paths(task_graph(graph, task_target),
+                known_nodesets=available_nodesets, nodeset_registry=local_registry,
+                path=(*node_path,"tasks",slot), active_nodesets=active_nodesets))
         target = _executed_nodeset_target(node, local_registry)
         if not target or target in active_nodesets:
             continue

@@ -62,7 +62,7 @@ def _mixed_graph(depth: int):
                 "outputs": [],
             }
         if index == 3:
-            call["async"] = "detached"
+            call={**_node("manage","example.manager"),"flow_kind":"task_manager","task_targets":{"work":call}}
         calls = [call]
         if index == depth - 1 and index > 0:
             calls.append(_node("branch", "example.depth.0"))

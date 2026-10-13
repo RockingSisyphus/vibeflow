@@ -12,6 +12,7 @@
 | 嵌套 Nodeset、多层循环、执行模式与 trace | [workflow_math](python/workflow_math/README.md) | [workflow_math](javascript/workflow_math/README.md) |
 | 多文件插件加法、覆盖与源码修改 | [plugin_addition](python/plugin_addition/README.md) | [plugin_addition](javascript/plugin_addition/README.md) |
 | 异步、Capability 与持续端口加法 | — | [async_addition](javascript/async_addition/README.md) |
+| 原生并发任务引用、任务管理 Node、取消与真实收尾 | [task_management](python/task_management/README.md) | [task_management](javascript/task_management/README.md) |
 | 完整工作流、CLI、宿主与生命周期 | [integration](python/integration/README.md) | [integration](javascript/integration/README.md) |
 | 领域插件与真实数值 | [domain_rules](python/domain_rules/README.md) | javascript/domain_rules |
 | 外部规则、资料传递与局部覆盖 | [rule_graph](python/rule_graph/README.md) | [rule_graph](javascript/rule_graph/README.md) |

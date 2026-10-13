@@ -55,6 +55,11 @@ function __vfObservation(options) {
       state = "running";
       publish();
     },
+    stopping() {
+      if (closed || state === "stopping") return;
+      state = "stopping";
+      publish();
+    },
     start(running = true) {
       if (typeof __vfCreateFileObservation === "function") {
         sink = __vfCreateFileObservation(raw, record(), interval);
@@ -104,7 +109,7 @@ function __vfObservation(options) {
 
 function __vfObservedOptions(options, observer) {
   return {...(options ?? {}), __vfStatusUpdate: info => observer.updateInfo(info),
-          __vfKernelLog: event => observer.kernel(event)};
+          __vfKernelLog: event => observer.kernel(event), __vfStatusStopping: () => observer.stopping()};
 }
 
 function __vfObserveSync(invoke, inputs, options) {
@@ -156,6 +161,7 @@ function __vfObserveHost(create, options) {
   }
   async function lifecycle(method) {
     try {
+      if (method === "stop") observer.stopping();
       await observer.run(() => host[method]());
       if (method === "start") observer.running();
       else observer.finish(null);

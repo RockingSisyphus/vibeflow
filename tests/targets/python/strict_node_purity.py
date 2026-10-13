@@ -446,7 +446,7 @@ def _nodeset_depth_graph(
         else:
             call = _node_call("call", child, f"Calls {child}.")
         if index == async_layer:
-            call["async"] = "detached"
+            call={"id":"manage","type_used":f"manage.{child}.join","display_name":"Manager","description":"Declared task target","task_targets":{"work":call}}
         calls = [call]
         if branch and index == depth - 1:
             calls.append(_node_call("branch", "depth.0", "Calls a shallow branch."))
@@ -772,15 +772,22 @@ def test_nodeset_health_treats_loop_body_as_recursion_reference() -> None:
     assert "NODESET.NESTING.DEPTH_EXCEEDED" not in {error.rule_id for error in report.errors}
 
 
+def _depth_registry():
+    from tests.fixtures.support.task_management import register_task_manager
+    registry=_registry()
+    for level in range(5):register_task_manager(registry,f'depth.{level}',provides=['value.out'])
+    return registry
+
+
 def test_nodeset_depth_limit_accepts_four_and_rejects_five_mixed_layers() -> None:
     accepted = validate_graph_health(
         _nodeset_depth_graph(4, loop_layer=2, async_layer=3, branch=True),
-        registry=_registry(),
+        registry=_depth_registry(),
         purity_policy=PurityPolicy(max_source_lines=1000),
     )
     rejected = validate_graph_health(
         _nodeset_depth_graph(5, loop_layer=2, async_layer=4, branch=True),
-        registry=_registry(),
+        registry=_depth_registry(),
         purity_policy=PurityPolicy(max_source_lines=1000),
     )
 

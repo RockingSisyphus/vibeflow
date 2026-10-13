@@ -91,7 +91,7 @@ function __vfCreateFileObservation(options, initial, interval) {
   };
   try {
     write(initial);
-    worker = new __vfStatusWorker(__vfHeartbeatSource, {eval: true, workerData: {
+    worker = new __vfStatusWorker(__vfHeartbeatSource, {eval: true, execArgv: [], workerData: {
       record: initial, file, interval, flags: flags.buffer,
     }});
     worker.on("message", message => { if (message.error) heartbeatError = new Error(message.error); });

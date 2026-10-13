@@ -1,4 +1,4 @@
-export const VIBEFLOW_WORKFLOW_ABI = "vibeflow.workflow.v5";
+export const VIBEFLOW_WORKFLOW_ABI = "vibeflow.workflow.v6";
 export const VIBEFLOW_PLUGIN_ABI = "vibeflow.plugin.v3";
 
 export class VibeFlowWorkflowError extends Error {
@@ -10,6 +10,8 @@ export class VibeFlowWorkflowError extends Error {
     this.workflowId = details.workflowId || "";
     this.nodePath = details.nodePath || "";
     this.blockPath = details.blockPath || "";
+    if (details.taskErrors) this.taskErrors = details.taskErrors;
+    if (details.sourceLocation) this.sourceLocation = details.sourceLocation;
   }
 }
 
@@ -30,23 +32,8 @@ function throwIfAborted(signal, workflow, nodePath = "", blockPath = "") {
 }
 
 async function awaitWithAbort(value, signal, workflow, nodePath = "", blockPath = "") {
-  throwIfAborted(signal, workflow, nodePath, blockPath);
-  if (!signal) return await value;
-  let onAbort;
-  const aborted = new Promise((_, reject) => {
-    onAbort = () => reject(vfError(
-      "VF_ABORTED",
-      "workflow execution was aborted",
-      workflow,
-      { nodePath, blockPath, cause: signal.reason },
-    ));
-    signal.addEventListener("abort", onAbort, { once: true });
-  });
-  try {
-    return await Promise.race([Promise.resolve(value), aborted]);
-  } finally {
-    signal.removeEventListener("abort", onAbort);
-  }
+  // Cancellation is cooperative. Retain the actual operation through finally.
+  return await value;
 }
 
 function assertObject(value, code, message, workflow) {
@@ -236,6 +223,7 @@ function emitTrace(root, kind, details = {}, boundary = false) {
 function normalizeOptions(workflow, options) {
   const raw = options === undefined ? {} : options;
   assertObject(raw, "VF_INTERNAL", "workflow options must be an object", workflow);
+  if (Object.hasOwn(raw,"detachedTimeoutMs")) throw vfError("VF_ASYNC_MIGRATION", "detachedTimeoutMs was removed; workflow waits for actual task cleanup", workflow);
   const traceMode = raw.trace ?? "boundary";
   if (!["off", "boundary", "full"].includes(traceMode)) {
     throw vfError("VF_INTERNAL", `unsupported trace mode '${String(traceMode)}'`, workflow);
@@ -243,18 +231,14 @@ function normalizeOptions(workflow, options) {
   if (raw.onTrace !== undefined && typeof raw.onTrace !== "function") {
     throw vfError("VF_INTERNAL", "options.onTrace must be a function", workflow);
   }
-  const detachedTimeoutMs = raw.detachedTimeoutMs ?? 5000;
-  if (!Number.isFinite(detachedTimeoutMs) || detachedTimeoutMs < 0) {
-    throw vfError("VF_INTERNAL", "options.detachedTimeoutMs must be a non-negative number", workflow);
-  }
   return {
     signal: raw.signal,
     traceMode,
     onTrace: raw.onTrace,
+    statusStopping: raw.__vfStatusStopping,
     statusUpdate: raw.__vfStatusUpdate,
     kernelLog: raw.__vfKernelLog,
     capabilities: raw.capabilities ?? {},
-    detachedTimeoutMs,
   };
 }
 
@@ -321,7 +305,7 @@ function wrapCapabilityFailure(
   location,
 ) {
   if (cause instanceof VibeFlowWorkflowError) throw cause;
-  if (root.signal?.aborted) {
+  if (root.signal?.aborted && (cause?.name === "AbortError" || cause === root.signal.reason)) {
     throwIfAborted(root.signal, workflow, location.nodePath, location.blockPath);
   }
   throw vfError(
@@ -372,9 +356,10 @@ function prepareCapabilities(workflow, descriptors, requirements, schemas, suppl
         );
       }
       if (completion === "suspend") {
-        setOwn(capability, operationName, async (input, caller = {}) => {
+        setOwn(capability, operationName, (input, caller = {}) => {
+          const promise = (async () => {
           const location = capabilityLocation(caller);
-          throwIfAborted(root.signal, workflow, location.nodePath, location.blockPath);
+          const signal = caller.signal || root.signal;
           validateCapabilityInput(
             workflow,
             schemas,
@@ -386,8 +371,8 @@ function prepareCapabilities(workflow, descriptors, requirements, schemas, suppl
           );
           try {
             const output = await awaitWithAbort(
-              callable.call(implementation, input, { signal: root.signal }),
-              root.signal,
+              callable.call(implementation, input, { signal: signal }),
+              signal,
               workflow,
               location.nodePath,
               location.blockPath,
@@ -405,17 +390,19 @@ function prepareCapabilities(workflow, descriptors, requirements, schemas, suppl
             return wrapCapabilityFailure(
               cause,
               workflow,
-              root,
+              {signal},
               capabilityId,
               operationName,
               location,
             );
           }
+          })();
+          return caller.execution ? caller.execution.own(promise) : promise;
         });
       } else {
         setOwn(capability, operationName, (input, caller = {}) => {
           const location = capabilityLocation(caller);
-          throwIfAborted(root.signal, workflow, location.nodePath, location.blockPath);
+          const signal = caller.signal || root.signal;
           validateCapabilityInput(
             workflow,
             schemas,
@@ -429,7 +416,7 @@ function prepareCapabilities(workflow, descriptors, requirements, schemas, suppl
             const output = callable.call(
               implementation,
               input,
-              { signal: root.signal },
+              { signal: signal },
             );
             return validateCapabilityOutput(
               workflow,
@@ -458,6 +445,18 @@ function prepareCapabilities(workflow, descriptors, requirements, schemas, suppl
   return Object.freeze(wrapped);
 }
 
+const __vfMultipleInputs = Symbol('native input envelopes');
+
+function inputValues(workflow, inputs, input) {
+  const values=inputs[__vfMultipleInputs]?.get(input.key);
+  if(values)return values;
+  if(workflow.task_input_cardinalities?.[input.type]==='all') {
+    if(!Array.isArray(inputs[input.key]))throw vfError('VF_TASK_INPUT_INVALID',`all input '${input.key}' requires an array`,workflow);
+    return inputs[input.key];
+  }
+  return [inputs[input.key]];
+}
+
 function validatePublicInputs(workflow, inputs) {
   assertObject(inputs, "VF_INPUT_SCHEMA", "workflow inputs must be an object", workflow);
   const known = new Set(workflow.inputs.map((item) => item.key));
@@ -472,10 +471,8 @@ function validatePublicInputs(workflow, inputs) {
       throw vfError("VF_INPUT_REQUIRED", `required workflow input '${input.key}' is missing`, workflow);
     }
     if (!present) continue;
-    const failure = validateJsonSchema(
-      inputs[input.key],
-      input.schema || workflow.schemas?.[input.type],
-    );
+    const failure = inputValues(workflow,inputs,input).map(value=>validateJsonSchema(
+      value,input.schema || workflow.schemas?.[input.type])).find(Boolean);
     if (failure) {
       throw vfError(
         "VF_INPUT_SCHEMA",
@@ -500,7 +497,7 @@ function createStaticState(workflow, initial, root, path) {
     candidates: new Map(),
     activeEdges: new Set(),
     lastInputs: new Map(),
-    pending: new Map(),
+    taskExecutors: dictionary(),
     nodeRuns: new Map(),
     stepCount: 0,
     initial,
@@ -516,9 +513,9 @@ function seedInbox(state, nodeId, acceptedTypes) {
   for (const input of state.workflow.inputs) {
     if (!accepted.has(input.type)) continue;
     if (!Object.prototype.hasOwnProperty.call(state.initial, input.key)) continue;
-    state.inboxes[nodeId].push(
-      createEnvelope(input.key, input.type, state.initial[input.key], "pipeline.input"),
-    );
+    for(const value of inputValues(state.workflow,state.initial,input)) {
+      state.inboxes[nodeId].push(createEnvelope(input.key,input.type,value,'pipeline.input'));
+    }
   }
 }
 
@@ -640,7 +637,7 @@ function deliverStatic(envelopes, state, targetId, acceptedTypes) {
   }
 }
 
-function nodeContext(node, state) {
+function nodeContext(node, state, execution) {
   const allowed = dictionary();
   for (const requirement of node.capabilities || []) {
     const capability = state.root.capabilities[requirement.id];
@@ -649,15 +646,22 @@ function nodeContext(node, state) {
     const requested = new Set(requirement.operations || []);
     for (const [operationName, operation] of Object.entries(capability)) {
       if (requested.size && !requested.has(operationName)) continue;
-      setOwn(contextual, operationName, (input) => operation(input, {
+      setOwn(contextual, operationName, (input) => {
+        if (execution && !execution.active) throw vfError("VF_NODE_CONTEXT_EXITED", "Node invocation has exited", state.workflow);
+        return operation(input, {
         nodePath: nodePath(state, node.id),
-        blockPath: formatBlockPath(state.path),
-      }));
+        blockPath: formatBlockPath(state.path), signal: execution?.signal || state.root.signal, execution,
+      });
+      });
     }
     setOwn(allowed, requirement.id, Object.freeze(contextual));
   }
   return Object.freeze({
-    signal: state.root.signal,
+    signal: execution?.signal || state.root.signal,
+    get tasks() {
+      if (node.flow_kind !== "task_manager") throw vfError("VF_TASK_CONTROL_FORBIDDEN", "only task_manager nodes have a task controller", state.workflow, {nodePath: nodePath(state, node.id)});
+      return taskController(node, state, execution);
+    },
     capabilities: Object.freeze(allowed),
     updateInfo(info) { state.root.statusUpdate?.(info); },
     trace(kind, details = {}) {
@@ -680,15 +684,17 @@ function invokeStaticImplementationSync(implementation, node, inputs, state) {
       { nodePath: nodePath(state, node.id) },
     );
   }
+  const execution = new NodeExecution(state.root.signal);
   try {
-    const outputs = implementation(inputs, node.params, nodeContext(node, state));
+    const outputs = implementation(inputs, node.params, nodeContext(node, state, execution));
     throwIfAborted(state.root.signal, state.workflow, nodePath(state, node.id));
     return validateNodeOutputs(node, outputs, state);
   } catch (cause) {
     if (cause instanceof VibeFlowWorkflowError) {
+      cause.sourceLocation ||= {path:node.source?.ref || "", symbol:node.source?.export || ""};
       throw ensureErrorLocation(cause, state.workflow, state.path, node.id);
     }
-    if (state.root.signal?.aborted) {
+    if (state.root.signal?.aborted && (cause?.name === "AbortError" || cause === state.root.signal.reason)) {
       throwIfAborted(state.root.signal, state.workflow, nodePath(state, node.id));
     }
     throw vfError(
@@ -697,6 +703,8 @@ function invokeStaticImplementationSync(implementation, node, inputs, state) {
       state.workflow,
       { nodePath: nodePath(state, node.id), cause },
     );
+  } finally {
+    execution.exitSync();
   }
 }
 
@@ -709,10 +717,12 @@ async function invokeStaticImplementationAsync(implementation, node, inputs, sta
       { nodePath: nodePath(state, node.id) },
     );
   }
+  const execution = new NodeExecution(state.root.signal);
+  let primaryFailure;
   try {
     const outputs = await awaitWithAbort(
       Promise.resolve().then(() =>
-        implementation(inputs, node.params, nodeContext(node, state))
+        implementation(inputs, node.params, nodeContext(node, state, execution))
       ),
       state.root.signal,
       state.workflow,
@@ -723,26 +733,36 @@ async function invokeStaticImplementationAsync(implementation, node, inputs, sta
     return validateNodeOutputs(node, outputs, state);
   } catch (cause) {
     if (cause instanceof VibeFlowWorkflowError) {
-      throw ensureErrorLocation(cause, state.workflow, state.path, node.id);
+      cause.sourceLocation ||= {path:node.source?.ref || "", symbol:node.source?.export || ""};
+      primaryFailure = ensureErrorLocation(cause, state.workflow, state.path, node.id);
+      throw primaryFailure;
     }
-    if (state.root.signal?.aborted) {
-      throwIfAborted(
+    if (state.root.signal?.aborted && (cause?.name === "AbortError" || cause === state.root.signal.reason)) {
+      try { throwIfAborted(
         state.root.signal,
         state.workflow,
         nodePath(state, node.id),
         formatBlockPath(state.path),
-      );
+      ); } catch(error) { primaryFailure=error; throw error; }
     }
-    throw vfError(
+    primaryFailure = vfError(
       "VF_NODE_FAILED",
       `node '${node.id}' failed`,
       state.workflow,
       {
         nodePath: nodePath(state, node.id),
         blockPath: formatBlockPath(state.path),
+        sourceLocation:{path:node.source?.ref || "",symbol:node.source?.export || ""},
         cause,
       },
     );
+    throw primaryFailure;
+  } finally {
+    try { await execution.exit(); }
+    catch(cleanup) {
+      if(primaryFailure) (primaryFailure.cleanupErrors ||= []).push(cleanup);
+      else throw cleanup;
+    }
   }
 }
 
@@ -770,49 +790,6 @@ function finishStaticNode(node, state) {
   });
 }
 
-async function joinStaticPending(node, state, activate) {
-  if (!state.pending.has(node.id)) return;
-  const pending = state.pending.get(node.id);
-  state.pending.delete(node.id);
-  let outputs;
-  try {
-    outputs = await awaitWithAbort(
-      pending,
-      state.root.signal,
-      state.workflow,
-      nodePath(state, node.id),
-      formatBlockPath(state.path),
-    );
-  } catch (cause) {
-    if (cause instanceof VibeFlowWorkflowError) throw cause;
-    if (state.root.signal?.aborted) {
-      throwIfAborted(
-        state.root.signal,
-        state.workflow,
-        nodePath(state, node.id),
-        formatBlockPath(state.path),
-      );
-    }
-    throw vfError(
-      "VF_NODE_FAILED",
-      `async node '${node.id}' failed`,
-      state.workflow,
-      {
-        nodePath: nodePath(state, node.id),
-        blockPath: formatBlockPath(state.path),
-        cause,
-      },
-    );
-  }
-  const inputs = state.lastInputs.get(node.id) || dictionary();
-  activate(outputs, inputs, state, false);
-  emitTrace(state.root, "async_result_join", {
-    nodeId: node.id,
-    nodePath: nodePath(state, node.id),
-    blockPath: formatBlockPath(state.path),
-  });
-}
-
 function enqueueStaticTargets(targets, ready, queued) {
   for (const target of targets) {
     if (queued.has(target)) continue;
@@ -828,9 +805,13 @@ function rawInputsForChild(inputSpecs, inputs, workflow, nodeId) {
     else if (value) items.push(value);
   }
   const initial = dictionary();
+  const multiple = new Map();
   for (const input of inputSpecs) {
-    const match = items.find((item) => item?.type === input.type);
-    if (match) setOwn(initial, input.key, match.value);
+    const matches = items.filter((item) => item?.type === input.type);
+    if (matches.length) {
+      setOwn(initial, input.key, matches[0].value);
+      multiple.set(input.key, matches.map(item => item.value));
+    }
     else if (input.required) {
       throw vfError(
         "VF_INPUT_REQUIRED",
@@ -839,6 +820,7 @@ function rawInputsForChild(inputSpecs, inputs, workflow, nodeId) {
       );
     }
   }
+  Object.defineProperty(initial, __vfMultipleInputs, {value: multiple});
   return initial;
 }
 
@@ -915,56 +897,6 @@ function finalizeOutputs(state) {
     }
   }
   return output;
-}
-
-function abandonPending(state) {
-  for (const [nodeId, promise] of state.pending) {
-    promise.catch(() => {});
-    emitTrace(state.root, "async_result_abandoned", {
-      nodeId,
-      nodePath: nodePath(state, nodeId),
-      blockPath: formatBlockPath(state.path),
-    });
-  }
-}
-
-async function settleDetached(root) {
-  const pending = [...root.detached];
-  root.detached.clear();
-  let firstFailure = root.detachedFailure;
-  root.detachedFailure = null;
-  for (const item of pending) {
-    let timer;
-    const timeout = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(vfError(
-        "VF_ASYNC_FLUSH_TIMEOUT",
-        `detached node '${item.node.id}' timed out after ${root.detachedTimeoutMs}ms`,
-        item.workflow,
-        { nodePath: item.nodePath, blockPath: item.blockPath },
-      )), root.detachedTimeoutMs);
-    });
-    try {
-      await Promise.race([item.promise, timeout]);
-      emitTrace(root, "async_detached_done", {
-        nodeId: item.node.id,
-        nodePath: item.nodePath,
-        blockPath: item.blockPath,
-      });
-    } catch (cause) {
-      const failure = cause instanceof VibeFlowWorkflowError
-        ? cause
-        : vfError(
-          "VF_NODE_FAILED",
-          `detached node '${item.node.id}' failed`,
-          item.workflow,
-          { nodePath: item.nodePath, blockPath: item.blockPath, cause },
-        );
-      if (!firstFailure) firstFailure = failure;
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-  if (firstFailure) throw firstFailure;
 }
 
 function deepFreeze(value) {
@@ -1056,8 +988,8 @@ function createRuntimePluginsSync(workflow, descriptors, factories, root) {
     for (let index = records.length - 1; index >= 0; index -= 1) {
       try {
         records[index].instance.dispose?.();
-      } catch {
-        // Preserve the primary creation failure.
+      } catch (error) {
+        (failure.cleanupErrors ||= []).push(runtimePluginError('VF_RUNTIME_PLUGIN_DISPOSE',records[index].descriptor,'dispose',error,workflow));
       }
     }
     throw failure;
@@ -1106,8 +1038,8 @@ async function createRuntimePluginsAsync(workflow, descriptors, factories, root)
     for (let index = records.length - 1; index >= 0; index -= 1) {
       try {
         await records[index].instance.dispose?.();
-      } catch {
-        // Preserve the primary creation failure.
+      } catch (error) {
+        (failure.cleanupErrors ||= []).push(runtimePluginError('VF_RUNTIME_PLUGIN_DISPOSE',records[index].descriptor,'dispose',error,workflow));
       }
     }
     throw failure;
@@ -1122,7 +1054,10 @@ function invokeRuntimeHookSync(root, hook, details = {}, preserveFailure = false
     try {
       callback(summary);
     } catch (cause) {
-      if (preserveFailure) continue;
+      if (preserveFailure) {
+        (root.cleanupErrors ||= []).push(runtimePluginError('VF_RUNTIME_PLUGIN_HOOK',record.descriptor,hook,cause,root.workflow,summary));
+        continue;
+      }
       throw runtimePluginError(
         "VF_RUNTIME_PLUGIN_HOOK",
         record.descriptor,
@@ -1147,7 +1082,10 @@ async function invokeRuntimeHookAsync(root, hook, details = {}, preserveFailure 
         root.workflow,
       );
     } catch (cause) {
-      if (preserveFailure) continue;
+      if (preserveFailure) {
+        (root.cleanupErrors ||= []).push(runtimePluginError('VF_RUNTIME_PLUGIN_HOOK',record.descriptor,hook,cause,root.workflow,summary));
+        continue;
+      }
       throw runtimePluginError(
         "VF_RUNTIME_PLUGIN_HOOK",
         record.descriptor,
@@ -1161,63 +1099,58 @@ async function invokeRuntimeHookAsync(root, hook, details = {}, preserveFailure 
 }
 
 function disposeRuntimePluginsSync(root, preserveFailure = false) {
-  for (let index = root.runtimePlugins.length - 1; index >= 0; index -= 1) {
-    const record = root.runtimePlugins[index];
-    if (typeof record.instance.dispose !== "function") continue;
-    try {
-      record.instance.dispose();
-    } catch (cause) {
-      if (preserveFailure) continue;
-      throw runtimePluginError(
-        "VF_RUNTIME_PLUGIN_DISPOSE",
-        record.descriptor,
-        "dispose",
-        cause,
-        root.workflow,
-      );
+  let firstFailure;
+  for (let index=root.runtimePlugins.length-1;index>=0;index--) {
+    const record=root.runtimePlugins[index];
+    try { record.instance.dispose?.(); }
+    catch(cause) {
+      const error=runtimePluginError('VF_RUNTIME_PLUGIN_DISPOSE',record.descriptor,'dispose',cause,root.workflow);
+      if(preserveFailure)(root.cleanupErrors ||= []).push(error);
+      else if(firstFailure)(firstFailure.cleanupErrors ||= []).push(error);
+      else firstFailure=error;
     }
   }
-  root.runtimePlugins.length = 0;
+  root.runtimePlugins.length=0;
+  if(firstFailure)throw firstFailure;
 }
 
 async function disposeRuntimePluginsAsync(root, preserveFailure = false) {
-  let firstFailure = null;
-  for (let index = root.runtimePlugins.length - 1; index >= 0; index -= 1) {
-    const record = root.runtimePlugins[index];
-    if (typeof record.instance.dispose !== "function") continue;
-    try {
-      await record.instance.dispose();
-    } catch (cause) {
-      if (!preserveFailure && !firstFailure) {
-        firstFailure = runtimePluginError(
-          "VF_RUNTIME_PLUGIN_DISPOSE",
-          record.descriptor,
-          "dispose",
-          cause,
-          root.workflow,
-        );
-      }
+  let firstFailure;
+  for (let index=root.runtimePlugins.length-1;index>=0;index--) {
+    const record=root.runtimePlugins[index];
+    try { await record.instance.dispose?.(); }
+    catch(cause) {
+      const error=runtimePluginError('VF_RUNTIME_PLUGIN_DISPOSE',record.descriptor,'dispose',cause,root.workflow);
+      if(preserveFailure)(root.cleanupErrors ||= []).push(error);
+      else if(firstFailure)(firstFailure.cleanupErrors ||= []).push(error);
+      else firstFailure=error;
     }
   }
-  root.runtimePlugins.length = 0;
-  if (firstFailure) throw firstFailure;
+  root.runtimePlugins.length=0;
+  if(firstFailure)throw firstFailure;
 }
 
 function createRoot(workflow, normalized) {
-  return {
+  const root = {
     workflow,
     workflowId: workflow.workflow_id,
     signal: normalized.signal || new AbortController().signal,
     traceMode: normalized.traceMode,
     onTrace: normalized.onTrace,
+    statusStopping: normalized.statusStopping,
     statusUpdate: normalized.statusUpdate,
     kernelLog: normalized.kernelLog,
-    detachedTimeoutMs: normalized.detachedTimeoutMs,
-    detached: new Set(),
-    detachedFailure: null,
     capabilities: {},
+    taskRegistry: new TaskRegistry(),
     runtimePlugins: [],
   };
+  const onAbort = () => {
+    try { root.statusStopping?.(); }
+    catch (error) { root.observationFailure ||= error; }
+  };
+  root.signal.addEventListener("abort", onAbort, {once:true});
+  root.unsubscribeSignal = () => root.signal.removeEventListener("abort", onAbort);
+  return root;
 }
 
 function prepareWorkflowInvocation(
@@ -1249,6 +1182,7 @@ function prepareWorkflowInvocation(
     emitTrace(root, "run_start", {}, true);
     return root;
   } catch (cause) {
+    root.unsubscribeSignal();
     throw ensureErrorLocation(cause, workflow, []);
   }
 }
@@ -1287,14 +1221,16 @@ function createStaticWorkflowSync(
       options,
       "sync",
     );
+    let failed = false;
+    let primaryFailure;
+    try {
     root.runtimePlugins = createRuntimePluginsSync(
       workflow,
       plugins,
       runtimePluginFactories,
       root,
     );
-    let failed = false;
-    try {
+
       invokeRuntimeHookSync(root, "beforeRun", {
         inputKeys: Object.keys(inputs || {}).sort(),
       });
@@ -1310,6 +1246,7 @@ function createStaticWorkflowSync(
       const failure = cause instanceof VibeFlowWorkflowError
         ? cause
         : vfError("VF_INTERNAL", "generated workflow failed internally", workflow, { cause });
+      primaryFailure = failure;
       if (failure.code !== "VF_TRACE_SINK_FAILED") {
         try {
           emitTrace(root, "run_failed", {
@@ -1326,7 +1263,11 @@ function createStaticWorkflowSync(
       }, true);
       throw ensureErrorLocation(failure, workflow, []);
     } finally {
-      disposeRuntimePluginsSync(root, failed);
+      try { disposeRuntimePluginsSync(root, failed); }
+      finally {
+        if(primaryFailure && root.cleanupErrors?.length)(primaryFailure.cleanupErrors ||= []).push(...root.cleanupErrors);
+        root.unsubscribeSignal();
+      }
     }
   };
 }
@@ -1355,15 +1296,16 @@ function createStaticWorkflowAsync(
       options,
       "async",
     );
+    let result;
+    let failure = null;
+    try {
     root.runtimePlugins = await createRuntimePluginsAsync(
       workflow,
       plugins,
       runtimePluginFactories,
       root,
     );
-    let result;
-    let failure = null;
-    try {
+
       await invokeRuntimeHookAsync(root, "beforeRun", {
         inputKeys: Object.keys(inputs || {}).sort(),
       });
@@ -1375,15 +1317,18 @@ function createStaticWorkflowAsync(
         : vfError("VF_INTERNAL", "generated workflow failed internally", workflow, { cause });
     }
     try {
-      await settleDetached(root);
+      await root.taskRegistry.finish(root);
+      if (!failure) throwIfAborted(root.signal, workflow);
+      if (root.observationFailure) throw root.observationFailure;
     } catch (cleanupCause) {
       const cleanupFailure = cleanupCause instanceof VibeFlowWorkflowError
         ? cleanupCause
-        : vfError("VF_INTERNAL", "detached task cleanup failed internally", workflow, {
+        : vfError("VF_INTERNAL", "task cleanup failed internally", workflow, {
           cause: cleanupCause,
         });
       if (!failure) failure = cleanupFailure;
       else {
+        (failure.cleanupErrors ||= []).push(cleanupFailure);
         try {
           emitTrace(root, "async_cleanup_failed", {
             code: cleanupFailure.code,
@@ -1394,6 +1339,7 @@ function createStaticWorkflowAsync(
         }
       }
     }
+    root.unsubscribeSignal();
     if (failure) {
       if (failure.code !== "VF_TRACE_SINK_FAILED") {
         try {
@@ -1410,6 +1356,7 @@ function createStaticWorkflowAsync(
         message: failure.message,
       }, true);
       await disposeRuntimePluginsAsync(root, true);
+      if(root.cleanupErrors?.length)(failure.cleanupErrors ||= []).push(...root.cleanupErrors);
       throw ensureErrorLocation(failure, workflow, []);
     }
     try {
@@ -1424,6 +1371,7 @@ function createStaticWorkflowAsync(
         message: failure.message,
       }, true);
       await disposeRuntimePluginsAsync(root, true);
+      if(root.cleanupErrors?.length)(failure.cleanupErrors ||= []).push(...root.cleanupErrors);
       throw failure;
     }
     await disposeRuntimePluginsAsync(root);

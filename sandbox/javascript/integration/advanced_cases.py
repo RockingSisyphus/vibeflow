@@ -33,7 +33,7 @@ def execution_model_case(
     if async_result.prepared.plan.entry_mode != "async":
         raise AssertionError(async_result.prepared.plan.entry_mode)
     expected_async = {
-        "double": ("suspend", "deferred", "event_loop"),
+        "double": ("suspend", "inline", "event_loop"),
         "read": ("suspend", "inline", "event_loop"),
     }
     for node_id, expected in expected_async.items():
@@ -47,13 +47,7 @@ def execution_model_case(
             raise AssertionError((node_id, actual, expected))
     async_tasks = tasks(async_result.prepared)
     if async_tasks != [
-        {
-            "id": "block:/:task:double",
-            "node_id": "double",
-            "schedule": "deferred",
-            "executor": "event_loop",
-            "result_key": "doubled",
-        }
+        {'id': 'block:/:task:double:work', 'manager_node_id': 'double', 'key': 'work', 'block_id': 'block:/double/tasks/work', 'executor': 'event_loop'},
     ]:
         raise AssertionError(async_tasks)
 
@@ -62,16 +56,11 @@ def execution_model_case(
         audit["completion"],
         audit["schedule"],
         audit["executor"],
-    ) != ("suspend", "detached", "event_loop"):
+    ) != ("suspend", "inline", "event_loop"):
         raise AssertionError(audit)
     detached_tasks = tasks(detached_result.prepared)
     if detached_tasks != [
-        {
-            "id": "block:/:task:audit",
-            "node_id": "audit",
-            "schedule": "detached",
-            "executor": "event_loop",
-        }
+        {'id': 'block:/:task:audit:work', 'manager_node_id': 'audit', 'key': 'work', 'block_id': 'block:/audit/tasks/work', 'executor': 'event_loop'},
     ]:
         raise AssertionError(detached_tasks)
     all_nodes = [
@@ -164,19 +153,8 @@ def nested_async_case(result: Any) -> Any:
     inner = next(block for block in result.prepared.plan.blocks
                  if block.path == ("outer", "inner")).to_dict()
     if inner["tasks"] != [
-        {
-            "id": "block:/outer/inner:task:double",
-            "node_id": "double",
-            "schedule": "deferred",
-            "executor": "event_loop",
-            "result_key": "doubled",
-        },
-        {
-            "id": "block:/outer/inner:task:audit",
-            "node_id": "audit",
-            "schedule": "detached",
-            "executor": "event_loop",
-        },
+        {'id': 'block:/outer/inner:task:double:work', 'manager_node_id': 'double', 'key': 'work', 'block_id': 'block:/outer/inner/double/tasks/work', 'executor': 'event_loop'},
+        {'id': 'block:/outer/inner:task:audit:work', 'manager_node_id': 'audit', 'key': 'work', 'block_id': 'block:/outer/inner/audit/tasks/work', 'executor': 'event_loop'},
     ]:
         raise AssertionError(inner["tasks"])
 
@@ -202,10 +180,8 @@ const value = await workflow.runWorkflowAsync(
 assert(value.doubled === 14, JSON.stringify(value));
 const taskEvents = trace
   .filter(event => [
-    "async_result",
-    "async_result_join",
-    "async_detached",
-    "async_detached_done",
+    "task_started",
+    "task_exited",
   ].includes(event.kind))
   .map(event => ({
     kind: event.kind,
@@ -220,27 +196,18 @@ for (const event of taskEvents) {
   );
   assert(event.blockPath === "/outer/inner", JSON.stringify(taskEvents));
 }
-let timeout;
-try {
-  await workflow.runWorkflowAsync(
-    { x: 3 },
-    {
-      detachedTimeoutMs: 5,
-      capabilities: {
-        "sandbox.audit": { record: () => new Promise(() => {}) },
-      },
-    },
-  );
-} catch (error) {
-  timeout = {
-    code: error.code,
-    nodePath: error.nodePath,
-    blockPath: error.blockPath,
-  };
-}
-assert(timeout.code === "VF_ASYNC_FLUSH_TIMEOUT", JSON.stringify(timeout));
-assert(timeout.nodePath === "outer.inner.audit", JSON.stringify(timeout));
-assert(timeout.blockPath === "/outer/inner", JSON.stringify(timeout));
+let releaseAudit;let finished=false;
+const controller=new AbortController();
+const pending=workflow.runWorkflowAsync({x:3},{signal:controller.signal,
+ capabilities:{'sandbox.audit':{record:()=>new Promise(resolve=>releaseAudit=resolve)}}});
+pending.finally(()=>finished=true).catch(()=>{});
+await new Promise(resolve=>setImmediate(resolve));
+assert(typeof releaseAudit==='function','audit never entered');
+controller.abort('stop');
+await Promise.resolve();assert(!finished,'root abandoned actual audit operation');
+releaseAudit({accepted:true});
+let stopped;try{await pending;}catch(error){stopped={code:error.code};}
+assert(stopped.code==='VF_ABORTED',JSON.stringify(stopped));
 const recovered = await workflow.runWorkflowAsync(
   { x: 4 },
   {
@@ -255,7 +222,7 @@ assert(recovered.doubled === 8, JSON.stringify(recovered));
 process.stdout.write(JSON.stringify({
   value,
   taskEvents,
-  timeout,
+  stopped,
   recovered,
 }));
 """,
@@ -323,7 +290,7 @@ const options = {
     "sandbox.audit": {
       record: async (request, context) => {
         assert(request.label === "detached-complete", JSON.stringify(request));
-        receivedSignal = context.signal === controller.signal;
+        receivedSignal = context.signal !== controller.signal && typeof context.signal.addEventListener==='function';
         await new Promise(resolve => setTimeout(resolve, 10));
         completed = true;
         return { accepted: true };
@@ -334,28 +301,22 @@ const options = {
 const result = await workflow.runWorkflowAsync({ x: 7 }, options);
 assert(result.result === 7, JSON.stringify(result));
 assert(completed, "runWorkflow returned before detached cleanup");
-assert(receivedSignal, "Capability did not receive the invocation signal");
+assert(receivedSignal, "Capability did not receive its Node invocation signal");
 const kinds = trace.map(event => event.kind);
-assert(kinds.includes("async_detached"), JSON.stringify(kinds));
-assert(kinds.includes("async_detached_done"), JSON.stringify(kinds));
-let timeout;
-try {
-  await workflow.runWorkflowAsync(
-    { x: 9 },
-    {
-      detachedTimeoutMs: 10,
-      capabilities: {
-        "sandbox.audit": {
-          record: () => new Promise(() => {}),
-        },
-      },
-    },
-  );
-} catch (error) {
-  timeout = { code: error.code, nodePath: error.nodePath };
-}
-assert(timeout.code === "VF_ASYNC_FLUSH_TIMEOUT", JSON.stringify(timeout));
-assert(timeout.nodePath === "audit", JSON.stringify(timeout));
+assert(kinds.includes("task_started"), JSON.stringify(kinds));
+assert(kinds.includes("task_exited"), JSON.stringify(kinds));
+let releaseAudit;let settled=false;
+const stopController=new AbortController();
+const pending=workflow.runWorkflowAsync({x:9},{signal:stopController.signal,
+ capabilities:{'sandbox.audit':{record:()=>new Promise(resolve=>releaseAudit=resolve)}}});
+pending.finally(()=>settled=true).catch(()=>{});
+await new Promise(resolve=>setImmediate(resolve));
+assert(typeof releaseAudit==='function','audit never entered');
+stopController.abort('stop');
+await Promise.resolve();assert(!settled,'root abandoned audit operation');
+releaseAudit({accepted:true});
+let stopped;try{await pending;}catch(error){stopped={code:error.code};}
+assert(stopped.code==='VF_ABORTED',JSON.stringify(stopped));
 const recovered = await workflow.runWorkflowAsync({ x: 11 }, {
   capabilities: {
     "sandbox.audit": {
@@ -420,7 +381,7 @@ assert(rightResolved, "right detached task did not complete");
 assert(concurrentLeft.result === 21, JSON.stringify(concurrentLeft));
 assert(concurrentRight.result === 34, JSON.stringify(concurrentRight));
 assert(
-  leftTrace.some(event => event.kind === "async_detached_done"),
+  leftTrace.some(event => event.kind === "task_exited"),
   JSON.stringify(leftTrace),
 );
 assert(
@@ -432,7 +393,7 @@ process.stdout.write(JSON.stringify({
   result,
   completed,
   receivedSignal,
-  timeout,
+  stopped,
   recovered,
   concurrent: {
     left: concurrentLeft,

@@ -123,3 +123,5 @@ python run.py review --config <root>/configs/main.jsonc --output reports/workflo
 ## Nodeset 的规则接管
 
 图级 `rulesets` 写在 Nodeset 定义文件顶层，与 `pipeline` 并列。未填写则继承上级；显式列表替代继承规则、接管内部；`[]` 停止内部继承。上级仍可检查该 Nodeset 调用的外部连接，内部 Node 自己的局部规则继续执行。Node 调用上的 `rulesets` 是局部选择，不能代替 Nodeset 定义上的图级选择。完整写法见 [Nodeset 接管的配置位置](rules-and-nodes.md#nodeset-接管的配置位置)。
+
+并发启动、任务引用、停止与实际收尾合同见[原生任务管理](task-management.md)。

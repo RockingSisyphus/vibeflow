@@ -34,6 +34,7 @@ class EmissionNode(Protocol):
     is_nodeset: bool
     is_loop: bool
     subplan: "EmissionWorkflow | None"
+    task_plans: Mapping[str, "EmissionWorkflow"]
     loop: object
     capabilities: Sequence[object]
     completion: str

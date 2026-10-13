@@ -29,6 +29,7 @@ RESOURCE_NAMES = (
     'sdk_loader.mjs',
     'source_ownership.mjs',
     'status_helpers.mjs',
+    'task_helpers.mjs',
     'toolchain_driver.mjs',
 )
 
@@ -79,7 +80,8 @@ def test_target_resource_api_is_closed_and_templates_use_canonical_runtime() -> 
 
     assert resources.RESOURCE_NAMES == frozenset(RESOURCE_NAMES)
     assert RUNTIME_SOURCE == (resources.read_text("runtime_helpers.mjs").strip() + "\n"
-                              + resources.read_text("status_helpers.mjs"))
+                              + resources.read_text("status_helpers.mjs") + "\n"
+                              + resources.read_text("task_helpers.mjs"))
     with pytest.raises(ValueError, match="unknown JavaScript Target resource"):
         resources.resource("../runtime_helpers.mjs")
 

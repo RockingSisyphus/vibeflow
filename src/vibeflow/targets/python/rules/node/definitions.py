@@ -8,6 +8,7 @@ from vibeflow.targets.shared.rule_support.import_policy import IMPORT_POLICY_SCH
 def source_rule_resources():
     scope_schema = {"effect_scope": {"type": "string"}, "policy": IMPORT_POLICY_SCHEMA}
     rules = (
+        RuleDescriptor("vibeflow.async_lifecycle", description="Check explicit asynchronous task ownership and controller use.", handler="vibeflow.async_lifecycle", scope="source"),
         RuleDescriptor("vibeflow.no_side_effects", description="Check the explicitly selected effect policy.",
                        outputs={"effect_policy": EFFECT_POLICY_TYPE}, params_schema=scope_schema,
                        params_defaults={"effect_scope": "none", "policy": {}}, handler="vibeflow.no_side_effects", scope="source"),

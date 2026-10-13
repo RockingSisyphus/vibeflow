@@ -17,7 +17,7 @@ from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
 from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
 
 
-def _runtime(tmp_path, *, selection, async_mode, flow_kind="process", delegate_cli=True):
+def _runtime(tmp_path, *, selection, managed, flow_kind="process", delegate_cli=True):
     source = (
         "class StartNode:\n"
         "    def run_pure(self, inputs, params):\n"
@@ -25,6 +25,14 @@ def _runtime(tmp_path, *, selection, async_mode, flow_kind="process", delegate_c
         "class ExitNode:\n"
         "    def run_pure(self, inputs, params):\n"
         "        raise SystemExit(7)\n\n"
+        "class ManagerNode:\n"
+        "    def run_pure(self, inputs, params, context):\n"
+        "        ref=context.tasks.start('work', {'cli.argv':inputs['cli.argv']['value']})\n"
+        "        result=context.tasks.wait_all_exited([ref])[0]\n"
+        "        if result['status']=='failed':\n"
+        "            if result['error']['code']=='VF_TASK_BUSINESS_EXIT':raise SystemExit(result['error']['exit_code'])\n"
+        "            raise RuntimeError(result['error']['message'])\n"
+        "        return result['outputs']\n\n"
         "class EndNode:\n"
         "    def run_pure(self, inputs, params):\n"
         "        return {}\n"
@@ -50,12 +58,14 @@ def _runtime(tmp_path, *, selection, async_mode, flow_kind="process", delegate_c
     registry.register(start, namespace["StartNode"])
     registry.register(descriptor, namespace["ExitNode"])
     registry.register(end, namespace["EndNode"])
+    registry.register(NodeDescriptor('test.manager','Manager','Explicitly handles a task outcome','1','task_manager',contract=contract,rulesets=()),namespace['ManagerNode'])
     registry.source_locations = {"test.start":(path,"StartNode","project",tmp_path), "test.exit":(path,"ExitNode","project",tmp_path), "test.end":(path,"EndNode","project",tmp_path)}
+    registry.source_locations["test.manager"]=(path,"ManagerNode","project",tmp_path)
     registry.source_roots = (tmp_path,)
     registry.source_root_ids = {tmp_path:"project"}
     registry.rule_catalogs = (*registry.rule_catalogs, SimpleNamespace(rules=(),rulesets=(custom,)),)
     graph = GraphConfig(
-        nodes=(NodeSpec("start","test.start"), NodeSpec("exit","test.exit",async_mode=async_mode,result_key="cli.exit_code" if async_mode else ""),
+        nodes=(NodeSpec("start","test.start"), NodeSpec("exit","test.manager",task_targets={"work":NodeSpec("worker","test.exit")}) if managed else NodeSpec("exit","test.exit"),
                NodeSpec("end","test.end")), edges=(EdgeSpec("start","exit"), EdgeSpec("exit","end")),
         inputs=(PipelineInputSpec("cli.argv","cli.argv",display_name="CLI argv",required=False),),
         outputs=(PipelineOutputSpec("cli.exit_code","exactly_one",display_name="CLI exit code"),), rulesets=(),
@@ -65,15 +75,16 @@ def _runtime(tmp_path, *, selection, async_mode, flow_kind="process", delegate_c
     return runtime, rules
 
 
-@pytest.mark.parametrize("async_mode",[None,"result_key"])
+@pytest.mark.parametrize("managed",[False,True])
 @pytest.mark.parametrize("selection",["terminal","unconstrained"])
-def test_process_can_exit_when_rule_allows_or_check_is_unselected(tmp_path,async_mode,selection):
-    runtime, rules = _runtime(tmp_path,selection=selection,async_mode=async_mode)
-    assert runtime._plan.frame("exit").flow_kind == "process"
-    assert runtime._plan.frame("exit").effect_scope == selection
+def test_process_can_exit_when_rule_allows_or_check_is_unselected(tmp_path,managed,selection):
+    runtime, rules = _runtime(tmp_path,selection=selection,managed=managed)
+    frame=runtime._plan.frame("exit").task_plans["work"].frame("worker") if managed else runtime._plan.frame("exit")
+    assert frame.flow_kind == "process"
+    assert frame.effect_scope == selection
     assert not any(item.severity == "error" for item in rules.findings)
     if selection == "terminal":
-        records = rules.call_effect_policies[("pipeline","exit")]
+        records = rules.call_effect_policies[("task:work","exit/tasks/work/worker") if managed else ("pipeline","exit")]
         assert records[0]["value"]["effect_scope"] == "terminal"
         assert records[0]["definition_id"] == "vibeflow.no_side_effects"
     else:
@@ -84,18 +95,19 @@ def test_process_can_exit_when_rule_allows_or_check_is_unselected(tmp_path,async
     assert runtime.trace.exception == ""
 
 
-@pytest.mark.parametrize("async_mode",[None,"result_key"])
+@pytest.mark.parametrize("managed",[False,True])
 @pytest.mark.parametrize("flow_kind",["process","io"])
-def test_selected_none_rejects_exit_independently_of_flow_kind(tmp_path,async_mode,flow_kind):
-    runtime, rules = _runtime(tmp_path,selection="none",async_mode=async_mode,flow_kind=flow_kind)
-    assert runtime._plan.frame("exit").effect_scope == "none"
+def test_selected_none_rejects_exit_independently_of_flow_kind(tmp_path,managed,flow_kind):
+    runtime, rules = _runtime(tmp_path,selection="none",managed=managed,flow_kind=flow_kind)
+    frame=runtime._plan.frame("exit").task_plans["work"].frame("worker") if managed else runtime._plan.frame("exit")
+    assert frame.effect_scope == "none"
     assert any(item.severity == "error" and item.definition_id == "vibeflow.no_side_effects" for item in rules.findings)
-    with pytest.raises(PipelineRuntimeError,match="effect_scope 'none'.*cannot control delegate CLI exit"):
+    with pytest.raises(RuntimeError if managed else PipelineRuntimeError,match="effect_scope 'none'.*cannot control delegate CLI exit"):
         runtime.run({"cli.argv":[]})
     assert runtime.trace.stop_reason == "node_failed"
 
 
 def test_rule_permission_does_not_change_non_delegate_execution_protocol(tmp_path):
-    runtime, _ = _runtime(tmp_path,selection="terminal",async_mode=None,delegate_cli=False)
+    runtime, _ = _runtime(tmp_path,selection="terminal",managed=False,delegate_cli=False)
     with pytest.raises(PipelineRuntimeError,match="outside delegate CLI mode"):
         runtime.run({"cli.argv":[]})

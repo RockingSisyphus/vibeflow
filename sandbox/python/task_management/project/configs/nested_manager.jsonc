@@ -1,0 +1,70 @@
+{
+  "pipeline": {
+    "entry_mode": "async",
+    "inputs": [
+      {
+        "key": "scenario",
+        "type": "fixture.scenario",
+        "required": true,
+        "display_name": "Scenario"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "fixture.terminal",
+        "display_name": "Start",
+        "description": "Start nested caller"
+      },
+      {
+        "id": "manage",
+        "type_used": "fixture.nested",
+        "display_name": "多层任务管理与线程池饱和探针",
+        "description": "Manage a nested caller through its task reference",
+        "task_targets": {
+          "nested": {
+            "type_used": "fixture.manager_block"
+          }
+        }
+      },
+      {
+        "id": "end",
+        "type_used": "fixture.terminal",
+        "display_name": "End",
+        "description": "End after all nested cleanup"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "manage"
+      },
+      {
+        "from": "manage",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "fixture.report",
+        "cardinality": "exactly_one",
+        "as": "report",
+        "display_name": "Nested report"
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugin.py",
+        "export": "plugin"
+      }
+    }
+  ],
+  "nodeset_imports": [
+    {
+      "path": "nodesets/nested_manager.jsonc"
+    }
+  ]
+}

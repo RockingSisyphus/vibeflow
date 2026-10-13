@@ -10,7 +10,7 @@ from vibeflow.block_compiler.model import (
     WORKFLOW_ABI_VERSION, BlockPlan, ConditionPlan, DataProviderPlan,
     DataRequirementPlan, ExecutionLockPlan, LoopCarryPlan, LoopCollectPlan,
     LoopOutputPlan, LoopPlan, NodeCallPlan, PipelineInputSpec, PipelineOutputSpec,
-    SourceRef, WorkflowPlan, freeze_json_object,
+    SourceRef, TaskPlan, WorkflowPlan, freeze_json_object,
 )
 from vibeflow.targets.javascript.build import BuildRequest
 from vibeflow.targets.javascript.frontend.bindings import build_javascript_binding_plan
@@ -69,6 +69,12 @@ def plan_fixture(description, *, project_root=None, import_policy=None, host_ext
                 child_id = "block:/" + "/".join((*path, raw["id"]))
                 block(raw["subplan"], child_id, (*path, raw["id"]),
                       "loop" if raw.get("is_loop") else "nodeset", raw.get("loop"))
+            task_targets = []
+            for slot, target in raw.get("task_targets", {}).items():
+                task_path = (*path, raw["id"], "tasks", slot)
+                target_id = "block:/" + "/".join(task_path)
+                block(target, target_id, task_path, "task")
+                task_targets.append((slot, target_id))
             implementation = raw.get("implementation")
             completion = raw.get("completion", (implementation or {}).get("completion", "immediate"))
             schedule = raw.get("schedule", "inline")
@@ -78,7 +84,7 @@ def plan_fixture(description, *, project_root=None, import_policy=None, host_ext
                 "params_schema": raw.get("params_schema", {})}
             required_capabilities[raw["type_used"]] = raw.get("capabilities", ())
             nodes.append(NodeCallPlan(
-                id=raw["id"], type_used=raw["type_used"], implementation=source(implementation, fallback=raw["type_used"]),
+                id=raw["id"], task_targets=tuple(task_targets), type_used=raw["type_used"], implementation=source(implementation, fallback=raw["type_used"]),
                 requires=tuple(DataRequirementPlan(value["type"], value.get("cardinality", "exactly_one")) for value in raw.get("requires", ())),
                 provides=tuple(DataProviderPlan(value["key"], value["type"]) for value in raw.get("provides", ())),
                 params=freeze_json_object(raw.get("params", {})), config_overrides=freeze_json_object({}),
@@ -99,6 +105,7 @@ def plan_fixture(description, *, project_root=None, import_policy=None, host_ext
         blocks.append(BlockPlan(
             id=block_id, kind=kind, path=path, source=SourceRef("fixture", block_id),
             inputs=inputs(item.get("inputs", ())), outputs=outputs(item.get("outputs", ())),
+            tasks=tuple(TaskPlan(f"{block_id}:task:{node.id}:{slot}", node.id, slot, target,"event_loop") for node in nodes for slot,target in node.task_targets),
             nodes=tuple(nodes), routes=routes, order=tuple(item.get("order", tuple(node.id for node in nodes))),
             entries=entries, exits=(), max_steps=item.get("max_steps", 1000), loop=loop(loop_description or item.get("loop")),
         ))

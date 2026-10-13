@@ -16,7 +16,7 @@ Python 可按 plan、block 或 compiled 模式执行；JavaScript emitter 将同
 
 ## 异步所有权
 
-TaskPlan 明确 immediate、suspend、deferred、detached 和 `result_key` 的所有权。需要 join 的结果必须存在可证明的 scheduled consumer path；未归属后台任务在支持静态分析的 Target 中被拒绝。
+TaskPlan ABI v6 保存 task_manager 调用、有限任务槽、目标 Block 和 Target 执行器。TaskRef 普通数组沿数据连边传递，显式 start、waitAny、requestStop、waitAllExited 控制实际执行。结果只在实际工作、finally、SDK 操作及后代收尾后通知；正常结束、异常、外部取消统一停止并等待所属工作。失败由管理 Node 作为数据处理，未消费失败在最终收尾时报错。旧 async/result_key/detached 调用入口拒绝迁移，不再维护 pending/detached 容器。详见[原生任务管理](../../distribution/docs/user/task-management.md)。
 
 ## 副作用与执行锁
 

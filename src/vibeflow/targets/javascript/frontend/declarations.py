@@ -28,7 +28,7 @@ export type WorkflowTraceMode = "off" | "boundary" | "full";
     + _ABORT_SIGNAL_DECLARATION
     + """
 export interface WorkflowRunStatus {
-  readonly state: "starting" | "running" | "succeeded" | "failed";
+  readonly state: "starting" | "running" | "stopping" | "succeeded" | "failed";
   readonly error: string | null;
   readonly updated_at: string;
   readonly info?: readonly Readonly<Record<string, unknown>>[];
@@ -93,14 +93,13 @@ def declarations(
             '  readonly trace?: WorkflowTraceMode;',
             "  readonly onTrace?: (event: WorkflowTraceEvent) => void;",
             "  readonly capabilities?: WorkflowCapabilities;",
-            "  readonly detachedTimeoutMs?: number;",
             "  readonly statusIntervalMs?: number;",
             "  readonly statusFile?: string;",
             "  readonly runDir?: string;",
             "  readonly onStatus?: (status: WorkflowRunStatus) => void;",
             "}",
             "",
-            "export const VIBEFLOW_WORKFLOW_ABI: \"vibeflow.workflow.v5\";",
+            "export const VIBEFLOW_WORKFLOW_ABI: \"vibeflow.workflow.v6\";",
             "export const VIBEFLOW_PLUGIN_ABI: \"vibeflow.plugin.v3\";",
             _entry_declaration(workflow),
     ]
@@ -168,6 +167,8 @@ def _capability_declarations(workflow: EmissionWorkflow) -> list[str]:
                     requirement.id,
                     set(),
                 ).update(requirement.operations)
+            for task in node.task_plans.values():
+                visit(task)
             if node.subplan is not None:
                 visit(node.subplan)
 

@@ -20,6 +20,6 @@ JS eval、Function 等动态求值不因无法证明安全而默认拒绝；实�
 
 工具链检查实际解析到的 Node、TypeScript 和 esbuild，以及已有兼容版本要求。没有 lock、使用 yarn.lock 或 pnpm-lock.yaml，不会仅因缺少指定 npm lock 被拒绝。项目依然负责安装依赖；框架不会代替包管理器证明安装可重复性。构建工具信息仅保留真实版本字段。
 
-0.17.0 使用 Workflow ABI `vibeflow.workflow.v5` 与 AOT manifest `vibeflow.aot-build.v2`。runtime_dispatch 推断字段及展示已退役；实际执行锁、调度、异步所有权和资源 cleanup 保留。旧计划、Architecture 与构建产物需重新生成，不提供旧字段兼容读取层。
+0.17.0 使用 Workflow ABI `vibeflow.workflow.v6` 与 AOT manifest `vibeflow.aot-build.v2`。runtime_dispatch 推断字段及展示已退役；实际执行锁、调度、异步所有权和资源 cleanup 保留。旧计划、Architecture 与构建产物需重新生成，不提供旧字段兼容读取层。
 
 公开 checked 读取实际完成的 Rule 结果；unavailable 或未选择不会宣称已检查。完整 Rule 结果和未检查的业务／安全范围仍可查看。

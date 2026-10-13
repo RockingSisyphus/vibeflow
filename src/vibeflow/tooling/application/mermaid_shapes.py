@@ -16,6 +16,7 @@ from vibeflow.core.constants import (
 
 
 _SHAPE_BY_FLOW_KIND = {
+    "task_manager": "dbl-circ",
     FLOW_KIND_TERMINAL: "stadium",
     FLOW_KIND_PROCESS: "rect",
     FLOW_KIND_DECISION: "diam",

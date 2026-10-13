@@ -65,7 +65,7 @@ def _project(tmp_path: Path) -> Path:
 
 def _plan(entry: Path, *, entry_mode: str, completion: str) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v5",
+        "abi_version": "vibeflow.workflow.v6",
         "workflow_id": "test.project-negative",
         "entry_mode": entry_mode,
         "inputs": [],
@@ -214,7 +214,7 @@ CASES = (
     ),
     NegativeCase(
         name="long-lived-listener",
-        code="VF_NODE_LONG_LIVED_LISTENER",
+        code="VF_NODE_RESOURCE_UNOWNED",
         diagnostic_file="entry.ts",
         marker="addEventListener",
         sources={
@@ -336,3 +336,27 @@ def test_failed_replace_preserves_every_existing_output_byte(tmp_path: Path) -> 
         if path.is_file()
     }
     assert after == before
+
+
+@pytest.mark.parametrize("body,forbidden", [
+    ("await new Promise(resolve=>setTimeout(resolve,1));",False),
+    ("setTimeout(()=>{},1);",True),
+    ("await new Promise(resolve=>{setInterval(()=>{},1);resolve(1);});",True),
+    ("let handle:any;try{await new Promise(resolve=>{handle=setInterval(()=>{},1);resolve(1);});}finally{clearInterval(handle);}",False),
+    ("const listener=()=>{};window.addEventListener('message',listener);",True),
+    ("const listener=()=>{};try{window.addEventListener('message',listener);await Promise.resolve();}finally{window.removeEventListener('message',listener);}",False),
+    ("const service={setTimeout(){return 1;},on(){return 2;}};service.setTimeout();service.on();",False),
+    ("const later=setTimeout;later(()=>{},1);",True),
+    ("const later=setTimeout;const handle=later(()=>{},1);try{await Promise.resolve();}finally{clearTimeout(handle);}",False),
+    ("const store={timer:undefined as any};try{store.timer=setTimeout(()=>{},1);await Promise.resolve();}finally{clearTimeout(store.timer);}",False),
+    ("const store={timer:undefined as any};const other={timer:undefined as any};try{store.timer=setTimeout(()=>{},1);await Promise.resolve();}finally{clearTimeout(other.timer);}",True),
+])
+def test_native_timer_and_listener_ownership_uses_actual_binding(tmp_path,body,forbidden):
+    project=_project(tmp_path);entry=project/'entry.ts'
+    entry.write_text('export async function run(inputs:any,params:any,context:any){'+body+'return {};}\n')
+    checked=run_rule_check_driver({
+        "typecheckFiles":[str(entry)],"ruleTopics":["completion"],
+        "importPolicy":{"owners":[{"path":str(entry),"kind":"node","id":"test.entry","export":"run","completion":"suspend"}]},
+    },package_root=project)
+    codes={item.get('code') for item in checked.findings}
+    assert ('VF_NODE_RESOURCE_UNOWNED' in codes) is forbidden,checked.findings

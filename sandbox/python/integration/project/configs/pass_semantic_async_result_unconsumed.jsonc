@@ -34,15 +34,21 @@
         "description": "Runs start."
       },
       {
-        "async": "result_key",
-        "result_key": "async.value",
-        "config": {
-          "value": 99
-        },
         "id": "slow_async",
-        "type_used": "semantic.slow_async_value",
-        "display_name": "Slow Async",
-        "description": "Runs slow_async."
+        "type_used": "task.launch.semantic_slow_async_value.waited",
+        "display_name": "任务管理：Slow Async",
+        "description": "Starts an explicitly declared workflow-owned task.",
+        "task_targets": {
+          "work": {
+            "config": {
+              "value": 99
+            },
+            "id": "work",
+            "type_used": "semantic.slow_async_value",
+            "display_name": "Slow Async",
+            "description": "Runs slow_async."
+          }
+        }
       },
       {
         "id": "add_pair",
@@ -99,10 +105,6 @@
         "to": "slow_async"
       },
       {
-        "from": "slow_async",
-        "to": "add_pair"
-      },
-      {
         "from": "add_pair",
         "to": "scale"
       },
@@ -135,6 +137,10 @@
       {
         "from": "scale",
         "to": "use_scaled"
+      },
+      {
+        "from": "slow_async",
+        "to": "end"
       }
     ],
     "outputs": [

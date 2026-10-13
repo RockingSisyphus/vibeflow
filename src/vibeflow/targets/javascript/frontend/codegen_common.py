@@ -17,7 +17,7 @@ class WorkflowCode:
     node_names: Mapping[str, str]
     activate_names: Mapping[str, str]
     execute_names: Mapping[str, str]
-    children: Mapping[str, "WorkflowCode"]
+    children: Mapping[tuple[str, str | None], "WorkflowCode"]
 
 
 def edge_identity(source: str, target: str) -> str:

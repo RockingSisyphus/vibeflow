@@ -3,16 +3,17 @@ from vibeflow.core.rules import RuleCall, RuleRelation, RulesetDescriptor
 
 
 def standard_rulesets():
-    scopes = {"process": "none", "io": "terminal", "python_io": "python_io", "document": "python_io",
+    scopes = {"task_manager": "none", "process": "none", "io": "terminal", "python_io": "python_io", "document": "python_io",
               "data_store": "python_io", "global_state": "global_state", "base_lib": "none"}
     rulesets = []
     for name, scope in scopes.items():
         calls = (RuleCall("effects", rule_id="vibeflow.no_side_effects", params={"effect_scope": scope}),
                  RuleCall("interface", rule_id="vibeflow.node_interface"),
+                 RuleCall("async", rule_id="vibeflow.async_lifecycle"),
                  RuleCall("maintainability", rule_id="vibeflow.maintainability"),
                  RuleCall("imports", rule_id="vibeflow.import_side_effects", params={"effect_scope": scope}))
         calls += (RuleCall("architecture", rule_id="vibeflow.node_architecture"),)
-        review_calls = ("effects", "maintainability", "architecture") if name == "base_lib" else ("effects", "architecture", "interface", "maintainability")
+        review_calls = ("effects", "maintainability", "architecture") if name == "base_lib" else ("effects", "architecture", "interface", "async", "maintainability")
         rulesets.append(RulesetDescriptor("vibeflow." + name, calls=calls,
                         entrypoints={"static": review_calls, "run": review_calls, "import": ("imports", "architecture")}))
     topics = ("flow", "join", "nodesets", "duplicates", "planned", "review")
@@ -31,9 +32,10 @@ def standard_rulesets():
             RuleCall("imports", rule_id="vibeflow.import_side_effects"),
             RuleCall("effects", rule_id="vibeflow.no_side_effects", params={"effect_scope":scope}),
             RuleCall("interface", rule_id="vibeflow.node_interface"),
+                 RuleCall("async", rule_id="vibeflow.async_lifecycle"),
             RuleCall("maintainability", rule_id="vibeflow.maintainability"),
             RuleCall("architecture", rule_id="vibeflow.node_architecture")),
-            entrypoints={"import":("imports","architecture"), "static":("effects","interface","maintainability","architecture"), "run":("effects","interface","maintainability","architecture")}))
+            entrypoints={"import":("imports","architecture"), "static":("effects","interface","async","maintainability","architecture"), "run":("effects","interface","async","maintainability","architecture")}))
     rulesets.append(RulesetDescriptor("vibeflow.plugin_declaration", calls=(
         RuleCall("imports", rule_id="vibeflow.import_side_effects"),
         RuleCall("maintainability", rule_id="vibeflow.maintainability")),

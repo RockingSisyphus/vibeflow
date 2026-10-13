@@ -96,9 +96,10 @@ def render_ascii(
             incoming.setdefault(edge.target, []).append(edge.source)
         for node in graph.nodes:
             parents = ", ".join(sorted(incoming.get(node.id, ()))) or "entry"
+            flow_kind = compiled.flow_kinds.get(node.id, node.flow_kind)
+            identity = " [任务管理]" if flow_kind == "task_manager" else ""
             semantics = ""
             if show_semantics:
-                flow_kind = compiled.flow_kinds.get(node.id, node.flow_kind)
                 nodeset = _nodeset_for_node(graph, node)
                 planned = node.status == STATUS_PLANNED or nodeset is not None and nodeset.status == STATUS_PLANNED
                 semantics = (
@@ -106,8 +107,16 @@ def render_ascii(
                     f" effect_scope={'unavailable' if planned else _effect_scope(compiled, node.id, flow_kind)}"
                 )
             lines.append(
-                f"{indent}- {node.id} [{node.type_used}] <- {parents}{semantics}"
+                f"{indent}- {node.id} [{node.type_used}]{identity} <- {parents}{semantics}"
             )
+            def append_targets(manager, prefix):
+                for slot, target in manager.task_targets.items():
+                    descriptor = _node_descriptor(result, target)
+                    target_identity = " [任务管理]" if getattr(descriptor, "flow_kind", "") == "task_manager" else ""
+                    target_path = f"{prefix}/tasks/{slot}"
+                    lines.append(f"{indent}  - task {target_path} [{target.type_used}]{target_identity} <- {prefix}")
+                    append_targets(target, target_path)
+            append_targets(node, node.id)
         if expand_nodesets:
             for group in _invocation_groups(graph):
                 append_graph(
@@ -450,6 +459,8 @@ def _graph_mermaid(
             native_class="externalDependency" if descriptor is not None and bool(getattr(descriptor, "external", False)) and nodeset is None else "loopNode" if node.type_used in LOOP_NODE_TYPES else "nodesetNode" if nodeset is not None else "documentNode" if flow_kind == FLOW_KIND_DOCUMENT else "defaultNode",
             status_class=node_class if node_class == "plannedNode" else "", call_style=node.style)
         label = [display_name, "", f"id: {node.id}", f"type_used: {node.type_used}"]
+        if flow_kind == "task_manager":
+            label.append("任务管理")
         if presentation.values.get("icon"):
             label[0] = f"{presentation.values['icon']} {label[0]}"
         if descriptor is not None:
@@ -530,6 +541,19 @@ def _graph_mermaid(
             lines.append(f"  linkStyle {index} stroke-dasharray:6 4,stroke-width:2px;")
         elif pair in edge_pairs["async"]:
             lines.append(f"  linkStyle {index} stroke-dasharray:3 3;")
+    from vibeflow.tooling.presentation.task_targets import task_target_label
+    def task_targets(manager,parent_id):
+        for slot,target in manager.task_targets.items():
+            target_id=_safe_id(f"{parent_id}__tasks__{slot}")
+            presentation=resolve_presentation(_node_descriptor(result,target),call_style=target.style)
+            label=task_target_label(slot,target)
+            if getattr(_node_descriptor(result,target),'flow_kind','')=='task_manager':label+='\n任务管理'
+            lines.append(f'  {target_id}@{{ shape: {presentation.shape}, label: "{_escape_label(label)}" }}')
+            lines.append(f'  style {target_id} {presentation.mermaid_style()};')
+            lines.append(f'  {parent_id} -.->|"启动: {_escape_label(slot)}"| {target_id}')
+            task_targets(target,target_id)
+    for manager in graph.nodes:
+        task_targets(manager,_safe_id(manager.id))
     return "\n".join(lines) + "\n"
 
 
@@ -579,6 +603,8 @@ def _node_class(
         nodeset is not None and nodeset.status == STATUS_PLANNED
     ):
         return "plannedNode"
+    if flow_kind == "task_manager":
+        return "taskManagerNode"
     if is_external:
         return "externalDependency"
     if node.type_used in LOOP_NODE_TYPES:
@@ -596,7 +622,8 @@ def _invocation_groups(graph: GraphConfig) -> tuple[_InvocationGroup, ...]:
     order: list[tuple[str, str]] = []
     grouped: dict[tuple[str, str], list[NodeSpec]] = {}
     nodesets: dict[tuple[str, str], NodesetSpec] = {}
-    for node in graph.nodes:
+    from vibeflow.core.tasks import call_specs
+    for node in call_specs(graph.nodes):
         kind = ""
         target = ""
         if node.type_used in LOOP_NODE_TYPES and node.loop.body:

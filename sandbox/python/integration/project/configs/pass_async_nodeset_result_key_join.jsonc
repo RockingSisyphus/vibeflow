@@ -26,12 +26,24 @@
         "description": "Runs input."
       },
       {
-        "async": "result_key",
-        "result_key": "value.out",
         "id": "composite",
-        "type_used": "math.add_five",
-        "display_name": "Composite",
-        "description": "Runs composite."
+        "type_used": "task.launch.math_add_five.waited",
+        "display_name": "任务管理：Composite",
+        "description": "Starts an explicitly declared workflow-owned task.",
+        "task_targets": {
+          "work": {
+            "id": "work",
+            "type_used": "math.add_five",
+            "display_name": "Composite",
+            "description": "Runs composite."
+          }
+        }
+      },
+      {
+        "id": "composite_join",
+        "type_used": "task.join.math_add_five",
+        "display_name": "任务管理：等待 Composite",
+        "description": "Waits for actual task execution and cleanup, then returns its declared outputs."
       },
       {
         "id": "end",
@@ -50,8 +62,12 @@
         "to": "composite"
       },
       {
-        "from": "composite",
+        "from": "composite_join",
         "to": "end"
+      },
+      {
+        "from": "composite",
+        "to": "composite_join"
       }
     ],
     "outputs": [

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -22,7 +21,6 @@ from vibeflow.targets.python.runtime.helpers import condition_matches, elapsed_m
 from vibeflow.targets.python.runtime.options import RuntimeOptions, runtime_hook_plan, runtime_options as normalize_runtime_options
 from vibeflow.targets.python.runtime.trace import RuntimeTrace, RuntimeTraceSink
 
-from vibeflow.targets.python.runtime.async_mixin import RuntimeAsyncMixin
 from vibeflow.targets.python.runtime.loop_mixin import RuntimeLoopMixin
 from vibeflow.targets.python.runtime.node_mixin import RuntimeNodeMixin
 from vibeflow.targets.python.runtime.nodeset_mixin import RuntimeNodesetMixin
@@ -35,7 +33,7 @@ from vibeflow.targets.python.runtime.summaries import summarize_mapping
 from vibeflow.targets.python.runtime.observation import observe_run
 
 
-class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, RuntimeAsyncMixin, RuntimeOutputMixin, RuntimeTraceMixin, RuntimeExecutionLockMixin):
+class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, RuntimeOutputMixin, RuntimeTraceMixin, RuntimeExecutionLockMixin):
     def __init__(
         self,
         graph: GraphConfig,
@@ -82,15 +80,18 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         self._node_runs: dict[str, int] = {node.name: 0 for node in graph.nodes}
         self._frames = self._plan.frames
         self._nodeset_runtimes: dict[str, PipelineRuntime] = {}
-        self._executor: ThreadPoolExecutor | None = None
-        self._async_results: dict[str, tuple[NodeFrame, Future[Mapping[str, object]]]] = {}
-        self._detached: list[tuple[NodeFrame, Future[Mapping[str, object]]]] = []
-        self._detached_timeout = False
-        self._abandoned_async_results = False
         self._run_dir = Path(run_dir) if run_dir is not None else Path("runs") / "vibeflow"
         self._trace_sink: RuntimeTraceSink | None = None
         self._trace_path_prefix: tuple[str, ...] = ()
         self._capabilities = dict(capabilities or {})
+        from .tasks import TaskRegistry, CancellationSignal
+        self._tasks = TaskRegistry(self)
+        self._signal = CancellationSignal()
+        self._current_task = None
+        self._owns_task_scope = True
+        self._owns_tasks = True
+        self._has_run = False
+        self._task_outputs = {}
         self._reset_execution_lock_state()
 
     def _assert_planned_runtime_allowed(self, graph: GraphConfig) -> None:
@@ -118,25 +119,40 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         runtime._node_runs = {name: 0 for name in plan.order}
         runtime._frames = plan.frames
         runtime._nodeset_runtimes = {}
-        runtime._executor = None
-        runtime._async_results = {}
-        runtime._detached = []
-        runtime._detached_timeout = False
-        runtime._abandoned_async_results = False
         runtime._run_dir = parent._run_dir
         runtime._trace_sink = parent._trace_sink
         runtime._trace_path_prefix = parent._trace_path_prefix
         runtime.runtime_options = parent.runtime_options
         runtime.delegate_cli = parent.delegate_cli
         runtime._capabilities = parent._capabilities
+        runtime._tasks = parent._tasks
+        runtime._signal = parent._signal
+        runtime._current_task = parent._current_task
+        runtime._owns_task_scope = False
+        runtime._owns_tasks = False
+        runtime._task_outputs = {}
         runtime._reset_execution_lock_state()
         return runtime
 
+    def request_stop(self, reason=None):
+        """Request cooperative cancellation; run() returns only after actual cleanup."""
+        self._signal.request_stop(reason)
+
     def run(self, initial: Mapping[str, Any] | None = None) -> RunResult:
+        if not self._owns_tasks:
+            return self._run_observed(initial)
+        if self._has_run:
+            from .tasks import TaskRegistry, CancellationSignal
+            self._tasks, self._signal = TaskRegistry(self), CancellationSignal()
+        self._has_run = True
         with observe_run(self._run_dir, self.runtime_options) as observer:
             observer.configure(self.runtime_options)
             observer.transition("running")
-            return self._run_observed(initial)
+            unsubscribe = self._signal.subscribe(lambda reason: observer.transition("stopping"))
+            try:
+                return self._run_observed(initial)
+            finally:
+                unsubscribe()
 
     def _run_observed(self, initial: Mapping[str, Any] | None = None) -> RunResult:
         owns_trace_sink = self._trace_sink is None
@@ -148,110 +164,87 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         initial_values = initial or {}
         state = self._new_state(initial_values)
         lease_started = False
+        primary_error = None
         try:
             self._begin_execution_lease()
             lease_started = True
             self._validate_public_inputs(initial_values)
             self._record_run_boundary("run_start")
-            self._call_runtime_plugins("before_run", dict(initial_values))
+            if self._owns_tasks:
+                self._call_runtime_plugins("before_run", dict(initial_values))
             if self.runtime_options.execution == "compiled":
                 run_compiled_steps(self, state)
             elif self.runtime_options.execution == "block":
                 self._run_block_steps(state)
             else:
                 self._run_steps(state)
-            if self.delegate_cli:
-                self._drain_async_results_for_delegate(exit_in_progress=False)
-            else:
-                self._abandon_async_results()
-            self._flush_detached()
-            # A protected result must have been consumed through its declared
-            # join before a successful root can publish outputs or success
-            # hooks. This also closes conservative static-analysis gaps such
-            # as an early terminal path abandoning a result task.
-            self._drain_protected_tasks(fail_on_unjoined=True)
+            self._signal.throw_if_aborted()
+            if self._owns_task_scope:
+                self._tasks.drain(self._current_task)
+            self._signal.throw_if_aborted()
             self.trace.stop_reason = self.trace.stop_reason or "completed"
             self._finalize_pipeline_outputs(state)
             self._record_run_boundary("run_end")
             self._write_trace(state.result)
-            self._call_runtime_plugins("after_run", state.result.to_dict(), self.trace.to_dict())
+            if self._owns_tasks:
+                self._call_runtime_plugins("after_run", state.result.to_dict(), self.trace.to_dict())
         except DelegateCliExit as exc:
             try:
-                self._settle_async_for_delegate_exit()
-            except Exception as pending_exc:
-                self._record_runtime_failure(state, pending_exc, force_node_failed=True)
-                raise
-            if not owns_trace_sink:
-                self.trace.stop_reason = "business_exit"
-                self.trace.exception = ""
+                if self._owns_task_scope:
+                    self._signal.request_stop("business exit")
+                    self._tasks.drain(self._current_task)
+            except BaseException as cleanup:
+                primary_error = cleanup
+                cleanup.business_exit = {"exit_code":exc.exit_code,"source":exc.source}
+                self._record_runtime_failure(state, cleanup, force_node_failed=True)
                 raise
             self.trace.stop_reason = "business_exit"
             self.trace.exception = ""
-            self._record_runtime_event(
-                "business_exit",
-                exc.source,
-                "delegate_cli",
-                details={"exit_code": exc.exit_code},
-            )
-            state.result.set(
-                "cli.exit_code",
-                DataEnvelope(
-                    key="cli.exit_code",
-                    type="cli.exit_code",
-                    value=exc.exit_code,
-                    source_node=exc.source,
-                ).to_input(),
-            )
+            if not owns_trace_sink:
+                raise
+            self._record_runtime_event("business_exit", exc.source, "delegate_cli",
+                                       details={"exit_code": exc.exit_code})
+            state.result.set("cli.exit_code", DataEnvelope(key="cli.exit_code", type="cli.exit_code",
+                value=exc.exit_code, source_node=exc.source).to_input())
             self._write_trace(state.result)
         except BaseException as exc:
-            self._abandon_async_results()
-            try:
-                self._flush_detached(exit_in_progress=True)
-            except BaseException:
-                # The original framework failure remains authoritative. Detached
-                # failures are already represented by their runtime events, and
-                # a later business exit must never replace the original error.
-                pass
+            primary_error = exc
+            if self._owns_task_scope:
+                self._signal.request_stop("workflow failed")
+                try:
+                    self._tasks.drain(self._current_task)
+                except BaseException as cleanup:
+                    exc.add_note(str(cleanup))
+                    exc.cleanup_errors = [*getattr(exc, "cleanup_errors", ()), cleanup]
             self._record_runtime_failure(state, exc)
             raise
         finally:
-            root_scope_protected = self._execution_scope_is_protected()
-            has_protected_futures = bool(self._protected_futures)
             try:
-                if has_protected_futures:
-                    self._drain_protected_tasks()
+                if self._owns_tasks:
+                    try:
+                        self._tasks.close()
+                    except BaseException as cleanup:
+                        if primary_error is None:
+                            raise
+                        primary_error.add_note(str(cleanup))
+                        primary_error.cleanup_errors = [*getattr(primary_error, "cleanup_errors", ()), cleanup]
+                if self.trace.exception:
+                    self._record_global_state_change_warning(self.trace.exception)
             finally:
                 try:
-                    self._shutdown_executor(
-                        force_wait=root_scope_protected
-                    )
+                    if lease_started:
+                        self._end_execution_lease()
+                        self._write_trace(state.result)
+                except BaseException as cleanup:
+                    if primary_error is None:
+                        raise
+                    primary_error.add_note(str(cleanup))
+                    primary_error.cleanup_errors = [*getattr(primary_error, "cleanup_errors", ()), cleanup]
                 finally:
-                    try:
+                    if owns_trace_sink and self._trace_sink is not None:
                         try:
-                            # A protected worker can begin after the main scheduler
-                            # has already entered failure handling. Re-check only
-                            # after every managed task is drained, while the lease is
-                            # still held, so that late ambient-state changes are not
-                            # silently omitted from the trace.
-                            if self.trace.exception:
-                                self._record_global_state_change_warning(
-                                    self.trace.exception
-                                )
-                        finally:
-                            # Observability is not allowed to own the lock
-                            # lifecycle. Even if recording the state-change warning
-                            # fails, every acquired domain and its ContextVars must
-                            # still be released/reset before this run can escape.
-                            if lease_started:
-                                self._end_execution_lease()
-                                # The release event is part of the public runtime trace.
-                                # Refresh the returned trace metadata only after the
-                                # lease has actually been released so event_count and
-                                # streamed events describe the same completed run.
-                                self._write_trace(state.result)
-                    finally:
-                        if owns_trace_sink and self._trace_sink is not None:
                             self._trace_sink.write_summary(self.trace)
+                        finally:
                             self._trace_sink.close()
                             self._trace_sink = None
         return state.result
@@ -270,7 +263,12 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         self.trace.exception = str(exc)
         self._record_global_state_change_warning(str(exc))
         self._write_trace(state.result)
-        self._call_runtime_plugins("run_failed", state.result.to_dict(), self.trace.to_dict(), str(exc))
+        if self._owns_tasks:
+            try:
+                self._call_runtime_plugins("run_failed", state.result.to_dict(), self.trace.to_dict(), str(exc))
+            except BaseException as cleanup:
+                exc.add_note(str(cleanup))
+                exc.cleanup_errors = [*getattr(exc, "cleanup_errors", ()), cleanup]
 
     def _record_global_state_change_warning(self, failure: str) -> None:
         lease = self._lease
@@ -302,11 +300,6 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
     def _reset_run_state(self) -> None:
         self.trace = RuntimeTrace(trace_path=str(self._trace_file_path()))
         self._node_runs = {name: 0 for name in self._plan.order}
-        self._async_results = {}
-        self._detached = []
-        self._detached_timeout = False
-        self._abandoned_async_results = False
-        self._protected_futures = []
         self._global_state_started = False
         self._global_state_nodes = []
 
@@ -353,20 +346,22 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
 
 
 
+    def _scheduled_targets(self, node_name, active_edges):
+        return tuple(dict.fromkeys(edge.target for edge in active_edges))
+
     def _initial_ready_nodes(self, state: _RuntimeState) -> tuple[str, ...]:
         ready = []
         for node_name in self._plan.order:
             frame = self._frames[node_name]
             if frame.incoming:
                 continue
-            if not frame.is_terminal:
+            if not frame.is_terminal and node_name != self.graph.task_entry:
                 continue
             if self._requirements_available(node_name, state):
                 ready.append(node_name)
         return tuple(ready)
 
     def _requirements_available(self, node_name: str, state: _RuntimeState) -> bool:
-        self._join_async_incoming(node_name, state)
         frame = self._frames[node_name]
         if not self._conditional_gate_satisfied(frame, state):
             return False
@@ -405,13 +400,6 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         return frame.is_terminal
 
     def _activated_edges(self, node_name: str, outputs: Mapping[str, object], state: _RuntimeState) -> tuple[EdgeSpec, ...]:
-        # A result-key task has only been scheduled at this point; its
-        # outgoing routes become active when ``_join_async_source`` resolves
-        # the task and supplies the real outputs.  Activating unconditional
-        # routes here records them twice and exposes a route before its result
-        # exists.
-        if node_name in self._async_results:
-            return ()
         active = []
         values = self._condition_values(node_name, outputs, state)
         for edge in self._frames[node_name].outgoing:
@@ -431,33 +419,33 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         return values
 
     def _run_node(self, node_name: str, state: _RuntimeState) -> Mapping[str, object]:
+        self._signal.throw_if_aborted()
         self.trace.current_node = node_name
         frame = self._frames[node_name]
         inputs = self._resolve_inputs(frame, state)
         state.last_inputs[node_name] = inputs
         state.inboxes[node_name] = []
-        if frame.async_mode:
-            outputs = self._run_async_node(frame, inputs)
-        else:
-            with self._frame_execution_scope(frame):
-                if frame.is_io:
-                    outputs = self._run_io_node(frame, inputs)
-                elif frame.is_planned_stub:
-                    outputs = self._run_planned_stub_node(frame, inputs)
-                elif frame.is_loop:
-                    if self.runtime_options.execution == "block":
-                        outputs = self._run_loop_block_node(frame, inputs)
-                    elif self.runtime_options.execution == "compiled" and loop_block(self._plan, frame.name) is not None:
-                        outputs = self._run_loop_block_node(frame, inputs)
-                    else:
-                        outputs = self._run_loop_node(frame, inputs)
-                elif frame.is_nodeset:
-                    if self.runtime_options.execution == "compiled" and nodeset_block(self._plan, frame.name) is not None:
-                        outputs = self._run_nodeset_block_node(frame, inputs)
-                    else:
-                        outputs = self._run_nodeset_node(frame, inputs)
+        with self._frame_execution_scope(frame):
+            if frame.is_io:
+                outputs = self._run_io_node(frame, inputs)
+            elif frame.is_planned_stub:
+                outputs = self._run_planned_stub_node(frame, inputs)
+            elif frame.is_loop:
+                if self.runtime_options.execution == "block":
+                    outputs = self._run_loop_block_node(frame, inputs)
+                elif self.runtime_options.execution == "compiled" and loop_block(self._plan, frame.name) is not None:
+                    outputs = self._run_loop_block_node(frame, inputs)
                 else:
-                    outputs = self._run_pure_node(frame, inputs)
+                    outputs = self._run_loop_node(frame, inputs)
+            elif frame.is_nodeset:
+                if self.runtime_options.execution == "compiled" and nodeset_block(self._plan, frame.name) is not None:
+                    outputs = self._run_nodeset_block_node(frame, inputs)
+                else:
+                    outputs = self._run_nodeset_node(frame, inputs)
+            else:
+                outputs = self._run_pure_node(frame, inputs)
+        if self.graph.task_entry == frame.id:
+            self._task_outputs = dict(outputs)
         self._record_node_output_candidates(node_name, outputs, state)
         return outputs
 

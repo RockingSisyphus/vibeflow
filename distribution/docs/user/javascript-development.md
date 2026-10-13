@@ -1,6 +1,6 @@
 # JavaScript/TypeScript 资源与 AOT
 
-用户资源从 `@vibeflow/plugin` 的 SDK 定义。声明与执行代码可以放在一起；workflow 显式选择固定插件对象。JS/TS 属于同一执行族，生成物继续是普通 ESM，使用原生 Workflow ABI v5。
+用户资源从 `@vibeflow/plugin` 的 SDK 定义。声明与执行代码可以放在一起；workflow 显式选择固定插件对象。JS/TS 属于同一执行族，生成物继续是普通 ESM，使用原生 Workflow ABI v6。
 
 ## Node 与固定插件
 
@@ -86,3 +86,5 @@ Browser/Node 平台由 `build --target` 选择。Rule 始终在 Node worker 环�
 上例使用运行器提供的第三个参数 `context`，通过 `context.updateInfo` 提交信息，并照常返回 Node 输出。异步 Node 在 `await` 业务操作后使用同一接口；训练循环可逐轮更新。Node 的规则选择与原生执行协议沿用已有声明。
 
 传入普通 JSON 对象数组，每次调用替换全部 `info`；`[]` 清空信息。缓存会在下次刷新、状态变化或结束时发布，默认间隔为 60000 毫秒，运行选项 `statusIntervalMs` 可调整。Node.js 写入状态文件，浏览器通过 `onStatus` 向宿主提供快照。文件路径、Host 会话及完整格式见[运行日志与状态接口](runtime-observation.md)。
+
+并发启动、任务引用、停止与实际收尾合同见[原生任务管理](task-management.md)。

@@ -13,30 +13,30 @@ from vibeflow.targets.python.runtime.summaries import summarize_mapping
 
 class RuntimeNodeMixin:
     def _run_compiled_frame(self, frame: NodeFrame, state: "_RuntimeState") -> Mapping[str, object]:
+        self._signal.throw_if_aborted()
         self.trace.current_node = frame.name
         inputs = self._resolve_inputs(frame, state)
         state.last_inputs[frame.name] = inputs
         state.inboxes[frame.name] = []
-        if frame.async_mode:
-            outputs = self._run_async_node(frame, inputs)
-        else:
-            with self._frame_execution_scope(frame):
-                if frame.is_io:
-                    outputs = self._run_io_node(frame, inputs)
-                elif frame.is_planned_stub:
-                    outputs = self._run_planned_stub_node(frame, inputs)
-                elif frame.is_loop:
-                    if loop_block(self._plan, frame.name) is not None:
-                        outputs = self._run_loop_block_node(frame, inputs)
-                    else:
-                        outputs = self._run_loop_node(frame, inputs)
-                elif frame.is_nodeset:
-                    if nodeset_block(self._plan, frame.name) is not None:
-                        outputs = self._run_nodeset_block_node(frame, inputs)
-                    else:
-                        outputs = self._run_nodeset_node(frame, inputs)
+        with self._frame_execution_scope(frame):
+            if frame.is_io:
+                outputs = self._run_io_node(frame, inputs)
+            elif frame.is_planned_stub:
+                outputs = self._run_planned_stub_node(frame, inputs)
+            elif frame.is_loop:
+                if loop_block(self._plan, frame.name) is not None:
+                    outputs = self._run_loop_block_node(frame, inputs)
                 else:
-                    outputs = self._run_pure_node(frame, inputs)
+                    outputs = self._run_loop_node(frame, inputs)
+            elif frame.is_nodeset:
+                if nodeset_block(self._plan, frame.name) is not None:
+                    outputs = self._run_nodeset_block_node(frame, inputs)
+                else:
+                    outputs = self._run_nodeset_node(frame, inputs)
+            else:
+                outputs = self._run_pure_node(frame, inputs)
+        if self.graph.task_entry == frame.id:
+            self._task_outputs = dict(outputs)
         self._record_node_output_candidates(frame.name, outputs, state)
         return outputs
 
@@ -246,7 +246,24 @@ class RuntimeNodeMixin:
         # Runtime globals retain their reference semantics; Node config is JSON.
         if "_global" in frame.params:
             params["_global"] = frame.params["_global"]
-        outputs = node.run_pure(inputs, params)
+        from .tasks import NodeRunContext
+        context = NodeRunContext(self, frame) if frame.accepts_context else None
+        primary = None
+        try:
+            outputs = node.run_pure(inputs, params, context) if context else node.run_pure(inputs, params)
+        except BaseException as exc:
+            primary = exc
+            raise
+        finally:
+            if context:
+                try:
+                    context.close()
+                except BaseException as cleanup:
+                    if primary is None:
+                        raise
+                    primary.add_note(str(cleanup))
+                    primary.cleanup_error = cleanup
+        self._signal.throw_if_aborted()
         return self._validate_outputs(frame, outputs)
 
     def _execute_planned_stub_outputs(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:

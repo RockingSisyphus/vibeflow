@@ -1,6 +1,6 @@
+from tests.fixtures.support.task_management import task_call, register_task_manager
 """Integration gates for the Python Target runtime."""
 
-from __future__ import annotations
 from tests.fixtures.support.declarations import native_registry
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 
@@ -256,14 +256,12 @@ def test_result_key_semantics_and_trace_match_all_execution_modes(
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the flow."),
-                    _node_call(
+                    task_call(
                         "seed",
                         "test.seed",
                         "Produces an asynchronous value.",
 
                         config={"value": 4},
-                        result_key="value.in",
-                        **{"async": "result_key"},
                     ),
                     _node_call(
                         "add",
@@ -286,7 +284,7 @@ def test_result_key_semantics_and_trace_match_all_execution_modes(
     )
     result = PipelineRuntime(
         graph,
-        registry=_registry(),
+        registry=register_task_manager(_registry(), "test.seed"),
         runtime_options=RuntimeOptions(execution=execution, trace="full"),
         run_dir=tmp_path / execution,
     ).run()
@@ -294,8 +292,8 @@ def test_result_key_semantics_and_trace_match_all_execution_modes(
 
     assert result.get("value.out")["value"] == 7
     assert result.get("runtime.stop_reason") == "completed"
-    assert "async_result" in kinds
-    assert "async_result_join" in kinds
+    assert "task_started" in kinds
+    assert "task_exited" in kinds
     assert kinds[-1] == "runtime_summary"
 
 
@@ -309,13 +307,12 @@ def test_detached_failure_cleanup_and_trace_match_all_execution_modes(
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the flow."),
-                    _node_call(
+                    task_call(
                         "metrics",
                         "test.runtime_fail",
                         "Fails in a detached task.",
 
                         config={"fail": True},
-                        **{"async": "detached"},
                     ),
                     _node_call(
                         "seed",
@@ -336,22 +333,13 @@ def test_detached_failure_cleanup_and_trace_match_all_execution_modes(
             }
         }
     )
-    result = PipelineRuntime(
-        graph,
-        registry=_registry(),
-        runtime_options=RuntimeOptions(execution=execution, trace="full"),
-        run_dir=tmp_path / execution,
-    ).run()
-    lines = _trace_lines(result)
-
-    assert result.get("value.in")["value"] == 2
-    assert result.get("runtime.stop_reason") == "completed"
-    assert any(line["kind"] == "async_detached" for line in lines)
-    assert any(
-        line["kind"] == "async_detached_failed" and "boom" in line["failure"]
-        for line in lines
-    )
-    assert lines[-1]["kind"] == "runtime_summary"
+    runtime=PipelineRuntime(graph,registry=register_task_manager(_registry(),'test.runtime_fail'),
+        runtime_options=RuntimeOptions(execution=execution,trace='full'),run_dir=tmp_path/execution)
+    with pytest.raises(RuntimeError,match='boom'):runtime.run()
+    lines=[json.loads(line) for line in (tmp_path/execution/'runtime_trace.jsonl').read_text().splitlines()]
+    assert any(line['kind']=='task_started' for line in lines)
+    assert any(line['kind']=='task_exited' and line['details']['status']=='failed' for line in lines)
+    assert lines[-1]['kind']=='runtime_summary'
 
 
 @pytest.mark.parametrize("execution", EXECUTION_MODES)

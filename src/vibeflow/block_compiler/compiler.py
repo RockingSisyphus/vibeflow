@@ -144,7 +144,6 @@ def compile_graph_plan(
         inherited_lock_key="",
     )
     root_block = state.blocks[0]
-    _validate_protected_async_plan(tuple(state.blocks))
     return WorkflowPlan(
         abi_version=WORKFLOW_ABI_VERSION,
         workflow_id=_workflow_id(graph, workflow_id),
@@ -222,6 +221,7 @@ class _PlannerState:
             ]
         ] = []
         nodes: list[NodeCallPlan] = []
+        task_children = []
         for spec in graph.nodes:
             is_loop = spec.type_used in LOOP_NODE_TYPES
             is_nodeset = spec.type_used in graph.nodesets and not is_loop
@@ -265,6 +265,19 @@ class _PlannerState:
                 node_lock_key,
                 subject=f"node {'.'.join(child_path)}",
             )
+            targets = []
+            from vibeflow.core.tasks import task_graph
+            for key, target in (() if spec.status == STATUS_PLANNED else spec.task_targets.items()):
+                target_path = (*path, spec.id, "tasks", key)
+                target_graph = task_graph(graph, target)
+                target_compiled = self.compiled_by_path.get(target_path)
+                if target_compiled is None:
+                    target_compiled = CoreGraphCompiler().compile(target_graph,
+                        implementation_facts=self.implementation_facts,
+                        target_features=self.target_features)
+                targets.append((key, _block_id(target_path)))
+                task_children.append((node_index, target_graph, target_compiled, target_path, child_lock_key))
+            node_plan = replace(node_plan, task_targets=tuple(targets))
             nodes.append(node_plan)
             if not has_child or nodeset is None:
                 continue
@@ -308,6 +321,7 @@ class _PlannerState:
                 loop=loop,
                 nodes=tuple(nodes),
                 execution_lock=block_lock,
+                task_executor="event_loop" if self.target_features.target in {"javascript", "browser", "node"} else "thread",
             )
         )
         for (
@@ -334,6 +348,12 @@ class _PlannerState:
                     nodes[node_index],
                     contains_global_state=True,
                 )
+        for node_index, target_graph, target_compiled, target_path, task_lock_key in task_children:
+            task_global_state = self.add_graph_block(target_graph, target_compiled, path=target_path,
+                kind="task", loop=None, active_nodesets=active_nodesets,
+                inherited_lock_key=task_lock_key)
+            if task_global_state:
+                nodes[node_index] = replace(nodes[node_index], contains_global_state=True)
         contains_global_state = any(
             node.contains_global_state for node in nodes
         )
@@ -346,6 +366,7 @@ class _PlannerState:
             nodes=tuple(nodes),
             execution_lock=block_lock,
             contains_global_state=contains_global_state,
+            task_executor="event_loop" if self.target_features.target in {"javascript", "browser", "node"} else "thread",
         )
         return contains_global_state
 
@@ -438,14 +459,6 @@ class _PlannerState:
             return ("immediate", "inline", "current")
         fact = (self.native_execution_facts if native else self.implementation_facts).get(spec.type_used)
         completion = fact.completion if fact is not None else "immediate"
-        if spec.async_mode:
-            schedule = _schedule(spec.async_mode)
-            executor = _executor(spec.async_mode)
-            if fact is not None:
-                executor = fact.async_executor or (
-                    fact.executor if fact.executor != "current" else executor
-                )
-            return (completion, schedule, executor)
         if fact is None:
             return (completion, "inline", "current")
         return (completion, fact.schedule, fact.executor)
@@ -461,12 +474,13 @@ def _block(
     nodes: tuple[NodeCallPlan, ...],
     execution_lock: ExecutionLockPlan | None = None,
     contains_global_state: bool = False,
+    task_executor: str = "thread",
 ) -> BlockPlan:
     routes = _routes(compiled)
     incoming = {route.target for route in routes if route.schedule}
     outgoing = {route.source for route in routes if route.schedule}
     terminal_by_id = {node.id: node.is_terminal for node in nodes}
-    entries = tuple(node_id for node_id in compiled.order if node_id not in incoming and terminal_by_id.get(node_id, False))
+    entries = (graph.task_entry,) if graph.task_entry else tuple(node_id for node_id in compiled.order if node_id not in incoming and terminal_by_id.get(node_id, False))
     exits = tuple(node_id for node_id in compiled.order if node_id not in outgoing and terminal_by_id.get(node_id, False))
     return BlockPlan(
         id=_block_id(path),
@@ -481,17 +495,10 @@ def _block(
         entries=entries,
         exits=exits,
         max_steps=graph.max_steps,
-        tasks=tuple(
-            TaskPlan(
-                id=f"{_block_id(path)}:task:{node.id}",
-                node_id=node.id,
-                schedule=node.schedule,
-                executor=node.executor,
-                result_key=node.result_key,
-            )
-            for node in nodes
-            if node.schedule != "inline"
-        ),
+        tasks=tuple(TaskPlan(id=f"{_block_id(path)}:task:{node.id}:{key}",
+            manager_node_id=node.id, key=key, block_id=target,
+            executor="event_loop" if node.executor == "event_loop" else task_executor)
+            for node in nodes for key, target in node.task_targets),
         loop=loop,
         execution_lock=(
             execution_lock
@@ -547,18 +554,6 @@ def _loop_plan(spec: LoopSpec) -> LoopPlan:
     )
 
 
-def _schedule(async_mode: str) -> str:
-    if async_mode == "result_key":
-        return "deferred"
-    if async_mode == "detached":
-        return "detached"
-    return "inline"
-
-
-def _executor(async_mode: str) -> str:
-    return "thread" if async_mode else "current"
-
-
 def _execution_lock_plan(
     spec: object | None,
     *,
@@ -579,99 +574,6 @@ def _nested_lock_key(parent: str, child: str, *, subject: str) -> str:
             f"incompatible key '{parent}'; nested locks must reuse one key"
         )
     return child or parent
-
-
-def _validate_protected_async_plan(
-    blocks: tuple[BlockPlan, ...],
-) -> None:
-    if not blocks:
-        return
-    root_protected = blocks[0].execution_lock is not None
-    blocks_by_path = {block.path: block for block in blocks}
-    for block in blocks:
-        block_protected = root_protected or _block_has_protected_ancestor(
-            block,
-            blocks_by_path=blocks_by_path,
-        )
-        for node in block.nodes:
-            if node.status == STATUS_PLANNED:
-                continue
-            protected = block_protected or node.execution_lock is not None
-            if not protected or not node.async_mode:
-                continue
-            if node.async_mode == "detached":
-                raise PortablePlanError(
-                    f"protected block '{block.id}' cannot detach node "
-                    f"'{node.id}' while execution_lock is active"
-                )
-            if (
-                node.async_mode == "result_key"
-                and not _plan_has_static_result_consumer(block, node)
-            ):
-                raise PortablePlanError(
-                    f"protected block '{block.id}' async result_key node "
-                    f"'{node.id}' has no statically provable scheduled "
-                    "consumer path"
-                )
-
-
-def _block_has_protected_ancestor(
-    block: BlockPlan,
-    *,
-    blocks_by_path: Mapping[tuple[str, ...], BlockPlan],
-) -> bool:
-    if block.execution_lock is not None:
-        return True
-    for length in range(1, len(block.path) + 1):
-        parent_path = block.path[: length - 1]
-        parent = blocks_by_path.get(parent_path)
-        if parent is None:
-            continue
-        if parent.execution_lock is not None:
-            return True
-        try:
-            invocation = parent.node(block.path[length - 1])
-        except KeyError:
-            continue
-        if invocation.execution_lock is not None:
-            return True
-    return False
-
-
-def _plan_has_static_result_consumer(
-    block: BlockPlan,
-    source: NodeCallPlan,
-) -> bool:
-    result_provider = next(
-        (item for item in source.provides if item.key == source.result_key),
-        None,
-    )
-    if result_provider is None:
-        return False
-    adjacency: dict[str, set[str]] = {}
-    for route in block.routes:
-        if route.schedule and route.condition is None:
-            adjacency.setdefault(route.source, set()).add(route.target)
-    nodes_by_id = {node.id: node for node in block.nodes}
-    pending = list(sorted(adjacency.get(source.id, ())))
-    seen: set[str] = set()
-    while pending:
-        node_id = pending.pop(0)
-        if node_id in seen:
-            continue
-        seen.add(node_id)
-        candidate = nodes_by_id.get(node_id)
-        if candidate is not None and any(
-            requirement.type == result_provider.type
-            for requirement in candidate.requires
-        ):
-            return True
-        pending.extend(
-            target
-            for target in sorted(adjacency.get(node_id, ()))
-            if target not in seen
-        )
-    return False
 
 
 def _sources_from_facts(

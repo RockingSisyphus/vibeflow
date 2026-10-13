@@ -183,3 +183,5 @@ python run.py validate --config <root>/configs/main.jsonc
 ## Workflow 的规则选择
 
 Workflow 顶层的 `rulesets` 未填写时，使用内置及所选 Plugin 的 Workflow 默认；非空列表替代全部默认，`[]` 取消根图规则。Node 调用自身的 `rulesets` 独立控制局部规则，不解除图级约束。需要同时保留内置 Workflow 审查与自定义图规则时，应显式列出 `["vibeflow.workflow", "example.graph"]`。定义和接入方法见 [规则选择与插件示例](rules-and-nodes.md)。
+
+并发启动、任务引用、停止与实际收尾合同见[原生任务管理](task-management.md)。

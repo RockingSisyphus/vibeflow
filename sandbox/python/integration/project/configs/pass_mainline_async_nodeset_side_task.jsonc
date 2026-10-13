@@ -15,11 +15,18 @@
         "type_used": "sandbox.constant"
       },
       {
-        "display_name": "Async Side Task",
-        "description": "Runs the side nodeset as detached async work.",
-        "async": "detached",
         "id": "side_task",
-        "type_used": "side.async_value"
+        "type_used": "task.launch.side_async_value.background",
+        "display_name": "任务管理：Async Side Task",
+        "description": "Starts an explicitly declared workflow-owned task.",
+        "task_targets": {
+          "work": {
+            "display_name": "Async Side Task",
+            "description": "Runs the side nodeset as detached async work.",
+            "id": "work",
+            "type_used": "side.async_value"
+          }
+        }
       },
       {
         "display_name": "Main Add",
@@ -50,6 +57,10 @@
       },
       {
         "from": "main_add",
+        "to": "end"
+      },
+      {
+        "from": "side_task",
         "to": "end"
       }
     ],

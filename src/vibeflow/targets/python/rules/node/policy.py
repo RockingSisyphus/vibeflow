@@ -51,7 +51,6 @@ BANNED_ATTR_CALLS = {
     "subprocess.call",
     "subprocess.Popen",
     "subprocess.run",
-    "time.sleep",
 }
 
 

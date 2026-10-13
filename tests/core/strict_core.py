@@ -69,11 +69,11 @@ class BypassMiddleNode:
         return {"middle.value": inputs["value.in"]["value"]}
 
 
-def test_selected_rules_check_pure_node_source() -> None:
+def test_selected_rules_allow_node_owned_synchronous_wait() -> None:
     report = _review_node(SeedNode_DECLARATION, SeedNode, policy=PurityPolicy(max_source_lines=1000))
     assert report.findings == ()
     violations = _review_node(BadIoNode_DECLARATION, BadIoNode, policy=PurityPolicy(max_source_lines=1000)).findings
-    assert any(item.rule_id == "NODE.EFFECT.CALL_FORBIDDEN" for item in violations)
+    assert not any(item.rule_id == "NODE.EFFECT.CALL_FORBIDDEN" for item in violations)
 
 
 def test_selected_maintainability_rule_enforces_source_size() -> None:

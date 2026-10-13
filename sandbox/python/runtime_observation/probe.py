@@ -21,8 +21,10 @@ BODY = '''        info = [{"metrics": {"loss": 0.125}}, {"message": "正在训�
         os.write(1, b"native-stdout\\n")
         subprocess.run([sys.executable, "-c", "print('child-stdout')"], check=True)
         thread = threading.Thread(target=lambda: print("thread-stdout", flush=True))
-        thread.start()
-        thread.join()
+        try:
+            thread.start()
+        finally:
+            thread.join()
         time.sleep(.25)
 '''
 

@@ -536,7 +536,7 @@ def test_mermaid_custom_style_overrides_health_class_color() -> None:
     assert "style seed fill:#123abc,stroke:#456def,color:#654321;" in text
 
 
-def test_mermaid_external_boundary_composes_with_health_custom_style_and_async_metadata(tmp_path) -> None:
+def test_mermaid_external_boundary_composes_with_health_and_custom_style(tmp_path) -> None:
     registry = _registry()
     register_node(registry, ExternalVisualNode_DECLARATION, ExternalVisualNode)
     register_node(registry, ExternalResultVisualNode_DECLARATION, ExternalResultVisualNode)
@@ -552,8 +552,6 @@ def test_mermaid_external_boundary_composes_with_health_custom_style_and_async_m
                         "Keeps its external boundary under custom colors.",
                         display_name="[EXTERNAL] Custom External",
                         style={"fill": "#123abc", "stroke": "#456def", "text": "#654321"},
-                        result_key="external.result",
-                        **{"async": "result_key"},
                     ),
                 ]
             }
@@ -584,8 +582,7 @@ def test_mermaid_external_boundary_composes_with_health_custom_style_and_async_m
     assert text.count("[EXTERNAL] Custom External") == 1
     assert "[EXTERNAL] [EXTERNAL]" not in text
     assert "external: true" in text
-    assert "async: result_key" in text
-    assert "result_key: external.result" in text
+    assert "type_used: test.external_result_visual" in text
 
     if not is_mermaid_svg_renderer_available():
         pytest.skip("Mermaid SVG renderer is not installed")
@@ -769,53 +766,12 @@ def test_compiler_applies_explicit_edge_roles_after_default_inference() -> None:
     ]
 
 
-def test_schedule_edges_keep_sync_mainline_before_async_branches() -> None:
-    registry = _registry()
-    register_node(registry, BackgroundVisualNode_DECLARATION, BackgroundVisualNode)
-    graph = parse_graph_config(
-        {
-            "pipeline": {
-                "nodes": [
-                    _node_call(
-                        "start",
-                        "test.start",
-                        "Starts sync and async branches.",
-                    ),
-                    _node_call(
-                        "background",
-                        "test.background_visual",
-                        "Runs as a detached async side branch.",
-                        **{"async": "detached"},
-                    ),
-                    _node_call(
-                        "seed",
-                        "test.seed",
-                        "Runs first on the synchronous mainline.",
-
-                    ),
-                    _node_call(
-                        "end",
-                        "test.in_end",
-                        "Ends the synchronous mainline.",
-
-                    ),
-                ],
-                "edges": [
-                    {"from": "start", "to": "background"},
-                    {"from": "start", "to": "seed"},
-                    {"from": "seed", "to": "end"},
-                ],
-            }
-        }
-    )
-
-    compiled = GraphCompiler().compile(graph, registry=registry)
-
-    assert [edge.pair for edge in compiled.schedule_edges] == [
-        ("start", "seed"),
-        ("seed", "end"),
-        ("start", "background"),
-    ]
+def test_old_implicit_scheduling_requires_explicit_task_manager() -> None:
+    from vibeflow.core.flow import GraphConfigError
+    for mode in ("detached", "result_key"):
+        with pytest.raises(GraphConfigError, match="GRAPH.ASYNC.MIGRATION"):
+            parse_graph_config({"pipeline":{"nodes":[_node_call("work", "test.seed",
+                "Old concurrent call", **{"async":mode})]}})
 
 
 def test_compiler_rejects_edge_with_no_effective_role_after_inference() -> None:
@@ -1061,43 +1017,18 @@ def test_cycle_validation_is_role_specific() -> None:
     ]
 
 
-def test_async_result_key_rejects_transfer_only_outgoing_edge() -> None:
-    graph = parse_graph_config(
-        {
-            "pipeline": {
-                "nodes": [
-                    _node_call("start", "test.start", "Starts the async role fixture."),
-                    _node_call(
-                        "async_seed",
-                        "test.seed",
-                        "Produces a result that requires a scheduled join.",
-
-                        result_key="value.in",
-                        **{"async": "result_key"},
-                    ),
-                    _node_call(
-                        "end",
-                        "test.in_end",
-                        "Would receive only transferred async data.",
-
-                    ),
-                ],
-                "edges": [
-                    {"from": "start", "to": "async_seed"},
-                    {
-                        "from": "async_seed",
-                        "to": "end",
-                        "schedule": False,
-                    },
-                ],
-            }
-        }
-    )
-
-    with pytest.raises(GraphCompileError) as exc_info:
-        GraphCompiler().compile(graph, registry=_registry())
-
-    assert exc_info.value.rule_id == "GRAPH.ASYNC.RESULT_UNJOINABLE"
+def test_task_reference_data_does_not_trigger_implicit_result_wait() -> None:
+    from vibeflow.core.flow import GraphConfig, NodeSpec, EdgeSpec
+    from vibeflow.core.models import ImplementationFact, ImplementationFacts
+    from vibeflow.core.compiler import CoreCompileRequest, compile_core
+    facts = ImplementationFacts((ImplementationFact("fixture.manager",flow_kind="task_manager",
+        provides=(DataProvider("refs","fixture.refs"),)),ImplementationFact("fixture.relay",flow_kind="process",
+        requires=(DataRequirement("fixture.refs","exactly_one"),))),strict=True)
+    graph = GraphConfig(nodes=(NodeSpec("manager","fixture.manager"),NodeSpec("relay","fixture.relay")),
+                        edges=(EdgeSpec("manager","relay"),))
+    result = compile_core(CoreCompileRequest(graph=graph,implementation_facts=facts))
+    assert result.compiled_graph.resolved_schedule_edges[0].pair == ("manager","relay")
+    assert result.compiled_graph.async_edges == ()
 
 
 def test_mermaid_renders_while_loop_shape_class_and_stop_condition() -> None:

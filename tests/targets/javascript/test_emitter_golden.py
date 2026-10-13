@@ -16,6 +16,7 @@ from tests.targets.javascript.test_aot_core import (
     _node,
     _provider,
     _requirement,
+    _managed_task,
 )
 from vibeflow.targets.javascript.build import BuildRequest, build_aot
 from vibeflow.targets.javascript.frontend.emitter import emit_workflow_module
@@ -109,30 +110,22 @@ def _loop_plan(max_iterations: int | None) -> dict[str, object]:
 
 def _deferred_plan() -> dict[str, object]:
     return _linear_plan(
-        middle=_middle(
-            completion="suspend",
-            async_mode="result_key",
-            result_key="out",
-        ),
+        middle=_managed_task("calculate", "calculate", requires=[_requirement("number")],
+                             provides=[_provider("out", "answer")]),
         entry_mode="async",
     )
 
 
 def _detached_plan() -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v5",
+        "abi_version": "vibeflow.workflow.v6",
         "workflow_id": "baseline.detached",
         "entry_mode": "async",
         "inputs": [],
         "outputs": [],
         "nodes": [
             _node("start", "start", terminal=True),
-            _node(
-                "audit",
-                "audit",
-                completion="suspend",
-                async_mode="detached",
-            ),
+            _managed_task("audit", "audit", wait=False),
             _node("end", "end", terminal=True),
         ],
         "routes": [
@@ -167,7 +160,7 @@ def _port_plan() -> dict[str, object]:
     )
     send["type_used"] = "vibeflow.io"
     return {
-        "abi_version": "vibeflow.workflow.v5",
+        "abi_version": "vibeflow.workflow.v6",
         "workflow_id": "baseline.port",
         "entry_mode": "async",
         "inputs": [],
@@ -227,36 +220,36 @@ def _emission_cases() -> dict[str, tuple[dict[str, object], tuple[dict, ...]]]:
 
 # These hashes intentionally freeze generated source formatting as well as its
 # semantic plan.  Update them only after reviewing an intentional ABI change.
-# Workflow ABI v5 retires runtime-dispatch metadata; source and plan hashes migrate together.
-EMISSION_GOLDENS = {'sync': ('92a9cfc17136c24e68cff11c2457f227d6b869c44f976ec19c14430ece0942c6',
-          '758795a1a4d87d71ac71f8cd17675159c2b6627077098d82ecaa0ef96f3eadc2',
-          'eff7205382e740cfcc38a226aeebca2963c4668da2cbfa1618a241f5f6166380'),
- 'async': ('98427927b4d5b961f72d5d57269b005e2ebad9d2feda3d1ddc6f2972653ad886',
-           '9ef96ea189aa0dace931813732867222bf6c9c353615ebe13e74856442961229',
-           '933f3dae514f51e03c47b5fecdee808df3c0fa50d4de1eaf274c90b2e988b0e3'),
- 'nested_nodeset': ('f904c25ec89cbf60d70d3c359e5c9b28b673c539a29fffde00cee7a7aac37657',
-                    '758795a1a4d87d71ac71f8cd17675159c2b6627077098d82ecaa0ef96f3eadc2',
-                    'de4aa426e2f03e9b09010da02397b4aac90f9b830a65710fb22bfa9159518d93'),
- 'bounded_loop': ('e4da526b38481b5b99f6e2ffc1f4c7e4a83e979ab59ed947f5d174dbd31d1cd7',
-                  '758795a1a4d87d71ac71f8cd17675159c2b6627077098d82ecaa0ef96f3eadc2',
-                  '5bac47f18822edc7e933660f62884c888056776d7771a093db20cc2d8bbe9180'),
- 'unbounded_loop': ('55ab8be520223e71d3ebe81167792453d48a9b709fe4cc81ebd212d967089a09',
-                    '758795a1a4d87d71ac71f8cd17675159c2b6627077098d82ecaa0ef96f3eadc2',
-                    '2a0d04be6c5f58168e07a03f5240127839fe24a7f5a6edcf44165dc8ce526386'),
- 'deferred': ('aa32b6d349a01ffc20e50afe107a3af780f6045a9f9c2b23f75b8396e0251559',
-              '9ef96ea189aa0dace931813732867222bf6c9c353615ebe13e74856442961229',
-              '5b1bcac65d07a2b156cbd4799dcef9f265c3730707012cd11498089921a80882'),
- 'detached': ('60be75a5fe52a1602a327d815835402c39d49faa4a692ead5dcff4a5ea8d12f0',
-              '64978ad1bf7dfe9c41a7444c8df5e4b2c410cd3f8d6f61e0fb1883a9b19731e7',
-              'b94fc627c316a9501c3917df5bdedf4137c8d6a6ac86f4a3dca5192cff124b6c'),
- 'port': ('8fe1af59573f415f1c78a5b9ee515bf224078f8782df3f1b8c7256fc89c98ac3',
-          '3455be48945601a9308f73af686142320f213d41871adc9422bf183a2b3145cd',
-          '5981bd98808dd43b5ae3b04935ace05b79a0db512fb514ddcbc2156d4d269a71'),
- 'host_extension': ('3ce340e6a4f23a9e9aa1623498a2b862be3a82ffff3d85801f049617f7cac66f',
-                    'fc7caab9967cce6ab92e95b6f793a4fb5aa25b7fb436094eec1f215b130733cb',
-                    'eff7205382e740cfcc38a226aeebca2963c4668da2cbfa1618a241f5f6166380')}
+# Workflow ABI v6 uses declared managed tasks; source and plan hashes migrate together.
+EMISSION_GOLDENS = {'async': ('841f5ebfceeeabdae86f19d621e11cd85fd951da4b706a3d1c72f529829a2a60',
+           '1a6baab32f00e76e0294e3f7badea9d365dc797d5d2487754156eb3c77f9a46e',
+           'ebb3cac6c7d61e3c808367e5e771c3ab9229ba9f91105130b32814d3cfa749b3'),
+ 'bounded_loop': ('b523eab8e0187abb25f24256cc3f141d1c375b00d242b6533aeca3de4f1a149d',
+                  '040518318f9a1c4aff7ddccda914fd6f86c673a4009b571d7ce66276a5a6fe76',
+                  'e18f57b734f7b1d83b24c4dd0ef4990c947a5a9223c3b6311b55ffd62678b11b'),
+ 'deferred': ('4074a7c890b7a3d4b449e64c74fccae1ae75698f64429e9afb432565c96813cc',
+              '1a6baab32f00e76e0294e3f7badea9d365dc797d5d2487754156eb3c77f9a46e',
+              '95b19f22d714bee95ec16755401979efd12189a11f93099c450ffef5cf2e0c73'),
+ 'detached': ('5e9f5ea20e2fffba895933c5e6fbfa91254dc99e2fa229e97e439691c055a545',
+              'd9ffcd4bbc2aade3f4cec188805d6a91dc9e05b37dfaa829c1ba0c7beda18c0a',
+              'c9720c2339c1e262745f5a6445627760624e2ab86940189b2944cf99dbff2fe2'),
+ 'host_extension': ('04cac38426f41108de5eba17161f1668ede67ec6782d2cc11942c7ceb9bbc0fe',
+                    '2b57cf6e55b15e96228e60912432a03c8d74f94137a1b58d8a60bc1c827c88d4',
+                    'e7ae9bec929e53617d80d63339a983605ff69b9494df3808ea640661ee8d1c3a'),
+ 'nested_nodeset': ('0fe037ddb1cf8a9ebc94ec7c899f876a5bb92c8485df8205bf42832c2cfd87f5',
+                    '040518318f9a1c4aff7ddccda914fd6f86c673a4009b571d7ce66276a5a6fe76',
+                    'fb49e5416a5431d72af425364cb6882e7375111b1d6dd16495aac7e9d98d436c'),
+ 'port': ('0310fc9889d31cce1bdfd4cb8e57364c2c0a126a6c6afd5198765d4b1cd771b0',
+          '65421af778599443ca2fdbda0aa258c77551ee402ac529d1805b6786711b1c53',
+          '592c6dcd07bb155a115a761b72523030fd77671b555abde8bef2a55f13247f04'),
+ 'sync': ('024d02d296283de3d07febc6de1bd8caf4ebd32cbd1f362a3aa1acbaba35a047',
+          '040518318f9a1c4aff7ddccda914fd6f86c673a4009b571d7ce66276a5a6fe76',
+          'e7ae9bec929e53617d80d63339a983605ff69b9494df3808ea640661ee8d1c3a'),
+ 'unbounded_loop': ('3ba50b0093b5d2382a5f8ff96b6ddc3df6af103840a60b3ab1ec830770fd7202',
+                    '040518318f9a1c4aff7ddccda914fd6f86c673a4009b571d7ce66276a5a6fe76',
+                    '6ffd003373fec5036fbd212a068b6d2bf1e1e76d8c133f43616404d668fc42c3')}
 
-NORMALIZED_WORKFLOW_SHA256 = '08ad91b0a7b80f6777e481597fc6374020b587d8dc780b5b9b91160226c463e5'
+NORMALIZED_WORKFLOW_SHA256 = '185efd1491168b56f715dbaa9db6d68c631020eb1d93156c6d3fbbc42b5ac66f'
 
 
 def test_canonical_bound_view_payload_is_frozen() -> None:
@@ -342,7 +335,7 @@ def test_representative_emission_source_declarations_and_plan_hash_are_frozen(
                 plan["nodes"][1].update(completion="immediate"),
             ),
             "VF_ENTRY_MODE_TASK_IN_SYNC",
-            "sync workflow contains deferred task 'calculate'",
+            "JavaScript task management requires an async workflow",
         ),
         (
             "sync_detached",
@@ -351,7 +344,7 @@ def test_representative_emission_source_declarations_and_plan_hash_are_frozen(
                 plan["nodes"][1].update(completion="immediate"),
             ),
             "VF_ENTRY_MODE_TASK_IN_SYNC",
-            "sync workflow contains detached task 'audit'",
+            "JavaScript task management requires an async workflow",
         ),
         (
             "port_missing_name",
@@ -555,7 +548,7 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
         "files": sorted(manifest["files"]),
     } == {
         "format": "vibeflow.aot-build.v2",
-        "abi_version": "vibeflow.workflow.v5",
+        "abi_version": "vibeflow.workflow.v6",
         "project_target": "javascript",
         "workflow_id": "test.workflow",
         "entry_mode": "sync",

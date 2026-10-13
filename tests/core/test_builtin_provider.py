@@ -19,8 +19,10 @@ from vibeflow.targets.shared.bindings import native_binding
 def test_standard_definitions_are_owned_by_the_selected_target(target):
     from vibeflow.tooling.project.descriptor_loader import load_builtin_plugins
     catalogs = load_builtin_plugins(target).catalogs
-    assert len(tuple(catalogs.rules)) == 26
-    assert len(tuple(catalogs.rulesets)) == 12
+    assert len(tuple(catalogs.rules)) == 27
+    assert catalogs.rules.require("vibeflow.async_lifecycle").scope == "source"
+    assert len(tuple(catalogs.rulesets)) == 13
+    assert catalogs.rulesets.require("vibeflow.task_manager")
     for group, directory, entries in (("rules", "rules", catalogs.rules),
                                       ("rulesets", "rulesets", catalogs.rulesets)):
         for entry in entries:
