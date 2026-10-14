@@ -1,0 +1,12 @@
+{
+  "roots": [
+    {
+      "id": "library",
+      "path": "library"
+    },
+    {
+      "id": "caller",
+      "path": "caller"
+    }
+  ]
+}

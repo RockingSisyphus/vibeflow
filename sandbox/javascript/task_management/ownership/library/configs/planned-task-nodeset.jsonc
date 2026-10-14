@@ -1,0 +1,63 @@
+{
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugin.ts"
+      }
+    }
+  ],
+  "nodeset_imports": [
+    {
+      "path": "body.jsonc"
+    }
+  ],
+  "pipeline": {
+    "entry_mode": "async",
+    "inputs": [],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "ownership.terminal",
+        "display_name": "start",
+        "description": "Ownership fixture start"
+      },
+      {
+        "id": "manage",
+        "type_used": "ownership.manager",
+        "display_name": "manage",
+        "description": "Ownership fixture manage",
+        "task_targets": {
+          "work": {
+            "type_used": "ownership.body"
+          }
+        },
+        "status": "planned",
+        "flow_kind": "task_manager",
+        "planned_behavior": "transparent",
+        "rulesets": [
+          "vibeflow.task_manager"
+        ],
+        "requires": [],
+        "provides": []
+      },
+      {
+        "id": "end",
+        "type_used": "ownership.terminal",
+        "display_name": "end",
+        "description": "Ownership fixture end"
+      }
+    ],
+    "edges": [
+      [
+        "start",
+        "manage"
+      ],
+      [
+        "manage",
+        "end"
+      ]
+    ],
+    "outputs": []
+  }
+}
