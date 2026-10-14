@@ -25,7 +25,7 @@ def task_plan():
             "schemas":{"scenario":{"type":"string"},"request":{"type":"object"},"value":{"type":"string"},"report":{"type":"array"}}}
 
 
-def test_task_results_ownership_cancellation_and_late_waits(tmp_path):
+def test_task_results_ownership_cancellation_and_consumption(tmp_path):
     (tmp_path/"workflow.mjs").write_text(emit_fixture(task_plan()).source)
     (tmp_path/"nodes.mjs").write_text('''
 export function terminal(){return {};}
@@ -51,13 +51,16 @@ export async function worker(inputs, params, context) {
 }
 export async function manage(inputs,params,context) {
  const scenario=inputs.scenario.value;
- const refs=['A','B','C'].map(label=>context.tasks.start('worker',{request:{scenario,label}}));
+ const received=[];
+ let refs=['A','B','C'].map(label=>context.tasks.start('worker',{request:{scenario,label}}));
  if(scenario==='failure') {
   const first=await context.tasks.waitAny(refs);
   if(first.task.task_id!==refs[1].task_id || first.status!=='failed')throw new Error('wrong first failure');
   if(!events.includes('cleanup_end:B'))throw new Error('early notification');
   globalThis.events.push('notified');
-  context.tasks.requestStop(refs.filter(ref=>ref!==refs[1]));
+  received.push(first);
+  refs=refs.filter(ref=>ref.task_id!==first.task.task_id);
+  context.tasks.requestStop(refs);
  } else if(scenario==='stop_return'||scenario==='stop_wait') {
   await Promise.resolve(); await Promise.resolve();
   context.tasks.requestStop(refs);
@@ -65,13 +68,14 @@ export async function manage(inputs,params,context) {
   globalThis.events.push('manager_return');
   return {report:refs};
  }
- const outcomes=await context.tasks.waitAllExited([...refs,refs[0]]);
+ const outcomes=[...received,...await context.tasks.waitAllExited([...refs,refs[0]])];
+ outcomes.sort((a,b)=>Number(a.task.task_id)-Number(b.task.task_id));
  if(outcomes.length!==3)throw new Error('not deduplicated');
- const late=await context.tasks.waitAny([refs[1]]);
- if(late!==outcomes[1])throw new Error('late result changed');
+ try{await context.tasks.waitAny([outcomes[1].task]);throw new Error('consumed result retained');}
+ catch(error){if(error.code!=='VF_TASK_REF_INVALID')throw error;}
  if(await context.tasks.waitAny([])!==null)throw new Error('empty any');
  if((await context.tasks.waitAllExited([])).length)throw new Error('empty all');
- if(context.tasks.requestStop(refs).some(ack=>ack.state!=='already_exited'))throw new Error('live control retained');
+
  for (const invalid of [[{run_id:'foreign',task_id:'1'}],[{...refs[0],task_id:'missing'}]]) {
   try{await context.tasks.waitAny(invalid);throw new Error('bad ref accepted');}
   catch(error){if(error.code!=='VF_TASK_REF_INVALID')throw error;}
@@ -233,23 +237,24 @@ export async function manage(inputs,params,context){
     assert [item['outputs']['sum'] for item in outcomes]==[0,1,6]
 
 
-def test_many_short_tasks_keep_late_results_without_restarting(tmp_path):
-    (tmp_path/'workflow.mjs').write_text(emit_fixture(task_plan()).source)
+def test_many_short_tasks_transfer_results_without_restarting(tmp_path):
+    (tmp_path/'workflow.mjs').write_text(emit_fixture(task_plan()).source.replace('this.records = new Map();', 'this.records = new Map();globalThis.taskRegistry=this;'))
     (tmp_path/'nodes.mjs').write_text('''
 export function terminal(){return {};}
 export function worker(inputs){return {value:String(inputs.request.value.index)};}
 export async function manage(inputs,params,context){
- const refs=[];
- for(let batch=0;batch<8;batch++){
+ const refs=[],held=[];
+ for(let batch=0;batch<16;batch++){
   const current=Array.from({length:64},(_,index)=>context.tasks.start('worker',{request:{index:batch*64+index}}));
   const outcomes=await context.tasks.waitAllExited(current);
   if(outcomes.some(outcome=>outcome.status!=='succeeded'))throw new Error('short task failed');
-  refs.push(...current);
+  refs.push(...current);held.push(...outcomes);
+  if(globalThis.taskRegistry.records.size!==0)throw new Error('delivered task cards retained');
  }
- if(new Set(refs.map(ref=>ref.task_id)).size!==512)throw new Error('identity reused');
- if((await context.tasks.waitAny([{...refs[0]}])).outputs.value!=='0')throw new Error('late result lost');
- if(context.tasks.requestStop(refs).some(ack=>ack.state!=='already_exited'))throw new Error('active control retained');
- return {report:await context.tasks.waitAllExited([...refs,refs[0]])};
+ if(new Set(refs.map(ref=>ref.task_id)).size!==1024)throw new Error('identity reused');
+ try{await context.tasks.waitAny([{...refs[0]}]);throw new Error('consumed result retained');}
+ catch(error){if(error.code!=='VF_TASK_REF_INVALID')throw error;}
+ return {report:held};
 }
 ''')
     (tmp_path/'consumer.mjs').write_text('''
@@ -260,7 +265,61 @@ console.log(JSON.stringify({count:result.report.length,last:result.report.at(-1)
 ''')
     completed=subprocess.run(['node',str(tmp_path/'consumer.mjs')],capture_output=True,text=True,timeout=15)
     assert completed.returncode==0,completed.stderr
-    assert json.loads(completed.stdout)=={'count':512,'last':'511','started':512,'exited':512}
+    assert json.loads(completed.stdout)=={'count':1024,'last':'1023','started':1024,'exited':1024}
+
+
+def test_overlapping_waits_do_not_partially_consume_a_batch(tmp_path):
+    (tmp_path/'workflow.mjs').write_text(emit_fixture(task_plan()).source)
+    (tmp_path/'nodes.mjs').write_text('''
+export function terminal(){return {};}
+export async function worker(inputs){
+ if(inputs.request.value.label==='B')await new Promise(resolve=>setTimeout(resolve,40));
+ return {value:inputs.request.value.label};
+}
+export async function manage(inputs,params,context){
+ const refs=['A','B'].map(label=>context.tasks.start('worker',{request:{label}}));
+ const batch=context.tasks.waitAllExited(refs).then(()=>{throw new Error('duplicate delivery');},error=>error.code);
+ const first=await context.tasks.waitAny([refs[0]]);
+ if(first.outputs.value!=='A')throw new Error('wrong first result');
+ if(await batch!=='VF_TASK_REF_INVALID')throw new Error('overlap accepted');
+ const remaining=await context.tasks.waitAny([refs[1]]);
+ if(remaining.outputs.value!=='B')throw new Error('batch lost unconsumed B');
+ return {report:[first,remaining]};
+}
+''')
+    (tmp_path/'consumer.mjs').write_text("import {runWorkflowAsync} from './workflow.mjs';console.log(JSON.stringify(await runWorkflowAsync({scenario:'overlap'})));\n")
+    result = subprocess.run(['node',str(tmp_path/'consumer.mjs')],cwd=tmp_path,capture_output=True,text=True,timeout=10)
+    assert result.returncode == 0, result.stderr
+    assert [item['outputs']['value'] for item in json.loads(result.stdout)['report']] == ['A','B']
+
+
+def test_reentrant_exit_observer_receives_the_final_error_not_provisional_success(tmp_path):
+    (tmp_path/'workflow.mjs').write_text(emit_fixture(task_plan()).source)
+    (tmp_path/'nodes.mjs').write_text('''
+export function terminal(){return {};}
+export async function worker(){return {value:'done'};}
+export async function manage(inputs,params,context){
+ globalThis.receiver=context;
+ context.tasks.start('worker',{request:{}});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ return {report:[await globalThis.received]};
+}
+''')
+    (tmp_path/'consumer.mjs').write_text('''
+import {runWorkflowAsync} from './workflow.mjs';
+const result=await runWorkflowAsync({scenario:'trace'},{trace:'full',onTrace:event=>{
+ if(event.kind==='task_exited'){
+  globalThis.received=globalThis.receiver.tasks.waitAny([event.task]);
+  throw new Error('trace failure after receiving');
+ }
+}});
+console.log(JSON.stringify(result));
+''')
+    result = subprocess.run(['node',str(tmp_path/'consumer.mjs')],cwd=tmp_path,capture_output=True,text=True,timeout=10)
+    assert result.returncode == 0, result.stderr
+    outcome = json.loads(result.stdout)['report'][0]
+    assert outcome['status'] == 'failed'
+    assert outcome['error']['code'] == 'VF_TRACE_SINK_FAILED'
 
 
 @pytest.mark.parametrize('primary',[False,True])

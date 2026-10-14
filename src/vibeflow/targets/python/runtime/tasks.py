@@ -105,6 +105,8 @@ class _Task:
     exit_order: int = 0
     phase: str = "queued"
     manager_path: tuple = ()
+    trace: object = None
+    trace_path: tuple = ()
 
 
 def _structured_error(exc, path, seen=None):
@@ -141,7 +143,7 @@ class TaskRegistry:
         self._records = {}
         self._pools = {}
         self._controls = []
-        self._completed_traces = []
+        self._next_id = 0
         self._exit_order = 0
         self._closing = False
 
@@ -160,7 +162,7 @@ class TaskRegistry:
                     raise TaskContractError("VF_TASK_REF_INVALID", "foreign workflow task reference")
                 task_id = ref.get("task_id")
                 if not isinstance(task_id, str) or task_id not in self._records:
-                    raise TaskContractError("VF_TASK_REF_INVALID", "unknown task reference")
+                    raise TaskContractError("VF_TASK_REF_INVALID", "unknown or consumed task reference")
                 if task_id not in seen:
                     seen.add(task_id)
                     selected.append(self._records[task_id])
@@ -176,7 +178,8 @@ class TaskRegistry:
             raise TaskContractError("VF_TASK_INPUT_INVALID", "task inputs must be a mapping")
         plan = frame.task_plans[key]
         with self._condition:
-            ref = {"run_id": self.run_id, "task_id": str(len(self._records) + 1)}
+            self._next_id += 1
+            ref = {"run_id": self.run_id, "task_id": str(self._next_id)}
             task = _Task(ref, runtime._current_task, CancellationSignal(),
                          manager_path=(*runtime._trace_path_prefix,frame.id))
             self._records[ref["task_id"]] = task
@@ -221,19 +224,20 @@ class TaskRegistry:
                     else:
                         failure.setdefault("cleanup_errors", []).append(cleanup)
             with self._condition:
-                self._completed_traces.append((child._trace_path_prefix, child.trace))
+                task.trace, task.trace_path = child.trace, child._trace_path_prefix
                 self._exit_order += 1
                 task.exit_order = self._exit_order
-                task.outcome = {"task": dict(ref), "status":
+                outcome = {"task": dict(ref), "status":
                     ("cancelled" if failure["code"] == "VF_ABORTED" and not failure.get("cleanup_error") and not failure.get("cleanup_errors") else "failed") if failure else "succeeded"}
-                task.outcome["error" if failure else "outputs"] = failure or outputs
+                outcome["error" if failure else "outputs"] = failure or outputs
                 task.signal = None
                 task.phase = "exited"
                 try:
-                    self._emit("task_exited", task, {"status":task.outcome["status"]})
+                    self._emit("task_exited", task, {"status":outcome["status"]})
                 except BaseException as error:
-                    task.outcome = {"task":dict(ref), "status":"failed",
+                    outcome = {"task":dict(ref), "status":"failed",
                                     "error":_structured_error(error,task.manager_path)}
+                task.outcome = outcome
                 self._condition.notify_all()
         try:
             self._emit("task_started", task, {"key":key})
@@ -299,11 +303,11 @@ class TaskRegistry:
         try:
             with self._condition:
                 while True:
+                    self._check_pending(tasks)
                     finished = [task for task in tasks if task.outcome is not None]
                     if finished:
                         task = min(finished, key=lambda item: item.exit_order)
-                        task.observed = True
-                        return dict(task.outcome)
+                        return self._deliver([task])[0]
                     signal.throw_if_aborted()
                     self._condition.wait()
         finally:
@@ -312,10 +316,32 @@ class TaskRegistry:
     def wait_all_exited(self, refs):
         tasks = self.select(refs)
         with self._condition:
-            self._condition.wait_for(lambda: all(task.outcome is not None for task in tasks))
-            for task in tasks:
-                task.observed = True
-            return [dict(task.outcome) for task in tasks]
+            while True:
+                self._check_pending(tasks)
+                if all(task.outcome is not None for task in tasks):
+                    return self._deliver(tasks)
+                self._condition.wait()
+
+    def _check_pending(self, tasks):
+        if any(self._records.get(task.ref["task_id"]) is not task for task in tasks):
+            raise TaskContractError("VF_TASK_REF_INVALID", "task result was already consumed")
+
+    def _retire(self, task):
+        if task.trace is not None and self._owner is not None:
+            self._owner.trace.merge_child(task.trace_path, task.trace)
+            task.trace = None
+        task.observed = True
+        self._records.pop(task.ref["task_id"], None)
+
+    def _deliver(self, tasks):
+        # Called under the completion lock: validate the whole batch before
+        # transferring any results, so overlapping waits cannot lose a subset.
+        self._check_pending(tasks)
+        outcomes = [dict(task.outcome) for task in tasks]
+        for task in tasks:
+            self._retire(task)
+        self._condition.notify_all()
+        return outcomes
 
     def drain(self, parent):
         with self._condition:
@@ -327,17 +353,23 @@ class TaskRegistry:
             observer = current_observation()
             if observer is not None:
                 observer.transition("stopping")
-        self.request_stop([task.ref for task in children], "owner exiting")
+        # A receiver may consume a completed child while this owner drains.
+        # Hold record objects, not references requiring another registry lookup.
+        for task in children:
+            with self._condition:
+                signal = task.signal
+                if signal is not None:
+                    task.phase = "stopping"
+            if signal is not None:
+                signal.request_stop("owner exiting")
         with self._condition:
             self._condition.wait_for(lambda: all(task.outcome is not None for task in children))
             failures = [task.outcome["error"] for task in children
                         if task.outcome["status"] == "failed" and not task.observed]
             for task in children:
-                task.observed = True
-            if parent is None and self._owner is not None:
-                for prefix, trace in self._completed_traces:
-                    self._owner.trace.merge_child(prefix, trace)
-                self._completed_traces.clear()
+                if self._records.get(task.ref["task_id"]) is task:
+                    self._retire(task)
+            self._condition.notify_all()
         if failures:
             error = PipelineRuntimeError("VF_TASK_UNOBSERVED: " + "; ".join(item["message"] for item in failures))
             error.task_errors = failures

@@ -13,13 +13,15 @@ class Launch:
         scenario = inputs["fixture.scenario"]["value"]
         refs = [context.tasks.start("worker", {"fixture.request": {"label": label, "scenario": scenario}})
                 for label in ("A", "B", "C")]
+        finished = []
         if scenario == "selective":
             extra = context.tasks.start("worker", {"fixture.request": {"label": "D", "scenario": "success"}})
             assert len({ref["task_id"] for ref in [*refs, extra]}) == 4
             context.tasks.request_stop([refs[1]])
-            context.tasks.wait_all_exited([refs[1]])
+            finished.extend(context.tasks.wait_all_exited([refs[1]]))
+            refs.pop(1)
             assert context.tasks.wait_any([extra])["status"] == "succeeded"
-            context.tasks.request_stop([refs[0], refs[2]])
+            context.tasks.request_stop(refs)
         elif scenario == "invalid_refs":
             for operation in (lambda: context.tasks.start("undeclared", {}),
                               lambda: context.tasks.wait_any([{"run_id": "foreign", "task_id": "1"}]),
@@ -32,36 +34,47 @@ class Launch:
                     raise AssertionError("invalid operation accepted")
             context.tasks.request_stop(refs)
         elif scenario in ("root_failure", "unobserved_failure"):
-            context.tasks.wait_all_exited([refs[0]])
+            finished.extend(context.tasks.wait_all_exited([refs.pop(0)]))
             if scenario == "root_failure":
                 raise ValueError("parent failed after starting B and C")
         if scenario in ("failure", "unexpected_failure", "cleanup_failure"):
             first = context.tasks.wait_any(refs)
             context.trace("first_outcome", {"outcome": first})
-            context.tasks.request_stop([ref for ref in refs if ref != first["task"]])
+            finished.append(first)
+            refs = [ref for ref in refs if ref != first["task"]]
+            context.tasks.request_stop(refs)
         elif scenario in ("stop_return", "stop_wait", "uncooperative"):
             context.tasks.request_stop(refs)
             if scenario == "stop_wait":
-                context.tasks.wait_all_exited(refs)
+                finished.extend(context.tasks.wait_all_exited(refs))
+                refs = []
         context.trace("manager_return", {"scenario": scenario})
-        return {"fixture.refs": refs}
+        return {"fixture.refs": refs, "fixture.finished": finished}
 
 
 class Relay:
     def run_pure(self, inputs, params):
         original = inputs["fixture.refs"]["value"]
         copied = list(original)
-        return {"fixture.forwarded": [*copied[:1], *[ref for ref in copied if ref != copied[0]]]}
+        return {"fixture.forwarded": copied,
+                "fixture.finished.forwarded": inputs["fixture.finished"]["value"]}
 
 
 class Control:
     def run_pure(self, inputs, params, context: NodeRunContext):
         refs = inputs["fixture.forwarded"]["value"]
-        outcomes = context.tasks.wait_all_exited([*refs, refs[0]])
-        assert context.tasks.wait_any([refs[1]]) == outcomes[1]
+        outcomes = [*inputs["fixture.finished.forwarded"]["value"],
+                    *context.tasks.wait_all_exited([*refs, *refs[:1]])]
+        outcomes.sort(key=lambda item: int(item["task"]["task_id"]))
         assert context.tasks.wait_any([]) is None
         assert context.tasks.wait_all_exited([]) == []
-        assert all(ack["state"] == "already_exited" for ack in context.tasks.request_stop(refs))
+        if refs:
+            try:
+                context.tasks.wait_any(refs)
+            except Exception as error:
+                assert "VF_TASK_REF_INVALID" in str(error)
+            else:
+                raise AssertionError("consumed result remained available")
         context.trace("control_joined")
         return {"fixture.report": outcomes}
 
