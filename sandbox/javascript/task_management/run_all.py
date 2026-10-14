@@ -188,7 +188,7 @@ def run(work, *, toolchain, puppeteer_root):
                 observations.append({"target":target,"profile":profile,"config":nested,"status":nested_result["status"]})
     consumer=work/"consumer.mjs"
     consumer.write_text("import * as workflow from './build-node/workflow.js';\nimport * as solo from './build-node-solo/workflow.js';\nimport * as nested from './build-node-nested/workflow.js';\nimport * as nestedManager from './build-node-nested_manager/workflow.js';\n"+CONSUMER+"\nconsole.log(JSON.stringify(await probe(workflow)));")
-    completed=subprocess.run(["node",str(consumer)],capture_output=True,text=True,timeout=20)
+    completed=subprocess.run(["node",str(consumer)],cwd=work,capture_output=True,text=True,timeout=20)
     assert completed.returncode==0,completed.stderr
     rows=json.loads(completed.stdout)
     for row in rows:

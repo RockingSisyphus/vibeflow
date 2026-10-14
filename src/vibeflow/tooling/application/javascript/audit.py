@@ -49,7 +49,7 @@ from vibeflow.targets.javascript.build.toolchain import (
     DriverQualityResult,
     run_audit_driver,
 )
-from vibeflow.targets.javascript.quality.rules import JavascriptRuleReport, node_type_calls, run_javascript_rules, run_javascript_workflow_rules
+from vibeflow.targets.javascript.quality.rules import JavascriptRuleReport, source_node_calls, run_javascript_rules, run_javascript_workflow_rules
 from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
 from vibeflow.targets.javascript.frontend.facts import (
     JavascriptImplementationFactsError,
@@ -179,7 +179,7 @@ def audit_javascript_project(
         rule_host_ids = tuple(item.id for item in catalogs.host_extensions if item.id not in planned_hosts)
     rule_import_policy, _ = target_neutral_import_policy(
         catalogs=catalogs, project_root=root.path, allowed_external=set(javascript["external_packages"]),
-        node_ids=None if request.audit_registered_resources else frozenset(node_type_calls(graph)), host_extension_ids=frozenset(rule_host_ids), plugin_ids=frozenset(rule_plugin_ids),
+        node_ids=None if request.audit_registered_resources else frozenset(source_node_calls(graph)), host_extension_ids=frozenset(rule_host_ids), plugin_ids=frozenset(rule_plugin_ids),
     )
     rule_report = run_javascript_rules(graph, catalogs, project_root=root.path, package_root=package_root,
                                      phase="static", import_policy=rule_import_policy, node_command=request.node_command, evaluate_sources=request.audit_sources, include_registered=request.audit_registered_resources, prefetched_quality=(request.quality_facts_by_root or {}).get(str(root.path)),

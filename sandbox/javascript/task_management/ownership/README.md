@@ -21,6 +21,6 @@ python -B sandbox/javascript/task_management/run_ownership.py \
 | planned 管理 Node 的直接 Node 任务目标，不导入 Nodeset | CONCERNS，无归属错误 | CONCERNS，无归属错误 |
 | 普通 Node 导入真实未登记 loose.ts，不导入 Nodeset | ERROR，1 条 VF_IMPORT_OWNER | ERROR，1 条 VF_IMPORT_OWNER |
 
-上述为 2026-10-14 本次源代码与实际 0.19.0 包的静态结果，不是任务运行、取消或业务迁移验收。inspect-base-lib.json 保存公开清单，证明 helper 与 types.ts 已登记。
+上述为 2026-10-14 修复前源代码与实际 0.19.0 包的静态结果，不是任务运行、取消或业务迁移验收。inspect-base-lib.json 保存公开清单，证明 helper 与 types.ts 已登记。
 
-当前本案例独立运行，不接入 task_management/run_all.py 的已完成生命周期矩阵；它是待修复回归，历史 full-04 通过不涵盖此组合。修复后应保留负对照、把新案例接入自动回归，并重新验证相关 validate/review/build 入口。根因与仓库外修正试验见开发文档 docs/maintainers/history/task-ownership-reproduction-20261014.md。
+正式修复后十项全部匹配：跨 root planned Nodeset 目标恢复 CONCERNS，两个真实未登记导入仍被拒绝。integration runner 在任务管理生命周期检查之后自动运行此归属矩阵，根目录完整验收因而覆盖本案例。历史 full-04 通过仍不涵盖此组合，不改写其分母。根因与各阶段验证见开发文档 docs/maintainers/history/task-ownership-reproduction-20261014.md。

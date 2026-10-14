@@ -1,6 +1,8 @@
 # 发行与文档装配
 
-VibeFlow 当前发行版本为 0.19.0，准备 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目和 Workflow ABI。迁移入口与删除接口见 [统一资源迁移](../../distribution/docs/user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖归档发行包。
+VibeFlow 当前发行版本为 0.19.1，准备 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目和 Workflow ABI。迁移入口与删除接口见 [统一资源迁移](../../distribution/docs/user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖归档发行包。
+
+0.19.1 修复跨 root 独立 Nodeset 源码审查遗漏 BaseLib 归属的问题，保持 planned 调用与真正未登记导入的检查行为。修复与验证见[复现及修复记录](history/task-ownership-reproduction-20261014.md)。
 
 0.19.0 引入原生任务管理与 Workflow ABI v6：管理 Node 使用声明目标启动任务，普通 TaskRef 数组可沿数据连边传递，停止请求与实际退出分开，workflow 在所属执行与清理完成后才退出。JS 使用事件循环，Python 使用线程与完成通知。旧 `async/result_key/detached` 入口须显式迁移，没有自动转换层；迁移后重新生成 Architecture、计划与构建产物。接口与内存边界见[原生任务管理](../../distribution/docs/user/task-management.md)，开发和全量验收见[实施记录](history/task-management-implementation-20261014.md)。
 
