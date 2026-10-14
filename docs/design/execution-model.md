@@ -16,7 +16,7 @@ Python 可按 plan、block 或 compiled 模式执行；JavaScript emitter 将同
 
 ## 异步所有权
 
-TaskPlan ABI v6 保存 task_manager 调用、有限任务槽、目标 Block 和 Target 执行器。TaskRef 普通数组沿数据连边传递，显式 start、waitAny、requestStop、waitAllExited 控制实际执行。结果只在实际工作、finally、SDK 操作及后代收尾后通知；正常结束、异常、外部取消统一停止并等待所属工作。失败由管理 Node 作为数据处理，未消费失败在最终收尾时报错。旧 async/result_key/detached 调用入口拒绝迁移，不再维护 pending/detached 容器。详见[原生任务管理](../../distribution/docs/user/task-management.md)。
+TaskPlan ABI v6 保存 task_manager 调用、有限任务槽、目标 Block 和 Target 执行器。TaskRef 普通数组沿数据连边传递，显式 start、waitAny、requestStop、waitAllExited 控制实际执行。结果只在实际工作、finally、SDK 操作及后代收尾后通知；正常结束、异常、外部取消统一停止并等待所属工作。失败由管理 Node 作为数据处理，未消费失败在最终收尾时报错。旧 async/result_key/detached 调用入口报迁移错误，不再维护 pending/detached 容器。编译链路、任务记录、线程/事件循环、SDK 操作归属及收尾错误机制见[任务管理设计](task-management.md)。
 
 ## 副作用与执行锁
 

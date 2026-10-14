@@ -62,7 +62,7 @@ workflow 显式启用：
 
 发行包和 wheel 包含 SDK 运行文件及类型声明。VibeFlow worker、分析器和构建器统一解析 `@vibeflow/plugin`。发行模板的 `tsconfig.json` 将 TypeScript 的 `paths["@vibeflow/plugin"]` 指向 `../kernel/javascript/sdk.d.ts`。这些文件由内核的同一 SDK 复制生成，受到发行清单保护。源码沙箱的 tsconfig 直接引用内核资源目录；wheel 用户可以通过 `importlib.resources.files("vibeflow.targets.javascript.resources")` 定位同一文件。无需另装一个同名 npm SDK。
 
-Node 返回普通对象，key 对应 `provides`。`completion: "immediate"` 使用同步返回；`"suspend"` 返回 Promise，并要求 workflow 的 `pipeline.entry_mode: "async"`。调度、TaskPlan、Capability 和 Host 协议保持原有机制。
+Node 返回普通对象，key 对应 `provides`。`completion: "immediate"` 使用同步返回；`"suspend"` 返回 Promise，并要求 workflow 的 `pipeline.entry_mode: "async"`。并发任务使用管理 Node 的 `task_targets` 与 `context.tasks`，声明和完整示例见[原生任务管理](task-management.md)。
 
 ```bash
 npm ci --prefix javascript_project

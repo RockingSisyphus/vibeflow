@@ -75,3 +75,5 @@ Architecture JSONC 的 implementation_graph 保存当前项目的资源、源码
 公开状态范围模型位于 Core/Tooling 共享边界，使 Python 与 JavaScript presenter 使用相同 coverage ID，同时只报告本次命令实际完成的检查。
 
 原生 task_manager 声明有限 task_targets；编译计划保存启动槽及目标绑定，TaskRef 数组作为普通数据传递。运行器每次 workflow 统一登记实际执行、协作停止与最终结果，完成通知只在实际收尾后产生。普通 Node 无控制接口；规则按真实接口绑定检查身份与资源归属，源码使用检查和图关系检查分工。默认 taskManagerNode 为 dbl-circ，填充 #FCE7F3、边框 #BE185D、文字 #831843，完整标签包含“任务管理”；错误／警告覆盖颜色时仍保留形状和身份。Decision 不变。
+
+当前任务编译、Runtime/AOT 实现位置和退出顺序见[原生任务管理设计](task-management.md)，维护时应同时核对公共计划、SDK 操作归属及最终收尾边界。

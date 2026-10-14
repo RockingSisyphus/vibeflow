@@ -7,6 +7,7 @@
 - [workflow-and-config](user/workflow-and-config.md)
 - [python-development](user/python-development.md)
 - [javascript-development](user/javascript-development.md)
+- [原生任务管理](user/task-management.md)：管理节点声明、并发启动、停止等待、取消清理和旧配置迁移。
 - [nodesets-and-loops](user/nodesets-and-loops.md)
 - [plugins-and-integrations](user/plugins-and-integrations.md)
 - [multifile-resources](user/multifile-resources.md)
@@ -27,5 +28,3 @@
 - 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
 
 完整归位规则见[仓库目录职责](../../docs/maintainers/directory-layout.md)。
-
-- [原生任务管理](user/task-management.md)

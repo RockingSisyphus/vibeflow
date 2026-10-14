@@ -14,6 +14,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 
 - [系统架构](design/system-architecture.md)：当前内核分层、插件装配与共享架构资料。
 - [执行模型](design/execution-model.md)：原生路由、任务、规则入口与宿主生命周期。
+- [原生任务管理设计](design/task-management.md)：ABI v6 编译链路、任务归属、两侧执行器、取消收尾与维护验证。
 - [Rule 机制设计](design/rule-system.md)：统一选择、资料与负责范围、协作、复用及维护边界。
 
 ## 设计演进与验收记录
