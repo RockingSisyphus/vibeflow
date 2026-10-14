@@ -60,4 +60,5 @@ Run the complete source-repository gate with:
 python tools/verify_project.py --full
 ```
 
-Current distribution package version: `0.18.3`. Workflow ABI: `vibeflow.workflow.v5`.
+Current distribution package version: `0.19.0`. Workflow ABI: `vibeflow.workflow.v6`.
+Migrate legacy concurrency calls to task manager Nodes with declared targets, then regenerate plans and build outputs. See [native task management](distribution/docs/user/task-management.md).
