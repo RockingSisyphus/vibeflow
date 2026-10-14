@@ -1,0 +1,3 @@
+import {defineNode,definePlugin} from "@vibeflow/plugin";
+const manager=defineNode({"type_key": "ownership.manager", "display_name": "Manager", "description": "Own one finite task target.", "flow_kind": "task_manager", "contract": {"requires": [], "provides": [], "input_semantics": {}, "output_semantics": {}}, "rulesets": ["vibeflow.task_manager"], "implementations": [{"language": "typescript", "targets": ["node", "browser"], "completion": "suspend", "source": {"kind": "file", "ref": "manager.ts", "export": "run"}}]});
+export const plugin=definePlugin({id:"ownership.caller",resources:[manager]});

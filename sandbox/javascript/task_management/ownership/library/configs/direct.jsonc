@@ -1,0 +1,50 @@
+{
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugin.ts"
+      }
+    }
+  ],
+  "nodeset_imports": [
+    {
+      "path": "body.jsonc"
+    }
+  ],
+  "pipeline": {
+    "entry_mode": "async",
+    "inputs": [],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "ownership.terminal",
+        "display_name": "start",
+        "description": "Ownership fixture start"
+      },
+      {
+        "id": "work",
+        "type_used": "ownership.body",
+        "display_name": "work",
+        "description": "Ownership fixture work"
+      },
+      {
+        "id": "end",
+        "type_used": "ownership.terminal",
+        "display_name": "end",
+        "description": "Ownership fixture end"
+      }
+    ],
+    "edges": [
+      [
+        "start",
+        "work"
+      ],
+      [
+        "work",
+        "end"
+      ]
+    ],
+    "outputs": []
+  }
+}

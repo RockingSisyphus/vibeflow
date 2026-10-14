@@ -8,4 +8,6 @@ python sandbox/javascript/task_management/run_all.py --toolchain-root /path/to/t
 
 公开矩阵还覆盖选择性停止、独立重复启动、名单复制／筛选／合并、非法槽与引用、清理及并发失败、父流程失败、未消费失败、外部 AbortSignal、无后续 join 的 workflow 收尾，以及普通／管理 Nodeset 任务目标。上述配置分别通过 Node.js 与真实 Chromium ESM 验证；web-app 使用同一公开管理流程验证失败通知和清理。
 
+[跨 root 源码归属复现](ownership/README.md)由 `run_ownership.py` 独立执行，覆盖 planned/implemented 管理调用、Node/Nodeset 目标及真实未登记导入。当前保留一个待修复的静态回归，不计入此前生命周期矩阵的通过结果。
+
 判定使用 trace 因果顺序；页面未处理异常单独收集。更细的屏障、SDK 操作 race、规则关闭后的权限、重复 512 个短任务和原生执行器边界见 `tests/targets/javascript/test_task_management.py`。Loop 目标覆盖位于 workflow_math 与 scheduled composite 测试；两 Target 的三种状态长标签图形在 `tests/tooling/test_task_manager_visuals.py` 中由真实浏览器检查。运行产物、依赖与探针证据均在仓库外临时工作区。
