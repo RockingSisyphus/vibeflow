@@ -15,7 +15,7 @@ from vibeflow.targets.javascript.build.project_graph import (
     PreparationState as _PreparationState,
     prepare_graph as _prepare_graph,
 )
-from vibeflow.targets.javascript.quality.rules import JavascriptRuleReport, node_type_calls, run_javascript_rules, run_javascript_workflow_rules
+from vibeflow.targets.javascript.quality.rules import JavascriptRuleReport, source_node_calls, run_javascript_rules, run_javascript_workflow_rules
 from vibeflow.targets.javascript.build.project_paths import (
     javascript_options as _javascript_options,
     safe_project_path as _safe_project_path,
@@ -229,7 +229,7 @@ def prepare_project_build(
     selected_hosts = declared_hosts(document.data, catalog=catalogs.host_extensions)
     selected_host_ids = active_host_ids(tuple(item.id for item in selected_hosts if item.status == "implemented"),
         catalog=catalogs.host_extensions, planned=frozenset(item.id for item in selected_hosts if item.status == "planned"))
-    rule_import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=root.path, allowed_external=set(javascript["external_packages"]), node_ids=frozenset(node_type_calls(graph)), host_extension_ids=frozenset(selected_host_ids), plugin_ids=frozenset(item.id for item in _active_plugin_bindings(plugin_plan)))
+    rule_import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=root.path, allowed_external=set(javascript["external_packages"]), node_ids=frozenset(source_node_calls(graph)), host_extension_ids=frozenset(selected_host_ids), plugin_ids=frozenset(item.id for item in _active_plugin_bindings(plugin_plan)))
     rule_report = run_javascript_rules(graph, catalogs, project_root=root.path, package_root=package_root, phase="static", target=request.target, import_policy=rule_import_policy, node_command=request.node_command,
                                      quality_policy=javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
     rule_errors = tuple(item for item in rule_report.findings if item.severity == "error")

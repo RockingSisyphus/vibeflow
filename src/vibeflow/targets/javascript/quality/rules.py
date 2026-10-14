@@ -7,8 +7,9 @@ Rule results and descriptor-owned facts through this facade.
 from vibeflow.targets.javascript.build.rule_session import (
     JavascriptRuleReport,
     node_type_calls,
+    source_node_calls,
     run_javascript_rules,
     run_javascript_workflow_rules,
 )
 
-__all__ = ["JavascriptRuleReport", "node_type_calls", "run_javascript_rules", "run_javascript_workflow_rules"]
+__all__ = ["JavascriptRuleReport", "node_type_calls", "source_node_calls", "run_javascript_rules", "run_javascript_workflow_rules"]

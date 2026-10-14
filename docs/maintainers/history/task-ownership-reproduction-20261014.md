@@ -1,5 +1,7 @@
 # 跨 root 任务目标源码归属阻断：最小复现与根因
 
+当前状态：正式修复完成，0.19.1 两种发布包已构建，实际 Gensokyo 最小配置复验通过。以下初始分析与候选阶段原样保留，最终证据见文末。
+
 用户提供 Gensokyo 的“源码归属检查阻断.md”，要求分析并在 VibeFlow 根目录沙箱建立复现，确认问题后说明原因及修复方法。本次仅增加复现材料、定位根因与仓库外候选试验；未修改产品源码、0.19.0 发布包或下游项目。
 
 ## 公开入口复现
@@ -29,3 +31,19 @@
 候选验证只在 `/home/rockingsisyphus/.cache/vftm/ownership-proof/src` 的源码副本进行：run_javascript_rules 合并 declaration_only/registered 审查对象后，按 used 集合重新构造策略，同时保留选中的 Host/Plugin、external packages 资料。十项全部匹配，合法跨 root planned Nodeset 目标恢复 CONCERNS（保留 planned 提示），两个真实未登记导入仍各报 1 条 VF_IMPORT_OWNER。报告为该目录 `results/report.json`。
 
 这证明补齐实际归属信息能消除误判，无需清空规则、复制业务、伪装 external、把任务移出图或把 planned 提前标为 implemented。副本候选尚不是正式修复，也未跑完整回归：实际落地还需收敛共享集合接口，核对 Host/Plugin 归属与其他已登记但未调用资源的审查，并验证 validate/review/build，随后再构建可信新包。当前正式内核与发布包仍存在此缺陷。
+
+## 正式修复与 0.19.1 交付
+
+用户随后授权修复。提取 source_node_calls 作为源码审查集合：保留活跃 Node 的实际调用路径，加入独立 Nodeset 声明内已实现的 Node 并使用空调用路径。run_javascript_rules 与 audit/build 的初始归属策略共同消费此集合；node_type_calls 继续只表达活跃调用。没有把 declaration_only 转成运行调用，没有加载 planned 实现，没有改变 SDK、Workflow ABI、规则选择或 Host/Plugin 选择机制。
+
+十项公开 validate 对照在正式源码和实际 0.19.1 解压包中全部匹配，真正未登记 loose.ts 仍在两 root 各报 1 条 VF_IMPORT_OWNER。新增机制测试验证 planned 管理目标的 worker 接受源码审查但没有执行调用路径、planned worker 仍被排除；implemented 路径完整保留。归属矩阵接入 JavaScript integration 的任务管理案例，随后由根目录 --full 调用。历史复现失败不更改为通过预期。
+
+相关定向 pytest 为 178 passed、1 skipped；补充配置渲染器后，对该原跳过图形测试单独复验为 1 passed。原 JS 公开生命周期沙箱 46 项通过，真实 Chrome/150.0.7871.24。八项跨 root review/build 正负对照全部匹配：合法普通/implemented 调用成功，planned 目标 review 可发布 SVG 而 build 仍按原合同拒绝 planned，真正未登记导入继续拒绝。首次 review 对照因测试项目未登记 Architecture 而失败，随后补齐外部测试项目的公开 Architecture 配置，不改产品逻辑。
+
+定向测试第一次命令含不存在的文件，未运行测试；原图形单项复验第一次用了测试工具不支持的相对 node ID，未收集测试。日志保留，后续有效结果分别报告。任务沙箱 Node consumer 原来继承仓库 cwd，产生 runs/status 日志；已改为 cwd=沙箱 work，原产物移到仓库外保存，consumer 在该目录复跑成功。最初发布构建被这些产物阻止；清理归位后构建成功。第一次最终质量检查另发现旧 checksum 仍在 dist，已随旧版归档。
+
+0.19.1 使用现有 distribution/build.py 构建 collaborative/autonomous 两包。新包的公开归属矩阵 10/10，并用解压包自己的 run.py 验证原 Gensokyo 工程的 ownership-core-direct、ownership-core-task-target、ownership-core-task-node：均 exit 0、CONCERNS、VF_IMPORT_OWNER 为零。不替换下游受保护内核，不修改其配置，不执行其业务；这不是完整迁移、正式 review/SVG 批准或业务运行验收。
+
+证据均在 `/home/rockingsisyphus/.cache/vftm`：ownership-fixed01/report.json、owner-tests02.log、owner-render02.log、owner-lifecycle01/report.json、owner-entrypoints02/report.json、owner-packaged-matrix0191/report.json、owner-gsko0191/report.json、owner-release0191-02.log。源码/测试/文档保存本地 checkpoint；ZIP、依赖和日志不纳入 Git。本次没有重跑整仓 --full，不以定向通过覆盖历史完整批次。
+
+路线复核：修复归属资料的集合不一致足以恢复原计划审查，无需扩大权限或改变生命周期。共用一个源码集合减少了 audit/build 与规则执行之间的维护差异；执行调用集合保持独立。剩余下游正式审核、业务迁移和运行验收由该项目按其流程开展。

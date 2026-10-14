@@ -115,6 +115,20 @@ def _call_specs(graph: Any) -> dict[tuple[str, ...], Any]:
         if not subject.declaration_only for node in subject.graph.nodes}
 
 
+def source_node_calls(graph: Any) -> dict[str, list[tuple[str, ...]]]:
+    """Source audit subjects, including implementations in unused declarations.
+
+    Empty paths mean declaration-only review, not an executable invocation.
+    Import ownership must cover this same set before source closure extraction.
+    """
+    result = node_type_calls(graph)
+    for subject in graph_rule_subjects(graph):
+        if subject.declaration_only:
+            for key in node_type_calls(subject.graph):
+                result.setdefault(key, [])
+    return result
+
+
 def _workflow_blocks(graph: Any, *, include_declarations: bool = False):
     for item in graph_rule_subjects(graph):
         if include_declarations or not item.declaration_only:
@@ -299,12 +313,8 @@ def run_javascript_rules(
     quality_policy: QualityPolicy | None = None,
 ) -> JavascriptRuleReport:
     """Evaluate descriptor selections; an empty selection remains unconstrained."""
-    used = node_type_calls(graph)
+    used = source_node_calls(graph)
     call_specs = _call_specs(graph)
-    for subject in graph_rule_subjects(graph):
-        if subject.declaration_only:
-            for key in node_type_calls(subject.graph):
-                used.setdefault(key, [])
     if include_registered:
         used.update({item.type_key: used.get(item.type_key, []) for item in catalogs.nodes})
     snapshot = {key: catalogs.nodes.require(key).to_dict() for key in sorted(used) if catalogs.nodes.get(key) is not None}
@@ -528,4 +538,4 @@ def run_javascript_workflow_rules(graph: Any, catalogs: Any, *, compiled_by_path
         node_report.call_effect_scopes, node_report.call_effect_policies, node_report.source_scopes, choices)
 
 
-__all__ = ["JavascriptRuleReport", "run_javascript_rules", "run_javascript_workflow_rules", "node_type_calls"]
+__all__ = ["JavascriptRuleReport", "run_javascript_rules", "run_javascript_workflow_rules", "node_type_calls", "source_node_calls"]

@@ -1,6 +1,6 @@
 # 原生任务管理：编译、执行与维护
 
-本文面向内核维护者，描述 0.19.0 当前实现。公开声明、配置与调用示例见[使用手册](../../distribution/docs/user/task-management.md)；阶段失败和 full-04 验收见[实施记录](../maintainers/history/task-management-implementation-20261014.md)。历史记录不代替当前设计。
+本文面向内核维护者，描述 0.19.1 当前实现。公开声明、配置与调用示例见[使用手册](../../distribution/docs/user/task-management.md)；阶段失败和 full-04 验收见[实施记录](../maintainers/history/task-management-implementation-20261014.md)。历史记录不代替当前设计。
 
 ## 目标与边界
 
@@ -59,6 +59,8 @@ TaskOutcome 是可传递数据。失败保留 code/message、调用路径与 sou
 ## 规则与图形
 
 Python `rules/node/async_lifecycle.py`、JS `rules/node/handlers.py` 及 toolchain 源码分析分别检查控制身份与原生后台工作归属；Target Ruleset 负责选择入口，图关系检查保留在图层。管理身份不自动豁免副作用、质量或依赖规则。
+
+JS 的活跃调用集合与源码审查集合分别由 node_type_calls/source_node_calls 表达：后者包含独立 Nodeset 声明中已实现的 Node，调用路径为空，不赋予执行身份。audit/build 的归属策略和 run_javascript_rules 必须共同消费该源码集合，登记相应 BaseLib 与传递依赖，不能只把 Node 加入审查却遗漏它的依赖归属。该区别尤其影响跨 root、planned 管理调用及未使用 Nodeset 声明，回归位于 task_management/run_ownership.py。
 
 检查应依据真实绑定和有限的拥有/释放模式：同名用户方法不是原生计时器；局部对象字段保存的原生句柄必须由同一对象释放；Python 线程/进程在 finally join、池在 context manager 或 finally 等待 shutdown。源码规则不是任意程序清理路径证明器，运行器也不能自动接管用户遗留的原生后台资源。
 

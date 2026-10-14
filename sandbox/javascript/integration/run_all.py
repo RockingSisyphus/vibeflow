@@ -644,7 +644,17 @@ def _task_management_case(puppeteer_root):
         env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
     if completed.returncode:
         raise AssertionError(completed.stdout + completed.stderr)
-    return json.loads((work / "report.json").read_text())
+    report = json.loads((work / "report.json").read_text())
+    ownership_work = _RUNTIME_ROOT / "task_ownership"
+    command = [sys.executable, str(_SOURCE_SANDBOX_ROOT.parent / "task_management/run_ownership.py"),
+               "--work-dir", str(ownership_work), "--toolchain-root", str(PROJECT_ROOT)]
+    completed = subprocess.run(command, capture_output=True, text=True,
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+    if completed.returncode:
+        raise AssertionError(completed.stdout + completed.stderr)
+    report["ownership"] = json.loads((ownership_work / "report.json").read_text())
+    return report
+
 
 
 def _comprehensive_math_case(puppeteer_root: Path, *, skip_browser: bool):
