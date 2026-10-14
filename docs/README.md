@@ -63,6 +63,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 
 - [跨 root 任务目标源码归属复现与根因](maintainers/history/task-ownership-reproduction-20261014.md)：静态回归、正式修复与原项目复验。
 - [任务结果一次交付与回收](maintainers/history/task-result-delivery-20261014.md)：0.20.0 消费语义、长期 workflow 任务卡回收与独立全量验证。
+- [0.20.0 中英文发布说明](maintainers/history/release-0.20.0.md)：相对上次正式分发版本 v0.18.3 的 Git 历史变化。
 - [0.19.0 发布包构建与验证](maintainers/history/release-0.19.0.md)
 - [原生任务管理实施与验收记录](maintainers/history/task-management-implementation-20261014.md)：ABI v6、双 Target 并发管理、历史失败与第四轮完整验收。
 - [0.18.3 历史发行记录](maintainers/history/release-0.18.3.md)
