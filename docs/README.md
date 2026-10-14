@@ -60,6 +60,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 
 ## 历史审核与实施记录
 
+- [0.19.0 发布包构建与验证](maintainers/history/release-0.19.0.md)
 - [原生任务管理实施与验收记录](maintainers/history/task-management-implementation-20261014.md)：ABI v6、双 Target 并发管理、历史失败与第四轮完整验收。
 - [0.18.3 历史发行记录](maintainers/history/release-0.18.3.md)
 - [Rule 机制统一重构目标与实施记录](maintainers/history/rule-mechanism-refactor.md)
