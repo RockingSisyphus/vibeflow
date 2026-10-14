@@ -48,14 +48,15 @@ def test_failed_task_notifies_after_finally_and_stop_waits_for_execution(tmp_pat
             assert first["status"] == "failed"
             assert "B failed" in first["error"]["message"]
             assert order == ["B_cleaned"]
-            context.tasks.request_stop(refs)
-            results = context.tasks.wait_all_exited([*refs, refs[0]])
+            pending = [ref for ref in refs if ref != first["task"]]
+            context.tasks.request_stop(pending)
+            results = [*context.tasks.wait_all_exited([*pending, pending[0]]), first]
             assert [item["status"] for item in results] == ["cancelled", "failed"]
             assert cleaned.is_set()
             assert context.tasks.wait_any([]) is None
             assert context.tasks.wait_all_exited([]) == []
-            assert context.tasks.wait_any([refs[1]]) == first
-            assert all(item["state"] == "already_exited" for item in context.tasks.request_stop(refs))
+            with pytest.raises(Exception, match="VF_TASK_REF_INVALID"):
+                context.tasks.wait_any([refs[1]])
             return {}
 
     registry = native_registry()
@@ -291,28 +292,90 @@ def test_task_target_all_inputs_preserve_envelopes(tmp_path,nested):
     PipelineRuntime(graph,registry=runtime.registry,run_dir=tmp_path/'actual').run({})
 
 
-def test_many_short_tasks_keep_results_and_release_execution_resources(tmp_path):
-    """Retaining outcomes is intentional; retaining worker/control resources isn't."""
+def test_many_short_tasks_transfer_results_and_reclaim_records(tmp_path):
     class Worker:
-        def run_pure(self,inputs,params):
+        def run_pure(self, inputs, params):
             return {}
     class Manager:
-        def run_pure(self,inputs,params,context):
-            refs=[]
-            for batch in range(8):
-                current=[context.tasks.start('worker',{}) for _ in range(64)]
-                assert all(outcome['status']=='succeeded' for outcome in context.tasks.wait_all_exited(current))
+        def run_pure(self, inputs, params, context):
+            refs, held = [], []
+            for batch in range(16):
+                current = [context.tasks.start('worker', {}) for _ in range(64)]
+                outcomes = context.tasks.wait_all_exited([*current, current[0]])
+                assert len(outcomes) == 64 and all(item['status']=='succeeded' for item in outcomes)
+                held.extend(outcomes)
                 refs.extend(current)
-            assert len({ref['task_id'] for ref in refs})==512
-            assert context.tasks.wait_any([dict(refs[0])])['task']==refs[0]
-            assert len(context.tasks.wait_all_exited([*refs,refs[0]]))==512
-            assert all(ack['state']=='already_exited' for ack in context.tasks.request_stop(refs))
+                assert not context._runtime._tasks._records
+            assert len({ref['task_id'] for ref in refs}) == 1024
+            assert len(held) == 1024 and held[0]['status']=='succeeded'
+            with pytest.raises(Exception, match="VF_TASK_REF_INVALID"):
+                context.tasks.wait_any([dict(refs[0])])
             return {}
-    runtime=make_runtime(tmp_path,Manager,(('worker','process',Worker),))
+    runtime = make_runtime(tmp_path, Manager, (('worker','process',Worker),))
     runtime.run({})
-    assert len(runtime._tasks._records)==512
-    assert all(task.signal is None and task.phase=='exited' for task in runtime._tasks._records.values())
-    assert not runtime._tasks._controls and not runtime._tasks._pools and not runtime._tasks._completed_traces
+    assert not runtime._tasks._records
+    assert not runtime._tasks._controls and not runtime._tasks._pools
+
+
+def test_completed_before_receiving_result_is_consumed_only_once(tmp_path):
+    entered, release = Event(), Event()
+    class Worker:
+        def run_pure(self, inputs, params):
+            entered.set()
+            release.wait()
+            return {}
+    class Manager:
+        def run_pure(self, inputs, params, context):
+            ref = context.tasks.start('worker', {})
+            entered.wait()
+            release.set()
+            registry = context._runtime._tasks
+            with registry._condition:
+                registry._condition.wait_for(lambda: registry._records[ref['task_id']].outcome is not None)
+            assert context.tasks.request_stop([ref])[0]['state'] == 'already_exited'
+            result = context.tasks.wait_any([ref])
+            assert result['status'] == 'succeeded' and not registry._records
+            with pytest.raises(Exception, match='VF_TASK_REF_INVALID'):
+                context.tasks.wait_all_exited([dict(ref)])
+            assert result['status'] == 'succeeded'
+            return {}
+    make_runtime(tmp_path, Manager, (('worker','process',Worker),)).run({})
+
+
+def test_overlapping_waiters_cannot_deliver_the_same_result_twice(tmp_path):
+    release, selected = Event(), Event()
+    results, selection_count = [], []
+    class Worker:
+        def run_pure(self, inputs, params):
+            release.wait()
+            return {}
+    class Manager:
+        def run_pure(self, inputs, params, context):
+            ref = context.tasks.start('worker', {})
+            registry = context._runtime._tasks
+            original = registry.select
+            def select(refs):
+                tasks = original(refs)
+                with registry._condition:
+                    selection_count.append(1)
+                    if len(selection_count) == 2:
+                        selected.set()
+                return tasks
+            registry.select = select
+            def receive():
+                try:
+                    results.append(context.tasks.wait_any([ref])['status'])
+                except Exception as error:
+                    results.append(error.code)
+            threads = [Thread(target=receive) for _ in range(2)]
+            for thread in threads: thread.start()
+            assert selected.wait(2)
+            release.set()
+            for thread in threads: thread.join(2)
+            assert sorted(results) == ['VF_TASK_REF_INVALID', 'succeeded']
+            assert not registry._records
+            return {}
+    make_runtime(tmp_path, Manager, (('worker','process',Worker),)).run({})
 
 
 def test_parent_failure_keeps_cleanup_and_failure_hook_errors(tmp_path):

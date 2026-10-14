@@ -1,6 +1,6 @@
 # 原生任务管理
 
-需要同时执行几个任务，并按结束结果决定后续行为时，使用任务管理 Node。例如启动 A、B、C，等待任一任务结束；B 失败后请求 A、C 停止，等待它们清理完成，再继续流程。
+需要同时执行几个任务，并按结束结果决定后续行为时，使用任务管理 Node。例如启动 A、B、C，等待任一任务结束并接收结果；B 失败后保存 B 的结果、从名单移除 B，再请求 A、C 停止，接收它们清理完成后的结果。
 
 开发者声明 `flow_kind="task_manager"` 的 Node，并选择 `vibeflow.task_manager` Ruleset。管理 Node 使用 `context.tasks` 启动、停止和等待任务；普通 Node 取得自身取消信号、执行等待和 `finally` 清理，也可以通过普通数据连边传递任务引用。关闭源码规则不会向普通 Node 授予控制接口。管理身份不豁免其他副作用或质量规则。
 
@@ -27,21 +27,20 @@
 | JS 接口 | Python 接口 | 行为 |
 | --- | --- | --- |
 | `start(key, inputs)` | `start(key, inputs)` | 立即返回独立 TaskRef |
-| `await waitAny(refs)` | `wait_any(refs)` | 任一任务实际退出后返回 TaskOutcome；空名单返回 null／None |
+| `await waitAny(refs)` | `wait_any(refs)` | 任一任务实际退出后交付并消费 TaskOutcome；空名单返回 null／None |
 | `requestStop(refs, reason?)` | `request_stop(refs, reason=None)` | 返回 StopAck，分别表示 stop_requested 或 already_exited，不等待退出 |
-| `await waitAllExited(refs)` | `wait_all_exited(refs)` | 等全部任务实际退出，按名单顺序返回结果；空名单返回空数组 |
+| `await waitAllExited(refs)` | `wait_all_exited(refs)` | 等名单中全部任务实际退出，按名单顺序交付并消费结果；空名单返回空数组 |
 
 这些方法位于 `context.tasks`。Python 管理 Node 必须使用 `run_pure(self, inputs, params, context)`；普通 Node 可继续使用二参形式，或接收可选第三参 context。Python 方法同步调用，不使用 `await`。JS 的等待方法必须 `await`，并用 `runWorkflowAsync` 执行异步 workflow。
 
-TaskOutcome 包含 `task` 引用与 `status`（succeeded、failed、cancelled）。成功时有 `outputs`；失败时有带来源位置的结构化 `error`，不传原始异常对象。StopAck 包含 `task` 与 `state`。重复引用按首次出现顺序去重；先结束后等待、重复等待仍能取得相同最终结果。连续处理任一结果时，应生成排除已处理引用的新数组。
+TaskOutcome 包含 `task` 引用与 `status`（succeeded、failed、cancelled）。成功时有 `outputs`；失败时有带来源位置的结构化 `error`，不传原始异常对象。StopAck 包含 `task` 与 `state`。同一次等待内的重复引用按首次出现顺序去重。任务先结束、父流程后等待，仍能取得结果；结果交付时框架立即删除任务卡，不支持重复查询。父流程保存返回的普通结果数据，并从待处理名单移除对应引用。复制件也会失效，再等待或停止已消费引用报 VF_TASK_REF_INVALID。
 
 ```ts
 const refs = ['main', 'io', 'control'].map(key => context.tasks.start(key, {}));
 const first = await context.tasks.waitAny(refs);
-if (first?.status === 'failed') {
-  context.tasks.requestStop(refs.filter(ref => ref.task_id !== first.task.task_id));
-}
-const results = await context.tasks.waitAllExited(refs);
+const pending = refs.filter(ref => ref.task_id !== first?.task.task_id);
+if (first?.status === 'failed') context.tasks.requestStop(pending);
+const results = [...(first ? [first] : []), ...await context.tasks.waitAllExited(pending)];
 ```
 
 管理 Node 可在自身 `if`、循环中决策，或把结果传给现有 Decision。失败不会自动停止兄弟任务。显式等待的失败可作为业务数据处理；未消费失败在 workflow 最终收尾时报错。
@@ -52,7 +51,7 @@ const results = await context.tasks.waitAllExited(refs);
 
 普通 Node 应等待自身工作，在 `finally` 释放计时器、监听器或其他资源。不能丢弃尚未完成的 Promise 或遗留后台工作。`task_manager` 身份不意味着框架自动清理任意业务资源；释放逻辑仍由持有资源的 Node 编写。
 
-任务退出后自动回收活跃执行及控制资源，结果保留至本次 workflow 结束，无需手工关闭遥控器。常驻 workflow 累计启动大量短任务时，结果缓存占用随累计任务数及输出大小增长；选择合理的 workflow 运行边界。
+任务退出后释放活跃执行和控制资源；结果只暂存到接收它的 waitAny/waitAllExited 完成交付。交付后任务卡自动回收，无需 release 接口。父流程把结果作为普通数据传给其他节点，后者不再通过旧任务引用查询。常驻 workflow 持续创建并接收短任务时，已交付任务卡不会累积；一直不接收的结果仍会占用空间。业务保存的结果和 trace 历史由各自的用途决定保留期限。
 
 Workflow ABI 为 v6。旧 `async`、`result_key`、`detached` 调用入口与停止等待超时选项必须迁移，没有自动转换层。将旧启动点改为管理 Node 的声明目标，把引用通过数据连边传到显式等待点；独立后台任务也须归属于本次 workflow。迁移后重新生成 Architecture，再执行 validate、quality 和实际运行／构建。
 
@@ -94,13 +93,15 @@ class Manage:
         refs = [context.tasks.start("work", {"example.request": {"label": label}})
                 for label in ("A", "B", "C")]
         pending = list(refs)
+        received = []
         while pending:
             outcome = context.tasks.wait_any(pending)
+            received.append(outcome)
             pending = [ref for ref in pending if ref != outcome["task"]]
             if outcome["status"] == "failed":
                 context.tasks.request_stop(pending, "另一个工作任务失败")
                 break
-        return {"report": context.tasks.wait_all_exited(refs)}
+        return {"report": [*received, *context.tasks.wait_all_exited(pending)]}
 ```
 
 ## JavaScript/TypeScript 管理 Node 示例
@@ -114,16 +115,18 @@ export async function run(inputs: any, params: any, context: TaskManagerContext)
   const refs = ['A', 'B', 'C'].map(label =>
     context.tasks.start('work', {'example.request': {label}}));
   let pending = [...refs];
+  const received = [];
   while (pending.length) {
     const outcome = await context.tasks.waitAny(pending);
     if (!outcome) break;
+    received.push(outcome);
     pending = pending.filter(ref => ref.task_id !== outcome.task.task_id);
     if (outcome.status === 'failed') {
       context.tasks.requestStop(pending, '另一个工作任务失败');
       break;
     }
   }
-  return {report: await context.tasks.waitAllExited(refs)};
+  return {report: [...received, ...await context.tasks.waitAllExited(pending)]};
 }
 ```
 
@@ -168,11 +171,11 @@ Python 普通 Node 接收可选 context，在工作步骤之间调用 `context.s
 
 两种语言都将业务资源释放放在 finally 中。清理动作本身应等到完成，不因“已请求停止”而跳过。JS 清理需要异步操作时继续 await；Python 线程需要 join，线程池需要等待 shutdown。业务超时可以触发 requestStop，但不能把超时结果当作 waitAllExited 已完成。
 
-## 跨节点传递与反复等待
+## 跨节点传递与一次接收
 
 启动 Node 可以把 refs 按普通 provides 返回；普通 Node 复制或筛选名单，再交给另一个 task_manager。后者读取 requires 的业务值并调用 context.tasks，目标与结果仍属于同一次 workflow。不要把 context 或控制接口存入数据，也不要在 Node 返回后从后台回调调用该 context。
 
-每次处理 waitAny 结果后排除对应引用，否则下一次仍可能读到同一已结束结果。waitAllExited 返回顺序是名单首次出现顺序，不能据此推断实际完成顺序。复制名单不复制任务；再次 start 才创建新任务。引用不能跨 workflow 运行复用，即使上一次输出保存了 refs。
+每次处理 waitAny 结果后排除对应引用，否则下次等待会遇到已消费引用错误。把已接收结果和剩余引用分开传递：前者是普通业务数据，后者只供管理节点接收尚未交付的任务。waitAllExited 返回顺序是名单首次出现顺序，不能据此推断实际完成顺序。不要让多个管理者并发接收同一任务；重叠等待最多交付一次，失败的批量等待不会偷偷消费其余结果。复制名单不复制任务；再次 start 才创建新任务。引用不能跨 workflow 复用。
 
 ## 从旧并发配置迁移
 
@@ -184,3 +187,7 @@ Python 普通 Node 接收可选 context，在工作步骤之间调用 `context.s
 6. 重新生成 Architecture，执行 validate、quality 与实际运行/构建。Node/插件与配置命令见[Workflow 与 Config](workflow-and-config.md)和两侧开发手册。
 
 Python 的 `runtime.async_max_workers` 仍可配置工作并发数，名称不表示支持旧调用级 async。管理 Node 的颜色与双圆形只用于识别；修改样式或关闭某个局部规则都不会授予普通 Node 控制权限。
+
+## 从 0.19.x 的重复查询方式迁移
+
+等待接口现为一次交付：waitAny 后删除该引用，将取得的结果保存在父流程；waitAllExited 只接收剩余名单。先等待结束、再 requestStop 的旧写法应改为接收前请求停止，或直接使用已取得结果。需要交给别的节点时，通过 requires/provides 传结果，不传已消费引用。旧重复等待示例须同步修改。底层清理、失败收尾和跨 Node 的未消费引用传递方式保持不变。

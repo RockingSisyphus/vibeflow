@@ -1,6 +1,6 @@
 # 原生任务管理：编译、执行与维护
 
-本文面向内核维护者，描述 0.19.1 当前实现。公开声明、配置与调用示例见[使用手册](../../distribution/docs/user/task-management.md)；阶段失败和 full-04 验收见[实施记录](../maintainers/history/task-management-implementation-20261014.md)。历史记录不代替当前设计。
+本文面向内核维护者，描述 0.20.0 当前实现。公开声明、配置与调用示例见[使用手册](../../distribution/docs/user/task-management.md)；首次实现见[实施记录](../maintainers/history/task-management-implementation-20261014.md)，一次交付与回收见[本轮验证记录](../maintainers/history/task-result-delivery-20261014.md)。历史记录不代替当前设计。
 
 ## 目标与边界
 
@@ -30,7 +30,7 @@
 
 Python 阶段为 queued/running/stopping/exited，JS 为 running/stopping/exited；阶段表达执行进度，TaskOutcome 的 succeeded/failed/cancelled 仅在最终退出时确定。requestStop 只发信号，排队任务仍须进入退出处理；不响应取消的操作继续保持未退出。不得通过取消 Future/Promise 的观察者来宣称底层工作已结束。
 
-waitAny 在已结束的候选中按 exitOrder 取最早结果，否则等待完成通知；waitAllExited 按名单顺序返回。两者取得结果时标为已观察，重复等待仍可读取结果。未观察失败在所属执行 drain 时汇总为 VF_TASK_UNOBSERVED；正常取消不作为未消费业务失败。控制 context 仅在当前管理 Node 调用活跃期间有效，关闭规则不授予控制权。
+waitAny 在已结束的候选中按 exitOrder 取最早结果，否则等待完成通知；waitAllExited 按名单顺序返回。两者将最终结果一次性交付给接收者，原子移除任务记录；同一批次先验证全部记录仍在，防止重叠等待部分消费。结果成为接收者普通数据，重复查询或停止已消费引用报 VF_TASK_REF_INVALID。未观察失败在所属执行 drain 时汇总为 VF_TASK_UNOBSERVED；正常取消不作为未消费业务失败。控制 context 仅在当前管理 Node 调用活跃期间有效，关闭规则不授予控制权。
 
 ## Python 执行与退出
 
@@ -38,13 +38,13 @@ Runtime 为本次 workflow 共享 TaskRegistry，当前 task ID 建立父子关�
 
 Condition 保护记录与完成通知。管理线程启动/工作池提交在同一锁下登记，启动失败转为退出失败并释放信号订阅及锁，不留下不可等待的活跃记录。wait_any 在等待期间响应管理调用取消；wait_all_exited 和 drain 不被同一取消信号提前截断。
 
-执行目标后依次处理其后代 drain、线程池上下文关闭、锁 lease 释放和信号退订，再确定 outcome、清空活跃 signal、分配 exit_order 并唤醒等待者。root 统一停止并等待所属任务，合并限定路径 trace、关闭工作池并 join 控制线程。正常路径 drain 后重新检查外部取消；CLI business exit 保留自身语义，任务内请求退出先转成结构化失败数据供管理 Node 决定。
+执行目标后依次处理其后代 drain、线程池上下文关闭、锁 lease 释放和信号退订，清空活跃 signal、分配 exit_order，发出退出 trace 后才发布最终 outcome 并唤醒等待者；退出 trace 回调失败也进入最终失败结果。接收或 drain 时合并限定路径 trace，root 统一停止并等待所属任务、关闭工作池并 join 控制线程。正常路径 drain 后重新检查外部取消；CLI business exit 保留自身语义，任务内请求退出先转成结构化失败数据供管理 Node 决定。
 
 普通旧二参 run_pure 仍可绑定，可选第三参提供 context；管理 Node 必须接收第三参。NodeRunContext.close 发出本次调用退出信号并收集取消回调清理错误，不把它当成所属任务全部退出。
 
 ## JavaScript 执行与退出
 
-AOT 为每个管理调用生成 taskExecutors 槽映射。start 使用独立 AbortController，订阅当前执行的取消信号，保存 parent ID 并异步执行目标。目标执行与后代 drain 完成后退订父信号、释放 controller，再保存最终 outcome 和退出顺序。root finish 设置 closing，必要时报告 stopping，停止并等待所属任务。
+AOT 为每个管理调用生成 taskExecutors 槽映射。start 使用独立 AbortController，订阅当前执行的取消信号，保存 parent ID 并异步执行目标。目标执行与后代 drain 完成后退订父信号、释放 controller，确定退出顺序并发出退出 trace，随后保存最终 outcome；重入等待不能提前收到暂定成功结果。root finish 设置 closing，必要时报告 stopping，停止并等待所属任务。
 
 每次 Node 调用另有内部 NodeExecution，跟踪该调用发起的 SDK Promise 操作。它不是公开任务组，不能随数据连边传递。Promise.race 已返回时，落败但未完成的操作仍属于该执行记录；exit 请求停止后持续等待 operations 集合清空。取消观察者不能删除实际操作归属。任务管理等待 Promise 同样由该 Node 调用持有。
 
@@ -54,7 +54,7 @@ Node 自身 finally 可以在取消后等待清理操作；收尾期间禁止 st
 
 TaskOutcome 是可传递数据。失败保留 code/message、调用路径与 source_location，并按实际错误保留 cause、任务错误、清理错误及业务 exit_code；不传原始异常对象。主错误和后续 drain、资源释放、run_failed hook 错误不能互相覆盖。取消伴随清理失败应报告失败，而不是纯 cancelled。
 
-已退出记录保留结果到本次 workflow 结束，成本为 O(累计任务数及输出大小)，不是 O(活跃任务数)。活跃 signal/controller、监听订阅、工作池和控制线程不作为最终结果保留。长时间反复启动任务仍可能积累结果；任何改变结果保留期限的设计都会影响先结束后等待及重复等待合同，需要另行讨论。
+记录仅保留活跃执行和未交付结果，等待成功交付后移除；父执行 drain 收集未交付失败并退休实际退出的孩子。活跃 signal/controller、监听订阅、工作池和控制线程不作为最终结果保留。Python 使用独立递增任务编号，不能按记录数量生成编号；删除记录后不复用旧 ID。子任务 trace 暂存在未交付记录上，接收或 drain 时合入运行 trace 并释放子 trace 对象，不另设累计 completed_traces 队列。历史 trace/运行汇总仍可能随时间增长，不将任务卡回收等同于整个 workflow 常量空间。
 
 ## 规则与图形
 

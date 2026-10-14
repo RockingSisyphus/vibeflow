@@ -39,14 +39,14 @@ class TaskRegistry {
     const seen = new Set();
     return refs.map(ref => {
       if (!ref || ref.run_id !== this.runId || !this.records.has(ref.task_id))
-        throw vfError("VF_TASK_REF_INVALID", "unknown or foreign workflow task reference", workflow);
+        throw vfError("VF_TASK_REF_INVALID", "unknown, consumed or foreign workflow task reference", workflow);
       return this.records.get(ref.task_id);
     }).filter(record => !seen.has(record.ref.task_id) && seen.add(record.ref.task_id));
   }
 
   stop(records, reason = "task stop requested") {
     return records.map(record => {
-      if (record.outcome) return {task: record.ref, state: "already_exited"};
+      if (record.phase === "exited") return {task: record.ref, state: "already_exited"};
       record.phase = "stopping";
       record.controller.abort(reason);
       return {task: record.ref, state: "stop_requested"};
@@ -59,11 +59,25 @@ class TaskRegistry {
     await Promise.allSettled(children.map(record => record.promise));
     const failures = children.filter(record => record.outcome.status === "failed" && !record.observed);
     const failed = failures[0];
+    for (const record of children) {
+      record.observed = true;
+      this.records.delete(record.ref.task_id);
+    }
     if (failed) {
-      for (const record of failures) record.observed = true;
       throw vfError("VF_TASK_UNOBSERVED", failed.outcome.error.message, workflow,
         {nodePath: failed.outcome.error.node_path, taskErrors: failures.map(record=>record.outcome)});
     }
+  }
+
+  deliver(records, workflow) {
+    if (records.some(record => this.records.get(record.ref.task_id) !== record))
+      throw vfError("VF_TASK_REF_INVALID", "task result was already consumed", workflow);
+    const outcomes = records.map(record => record.outcome);
+    for (const record of records) {
+      record.observed = true;
+      this.records.delete(record.ref.task_id);
+    }
+    return outcomes;
   }
 
   async finish(root) {
@@ -111,14 +125,15 @@ class TaskRegistry {
       record.controller = null;
       record.phase = "exited";
       const status = failure ? (failure.code === "VF_ABORTED" && !failure.cleanupErrors?.length ? "cancelled" : "failed") : "succeeded";
-      record.outcome = Object.freeze({task: ref, status,
+      let outcome = Object.freeze({task: ref, status,
         ...(status === "succeeded" ? {outputs: output} : {error:taskErrorData(failure,nodePath(state,node.id))})});
       record.exitOrder = ++this.nextExit;
       try { emitTrace(state.root, "task_exited", {task: ref, status, managerNode: node.id, nodePath:nodePath(state,node.id),blockPath:formatBlockPath(state.path)}); }
       catch (error) {
-        record.outcome = Object.freeze({task:ref, status:"failed", error:{code:error.code,
+        outcome = Object.freeze({task:ref, status:"failed", error:{code:error.code,
           message:error.message, node_path:error.nodePath || nodePath(state,node.id)}});
       }
+      record.outcome = outcome;
       return record.outcome;
     })();
     emitTrace(state.root, "task_started", {task: ref, managerNode: node.id, key, nodePath:nodePath(state,node.id),blockPath:formatBlockPath(state.path)});
@@ -143,8 +158,8 @@ function taskController(node, state, execution) {
       const ready = records.filter(record => record.outcome).sort((a,b) => a.exitOrder-b.exitOrder);
       const result = ready.length ? ready[0].outcome : await waitTaskNotification(
         Promise.race(records.map(record => record.promise)), execution?.signal || state.root.signal, state.workflow);
-      registry.records.get(result.task.task_id).observed = true;
-      return result;
+      const record = records.find(record => record.ref.task_id === result.task.task_id);
+      return registry.deliver([record], state.workflow)[0];
       })();
       return execution ? execution.own(waiting) : waiting;
     },
@@ -152,9 +167,8 @@ function taskController(node, state, execution) {
       assertActive();
       const waiting = (async () => {
       const records = registry.select(refs, state.workflow);
-      const outcomes = await Promise.all(records.map(record => record.promise));
-      for (const record of records) record.observed = true;
-      return outcomes;
+      await Promise.all(records.map(record => record.promise));
+      return registry.deliver(records, state.workflow);
       })();
       return execution ? execution.own(waiting) : waiting;
     },

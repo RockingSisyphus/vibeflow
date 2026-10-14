@@ -22,8 +22,10 @@ export interface TaskOutcome {
 export interface StopAck {readonly task: TaskRef; readonly state: "stop_requested" | "already_exited";}
 export interface TaskController {
   start(key: string, inputs?: Readonly<Record<string, any>>): TaskRef;
+  /** Receive one final result and retire its reference. */
   waitAny(refs: readonly TaskRef[]): Promise<TaskOutcome | null>;
   requestStop(refs: readonly TaskRef[], reason?: any): readonly StopAck[];
+  /** Receive all final results and retire the supplied references. */
   waitAllExited(refs: readonly TaskRef[]): Promise<readonly TaskOutcome[]>;
 }
 export interface TaskManagerContext extends NodeRunContext {readonly tasks: TaskController;}

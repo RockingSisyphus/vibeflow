@@ -1,12 +1,15 @@
 import type {TaskManagerContext, TaskRef} from "@vibeflow/plugin";
 export async function run(inputs: any, params: any, context: TaskManagerContext) {
   const refs: TaskRef[] = inputs["fixture.forwarded"].value;
-  const results = await context.tasks.waitAllExited([...refs, refs[0]]);
-  const repeated = await context.tasks.waitAny([refs[1]]);
-  if (repeated!.task.task_id !== results[1].task.task_id) throw new Error("late outcome lost");
+  const results = [...inputs["fixture.finished.forwarded"].value,
+    ...await context.tasks.waitAllExited([...refs, ...refs.slice(0,1)])];
+  results.sort((a,b)=>Number(a.task.task_id)-Number(b.task.task_id));
   if (await context.tasks.waitAny([]) !== null) throw new Error("empty waitAny");
   if ((await context.tasks.waitAllExited([])).length) throw new Error("empty waitAllExited");
-  if (context.tasks.requestStop(refs).some(ack=>ack.state !== "already_exited")) throw new Error("completed task still active");
+  if(refs.length){
+    try {await context.tasks.waitAny(refs);throw new Error("consumed result retained");}
+    catch(error:any){if(error.code!=="VF_TASK_REF_INVALID")throw error;}
+  }
   context.trace("control_joined");
   return {"fixture.report": results};
 }
