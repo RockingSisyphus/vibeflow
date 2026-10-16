@@ -45,10 +45,14 @@ def test_manager_visual_identity_and_long_label_in_real_browser(tmp_path, severi
     script=tmp_path/'inspect.mjs'
     script.write_text('''
 import {createRequire} from 'node:module';import {pathToFileURL} from 'node:url';
+import {serveAssets} from ASSET_SERVER;
 const require=createRequire(RENDERER);const {default:puppeteer}=await import(pathToFileURL(require.resolve('puppeteer')).href);
-const browser=await puppeteer.launch({headless:true,args:['--no-sandbox','--disable-setuid-sandbox']});
-try {const page=await browser.newPage();const proof=[];
- for(const path of PATHS){await page.goto(pathToFileURL(path).href);
+const paths=PATHS;
+const assets=await serveAssets({files:Object.fromEntries(paths.map((path,i)=>[i+'.svg',path]))});
+let browser;
+try {browser=await puppeteer.launch({headless:true,args:['--no-sandbox','--disable-setuid-sandbox']});
+const page=await browser.newPage();const proof=[];
+ for(let i=0;i<paths.length;i++){await page.goto(assets.url(i+'.svg'));
   proof.push(await page.evaluate(()=>{
    const node=[...document.querySelectorAll('g.node')].find(node=>node.textContent.includes('任务管理'));
    if(!node)throw new Error('manager label lost');
@@ -62,8 +66,8 @@ try {const page=await browser.newPage();const proof=[];
   }));
  }
  console.log(JSON.stringify({browser:await browser.version(),proof}));
-} finally {await browser.close();}
-'''.replace('RENDERER',json.dumps(str(Path(renderer)/'package.json'))).replace('PATHS',json.dumps(paths)))
+} finally {try {await browser?.close();} finally {await assets.close();}}
+'''.replace('ASSET_SERVER',json.dumps((Path(__file__).resolve().parents[2]/'src/vibeflow/tooling/presentation/http_assets.mjs').as_uri())).replace('RENDERER',json.dumps(str(Path(renderer)/'package.json'))).replace('PATHS',json.dumps(paths)))
     result=subprocess.run(['node',str(script)],capture_output=True,text=True,timeout=40)
     assert result.returncode==0,result.stderr
     proof=json.loads(result.stdout);assert len(proof['proof'])==2

@@ -8,11 +8,14 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import threading
 
 from tests.fixtures.support.plugins import copy_sdk_inputs
 
 
 ROOT = Path(__file__).resolve().parents[3]
+OBSERVATION_JOURNAL = None
+_JOURNAL_LOCK = threading.Lock()
 
 
 def write(path, value):
@@ -102,6 +105,10 @@ def cli(project, command_name, *, name, extra=(), config=None):
 
 
 def row(case_id, title, family, actual, expected=None, *, classification="new_feature"):
-    return {"id": case_id, "title": title, "family": family, "classification": classification,
+    observation = {"id": case_id, "title": title, "family": family, "classification": classification,
             "expected": {"should_accept": True, "metrics": {"exit_code": 0, "json_output": True}, **(expected or {})},
             "actual": actual}
+    if OBSERVATION_JOURNAL is not None:
+        with _JOURNAL_LOCK, OBSERVATION_JOURNAL.open("a", encoding="utf-8") as journal:
+            journal.write(json.dumps(observation, ensure_ascii=False) + "\n")
+    return observation

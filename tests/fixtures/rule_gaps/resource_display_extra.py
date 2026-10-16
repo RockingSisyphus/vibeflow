@@ -36,6 +36,13 @@ def run_cases(work,toolchain,*,kinds=KINDS,state_kinds=("host_extension","plugin
         case=f"display.{kind}.failed_review_keeps_previous";root=project(work/case,toolchain=toolchain)
         before,_,_,_=documents(root,name="formal")
         svg=root/"evidence/formal.svg";document=root/"ARCHITECTURE.jsonc"
+        if before["metrics"]["exit_code"] != 0 or not svg.is_file() or not document.is_file():
+            before["metrics"].update(initial_review=before["metrics"]["exit_code"],artifacts_preserved=False,
+                                      setup_failed=True,missing_artifacts=[str(path) for path in (svg,document) if not path.is_file()])
+            rows.append(observe(case,"resource-display",before,accept=False,
+                code="NODE.PURITY.SOURCE_TOO_LARGE" if kind=="node" else "BASE_LIB.SOURCE.MAX_LINES",
+                metrics={"initial_review":0,"artifacts_preserved":True}))
+            continue
         originals=[hashlib.sha256(path.read_bytes()).hexdigest() for path in (svg,document)]
         path=root/PARTS[kind];text=path.read_text();path.write_text(text+"// invalid support\n"*(501-len(text.splitlines())))
         actual=cli(root,"review",name="failed-review",extra=["--output",svg])

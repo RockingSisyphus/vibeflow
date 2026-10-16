@@ -140,7 +140,7 @@ inputs['x']: int 只有注解，没有赋值值。当前分支在 node.value 为
 
 [审核摘要及当前源码哈希](../evidence/index.md#artifact-60b2a4246d74d2c2)、[真实 AOT 日志](../evidence/index.md#artifact-b1ad8b8777dcacd2)、[架构选择](../evidence/index.md#artifact-b5c5d2400e041619)、[空选择](../evidence/index.md#artifact-0cf6f9c91172a8a6)、[JS 结果](../evidence/index.md#artifact-23aa24c1c1733941)均已保存。正式 CLI 的最小项目和 stdout 保存在 fixtures 目录。记录中的临时执行路径是原始现场元数据；隔离依赖和整改前解包副本用完即清理。
 
-[CLI 复现脚本](../evidence/index.md#artifact-35d5ff0ce7863a81) 使用已保存的最小项目、隔离子进程和指定产品 src；可传入 --product /home/rockingsisyphus/projects/VibeFlow/src 复测。本次已实际重跑脚本的 38 项，状态和诊断代码与首次观察全部一致，见[重跑结果](../evidence/index.md#artifact-43fe91f85a78ca59)。[临时目录清理记录](../evidence/index.md#artifact-076c08b21be4ffad)确认只清理本次创建的隔离环境和解包副本。
+[CLI 复现脚本](../evidence/index.md#artifact-35d5ff0ce7863a81) 使用已保存的最小项目、隔离子进程和指定产品 src；从仓库根目录可传入 `--product ./src` 复测。本次已实际重跑脚本的 38 项，状态和诊断代码与首次观察全部一致，见[重跑结果](../evidence/index.md#artifact-43fe91f85a78ca59)。[临时目录清理记录](../evidence/index.md#artifact-076c08b21be4ffad)确认只清理本次创建的隔离环境和解包副本。
 
 ## 后续修正边界
 

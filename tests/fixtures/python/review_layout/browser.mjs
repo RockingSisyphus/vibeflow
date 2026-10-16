@@ -1,14 +1,16 @@
 /** Computed geometry and colours from the final, composed SVG. */
 import {createRequire} from "node:module";
-import {pathToFileURL} from "node:url";
+import {serveAssets} from "../../../../src/vibeflow/tooling/presentation/http_assets.mjs";
 const [renderer, svg, screenshot] = process.argv.slice(2);
 const require = createRequire(renderer + "/package.json");
-const browser = await require("puppeteer").launch({headless:true,
-  args:["--no-sandbox", "--disable-dev-shm-usage"]});
+const assets = await serveAssets({files: {"graph.svg": svg}});
+let browser;
 try {
+  browser = await require("puppeteer").launch({headless:true,
+  args:["--no-sandbox", "--disable-dev-shm-usage"]});
   const page = await browser.newPage();
   await page.setViewport({width:2200,height:1500});
-  await page.goto(pathToFileURL(svg).href, {waitUntil:"networkidle0"});
+  await page.goto(assets.url("graph.svg"), {waitUntil:"networkidle0"});
   const result = await page.evaluate(() => ({
     root:document.querySelector("svg")?.getAttribute("aria-roledescription"),
     titles:[...document.querySelectorAll("text.review-title")].map(item => {
@@ -40,4 +42,4 @@ try {
   }));
   if (screenshot) await page.screenshot({path:screenshot,fullPage:true});
   process.stdout.write(JSON.stringify(result));
-} finally { await browser.close(); }
+} finally {try {await browser?.close();} finally {await assets.close();}}

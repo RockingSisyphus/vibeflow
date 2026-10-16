@@ -45,8 +45,31 @@ from vibeflow.tooling.application.python.presentation import ...
 Use Python 3.11 or newer:
 
 ```bash
-python -m pip install -e .
+python -m pip install -e '.[test]' build
 ```
+
+The `test` extra includes pytest, pytest-xdist and PyYAML, which the YAML CLI
+Sandbox uses. CI installs this same dependency group from `pyproject.toml`;
+PyYAML is not a runtime dependency of the framework itself.
+
+SVG rendering uses the locked Mermaid/Puppeteer dependencies in
+`tools/mermaid-renderer` (or `kernel/tools/mermaid-renderer` in a distribution).
+The renderer loads its page, modules and fonts through a temporary HTTP server
+bound to `127.0.0.1`, rather than browser `file://` navigation. It exposes only
+registered rendering assets under a random URL prefix and closes after each
+render, including failures. Browser evidence tests similarly register only the
+specific SVG files being inspected. The browser must permit loopback HTTP.
+
+On Linux, each SVG render runs inside a child subreaper that owns and reaps
+its browser descendants. Direct `tools/run_tests.py` and `tools/verify_project.py`
+entrypoints also supervise their complete process trees. For a custom batch use
+`python src/vibeflow/tooling/application/process_supervisor.py --state /path/outside/repo/process-state.json -- python batch.py`.
+The state records termination signals, timeouts, child exit status and cleanup;
+SIGTERM is an interrupted run, never a successful test result. This prevents new
+orphan accumulation but cannot reap old zombies already owned by another PID.
+Rule observation workers checkpoint each row to `*.partial.jsonl`; only a fully
+completed group publishes its final JSON. Failed/interrupted groups also retain
+`*.error.json`, and output paths must be unique.
 
 ## Validation
 
