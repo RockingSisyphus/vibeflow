@@ -4752,3 +4752,30 @@
 外部目录的 acceptance/full-1 保存完整首批日志、各机器报告、固定源码快照及初次定向失败现场。acceptance/final 保存修正后的日志、交付物、最终来源快照和可复查的运行产物归档。所有文件的大小与 SHA-256 记录在 acceptance-manifest.json。
 
 成绩与首批失败、后续复验的区别见 [整改结果](../directory-remediation-results-20261009.md)。本次临时工作区在归档校验完成后删除。
+
+## 后续历史验收原件的定位记录
+
+以下历史材料由仓库内报告引用，原件没有随当前云环境提供。本表仅保留定位信息；没有读取原件、核验其哈希或重新验证相应历史成绩。报告中的“位置”链接指向此表，不表示原始报告或日志可直接下载。
+
+路径均以仓库根目录为基准，`../VibeFlow-evidence/` 表示仓库旁的外部证据目录。需要复核时，应由实际保管位置取得真实原件；不要创建空文件或用本次结果替代历史原件。
+
+| 定位记录 | 原件相对位置 | 当前状态 |
+| --- | --- | --- |
+| <a id="external-c0463e5f0fa01f08"></a>addition-sandboxes-20261009/javascript-batch-current/reports/summary.json | `../VibeFlow-evidence/addition-sandboxes-20261009/javascript-batch-current/reports/summary.json` | 当前云环境未提供原件，内容与完整性未核验 |
+| <a id="external-384da8301cda12b7"></a>addition-sandboxes-20261009/math-follow-up-completion.json | `../VibeFlow-evidence/addition-sandboxes-20261009/math-follow-up-completion.json` | 当前云环境未提供原件，内容与完整性未核验 |
+| <a id="external-65bdc7f6b9dfb374"></a>addition-sandboxes-20261009/python-batch-current/reports/summary.json | `../VibeFlow-evidence/addition-sandboxes-20261009/python-batch-current/reports/summary.json` | 当前云环境未提供原件，内容与完整性未核验 |
+| <a id="external-d528ed995558227e"></a>addition-sandboxes-20261009/timing-samples | `../VibeFlow-evidence/addition-sandboxes-20261009/timing-samples` | 当前云环境未提供原件，内容与完整性未核验 |
+| <a id="external-466798745f4a9b80"></a>addition-sandboxes-20261009/verification-logs/pytest-current-final.log | `../VibeFlow-evidence/addition-sandboxes-20261009/verification-logs/pytest-current-final.log` | 当前云环境未提供原件，内容与完整性未核验 |
+| <a id="external-9c7c54d6ec1c71eb"></a>addition-sandboxes-20261009/verification-logs/pytest-follow-up.log | `../VibeFlow-evidence/addition-sandboxes-20261009/verification-logs/pytest-follow-up.log` | 当前云环境未提供原件，内容与完整性未核验 |
+| <a id="external-6999a0ad380a32a6"></a>addition-sandboxes-20261009/verification-logs/quality-final-current.log | `../VibeFlow-evidence/addition-sandboxes-20261009/verification-logs/quality-final-current.log` | 当前云环境未提供原件，内容与完整性未核验 |
+| <a id="external-01a3d72a867b3269"></a>addition-sandboxes-20261009/verified-source-current-manifest.json | `../VibeFlow-evidence/addition-sandboxes-20261009/verified-source-current-manifest.json` | 当前云环境未提供原件，内容与完整性未核验 |
+| <a id="external-6a244a371842e7d5"></a>addition-sandboxes-20261009/verified-source-follow-up-manifest.json | `../VibeFlow-evidence/addition-sandboxes-20261009/verified-source-follow-up-manifest.json` | 当前云环境未提供原件，内容与完整性未核验 |
+| <a id="external-a87934dc02d6e8c3"></a>comprehensive-sandbox-20261009/results.json | `../VibeFlow-evidence/comprehensive-sandbox-20261009/results.json` | 当前云环境未提供原件，内容与完整性未核验 |
+| <a id="external-0c063f3624cb3b26"></a>piecewise-math-20261010/old-eleven/timing.json | `../VibeFlow-evidence/piecewise-math-20261010/old-eleven/timing.json` | 当前云环境未提供原件，内容与完整性未核验 |
+| <a id="external-d15cb3c5c3269848"></a>piecewise-math-20261010/pytest.log | `../VibeFlow-evidence/piecewise-math-20261010/pytest.log` | 当前云环境未提供原件，内容与完整性未核验 |
+| <a id="external-c26c10369db3de8a"></a>piecewise-math-20261010/python-batch.log | `../VibeFlow-evidence/piecewise-math-20261010/python-batch.log` | 当前云环境未提供原件，内容与完整性未核验 |
+| <a id="external-1059691b6f6f8ce5"></a>piecewise-math-20261010/python-batch/piecewise_math/report.json | `../VibeFlow-evidence/piecewise-math-20261010/python-batch/piecewise_math/report.json` | 当前云环境未提供原件，内容与完整性未核验 |
+| <a id="external-f9255b0468cc48b9"></a>piecewise-math-20261010/python-batch/reports/summary.json | `../VibeFlow-evidence/piecewise-math-20261010/python-batch/reports/summary.json` | 当前云环境未提供原件，内容与完整性未核验 |
+| <a id="external-2251f592a932ca89"></a>piecewise-math-20261010/quality-final.log | `../VibeFlow-evidence/piecewise-math-20261010/quality-final.log` | 当前云环境未提供原件，内容与完整性未核验 |
+| <a id="external-fc168f14d77caaa8"></a>piecewise-math-20261010/standalone/report.json | `../VibeFlow-evidence/piecewise-math-20261010/standalone/report.json` | 当前云环境未提供原件，内容与完整性未核验 |
+| <a id="external-caa751dcbe43963c"></a>rule-mechanism-refactor-20261009/results.json | `../VibeFlow-evidence/rule-mechanism-refactor-20261009/results.json` | 当前云环境未提供原件，内容与完整性未核验 |

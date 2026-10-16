@@ -133,4 +133,8 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    if __package__:
+        from .process_supervision import entrypoint
+    else:
+        from process_supervision import entrypoint
+    raise SystemExit(entrypoint(Path(__file__), sys.argv[1:], main))

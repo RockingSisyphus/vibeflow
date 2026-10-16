@@ -67,14 +67,14 @@ Python 名称省略 valid: 前缀。下面的检查都已经在新驱动中明�
 
 | 验收项 | 实际结果 | 原始记录 |
 | --- | --- | --- |
-| Python 完整 integration | 124/124 通过；失败 0；跳过 0；退出码 0；501.352 秒 | [汇总](../../../../../VibeFlow-evidence/addition-sandboxes-20261009/python-batch-current/reports/summary.json) |
-| JavaScript 完整 integration | 53/53 通过；失败 0；跳过 0；退出码 0；137.472 秒；包含真实浏览器专项和 52 项嵌入式质量 pytest | [汇总](../../../../../VibeFlow-evidence/addition-sandboxes-20261009/javascript-batch-current/reports/summary.json) |
-| 相关 pytest | 222 通过，87.07 秒；涵盖沙盒集成、对象/观察、Rule graph、输入记录、选择边界、Nodeset、资源配置及审查 | [日志](../../../../../VibeFlow-evidence/addition-sandboxes-20261009/verification-logs/pytest-current-final.log) |
-| 后续规则修改专项 | 128 通过，82.42 秒；与上行有重叠，不相加计算独立用例总数 | [日志](../../../../../VibeFlow-evidence/addition-sandboxes-20261009/verification-logs/pytest-follow-up.log) |
-| quality all | 当前工作区和补验副本通过：0 error、0 warning、0 info | [日志](../../../../../VibeFlow-evidence/addition-sandboxes-20261009/verification-logs/quality-final-current.log) |
-| 后续五个独立数学入口 | 全部通过；CLI 3、对象 6、Python 插件 3、JS 插件 3、异步 2 组观察 | [结果](../../../../../VibeFlow-evidence/addition-sandboxes-20261009/math-follow-up-completion.json) |
+| Python 完整 integration | 124/124 通过；失败 0；跳过 0；退出码 0；501.352 秒 | [汇总位置](../../evidence/index.md#external-65bdc7f6b9dfb374) |
+| JavaScript 完整 integration | 53/53 通过；失败 0；跳过 0；退出码 0；137.472 秒；包含真实浏览器专项和 52 项嵌入式质量 pytest | [汇总位置](../../evidence/index.md#external-c0463e5f0fa01f08) |
+| 相关 pytest | 222 通过，87.07 秒；涵盖沙盒集成、对象/观察、Rule graph、输入记录、选择边界、Nodeset、资源配置及审查 | [日志位置](../../evidence/index.md#external-466798745f4a9b80) |
+| 后续规则修改专项 | 128 通过，82.42 秒；与上行有重叠，不相加计算独立用例总数 | [日志位置](../../evidence/index.md#external-9c7c54d6ec1c71eb) |
+| quality all | 当前工作区和补验副本通过：0 error、0 warning、0 info | [日志位置](../../evidence/index.md#external-6999a0ad380a32a6) |
+| 后续五个独立数学入口 | 全部通过；CLI 3、对象 6、Python 插件 3、JS 插件 3、异步 2 组观察 | [结果位置](../../evidence/index.md#external-384da8301cda12b7) |
 
-两个完整批次和 222 项 pytest 对应 [完整验收源码清单](../../../../../VibeFlow-evidence/addition-sandboxes-20261009/verified-source-current-manifest.json)，后续专项与五入口对应 [补验源码清单](../../../../../VibeFlow-evidence/addition-sandboxes-20261009/verified-source-follow-up-manifest.json)。副本保存在同一证据目录，可以核对实现、配置和驱动，而不依赖后来变化的工作区。当前工作区仍有另一任务的规则重构；本记录不声称其后续所有改动已经跑过本轮完整批次，也不声称整个仓库所有 pytest、发行或性能专项均已执行。
+两个完整批次和 222 项 pytest 对应 [完整验收源码清单位置](../../evidence/index.md#external-01a3d72a867b3269)，后续专项与五入口对应 [补验源码清单位置](../../evidence/index.md#external-6a244a371842e7d5)。副本保存在同一证据目录，可以核对实现、配置和驱动，而不依赖后来变化的工作区。当前工作区仍有另一任务的规则重构；本记录不声称其后续所有改动已经跑过本轮完整批次，也不声称整个仓库所有 pytest、发行或性能专项均已执行。
 
 ### 暴露问题与处理
 
@@ -100,4 +100,4 @@ Python 名称省略 valid: 前缀。下面的检查都已经在新驱动中明�
 | Python | 11 任务，79.071 秒 | 3 入口，63.603 秒（38.574+12.226+12.803） | 70.100 秒（38.331+17.032+14.737） |
 | JavaScript | 7 任务，6.190 秒 | 2 入口，7.875 秒（4.071+3.804） | 6.405 秒（4.503+1.902） |
 
-[原始样本](../../../../../VibeFlow-evidence/addition-sandboxes-20261009/timing-samples)保留每项结果。后两列包含不同阶段的规则修复、断言完善和运行负载，不能据此计算可靠的统一提速比例。JS 新组增加了真实修改/恢复与等待观察，watchdog 清理又消除了成功后的额外等待；数学整合的确定收益是入口和重复驱动减少，覆盖迁移有明确对应关系。
+[原始样本位置](../../evidence/index.md#external-d528ed995558227e)保留每项结果。后两列包含不同阶段的规则修复、断言完善和运行负载，不能据此计算可靠的统一提速比例。JS 新组增加了真实修改/恢复与等待观察，watchdog 清理又消除了成功后的额外等待；数学整合的确定收益是入口和重复驱动减少，覆盖迁移有明确对应关系。

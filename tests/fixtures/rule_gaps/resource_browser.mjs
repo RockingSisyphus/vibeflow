@@ -1,13 +1,15 @@
 /** Browser evidence over the final composed SVG, including actual geometry. */
 import {createRequire} from "node:module";
-import {pathToFileURL} from "node:url";
+import {serveAssets} from "../../../src/vibeflow/tooling/presentation/http_assets.mjs";
 const [renderer,svg,output] = process.argv.slice(2);
 const require=createRequire(renderer+"/package.json");
 const puppeteer=require("puppeteer");
-const browser=await puppeteer.launch({headless:true,args:["--no-sandbox","--disable-dev-shm-usage"]});
+const assets = await serveAssets({files: {"graph.svg": svg}});
+let browser;
 try {
+  browser=await puppeteer.launch({headless:true,args:["--no-sandbox","--disable-dev-shm-usage"]});
   const page=await browser.newPage();await page.setViewport({width:2400,height:1600});
-  await page.goto(pathToFileURL(svg).href,{waitUntil:"networkidle0"});
+  await page.goto(assets.url("graph.svg"),{waitUntil:"networkidle0"});
   const facts=await page.evaluate(()=>[...document.querySelectorAll("g.node")].map(node=>{
     const geometries=[...node.querySelectorAll("rect,polygon,circle,ellipse,path")].filter(item=>!item.closest(".label"));
     const rect=node.getBoundingClientRect();
@@ -17,4 +19,4 @@ try {
   }));
   if(output)await page.screenshot({path:output,fullPage:true});
   console.log(JSON.stringify({nodes:facts,svg:true}));
-} finally {await browser.close();}
+} finally {try {await browser?.close();} finally {await assets.close();}}

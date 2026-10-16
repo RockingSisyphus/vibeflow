@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+from importlib.resources import files
 import json
 import math
 import unicodedata
@@ -8,6 +9,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -47,7 +49,7 @@ def render_mermaid_svg(
     html_labels: bool = False,
     enhance_labels: bool = True,
 ) -> Path:
-    """Render Mermaid source to SVG using the project-local Mermaid CLI."""
+    """Render SVG with project-local Mermaid dependencies over loopback HTTP."""
 
     _validate_positive_int("max_text_size", max_text_size)
     _validate_positive_int("max_edges", max_edges)
@@ -55,6 +57,9 @@ def render_mermaid_svg(
     output.parent.mkdir(parents=True, exist_ok=True)
     mmdc = _find_mmdc()
     _ensure_mermaid_cli_compat()
+    node = shutil.which("node")
+    if node is None:
+        raise MermaidRenderError("Node.js not found; install Node.js to render Mermaid SVG")
     errors: list[tuple[str, str]] = []
     skipped_snap = _snap_chromium_candidates()
     with tempfile.TemporaryDirectory(prefix="vibeflow-mermaid-") as temp_dir:
@@ -62,6 +67,11 @@ def render_mermaid_svg(
         input_path = temp / "graph.mmd"
         config_path = temp / "puppeteer.json"
         mermaid_config_path = temp / "mermaid.json"
+        # Materialize both resources together: distribution kernels are ZIP-imported.
+        for name in ("mermaid_http.mjs", "http_assets.mjs"):
+            (temp / name).write_bytes(files(__package__).joinpath(name).read_bytes())
+        supervisor = temp / "process_supervisor.py"
+        supervisor.write_bytes(files("vibeflow.tooling.application").joinpath(supervisor.name).read_bytes())
         input_path.write_text(mermaid_text, encoding="utf-8")
         _write_mermaid_config(
             mermaid_config_path,
@@ -70,12 +80,19 @@ def render_mermaid_svg(
             html_labels=html_labels,
             node_padding=_doublecircle_padding(mermaid_text),
         )
-        for label, executable_path in _puppeteer_launch_options():
+        for attempt, (label, executable_path) in enumerate(_puppeteer_launch_options(), 1):
             if output.exists():
                 output.unlink()
             _write_puppeteer_config(config_path, executable_path=executable_path)
+            process_state = temp / f"process-{attempt}.json"
             command = [
-                str(mmdc),
+                sys.executable, "-B", str(supervisor),
+                "--state", str(process_state),
+                "--timeout", str(timeout_seconds + 5), "--",
+                node,
+                str(temp / "mermaid_http.mjs"),
+                "--renderer-cli",
+                str(mmdc.resolve()),
                 "--input",
                 str(input_path),
                 "--output",
@@ -88,16 +105,20 @@ def render_mermaid_svg(
                 str(mermaid_config_path),
                 "--puppeteerConfigFile",
                 str(config_path),
+                "--timeout",
+                str(timeout_seconds),
             ]
-            completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout_seconds)
+            completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout_seconds + 20)
             if completed.returncode == 0:
                 if not output.exists():
-                    raise MermaidRenderError(f"Mermaid CLI did not create {output}")
+                    raise MermaidRenderError(f"Mermaid renderer did not create {output}")
                 _raise_on_error_svg(output)
                 if enhance_labels and not html_labels:
                     _enhance_svg_labels(output)
                 return output
-            detail = (completed.stderr or completed.stdout or "Mermaid CLI failed").strip()
+            state = process_state.read_text() if process_state.exists() else "not available"
+            detail = (f"Renderer supervisor returncode={completed.returncode}; process state: {state}\n"
+                      f"stderr:\n{completed.stderr or '(empty)'}\nstdout:\n{completed.stdout or '(empty)'}")
             errors.append((label, detail))
     raise MermaidRenderError(_format_render_errors(errors, skipped_snap=skipped_snap))
 
@@ -199,7 +220,7 @@ def _raise_on_error_svg(path: Path) -> None:
     visible_text = _strip_svg_tags(svg_text)
     for marker in _MERMAID_ERROR_TEXT_MARKERS:
         if marker in visible_text:
-            raise MermaidRenderError(f"Mermaid CLI wrote an error SVG: {marker}")
+            raise MermaidRenderError(f"Mermaid renderer wrote an error SVG: {marker}")
 
 
 _SVG_NS = "http://www.w3.org/2000/svg"
@@ -431,7 +452,7 @@ def _is_snap_chromium(path: str) -> bool:
 
 
 def _format_render_errors(errors: list[tuple[str, str]], *, skipped_snap: list[str]) -> str:
-    lines = ["Mermaid CLI failed to render SVG with all supported browser launch options."]
+    lines = ["Mermaid HTTP renderer failed with all supported browser launch options."]
     if skipped_snap:
         lines.append(
             "Skipped snap Chromium because Puppeteer commonly fails to launch it with profile-lock errors: "
@@ -442,9 +463,9 @@ def _format_render_errors(errors: list[tuple[str, str]], *, skipped_snap: list[s
         "or `kernel/tools/mermaid-renderer` for a distribution package to install Puppeteer's browser, "
         "or install a non-snap Chrome/Chromium."
     )
+    lines.append("The browser must allow HTTP to 127.0.0.1 for the temporary rendering server.")
     for label, detail in errors:
-        first_line = detail.splitlines()[0] if detail else "Mermaid CLI failed"
-        lines.append(f"- {label}: {first_line}")
+        lines.append(f"- {label}: {detail or 'Mermaid renderer failed'}")
     return "\n".join(lines)
 
 

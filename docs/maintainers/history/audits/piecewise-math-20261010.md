@@ -56,12 +56,12 @@
 
 | 验证 | 实际结果 | 证据 |
 | --- | --- | --- |
-| 新入口独立执行 | 24/24 组观察通过，26.682 秒 | [逐项报告](../../../../../VibeFlow-evidence/piecewise-math-20261010/standalone/report.json) |
-| 退役前旧 11 项同环境对照 | 11/11 通过，88.494 秒 | [逐任务耗时](../../../../../VibeFlow-evidence/piecewise-math-20261010/old-eleven/timing.json) |
-| Python 完整 integration | 114/114 通过，失败 0、跳过 0；退出码 0；498.547 秒 | [完整汇总](../../../../../VibeFlow-evidence/piecewise-math-20261010/python-batch/reports/summary.json)、[日志](../../../../../VibeFlow-evidence/piecewise-math-20261010/python-batch.log) |
-| 新入口在完整 runner 中执行 | 24/24 组观察通过，26.706 秒 | [逐项报告](../../../../../VibeFlow-evidence/piecewise-math-20261010/python-batch/piecewise_math/report.json) |
-| 相关 pytest | 114 通过，失败 0、跳过 0；32.40 秒 | [日志](../../../../../VibeFlow-evidence/piecewise-math-20261010/pytest.log) |
-| quality all | 0 error、0 warning、0 info；退出码 0 | [日志](../../../../../VibeFlow-evidence/piecewise-math-20261010/quality-final.log) |
+| 新入口独立执行 | 24/24 组观察通过，26.682 秒 | [逐项报告位置](../../evidence/index.md#external-fc168f14d77caaa8) |
+| 退役前旧 11 项同环境对照 | 11/11 通过，88.494 秒 | [逐任务耗时位置](../../evidence/index.md#external-0c063f3624cb3b26) |
+| Python 完整 integration | 114/114 通过，失败 0、跳过 0；退出码 0；498.547 秒 | [完整汇总位置](../../evidence/index.md#external-f9255b0468cc48b9)、[日志位置](../../evidence/index.md#external-c26c10369db3de8a) |
+| 新入口在完整 runner 中执行 | 24/24 组观察通过，26.706 秒 | [逐项报告位置](../../evidence/index.md#external-1059691b6f6f8ce5) |
+| 相关 pytest | 114 通过，失败 0、跳过 0；32.40 秒 | [日志位置](../../evidence/index.md#external-d15cb3c5c3269848) |
+| quality all | 0 error、0 warning、0 info；退出码 0 | [日志位置](../../evidence/index.md#external-2251f592a932ca89) |
 
 相关 pytest 使用既有 `tools/run_tests.py` 的仓库外运行环境，范围为 Python `strict_runtime.py`、`strict_graph_runtime_guardrails.py`、`test_runtime_integration.py`。Python 完整报告的名称与顺序已逐项核对今天的任务清单。
 

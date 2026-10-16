@@ -45,7 +45,7 @@ Python 从 57 个普通合法运行任务中移除 7 项，另加综合专项一
 
 ## 实际验证与效率
 
-本次最终全批结果见随附的 [验证记录](../../../../../VibeFlow-evidence/comprehensive-sandbox-20261009/results.json)。运行两个完整 integration 批次，JS 使用真实 Puppeteer 浏览器，Python 使用真实 Mermaid/Puppeteer 渲染；另运行受影响的 JS 预处理、规则插件与 Python runtime/Nodeset/默认参数回归及仓库质量检查。没有把该范围写成完整 `verify_project.py --full`、全 pytest 或发布包验收。
+本次最终全批结果见随附的 [验证记录位置](../../evidence/index.md#external-a87934dc02d6e8c3)。运行两个完整 integration 批次，JS 使用真实 Puppeteer 浏览器，Python 使用真实 Mermaid/Puppeteer 渲染；另运行受影响的 JS 预处理、规则插件与 Python runtime/Nodeset/默认参数回归及仓库质量检查。没有把该范围写成完整 `verify_project.py --full`、全 pytest 或发布包验收。
 
 | 本次验证 | 实际成绩 |
 | --- | --- |
