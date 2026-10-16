@@ -30,9 +30,6 @@ from vibeflow.block_compiler import SourceRef
 from vibeflow.core.config.scope import (
     ConfigScope,
     attach_global_config,
-    merge_config_scopes,
-    nested_node_config_overrides,
-    node_invocation_scope,
     normalize_config_scope,
     scoped_node_params,
 )
@@ -65,18 +62,23 @@ def prepare_graph(
     global_scope: ConfigScope,
     active_nodesets: tuple[str, ...],
 ) -> None:
-    del compiled
+    from vibeflow.core.graph_calls import graph_call_subjects
+    from vibeflow.targets.javascript.frontend.facts import apply_call_effect_scopes
+    for subject in graph_call_subjects(graph, global_config=global_scope, node_config_overrides=overrides):
+        call_path = (*path, *subject.call_path)
+        current = subject.graph
+        if subject.call_path:
+            current_compiled = state.compile_graph(current, set(current.nodesets), subject.owner)
+            state.compiled_by_path[call_path] = apply_call_effect_scopes(
+                current_compiled, current, state.call_effect_scopes or {}, call_path)
+        _prepare_calls(current, state=state, path=call_path,
+            overrides=subject.overrides, global_scope=normalize_config_scope(subject.global_config))
+
+
+def _prepare_calls(graph, *, state, path, overrides, global_scope):
     state.used_types.update(item.type for item in graph.inputs)
     state.used_types.update(item.type for item in graph.outputs)
     for spec in graph.nodes:
-        from vibeflow.core.tasks import task_graph
-        for key, target in spec.task_targets.items():
-            child_path = (*path, spec.id, "tasks", key)
-            child_graph = task_graph(graph, target)
-            child_compiled = state.compile_graph(child_graph, set(child_graph.nodesets), ".".join(child_path))
-            state.compiled_by_path[child_path] = child_compiled
-            prepare_graph(child_graph, child_compiled, state=state, path=child_path,
-                overrides={}, global_scope=global_scope, active_nodesets=active_nodesets)
         call_path = (*path, spec.id)
         state.used_types.update(item.type for item in spec.requires)
         state.used_types.update(item.type for item in spec.provides)
@@ -111,45 +113,7 @@ def prepare_graph(
                     ),
                     call_path,
                 )
-            if nodeset_key in active_nodesets:
-                chain = " -> ".join((*active_nodesets, nodeset_key))
-                raise ProjectBuildError(
-                    "VF_AOT_NODESET_RECURSION",
-                    f"recursive nodeset calls cannot target AOT: {chain}",
-                    call_path,
-                )
             state.params_by_path[call_path] = {}
-            child_overrides = nested_node_config_overrides(spec, overrides)
-            caller_values = {
-                **dict(spec.params),
-                **dict(global_scope.values),
-                **dict(overrides.get(spec.id, {})),
-            }
-            caller_scope = node_invocation_scope(
-                caller_values,
-                allow_config_override=spec.allow_config_override,
-            )
-            child_scope = merge_config_scopes(
-                normalize_config_scope(nodeset.global_config),
-                caller_scope,
-            )
-            child_compiled = state.compile_graph(
-                nodeset.graph,
-                set(nodeset.graph.nodesets),
-                f"nodeset:{nodeset.type_key}",
-            )
-            from vibeflow.targets.javascript.frontend.facts import apply_call_effect_scopes
-            child_compiled = apply_call_effect_scopes(child_compiled, nodeset.graph, state.call_effect_scopes or {}, call_path)
-            state.compiled_by_path[call_path] = child_compiled
-            prepare_graph(
-                nodeset.graph,
-                child_compiled,
-                state=state,
-                path=call_path,
-                overrides=child_overrides,
-                global_scope=child_scope,
-                active_nodesets=(*active_nodesets, nodeset_key),
-            )
             continue
 
         descriptor = state.catalog.get(spec.type_used)

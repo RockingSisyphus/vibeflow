@@ -13,7 +13,7 @@
 | 层 | 实现入口 | 职责 |
 | --- | --- | --- |
 | Core | `core/flow.py`、`core/tasks.py`、`core/compiler.py` | 保存 task_manager/task_targets；递归枚举目标调用，核对真实声明身份和旧入口；构造有限任务图 |
-| Block Compiler | `block_compiler/compiler.py`、`block_compiler/model.py` | 编译任务目标 Block，输出 Workflow ABI v6 与 TaskPlan，保留槽与调用位置 |
+| Block Compiler | `block_compiler/compiler.py`、`block_compiler/model.py` | 编译任务目标 Block，输出 Workflow ABI v7 与 TaskPlan，保留槽与调用位置 |
 | Python Target | `targets/python/runtime/planning.py`、`tasks.py` | 绑定任务执行计划、context、线程执行及完成通知 |
 | JS Target | `targets/javascript/frontend/`、`resources/task_helpers.mjs` | 发射有限槽的执行器，连接生成流程与任务记录、Node 操作归属 |
 | Tooling | `tooling/presentation/task_targets.py`、project schema、两侧 presenter | 配置合同、Architecture 启动关系、管理身份和图形 |

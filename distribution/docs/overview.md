@@ -15,7 +15,7 @@ terminal start → input I/O → process / nodeset → output I/O → terminal e
 - **Plugin**：以 Python 或 JS/TS 代码声明固定资源，由 workflow 显式启用；也可提供编译与运行生命周期。
 - **BaseLib / Host**：辅助库提供共享实现；JS/TS Host 管理宿主生命周期、Capability 和即时事件。
 - **Architecture**：从真实 Config、资源声明及源码依赖生成的审查视图。
-- **Target**：执行或生成工作流的语言后端。当前正式 Target 为 Python Runtime 和 JavaScript AOT。
+- **Target**：执行或生成工作流的语言后端。当前正式 Target 为 Python Runtime/AOT 和 JavaScript AOT。
 
 Node 类型信息是端口契约和语义的来源；Config 中的 `display_name` 与 `description` 说明一次调用在当前工作流中的用途。已实现 Node 和 Nodeset 调用从类型定义取得契约，planned 与系统调用在 Config 中显式声明必要结构。
 
@@ -25,7 +25,7 @@ Node 类型信息是端口契约和语义的来源；Config 中的 `display_name
 - 显式控制流、数据可达性和合流检查；
 - 可组合的源码、架构和领域 Ruleset；
 - Node、BaseLib、Plugin 与 Host 的多文件实现、源码归属和逐文件质量检查；
-- Python 运行时和 JavaScript/TypeScript AOT 构建；
+- Python 运行时与目录 AOT、JavaScript/TypeScript AOT 构建；
 - 保存规则及样式来源的 Architecture JSONC，以及展示工作流和资源依赖的展开 SVG；
 - 可追踪的运行产物与工作流执行探针。
 
@@ -36,6 +36,6 @@ VibeFlow 检查工程结构、源码健康度与所选领域约束。项目测�
 - **collaborative**：使用变更清单、planned 架构审核、正式 SVG 和人工批准门。
 - **autonomous**：AI 直接维护真实 source，自动更新架构并完成适用门禁。
 
-两个 profile 使用同一 Core、quality policy、项目模板和 Workflow ABI `vibeflow.workflow.v6`。profile 只改变开发协议、提示词和随包文档选择。
+两个 profile 使用同一 Core、quality policy、项目模板和 Workflow ABI `vibeflow.workflow.v7`。profile 只改变开发协议、提示词和随包文档选择。
 
 从发行包开始开发时，先阅读[快速开始](user/quickstart.md)，再按任务进入对应接口文档。

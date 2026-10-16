@@ -169,8 +169,8 @@ def _mapped_sources(payload: dict[str, Any]) -> set[str]:
 def _manifest_case(cache: BuildCache, *, key: str, profile: str) -> dict[str, Any]:
     result = cache.build(key, "linear.jsonc", profile=profile)
     manifest = json.loads(result.manifest.read_text(encoding="utf-8"))
-    assert_equal(manifest["profile"], profile, label="manifest profile")
-    assert_equal(manifest["target"], "node", label="manifest target")
+    assert_equal(manifest["target_metadata"]["profile"], profile, label="manifest profile")
+    assert_equal(manifest["target_metadata"]["target"], "node", label="manifest target")
     installed_typescript = json.loads(
         (PROJECT_ROOT / "node_modules/typescript/package.json").read_text(
             encoding="utf-8"
@@ -194,7 +194,7 @@ def _manifest_case(cache: BuildCache, *, key: str, profile: str) -> dict[str, An
         "esbuild": installed_esbuild,
     }
     assert_equal(
-        manifest["toolchain"],
+        manifest["target_metadata"]["toolchain"],
         expected_toolchain,
         label="manifest toolchain identity",
     )

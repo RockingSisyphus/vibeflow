@@ -284,7 +284,7 @@ def test_abi_v5_serializes_global_state_and_locks_without_dispatch() -> None:
     payload = plan.to_dict()
     root = plan.block(plan.entry_block)
 
-    assert plan.abi_version == WORKFLOW_ABI_VERSION == "vibeflow.workflow.v6"
+    assert plan.abi_version == WORKFLOW_ABI_VERSION == "vibeflow.workflow.v7"
     assert plan.contains_global_state is True
     assert "root_exclusive" not in payload
     assert payload["execution_lock"] == {"key": "trainer", "scope": "root"}
@@ -469,5 +469,7 @@ def test_protected_task_plan_records_manager_target_and_executor() -> None:
     assert task.executor == "thread"
     assert plan.block(task.block_id).node("work").provides[0].key == "value"
     # Legacy positive plans cannot bypass the explicit ownership contract.
-    with pytest.raises(GraphCompileError, match="GRAPH.ASYNC.MIGRATION"):
-        _compile_global(GraphConfig(nodes=(NodeSpec("work","fixture.work",async_mode="result_key",result_key="value"),)),facts)
+    from vibeflow.core.config.graph import parse_graph_config_data as parse_graph_config
+    from vibeflow.core.flow import GraphConfigError
+    with pytest.raises(GraphConfigError, match="GRAPH.ASYNC.MIGRATION"):
+        parse_graph_config({"pipeline":{"nodes":[{"id":"work","type_used":"fixture.work","async":"result_key","result_key":"value"}]}})

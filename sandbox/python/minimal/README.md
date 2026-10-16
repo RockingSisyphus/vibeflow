@@ -1,8 +1,13 @@
 # Python 最小示例
 
-`manifests/nodes/` 声明 Node 的业务说明、契约、参数和 Ruleset；`nodes.py` 只实现执行方法。项目通过 `vibeflow_project.jsonc` 装配资源，再通过 `config.jsonc` 组合原生 Node 和 Nodeset。
+`code_plugin.py` 通过 Python SDK 声明 Node、契约与规则，`nodes.py` 保存实现；workflow 显式选择固定插件对象。`base_lib/` 提供纯算术辅助函数，`nodesets.jsonc` 与 `config_with_imports.jsonc` 演示组合和导入。
 
-`base_lib/` 提供纯算术辅助函数。源码由所选 `vibeflow.process` Ruleset 检查；`nodesets.jsonc` 与 `config_with_imports.jsonc` 演示原生组合和导入。检查不执行契约中的示例输入。
+```bash
+python -m vibeflow build --workspace sandbox/python/minimal/vibeflow_config.jsonc --config sandbox/python/minimal/config.jsonc --out-dir /path/to/candidate-bundle
+python /path/to/candidate-bundle/run.py run
+```
+
+默认生成 python-package；整个目录可搬迁到提供 Python 与业务依赖的环境。检查不执行契约中的示例输入。运行选项与 API 见 [Python 开发](../../../distribution/docs/user/python-development.md#aot-目录部署)。
 
 ## 目录用途与边界
 

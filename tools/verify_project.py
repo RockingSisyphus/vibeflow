@@ -386,6 +386,22 @@ status = main([
 ])
 assert status == 0, status
 assert (root / "runs/wheel-target-isolation/output_summary.json").is_file()
+# The installed wheel must build and run a source-free Python AOT artifact.
+import shutil
+import subprocess
+from vibeflow.tooling.application.python import load_bundle
+bundle_path = root.with_name(root.name + "-aot")
+assert main(["build", "--workspace", str(workspace), "--config", str(config),
+             "--out-dir", str(bundle_path)]) == 0
+result = load_bundle(bundle_path).run({}, run_root=root.parent / "wheel-aot-runs",
+                                      runtime_options={"execution": "compiled", "trace": "off"})
+assert result.context.get("value.out")["value"] == 7
+shutil.rmtree(root)
+environment = dict(os.environ)
+environment.pop("PYTHONPATH", None)
+subprocess.run([sys.executable, "-B", str(bundle_path / "run.py"), "run",
+                "--runtime-profile", "train", "--run-root", str(root.parent / "standalone-runs")],
+               cwd=root.parent, env=environment, check=True)
 assert not [
     name for name in sys.modules
     if any(
@@ -618,6 +634,29 @@ def _distribution_smoke(scratch: Path) -> None:
             (PYTHON, extracted / "vibeflow-distribution/run.py", "verify-kernel"),
             overrides={"PYTHONPATH": None},
         )
+        distribution_root = extracted / "vibeflow-distribution"
+        bundle = scratch / f"python-aot-from-profile-{index}"
+        input_path = scratch / f"python-aot-input-{index}.json"
+        shutil.copy2(distribution_root / "python_project/probe_input.json", input_path)
+        _run((PYTHON, distribution_root / "run.py", "build",
+              "--config", distribution_root / "python_project/configs/main.jsonc",
+              "--out-dir", bundle), cwd=scratch, overrides={"PYTHONPATH": None})
+        api_probe = "\n".join((
+            "import sys,json",
+            f"sys.path.insert(0, {str(distribution_root / 'kernel/vibeflow-kernel.zip')!r})",
+            "from vibeflow.tooling.application.python import load_bundle",
+            f"bundle=load_bundle({str(bundle)!r})",
+            f"initial=json.loads(open({str(input_path)!r}).read())",
+            f"result=bundle.run(initial,run_root={str(scratch / f'aot-api-runs-{index}')!r},runtime_options={{'execution':'compiled','trace':'off'}})",
+            "assert result.health.status not in {'FAIL','ERROR'},result.health",
+            "assert result.context is not None",
+        ))
+        _run((PYTHON, "-B", "-c", api_probe), cwd=scratch, overrides={"PYTHONPATH": None})
+        # No original extracted framework/project remains available to run.py.
+        shutil.rmtree(extracted)
+        _run((PYTHON, "-B", bundle / "run.py", "run", "--input", input_path,
+              "--runtime-profile", "train", "--run-root", scratch / f"aot-cli-runs-{index}"),
+             cwd=scratch, overrides={"PYTHONPATH": None})
     return
 def _cleanup_generated_artifacts(_scratch: Path) -> None:
     """Remove only artifacts produced by earlier full-gate steps.

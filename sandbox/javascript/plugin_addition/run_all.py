@@ -25,8 +25,8 @@ def run(work, *, toolchain=None):
         for name, expected_values in PLUGIN_EXPECTED[phase].items():
             built = build_project_aot(ProjectBuildRequest(workspace=workspace_path, config=work / "project/configs" / (name + ".jsonc"), out_dir=work / (phase + "-" + name), target="node", profile="single-esm"))
             manifest = json.loads(built.manifest.read_text())
-            plugins = manifest["plugins"]
-            assert manifest["plugin_abi_version"] == "vibeflow.plugin.v3"
+            plugins = manifest["target_metadata"]["plugins"]
+            assert manifest["target_metadata"]["plugin_abi_version"] == "vibeflow.plugin.v3"
             assert [item["id"] for item in plugins["active"]] == ["addition.compiler", "addition.runtime"]
             assert len(plugins["declared"]) == 3 and plugins["planned"] == ["addition.future"]
             for item in plugins["active"]:

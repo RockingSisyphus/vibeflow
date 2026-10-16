@@ -481,7 +481,7 @@ def test_real_build_packages_only_runtime_plugins_and_omits_planned_source(
         javascript_project.root / "configs/plugins.jsonc",
         key="plugin-packaging",
     )
-    manifest = _read_json(result.manifest)
+    manifest = _read_json(result.manifest)["target_metadata"]
     source = result.entry.read_text(encoding="utf-8")
 
     assert manifest["plugins"]["planned"] == ["sandbox.future_runtime"]

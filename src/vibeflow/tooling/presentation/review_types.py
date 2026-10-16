@@ -35,6 +35,3 @@ class SvgFragment:
     review_kind: str = "fragment"
     review_owner: str = ""
     review_target: str = ""
-
-
-_SvgFragment = SvgFragment

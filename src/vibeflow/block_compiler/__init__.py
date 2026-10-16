@@ -57,3 +57,6 @@ __all__ = [
     "freeze_json_object",
     "normalize_condition",
 ]
+
+from vibeflow.block_compiler.codec import workflow_plan_from_dict, workflow_plan_from_json, workflow_subplan, map_plan_sources
+__all__ += ["workflow_plan_from_dict", "workflow_plan_from_json", "workflow_subplan", "map_plan_sources"]

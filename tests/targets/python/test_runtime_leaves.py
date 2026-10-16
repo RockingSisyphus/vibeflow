@@ -77,7 +77,6 @@ def test_python_block_compiler_source_is_deterministic_golden() -> None:
             is_loop=False,
             is_nodeset=False,
             is_planned_stub=False,
-            async_mode="",
             outgoing=(),
         )
 
@@ -99,7 +98,7 @@ def test_python_block_compiler_source_is_deterministic_golden() -> None:
     assert first[0].source == second[0].source
     # Transfer routes are evaluated independently of scheduling routes.
     assert sha256(first[0].source.encode("utf-8")).hexdigest() == (
-        "7d29ba1a73373a04d1c4c98ccaf2f06381d2131e796f7d8c3369b08801dd6fa5"
+        "697e43749a18e2f2803978bdd6123b95ccd3bdff547a787b1e1c388a13497abe"
     )
 
 

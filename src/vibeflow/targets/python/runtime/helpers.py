@@ -26,64 +26,50 @@ def condition_matches(expression: str, values: Mapping[str, object]) -> bool:
     raise PipelineRuntimeError(f"unsupported edge condition: {expression}")
 
 
-def has_planned(graph: GraphConfig, *, visited_nodesets: set[str] | None = None) -> bool:
-    if visited_nodesets is None:
-        visited_nodesets = set()
-    if any(node.status == STATUS_PLANNED for node in graph.nodes):
-        return True
-    for nodeset in graph.nodesets.values():
-        if nodeset.type_key in visited_nodesets:
-            continue
-        visited_nodesets.add(nodeset.type_key)
-        if nodeset.status == STATUS_PLANNED or has_planned(nodeset.graph, visited_nodesets=visited_nodesets):
-            return True
-    return False
+def has_planned(graph: GraphConfig) -> bool:
+    return bool(planned_items(graph))
 
 
-def planned_items(graph: GraphConfig, *, prefix: str = "", visited_nodesets: set[str] | None = None) -> tuple[dict[str, object], ...]:
-    if visited_nodesets is None:
-        visited_nodesets = set()
+def planned_items(graph: GraphConfig, *, prefix: str = "") -> tuple[dict[str, object], ...]:
+    """Inventory declarations and task targets once, including unused definitions."""
     items: list[dict[str, object]] = []
-    for node in graph.nodes:
-        nodeset = graph.nodesets.get(node.type_used)
-        if node.status == STATUS_PLANNED:
-            behavior = effective_planned_behavior(node, nodeset)
-            items.append(
-                {
-                    "id": f"{prefix}{node.id}",
-                    "object_type": "node",
-                    "behavior": behavior.kind,
-                    "stub_module": behavior.stub_module,
-                }
-            )
-    for name, nodeset in graph.nodesets.items():
-        if name in visited_nodesets:
-            continue
-        visited_nodesets.add(name)
-        full_name = f"{prefix}nodeset.{name}"
-        if nodeset.status == STATUS_PLANNED:
-            behavior = nodeset.planned_behavior
-            items.append(
-                {
-                    "id": full_name,
-                    "object_type": "nodeset",
-                    "behavior": behavior.kind,
-                    "stub_module": behavior.stub_module,
-                }
-            )
-            continue
-        for node in nodeset.graph.nodes:
-            child_nodeset = nodeset.graph.nodesets.get(node.type_used)
-            if node.status == STATUS_PLANNED:
-                behavior = effective_planned_behavior(node, child_nodeset)
-                items.append(
-                    {
-                        "id": f"{full_name}.{node.id}",
-                        "object_type": "node",
-                        "behavior": behavior.kind,
-                        "stub_module": behavior.stub_module,
-                    }
-                )
+    seen_graphs: set[int] = set()
+    seen_definitions: set[int] = set()
+    active_nodes: set[int] = set()
+
+    def add(label, object_type, behavior):
+        items.append({"id": label, "object_type": object_type,
+                      "behavior": behavior.kind, "stub_module": behavior.stub_module})
+
+    def node(spec, current, label):
+        if id(spec) in active_nodes:
+            return
+        active_nodes.add(id(spec))
+        try:
+            if spec.status == STATUS_PLANNED:
+                add(label, "node", effective_planned_behavior(spec, current.nodesets.get(spec.type_used)))
+            for name, target in spec.task_targets.items():
+                node(target, current, f"{label}.$task.{name}")
+        finally:
+            active_nodes.remove(id(spec))
+
+    def visit(current, path):
+        if id(current) in seen_graphs:
+            return
+        seen_graphs.add(id(current))
+        for spec in current.nodes:
+            node(spec, current, f"{path}{spec.id}")
+        for name, definition in current.nodesets.items():
+            if id(definition) in seen_definitions:
+                continue
+            seen_definitions.add(id(definition))
+            label = f"{path}nodeset.{name}"
+            if definition.status == STATUS_PLANNED:
+                add(label, "nodeset", definition.planned_behavior)
+            else:
+                visit(definition.graph, f"{label}.")
+
+    visit(graph, prefix)
     return tuple(items)
 
 

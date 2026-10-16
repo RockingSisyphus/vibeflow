@@ -12,7 +12,7 @@ terminal start → input I/O → process / nodeset → output I/O → terminal e
 
 ## Main capabilities
 
-- Python Runtime and JavaScript/TypeScript AOT;
+- Python Runtime, relocatable Python AOT packages, and JavaScript/TypeScript AOT;
 - Python and JS/TS plugin SDKs for code-defined Nodes, Rules, Rulesets, and other resources explicitly selected by each workflow;
 - composable Rules and Rulesets, plus Nodes, Nodesets, Loops, Capabilities, and explicit effect boundaries;
 - explicit multi-file implementations, source ownership, per-file reviews, and default presentation for Nodes, BaseLibs, Plugins, and Hosts;
@@ -60,5 +60,5 @@ Run the complete source-repository gate with:
 python tools/verify_project.py --full
 ```
 
-Current distribution package version: `0.20.0`. Workflow ABI: `vibeflow.workflow.v6`.
-Waiting now consumes task references; callers retain and forward received result data. Migrate legacy concurrency calls to task manager Nodes with declared targets, then regenerate plans and build outputs. See [native task management](distribution/docs/user/task-management.md).
+Current distribution package version: `1.0.0`. Workflow ABI: `vibeflow.workflow.v7`. AOT manifest: `vibeflow.aot-build.v3`.
+Python and JavaScript share workflow plans and build orchestration. Python bundles include the matching framework and run independently of the original project. Rebuild old plans and build directories; existing standalone JS artifacts can continue using their bundled runtime. See [Python AOT](distribution/docs/user/python-development.md#aot-目录部署) and the [1.0.0 release notes](docs/maintainers/history/release-1.0.0.md).

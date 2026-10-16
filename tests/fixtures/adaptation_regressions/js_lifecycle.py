@@ -45,7 +45,7 @@ def finite_graph_cases(work, kernel, toolchain):
         manifest=Path((built.get("payload") or {}).get("manifest",root/"dist/vibeflow-build.json"))
         if manifest.is_file():
             observed["manifest_path"]=str(manifest)
-            annotations=json.loads(manifest.read_text()).get("plugins",{}).get("annotations",[])
+            annotations=json.loads(manifest.read_text())["target_metadata"]["plugins"]["annotations"]
             observed["annotation_phases"]=[item.get("stage") for item in annotations]
         else:
             observed["annotation_phases"]=[]

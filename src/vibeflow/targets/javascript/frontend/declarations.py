@@ -99,7 +99,7 @@ def declarations(
             "  readonly onStatus?: (status: WorkflowRunStatus) => void;",
             "}",
             "",
-            "export const VIBEFLOW_WORKFLOW_ABI: \"vibeflow.workflow.v6\";",
+            "export const VIBEFLOW_WORKFLOW_ABI: \"vibeflow.workflow.v7\";",
             "export const VIBEFLOW_PLUGIN_ABI: \"vibeflow.plugin.v3\";",
             _entry_declaration(workflow),
     ]

@@ -89,8 +89,6 @@ def _flow_maps(compiled, active_names: set[str]) -> tuple[dict[str, list[str]], 
 
 
 def _node_participates_in_flow(graph, node) -> bool:
-    if getattr(node, "async_mode", "") == "detached":
-        return False
     if node.status != STATUS_PLANNED:
         return True
     nodeset = graph.nodesets.get(node.type_used)

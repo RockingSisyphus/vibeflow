@@ -1,9 +1,9 @@
 <!-- vibeflow-directory-purpose -->
-# sandbox/python/integration/project/configs/nodesets/pass_mainline_async_nodeset_side_task
+# sandbox/python/integration/project/configs/nodesets/pass_task_nodeset_result_join
 
 ## 目录用途与边界
 
-仅用于：python / integration 案例引用的 pass_mainline_async_nodeset_side_task Nodeset 固定定义；只放本定义所需的配置输入。
+仅用于：python / integration 案例引用的 pass_task_nodeset_result_join Nodeset 固定定义；只放本定义所需的配置输入。
 
 - 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
 - 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。

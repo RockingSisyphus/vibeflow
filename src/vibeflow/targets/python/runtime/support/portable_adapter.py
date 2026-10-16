@@ -5,33 +5,10 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 from dataclasses import replace
 
-from vibeflow.block_compiler.compiler import (
-    _block,
-    _block_id,
-    _execution_lock_plan,
-    _graph_source,
-    _loop_plan,
-    _normalize_source_map,
-    _providers,
-    _requirements,
-    _root_inputs,
-    _root_outputs,
-    _workflow_id,
-    compile_graph_plan,
-)
-from vibeflow.block_compiler.model import (
-    WORKFLOW_ABI_VERSION,
-    LoopPlan,
-    NodeCallPlan,
-    PipelineInputSpec,
-    PipelineOutputSpec,
-    PortablePlanError,
-    SourceRef,
-    WorkflowPlan,
-    freeze_json_object,
-)
+from vibeflow.block_compiler.compiler import _normalize_source_map, _root_inputs, _root_outputs, _workflow_id, compile_graph_plan
+from vibeflow.block_compiler.model import PipelineInputSpec, PipelineOutputSpec, PortablePlanError, SourceRef, WorkflowPlan, freeze_json_object
 from vibeflow.core.compiler import CompiledGraph
-from vibeflow.core.flow import IO_NODE_TYPE, GraphConfig, NodeSpec
+from vibeflow.core.flow import GraphConfig
 
 
 def build_workflow_plan(
@@ -81,176 +58,35 @@ def workflow_plan_from_execution_plan(
     pipeline_inputs: Sequence[PipelineInputSpec] | None = None,
     pipeline_outputs: Sequence[PipelineOutputSpec] | None = None,
 ) -> WorkflowPlan:
-    """Project an ExecutionPlan without retaining Python live objects."""
-
+    """Expose the common plan, adding the native call parameters on request."""
+    from vibeflow.block_compiler import workflow_subplan
+    original = execution_plan.workflow_plan
+    if original is None:
+        raise PortablePlanError("execution plan has no prepared workflow")
+    original = workflow_subplan(original, execution_plan.python_bindings.block_id)
+    sources = _normalize_source_map(source_by_type)
+    frames_by_path = {}
+    def collect(native, block_id):
+        block = original.block(block_id)
+        for call in block.nodes:
+            frame = native.frames[call.id]
+            frames_by_path[(*block.path,call.id)] = frame
+            if call.child_block:
+                collect(frame.subplan,call.child_block)
+            for key,target in call.task_targets:
+                collect(frame.task_plans[key],target)
+    collect(execution_plan, original.entry_block)
+    blocks = []
+    for block in original.blocks:
+        calls = []
+        for call in block.nodes:
+            frame = frames_by_path[(*block.path,call.id)]
+            calls.append(replace(call, implementation=sources.get(call.type_used,call.implementation),
+                params=freeze_json_object(frame.params,path=f"node[{call.id}].params")))
+        blocks.append(replace(block,nodes=tuple(calls)))
     graph = execution_plan.graph
-    resolved_inputs = _root_inputs(graph, pipeline_inputs)
-    resolved_outputs = _root_outputs(graph, pipeline_outputs)
-    adapter = _ExecutionPlanAdapter(source_by_type)
-    adapter.add_block(execution_plan, path=(), kind="workflow", loop=None)
-    resolved_workflow_id = _workflow_id(graph, workflow_id)
-    return WorkflowPlan(
-        abi_version=WORKFLOW_ABI_VERSION,
-        workflow_id=resolved_workflow_id,
-        source=_graph_source(graph, resolved_workflow_id),
-        entry_block=_block_id(()),
-        inputs=resolved_inputs,
-        outputs=resolved_outputs,
-        blocks=tuple(adapter.blocks),
-        max_steps=execution_plan.max_steps,
-        entry_mode=graph.entry_mode,
-        execution_lock=_execution_lock_plan(
-            graph.execution_lock,
-            scope="root",
-        ),
-        contains_global_state=execution_plan.contains_global_state,
-    )
-
-
-class _ExecutionPlanAdapter:
-    def __init__(
-        self,
-        source_by_type: Mapping[str, SourceRef] | None,
-    ) -> None:
-        self.source_by_type = _normalize_source_map(source_by_type)
-        self.blocks = []
-
-    def add_block(
-        self,
-        execution_plan: Any,
-        *,
-        path: tuple[str, ...],
-        kind: str,
-        loop: LoopPlan | None,
-    ) -> None:
-        graph = execution_plan.graph
-        children: list[
-            tuple[Any, tuple[str, ...], str, LoopPlan | None]
-        ] = []
-        nodes: list[NodeCallPlan] = []
-        for spec in graph.nodes:
-            frame = execution_plan.frames[spec.id]
-            child_path = (*path, spec.id)
-            child_block = (
-                _block_id(child_path)
-                if frame.subplan is not None and not frame.is_planned
-                else ""
-            )
-            nodes.append(
-                self._node(
-                    spec,
-                    frame,
-                    compiled=execution_plan.compiled,
-                    child_block=child_block,
-                    task_targets=tuple((key, _block_id((*child_path,"tasks",key))) for key in frame.task_plans),
-                )
-            )
-            for key, task_plan in frame.task_plans.items():
-                children.append((task_plan, (*child_path, "tasks", key), "task", None))
-            if frame.subplan is not None and not frame.is_planned:
-                child_kind = "loop" if frame.is_loop else "nodeset"
-                child_loop = _loop_plan(spec.loop) if frame.is_loop else None
-                children.append(
-                    (frame.subplan, child_path, child_kind, child_loop)
-                )
-        self.blocks.append(
-            _block(
-                graph,
-                execution_plan.compiled,
-                path=path,
-                kind=kind,
-                loop=loop,
-                nodes=tuple(nodes),
-                execution_lock=_execution_lock_plan(
-                    graph.execution_lock,
-                    scope="root" if not path else "block",
-                ),
-                contains_global_state=execution_plan.contains_global_state,
-            )
-        )
-        block = self.blocks[-1]
-        self.blocks[-1] = replace(block, tasks=tuple(replace(task, executor="thread") for task in block.tasks))
-        for subplan, child_path, child_kind, child_loop in children:
-            self.add_block(
-                subplan,
-                path=child_path,
-                kind=child_kind,
-                loop=child_loop,
-            )
-
-    def _node(
-        self,
-        spec: NodeSpec,
-        frame: Any,
-        *,
-        compiled: CompiledGraph,
-        child_block: str,
-        task_targets: tuple,
-    ) -> NodeCallPlan:
-        is_receive = (
-            spec.type_used == IO_NODE_TYPE
-            and spec.io.operation == "receive"
-        )
-        return NodeCallPlan(
-            id=spec.id,
-            task_targets=task_targets,
-            type_used=spec.type_used,
-            implementation=self.source_by_type.get(
-                spec.type_used,
-                SourceRef(kind="catalog", ref=spec.type_used),
-            ),
-            requires=_requirements(frame.requires),
-            provides=_providers(frame.provides),
-            params=freeze_json_object(
-                frame.params,
-                path=f"node[{spec.id}].params",
-            ),
-            config_overrides=freeze_json_object(
-                spec.node_config_overrides,
-                path=f"node[{spec.id}].node_config_overrides",
-            ),
-            flow_kind=frame.flow_kind,
-            join_policy=frame.join_policy,
-            status=frame.status,
-            planned_behavior=frame.planned_behavior.kind,
-            async_mode=frame.async_mode,
-            result_key=frame.result_key,
-            is_terminal=frame.is_terminal,
-            is_nodeset=frame.is_nodeset,
-            is_loop=frame.is_loop,
-            nodeset_type_key=frame.nodeset_type_key,
-            child_block=child_block,
-            exports=_providers(frame.exports),
-            allow_config_override=spec.allow_config_override,
-            display_name=spec.metadata.display_name,
-            description=spec.metadata.description,
-            completion="suspend" if is_receive else "immediate",
-            schedule="inline",
-            executor=(
-                "event_loop" if is_receive else "current"
-            ),
-            io_operation=spec.io.operation,
-            io_port=spec.io.port if spec.io.operation else "",
-            effect_scope=compiled.effect_scopes.get(
-                spec.id,
-                execution_plan_effect_scope(frame),
-            ),
-
-            execution_lock=_execution_lock_plan(
-                frame.execution_lock,
-                scope="block" if frame.is_nodeset or frame.is_loop else "node",
-            ),
-            contains_global_state=(
-                not frame.is_planned
-                and (
-                    frame.flow_kind == "global_state"
-                    or (
-                        frame.subplan is not None
-                        and frame.subplan.contains_global_state
-                    )
-                )
-            ),
-        )
+    return replace(original,workflow_id=_workflow_id(graph,workflow_id),blocks=tuple(blocks),
+        inputs=_root_inputs(graph,pipeline_inputs),outputs=_root_outputs(graph,pipeline_outputs),entry_mode=graph.entry_mode)
 
 
 def execution_plan_effect_scope(frame: Any) -> str:

@@ -33,7 +33,6 @@ class ImplementationFact:
     source_kind: str = ""
     source_ref: str = ""
     source_export: str = ""
-    async_executor: str = ""  # Target preference when a call is deferred or detached.
 
     def __post_init__(self) -> None:
         text_fields = (
@@ -43,7 +42,6 @@ class ImplementationFact:
             self.completion,
             self.schedule,
             self.executor,
-            self.async_executor,
             self.source_kind,
             self.source_ref,
             self.source_export,
@@ -76,10 +74,6 @@ class ImplementationFact:
             raise ValueError(
                 f"implementation executor must be one of {sorted(EXECUTORS)}"
             )
-        if self.async_executor and self.async_executor not in EXECUTORS:
-            raise ValueError(
-                f"implementation async_executor must be empty or one of {sorted(EXECUTORS)}"
-            )
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -92,7 +86,6 @@ class ImplementationFact:
             "completion": self.completion,
             "schedule": self.schedule,
             "executor": self.executor,
-            "async_executor": self.async_executor,
             "source_kind": self.source_kind,
             "source_ref": self.source_ref,
             "source_export": self.source_export,

@@ -67,7 +67,6 @@ def test_javascript_descriptors_supply_core_execution_facts() -> None:
         "completion": "suspend",
         "schedule": "inline",
         "executor": "event_loop",
-        "async_executor": "event_loop",
         "source_kind": "file",
             "source_ref": "src/fetch.ts",
             "source_export": "run",
@@ -110,9 +109,8 @@ def test_immediate_javascript_implementation_scheduling_uses_target_facts(
     features = TargetFeatureSet(target="browser")
     compilation = compile_core(CoreCompileRequest(graph=graph, implementation_facts=facts, target_features=features))
     plan = compile_graph_plan(compilation.workflow.graph, compilation.compiled_graph,
-        implementation_facts=facts, target_features=features,
-        native_execution_facts=ImplementationFacts((ImplementationFact("demo.fetch",
-            executor="thread", async_executor="thread"),)))
+        implementation_facts=facts, target_features=features,task_executor="event_loop",
+        call_execution_facts={("unused",):ImplementationFact("demo.fetch",executor="thread")})
     root = plan.block(plan.entry_block)
     assert root.node("fetch").completion == ("suspend" if managed else "immediate")
     assert (root.node("fetch").schedule, root.node("fetch").executor) == ("inline", "event_loop" if managed else "current")

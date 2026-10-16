@@ -176,7 +176,7 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         provides = parse_data_providers(item.get("provides", ()), field=f"node[{node_id}].provides")
     except ValueError as exc:
         raise GraphConfigError(str(exc)) from exc
-    async_mode, result_key = _parse_node_async(item, index=index, provides=provides)
+    _reject_removed_async_fields(item)
     join_policy = _parse_join_policy(item.get("join_policy", JOIN_POLICY_SAFE_ANY), field=f"pipeline.nodes[{index}].join_policy")
     from vibeflow.core.config.loop import _parse_loop_spec
 
@@ -186,7 +186,6 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         type_used=type_used,
         requires=requires,
         provides=provides,
-        async_mode=async_mode,
         field=f"pipeline.nodes[{index}].io",
     )
     execution_lock = _parse_execution_lock(
@@ -220,8 +219,6 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         status=status,
         flow_kind=flow_kind,
         planned_behavior=planned_behavior,
-        async_mode=async_mode,
-        result_key=result_key,
         execution_lock=execution_lock,
         task_targets=parsed_targets,
     )
@@ -233,7 +230,6 @@ def _parse_io_spec(
     type_used: str,
     requires: tuple[DataRequirement, ...],
     provides: tuple[DataProvider, ...],
-    async_mode: str,
     field: str,
 ) -> IoSpec:
     if type_used != IO_NODE_TYPE:
@@ -260,11 +256,6 @@ def _parse_io_spec(
     if not port:
         raise GraphConfigError(
             f"{field}.port must be a non-empty string"
-        )
-    if async_mode:
-        raise GraphConfigError(
-            f"{IO_NODE_TYPE} uses its operation completion and cannot "
-            "also declare legacy node.async"
         )
     if operation == "receive":
         if requires or len(provides) != 1:
@@ -453,10 +444,9 @@ def _parse_status(value: Any, *, field: str) -> str:
     return status
 
 
-def _parse_node_async(item: Mapping[str, Any], *, index: int, provides: tuple[DataProvider, ...]) -> tuple[str, str]:
+def _reject_removed_async_fields(item: Mapping[str, Any]) -> None:
     if "async" in item or "result_key" in item:
         raise GraphConfigError("GRAPH.ASYNC.MIGRATION: use a task_manager node with task_targets and context.tasks.start; async/result_key/detached calls have been removed", "GRAPH.ASYNC.MIGRATION")
-    return "", ""
 
 
 def _parse_join_policy(value: Any, *, field: str) -> str:
@@ -467,13 +457,12 @@ def _parse_join_policy(value: Any, *, field: str) -> str:
 
 
 def _parse_node_params(item: Mapping[str, Any], *, reserved: set[str], field: str) -> dict[str, Any]:
-    raw_config = item.get("config", {})
-    if raw_config in (None, {}):
-        raw_config = {}
-    if not isinstance(raw_config, Mapping):
-        raise GraphConfigError(f"{field} must be an object")
-    inline = {str(k): v for k, v in item.items() if k not in reserved}
-    return {**{str(k): v for k, v in raw_config.items()}, **inline}
+    from vibeflow.core.config.node import NodeConfigError, node_config_from_call_params
+
+    try:
+        return node_config_from_call_params(item, reserved=reserved)
+    except NodeConfigError as error:
+        raise GraphConfigError(f"{field} must be an object") from error
 
 
 def _parse_node_metadata(item: Mapping[str, Any]) -> NodeMetadata:

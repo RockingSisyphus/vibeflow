@@ -5,19 +5,61 @@ import importlib
 import importlib.util
 from pathlib import Path
 import sys
+from threading import RLock
 
 from vibeflow.targets.python.sdk.plugin import Plugin
+
+_PATH_LOCK = RLock()
+_PATH_USERS = {}
 
 
 @contextmanager
 def source_paths(paths):
-    additions = [str(Path(path).resolve()) for path in dict.fromkeys(paths) if str(Path(path).resolve()) not in sys.path]
-    sys.path[:0] = additions
+    roots = tuple(dict.fromkeys(str(Path(path).resolve()) for path in paths))
+    with _PATH_LOCK:
+        additions = []
+        for root in roots:
+            users, inserted = _PATH_USERS.get(root, (0, root not in sys.path))
+            _PATH_USERS[root] = users + 1, inserted
+            if not users and inserted:
+                additions.append(root)
+        sys.path[:0] = additions
     try:
         yield
     finally:
-        for item in additions:
-            sys.path.remove(item)
+        with _PATH_LOCK:
+            for root in roots:
+                users, inserted = _PATH_USERS[root]
+                if users > 1:
+                    _PATH_USERS[root] = users - 1, inserted
+                else:
+                    del _PATH_USERS[root]
+                    if inserted and root in sys.path:
+                        sys.path.remove(root)
+
+
+def load_source_module(path, name, *, package=None):
+    """Load one native implementation, reusing only the same physical source."""
+    path = Path(path).resolve()
+    existing = sys.modules.get(name)
+    filename = getattr(existing, "__file__", None)
+    if filename is not None and Path(filename).resolve() == path:
+        return existing
+    if package:
+        importlib.import_module(package)
+    specification = importlib.util.spec_from_file_location(name, path)
+    if specification is None or specification.loader is None:
+        raise ImportError(f"cannot load Python implementation: {path}")
+    module = importlib.util.module_from_spec(specification)
+    if package:
+        module.__package__ = package
+    sys.modules[name] = module
+    try:
+        specification.loader.exec_module(module)
+    except BaseException:
+        sys.modules.pop(name, None)
+        raise
+    return module
 
 
 def load_plugin(source, *, root, source_roots=()):
@@ -57,20 +99,29 @@ def load_plugin(source, *, root, source_roots=()):
 
 
 def _discard_foreign_project_modules(roots):
-    """A prior project must not satisfy a same-named local import."""
+    """A selected project's imports must not reuse another project's modules."""
+    replaced = set()
     for name, module in tuple(sys.modules.items()):
-        filename = getattr(module, "__file__", None)
-        if name.startswith("vibeflow."):
+        if name == "vibeflow" or name.startswith("vibeflow."):
             continue
         relative = Path(*name.split("."))
-        if not filename:
-            expected = next((Path(root)/relative for root in roots if (Path(root)/relative).is_dir()),None)
-            namespace = getattr(module,"__path__",None)
-            if expected is not None and namespace is not None and str(expected.resolve()) not in namespace:
-                sys.modules.pop(name,None)
-            continue
-        candidates = (candidate for root in roots
-                      for candidate in (Path(root) / relative.with_suffix(".py"), Path(root) / relative / "__init__.py"))
-        expected = next((candidate.resolve() for candidate in candidates if candidate.is_file()), None)
-        if expected is not None and Path(filename).resolve() != expected:
+        expected_file, namespace_roots = None, set()
+        for root in roots:
+            directory = Path(root) / relative
+            candidates = (directory / "__init__.py", directory.with_suffix(".py"))
+            expected_file = next((item.resolve() for item in candidates if item.is_file()), None)
+            if expected_file is not None:
+                break
+            if directory.is_dir():
+                namespace_roots.add(str(directory.resolve()))
+        filename = getattr(module, "__file__", None)
+        if expected_file is not None:
+            if not filename or Path(filename).resolve() != expected_file:
+                replaced.add(name)
+        elif namespace_roots:
+            actual = {str(Path(value).resolve()) for value in getattr(module, "__path__", ())}
+            if filename or not namespace_roots.issubset(actual):
+                replaced.add(name)
+    for name in tuple(sys.modules):
+        if name in replaced or any(name.startswith(parent + ".") for parent in replaced):
             sys.modules.pop(name, None)

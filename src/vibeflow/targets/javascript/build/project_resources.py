@@ -516,17 +516,22 @@ def target_neutral_import_policy(
 def driver_import_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
     """Project-neutral owner facts in the driver request spelling."""
 
+    fields = {
+        "node_base_libs": "nodeBaseLibs",
+        "base_lib_dependencies": "baseLibDependencies",
+        "host_extension_dependencies": "hostExtensionDependencies",
+        "plugin_dependencies": "pluginDependencies",
+        "resource_base_libs": "resourceBaseLibs",
+        "plugin_contributions": "pluginContributions",
+    }
     return {
         "owners": [dict(item) for item in policy.get("owners", ())],
-        "nodeBaseLibs": dict(policy.get("node_base_libs", {})),
-        "baseLibDependencies": dict(policy.get("base_lib_dependencies", {})),
-        "hostExtensionDependencies": dict(policy.get("host_extension_dependencies", {})),
-        "pluginDependencies": dict(policy.get("plugin_dependencies", {})),
-        "resourceBaseLibs": dict(policy.get("resource_base_libs", {})),
-        "pluginContributions": dict(policy.get("plugin_contributions", {})),
-        "allowedExternalPackages": list(policy.get("allowed_external_packages", ())),
-        "sourceRoots": list(policy.get("source_roots", ())),
+        **{driver: dict(policy.get(key, policy.get(driver, {})) or {})
+           for key, driver in fields.items()},
+        "allowedExternalPackages": list(policy.get("allowed_external_packages", policy.get("allowedExternalPackages", ()))),
+        "sourceRoots": list(policy.get("source_roots", policy.get("sourceRoots", ()))),
     }
+
 
 
 __all__ = [

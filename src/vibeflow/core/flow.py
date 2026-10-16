@@ -178,8 +178,6 @@ class NodeSpec:
     status: str = STATUS_IMPLEMENTED
     flow_kind: str = ""
     planned_behavior: PlannedBehavior = field(default_factory=blocking_planned_behavior)
-    async_mode: str = ""
-    result_key: str = ""
     execution_lock: ExecutionLockSpec | None = None
     rulesets: tuple | None = None
 

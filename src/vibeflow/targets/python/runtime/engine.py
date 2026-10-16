@@ -46,6 +46,7 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         runtime_options: RuntimeOptions | Mapping[str, object] | None = None,
         delegate_cli: bool = False,
         capabilities: Mapping[str, object] | None = None,
+        _execution_plan: ExecutionPlan | None = None,
     ) -> None:
         self.runtime_options = normalize_runtime_options(runtime_options)
         self.delegate_cli = bool(delegate_cli)
@@ -57,16 +58,16 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         from vibeflow.targets.python.project.check_session import current_python_check
         session = current_python_check(registry)
         compilation = session.checked_compilation(graph) if session is not None else None
-        if compilation is None:
+        if compilation is None and _execution_plan is None:
             compilation = GraphCompiler().compile_with_findings(
                 graph,
                 registry=registry,
                 plugin_registry=plugin_registry,
             )
-        graph = compilation.workflow.graph
+        graph = _execution_plan.graph if _execution_plan is not None else compilation.workflow.graph
         self.graph = graph
-        self.compiled = compilation.compiled_graph
-        self._plan = build_execution_plan(
+        self.compiled = _execution_plan.compiled if _execution_plan is not None else compilation.compiled_graph
+        self._plan = _execution_plan if _execution_plan is not None else build_execution_plan(
             graph,
             self.compiled,
             registry=registry,
@@ -139,6 +140,28 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         self._signal.request_stop(reason)
 
     def run(self, initial: Mapping[str, Any] | None = None) -> RunResult:
+        factory = getattr(self, "_runtime_plugin_factory", None)
+        if factory is None or not self._owns_tasks:
+            return self._run_with_observation(initial)
+        from vibeflow.targets.python.sdk.loading import source_paths
+        from vibeflow.targets.python.project.plugins import plugin_lifetime
+        with source_paths(self._bundle_source_roots), observe_run(self._run_dir, self.runtime_options):
+            plugins = factory()
+            self._plugin_registry = plugins
+            with plugin_lifetime(plugins):
+                initialize = getattr(self, "_runtime_plan_factory", None)
+                if initialize is not None:
+                    self._plan = initialize(plugins)
+                    self._frames = self._plan.frames
+                    self._runtime_plan_factory = None
+                else:
+                    from dataclasses import replace
+                    self._plan = replace(self._plan,python_bindings=replace(self._plan.python_bindings,plugin_registry=plugins))
+                self._runtime_plugins = plugins.runtime_plugins()
+                self._hook_plan = runtime_hook_plan(self._runtime_plugins, self.runtime_options)
+                return self._run_with_observation(initial)
+
+    def _run_with_observation(self, initial: Mapping[str, Any] | None = None) -> RunResult:
         if not self._owns_tasks:
             return self._run_observed(initial)
         if self._has_run:

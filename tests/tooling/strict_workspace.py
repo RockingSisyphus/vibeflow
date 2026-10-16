@@ -16,7 +16,7 @@ from vibeflow.tooling.application.python.project.core import (
 )
 from vibeflow.tooling.application.python.project.project_options import _workspace_runtime_options
 from vibeflow.tooling.application.python.project.quality import scan_workspace_code_quality
-from vibeflow.tooling.application.python.project.types import ArchitectureDocumentSpec, WorkspaceConfigError
+from vibeflow.tooling.project.architecture_types import ArchitectureDocumentSpec, WorkspaceConfigError
 from vibeflow.tooling.project.config_loader import load_workspace_config_document
 
 

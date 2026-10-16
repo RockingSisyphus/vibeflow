@@ -41,8 +41,6 @@ def _canonical_json(value: object) -> str:
 def _middle(
     *,
     completion: str = "immediate",
-    async_mode: str = "",
-    result_key: str = "",
 ) -> dict[str, object]:
     return _node(
         "calculate",
@@ -50,8 +48,6 @@ def _middle(
         requires=[_requirement("number")],
         provides=[_provider("out", "answer")],
         completion=completion,
-        async_mode=async_mode,
-        result_key=result_key,
     )
 
 
@@ -118,7 +114,7 @@ def _deferred_plan() -> dict[str, object]:
 
 def _detached_plan() -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v6",
+        "abi_version": "vibeflow.workflow.v7",
         "workflow_id": "baseline.detached",
         "entry_mode": "async",
         "inputs": [],
@@ -160,7 +156,7 @@ def _port_plan() -> dict[str, object]:
     )
     send["type_used"] = "vibeflow.io"
     return {
-        "abi_version": "vibeflow.workflow.v6",
+        "abi_version": "vibeflow.workflow.v7",
         "workflow_id": "baseline.port",
         "entry_mode": "async",
         "inputs": [],
@@ -221,36 +217,35 @@ def _emission_cases() -> dict[str, tuple[dict[str, object], tuple[dict, ...]]]:
 # These hashes intentionally freeze generated source formatting as well as its
 # semantic plan.  Update them only after reviewing an intentional ABI change.
 # Workflow ABI v6 uses declared managed tasks; source and plan hashes migrate together.
-EMISSION_GOLDENS = {'async': ('f442061cc15d26d50233ab09e4f550e8151c18de4b0c9c387043ea68a7bfa330',
-           '1a6baab32f00e76e0294e3f7badea9d365dc797d5d2487754156eb3c77f9a46e',
-           'ebb3cac6c7d61e3c808367e5e771c3ab9229ba9f91105130b32814d3cfa749b3'),
- 'bounded_loop': ('0977a4050b9b5dbc8242695d197273512e4acd07f9673293ba66788eb6160d86',
-                  '040518318f9a1c4aff7ddccda914fd6f86c673a4009b571d7ce66276a5a6fe76',
-                  'e18f57b734f7b1d83b24c4dd0ef4990c947a5a9223c3b6311b55ffd62678b11b'),
- 'deferred': ('62aabab5ac17209fe89becbdd57bfbed4e7a647174fde8070d540f4657c6a961',
-              '1a6baab32f00e76e0294e3f7badea9d365dc797d5d2487754156eb3c77f9a46e',
-              '95b19f22d714bee95ec16755401979efd12189a11f93099c450ffef5cf2e0c73'),
- 'detached': ('03c9cd9edb0207c73fabcc05670bebac01e30e1b4d45171c46be332d20f3b098',
-              'd9ffcd4bbc2aade3f4cec188805d6a91dc9e05b37dfaa829c1ba0c7beda18c0a',
-              'c9720c2339c1e262745f5a6445627760624e2ab86940189b2944cf99dbff2fe2'),
- 'host_extension': ('ff5fa3985b91345410d37077b94a6321e34e7c036fca57cfd40a4e8c30fb9015',
-                    '2b57cf6e55b15e96228e60912432a03c8d74f94137a1b58d8a60bc1c827c88d4',
-                    'e7ae9bec929e53617d80d63339a983605ff69b9494df3808ea640661ee8d1c3a'),
- 'nested_nodeset': ('a3d3a8d190ffe9b19de7fc47b556265be38b383325e1bdcb4f9f158bb7484350',
-                    '040518318f9a1c4aff7ddccda914fd6f86c673a4009b571d7ce66276a5a6fe76',
-                    'fb49e5416a5431d72af425364cb6882e7375111b1d6dd16495aac7e9d98d436c'),
- 'port': ('97e364d3d76ceb59963e368aa27b0e3bd7fccc53f0556ccee0aba4fa1a4d5bc5',
-          '65421af778599443ca2fdbda0aa258c77551ee402ac529d1805b6786711b1c53',
-          '592c6dcd07bb155a115a761b72523030fd77671b555abde8bef2a55f13247f04'),
- 'sync': ('31d1f65a19bc9fa59150bfe8efd3ea8b81abebe54bcbbb5b3580a777a9cb3009',
-          '040518318f9a1c4aff7ddccda914fd6f86c673a4009b571d7ce66276a5a6fe76',
-          'e7ae9bec929e53617d80d63339a983605ff69b9494df3808ea640661ee8d1c3a'),
- 'unbounded_loop': ('ef7c5ad335d81a0084d761cb51eb76eac461b9a08e4aafccacaa3e8bb909434e',
-                    '040518318f9a1c4aff7ddccda914fd6f86c673a4009b571d7ce66276a5a6fe76',
-                    '6ffd003373fec5036fbd212a068b6d2bf1e1e76d8c133f43616404d668fc42c3')}
+EMISSION_GOLDENS = {'async': ('0005e7e704bfe903404cfc70d8fdce40ac9d7d1b804f54326ef3378f608873b3',
+           '742f4b399ddd9748b718454000b36adba1063c23733c72aef5b5cd13fd22f880',
+           'edb965afe2850a9c1dd165d17055799a31163325951136df3714078d67de951c'),
+ 'bounded_loop': ('b83bd32962669859e57d966f897c472017c5884286b0d5077c89baf7a8e8f5ae',
+                  '2873b3ce54254ebee51701947852fd5bf26ff3fd5d4cd8634baf0fe3515684fc',
+                  'fdf0d490e1c10239af299a1a64754817087d33acf5e7e184f2cf8e53d0056b5c'),
+ 'deferred': ('f268c3f7576dc8e118ffd5c6345bf0fc7928b694424975326f6ddf1a07673984',
+              '742f4b399ddd9748b718454000b36adba1063c23733c72aef5b5cd13fd22f880',
+              'b7d09ce3e465de879c9715ccfc2acb248854fc12e4e89aa83dfcf1f40739ea8a'),
+ 'detached': ('3429fdb56d0a57b5775eeb8710e5e11c883a7e7944e6cb5a078ae5850c878079',
+              '931f71c1a6f98d4c06ca1d11231f68fa8e780e24c080db6488f350ab5480ec40',
+              'd48c09c2ed062c3dc60094c9dd1c3237c81d4af88e0e9be0bfa0893bcf85f4ac'),
+ 'host_extension': ('6a54efc307bf659a7b5e7edf5946e1eca56d381f0ce3d49ca1c470068f9e2372',
+                    '7d42f7e7aa8acf3bab7e23816bd025e45f65c766352a4f9ea564c920c58f723f',
+                    '00f4c9c6e93b80560931eb85b5979a54e59b89a81d65831a8a805d9b3cb12931'),
+ 'nested_nodeset': ('899c4410f854400e0f6a126e1c3b513d84933a1bbda0daf010d0cec61c8c43ec',
+                    '2873b3ce54254ebee51701947852fd5bf26ff3fd5d4cd8634baf0fe3515684fc',
+                    'e03779b85fa8f96be4186b60fc87c61da24eb3ff2390c692a473540269e2da12'),
+ 'port': ('6ee7af190eb2313db1623ff93004a2dc533abd55a206523a16c2603d76b2108a',
+          '3b7386483d8723d3fcac187b1ad052d370af5c763086fee71a3c47043a8f0666',
+          'f6f650d359a5defa16b646148ecc7fae693cf3884feef35762b28a97da0ac718'),
+ 'sync': ('01c4cfb1f2a2709d7e20624e4fe5e4e6679b67aefe7d9f9695175716e1b29d70',
+          '2873b3ce54254ebee51701947852fd5bf26ff3fd5d4cd8634baf0fe3515684fc',
+          '00f4c9c6e93b80560931eb85b5979a54e59b89a81d65831a8a805d9b3cb12931'),
+ 'unbounded_loop': ('508168ba3419ff66d0fd156298563304a281135d0a5ff76063c14f87988fd5ae',
+                    '2873b3ce54254ebee51701947852fd5bf26ff3fd5d4cd8634baf0fe3515684fc',
+                    'f85ce3ebd26f738341160044a8b23d999c0af95b83b7f43361a89dd3a935bfe9')}
 
-NORMALIZED_WORKFLOW_SHA256 = '185efd1491168b56f715dbaa9db6d68c631020eb1d93156c6d3fbbc42b5ac66f'
-
+NORMALIZED_WORKFLOW_SHA256 = 'cdb0dd2475424a03fbd7ae902f1e40dff5f3a6bae8c6e4120e929891c782181b'
 
 def test_canonical_bound_view_payload_is_frozen() -> None:
     workflow = view_fixture(_sync_plan())
@@ -540,15 +535,15 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
         "project_target": manifest["project_target"],
         "workflow_id": manifest["workflow_id"],
         "entry_mode": manifest["entry_mode"],
-        "target": manifest["target"],
-        "profile": manifest["profile"],
+        "target": manifest["target_metadata"]["target"],
+        "profile": manifest["target_metadata"]["profile"],
         "entry": manifest["entry"],
-        "external_packages": manifest["external_packages"],
-        "host_extensions": manifest["host_extensions"],
+        "external_packages": manifest["target_metadata"]["external_packages"],
+        "host_extensions": manifest["target_metadata"]["host_extensions"],
         "files": sorted(manifest["files"]),
     } == {
-        "format": "vibeflow.aot-build.v2",
-        "abi_version": "vibeflow.workflow.v6",
+        "format": "vibeflow.aot-build.v3",
+        "abi_version": "vibeflow.workflow.v7",
         "project_target": "javascript",
         "workflow_id": "test.workflow",
         "entry_mode": "sync",

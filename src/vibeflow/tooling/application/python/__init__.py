@@ -6,6 +6,11 @@ from importlib import import_module
 
 
 _EXPORTS = {
+    "build_python_aot": ("vibeflow.tooling.application.python.build", "build_python_aot"),
+    "PythonBuildResult": ("vibeflow.tooling.application.python.build", "PythonBuildResult"),
+    "PythonBuildRequest": ("vibeflow.tooling.application.python.build", "PythonBuildRequest"),
+    "PythonBundle": ("vibeflow.tooling.application.python.bundle", "PythonBundle"),
+    "load_bundle": ("vibeflow.tooling.application.python.bundle", "load_bundle"),
     "CheckedRunError": (
         "vibeflow.tooling.application.python.runner",
         "CheckedRunError",

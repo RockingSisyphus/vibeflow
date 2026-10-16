@@ -44,7 +44,6 @@ class CompiledGraph:
     contains_global_state: bool = False
     mainline_edges: tuple[EdgeSpec, ...] = ()
     data_bypass_edges: tuple[EdgeSpec, ...] = ()
-    async_edges: tuple[EdgeSpec, ...] = ()
     schedule_edges: tuple[EdgeSpec, ...] = ()
     transfer_edges: tuple[EdgeSpec, ...] = ()
     edge_roles_resolved: bool = False
@@ -188,7 +187,6 @@ def compile_core(request: CoreCompileRequest) -> CoreCompilation:
         contains_global_state=contains_global_state,
         mainline_edges=mainline.mainline_edges,
         data_bypass_edges=mainline.data_bypass_edges,
-        async_edges=mainline.async_edges,
         schedule_edges=mainline.schedule_edges,
         transfer_edges=mainline.transfer_edges,
         edge_roles_resolved=True,
@@ -315,8 +313,6 @@ def _validate_resolved_node_contracts(
     visited.add(id(graph))
     from vibeflow.core.tasks import call_specs
     for node in call_specs(graph.nodes):
-        if node.async_mode or node.result_key:
-            raise GraphCompileError("use task_manager/task_targets instead of async/result_key/detached", "GRAPH.ASYNC.MIGRATION")
         fact = implementations.get(node.type_used)
         if node.task_targets and (fact.flow_kind if fact else node.flow_kind) != "task_manager":
             raise GraphCompileError("task_targets requires a task_manager", "GRAPH.TASK.CONTROL_FORBIDDEN")

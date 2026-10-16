@@ -86,7 +86,7 @@ def host_extension_case(cache: BuildCache) -> dict[str, Any]:
     )
     manifest = json.loads(result.manifest.read_text(encoding="utf-8"))
     assert_equal(
-        manifest["host_extensions"],
+        manifest["target_metadata"]["host_extensions"],
         ["sandbox.math_host"],
         label="host extension manifest",
     )
@@ -130,7 +130,7 @@ def browser_permanent_port_host_case(
 
     manifest = json.loads(result.manifest.read_text(encoding="utf-8"))
     assert_equal(
-        manifest["host_extensions"],
+        manifest["target_metadata"]["host_extensions"],
         ["sandbox.browser_port_host"],
         label=f"{profile} browser Port host extension manifest",
     )

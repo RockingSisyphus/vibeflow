@@ -23,7 +23,8 @@ def test_plugin_import_rule_is_selected_and_blocks_the_actual_write(tmp_path, se
     assert not marker.exists()
     if not selection:
         from vibeflow.tooling.application.python.project.declarations import declared_python_registry
-        from vibeflow.tooling.application.python.project.contributions import lifecycle_registry, release_runtime_plugins
+        from vibeflow.tooling.application.python.project.lifecycle import lifecycle_registry
+        from vibeflow.targets.python.project.plugins import release_runtime_plugins
         registry = declared_python_registry(load_project_workspace(config), config)
         instances = lifecycle_registry(registry, workflow_id="test", config_path=config, plugin_types=("runtime",))
         release_runtime_plugins(instances)

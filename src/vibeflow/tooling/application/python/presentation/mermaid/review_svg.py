@@ -18,13 +18,13 @@ from vibeflow.tooling.application.python.presentation.mermaid import (
     _safe_id,
     export_mermaid,
 )
-from vibeflow.tooling.application.python.presentation.mermaid.render import DEFAULT_MERMAID_MAX_EDGES, DEFAULT_MERMAID_MAX_TEXT_SIZE
+from vibeflow.tooling.presentation.mermaid import DEFAULT_MERMAID_MAX_EDGES, DEFAULT_MERMAID_MAX_TEXT_SIZE
 
 from . import review_fragments as _review_fragments
 from vibeflow.tooling.application.python.presentation.mermaid.review_fragments import _compose_detail_panel_svg, _nodeset_fragments, _nodeset_mermaid, _resource_mermaid
-from vibeflow.tooling.application.python.presentation.mermaid.review_layout import _compose_svg, _validate_review_fragment_max_width
-from vibeflow.tooling.application.python.presentation.mermaid.review_types import REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH, _SvgFragment
-from vibeflow.tooling.application.python.presentation.style import MERMAID_RESOURCE_CLASS_ORDER, mermaid_class_def_lines
+from vibeflow.tooling.presentation.review_layout import _compose_svg, _validate_review_fragment_max_width
+from vibeflow.tooling.presentation.review_types import REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH, SvgFragment
+from vibeflow.tooling.presentation.style import MERMAID_RESOURCE_CLASS_ORDER, mermaid_class_def_lines
 
 
 REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH = 3200.0
@@ -141,8 +141,8 @@ def _build_columns(
     max_edges: int | None,
     review_fragment_max_width: float,
     prepared=None,
-) -> list[list[_SvgFragment]]:
-    columns: list[list[_SvgFragment]] = [
+) -> list[list[SvgFragment]]:
+    columns: list[list[SvgFragment]] = [
         [
             _render_fragment(
                 "main pipeline",
@@ -194,9 +194,9 @@ def _resource_columns(
     max_text_size: int | None,
     max_edges: int | None,
     registry=None,
-) -> list[list[_SvgFragment]]:
+) -> list[list[SvgFragment]]:
     payload = _rendered_resources_payload(resources, graph, registry)
-    columns: list[list[_SvgFragment]] = []
+    columns: list[list[SvgFragment]] = []
     plugins = _mapping_items(payload.get("plugins", ()))
     if plugins:
         columns.append([_render_fragment("plugins", _resource_mermaid("plugins", plugins, kind="plugin"), temp_dir, theme=theme, background=background, max_text_size=max_text_size, max_edges=max_edges)])

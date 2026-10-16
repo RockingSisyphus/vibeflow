@@ -41,27 +41,16 @@ class PythonCompiledBlock:
 CompiledBlock = PythonCompiledBlock
 
 
-@dataclass(frozen=True)
-class _Instrumentation:
-    trace: str
-    node_hooks: bool
-    node_events: bool
-    node_failure_events: bool
-    block_output_summary: bool
-    record_internal_edges: bool
-
-
 def compile_blocks(plan: "ExecutionPlan", runtime_options: object | None = None) -> tuple[CompiledBlock, ...]:
-    instrumentation = _instrumentation(runtime_options)
     blocks: list[CompiledBlock] = []
     for name in plan.order:
         frame = plan.frames[name]
         if frame.is_loop and _loop_block_compilable(frame):
-            blocks.append(_compile_loop_block(frame, instrumentation))
+            blocks.append(_compile_loop_block(frame))
         elif frame.is_nodeset and _nodeset_block_compilable(frame):
-            blocks.append(_compile_nodeset_block(frame, instrumentation))
+            blocks.append(_compile_nodeset_block(frame))
     if _graph_block_compilable(plan):
-        blocks.append(_compile_generated_graph_block(plan, instrumentation))
+        blocks.append(_compile_generated_graph_block(plan))
     return tuple(blocks)
 
 
@@ -94,27 +83,13 @@ def explain_block_compilation(plan: "ExecutionPlan") -> tuple[dict[str, object],
     return tuple(findings)
 
 
-def _instrumentation(runtime_options: object | None) -> _Instrumentation:
-    trace = str(getattr(runtime_options, "trace", "full"))
-    node_hooks = bool(getattr(runtime_options, "node_hooks", True))
-    return _Instrumentation(
-        trace=trace,
-        node_hooks=node_hooks,
-        node_events=trace == "full",
-        node_failure_events=trace == "full" or node_hooks,
-        block_output_summary=trace == "full" or node_hooks,
-        record_internal_edges=trace == "full",
-    )
-
-
-def _compile_generated_graph_block(plan: "ExecutionPlan", instrumentation: _Instrumentation) -> CompiledBlock:
+def _compile_generated_graph_block(plan: "ExecutionPlan") -> CompiledBlock:
     block_name = f"graph:{plan.order[0]}"
     nodes = tuple(plan.order)
-    source = _generated_graph_block_source(block_name, nodes, instrumentation)
+    source = _generated_graph_block_source(block_name, nodes)
     namespace = {
         "CompiledBlockResult": CompiledBlockResult,
         "elapsed_ms": elapsed_ms,
-        "frames": dict(plan.frames),
         "now": time.perf_counter,
         "PipelineRuntimeError": PipelineRuntimeError,
         "summarize_mapping": summarize_mapping,
@@ -130,14 +105,14 @@ def _compile_generated_graph_block(plan: "ExecutionPlan", instrumentation: _Inst
         edge_routes={node: tuple(plan.frames[node].outgoing) for node in nodes},
         callable=compiled_block,
         source=source,
-        supports_full_trace=instrumentation.trace == "full",
-        supports_node_hooks=instrumentation.node_hooks,
+        supports_full_trace=True,
+        supports_node_hooks=True,
         kind="graph",
         mode="generated",
     )
 
 
-def _compile_loop_block(frame: "NodeFrame", instrumentation: _Instrumentation) -> CompiledBlock:
+def _compile_loop_block(frame: "NodeFrame") -> CompiledBlock:
     block_name = f"loop:{frame.name}"
 
     def compiled_loop_block(runtime: "PipelineRuntime", inputs: object) -> CompiledBlockResult:
@@ -151,16 +126,16 @@ def _compile_loop_block(frame: "NodeFrame", instrumentation: _Instrumentation) -
         nodes=(frame.name,),
         edge_routes={frame.name: ()},
         callable=compiled_loop_block,
-        source=_loop_block_source(frame, instrumentation),
-        supports_full_trace=instrumentation.trace == "full",
-        supports_node_hooks=instrumentation.node_hooks,
+        source=_loop_block_source(frame),
+        supports_full_trace=True,
+        supports_node_hooks=True,
         kind="loop",
         mode="generated",
         path=(frame.name,),
     )
 
 
-def _compile_nodeset_block(frame: "NodeFrame", instrumentation: _Instrumentation) -> CompiledBlock:
+def _compile_nodeset_block(frame: "NodeFrame") -> CompiledBlock:
     block_name = f"nodeset:{frame.name}"
 
     def compiled_nodeset_block(runtime: "PipelineRuntime", inputs: object) -> CompiledBlockResult:
@@ -174,20 +149,21 @@ def _compile_nodeset_block(frame: "NodeFrame", instrumentation: _Instrumentation
         nodes=(frame.name,),
         edge_routes={frame.name: ()},
         callable=compiled_nodeset_block,
-        source=_nodeset_block_source(frame, instrumentation),
-        supports_full_trace=instrumentation.trace == "full",
-        supports_node_hooks=instrumentation.node_hooks,
+        source=_nodeset_block_source(frame),
+        supports_full_trace=True,
+        supports_node_hooks=True,
         kind="nodeset",
         mode="generated",
         path=(frame.name,),
     )
 
 
-def _generated_graph_block_source(name: str, nodes: tuple[str, ...], instrumentation: _Instrumentation) -> str:
+def _generated_graph_block_source(name: str, nodes: tuple[str, ...]) -> str:
     lines = [
         "def compiled_block(runtime, state):",
         f"    # generated ready-queue graph block: {name}",
         f"    # nodes: {nodes!r}",
+        "    frames = runtime._frames",
         "    started = now()",
         f"    block_name = {name!r}",
         f"    block_nodes = {nodes!r}",
@@ -205,29 +181,10 @@ def _generated_graph_block_source(name: str, nodes: tuple[str, ...], instrumenta
         "            runtime.trace.step_count += steps",
         "            counted = True",
     ]
-    if instrumentation.block_output_summary:
-        lines.extend(
-            [
-                "        runtime._record_runtime_event(",
-                "            'block_exit',",
-                "            block_name,",
-                "            'block',",
-                "            output_summary=summarize_mapping(outputs),",
-                "            elapsed_ms=elapsed_ms(started),",
-                "        )",
-            ]
-        )
-    else:
-        lines.extend(
-            [
-                "        runtime._record_runtime_event(",
-                "            'block_exit',",
-                "            block_name,",
-                "            'block',",
-                "            elapsed_ms=elapsed_ms(started),",
-                "        )",
-            ]
-        )
+    lines.extend([
+        "        summary = {'output_summary': summarize_mapping(outputs)} if runtime.runtime_options.trace == 'full' or runtime.runtime_options.node_hooks else {}",
+        "        runtime._record_runtime_event('block_exit', block_name, 'block', elapsed_ms=elapsed_ms(started), **summary)",
+    ])
     lines.extend(
         [
             "        runtime._call_runtime_plugins('after_block', block_name, block_nodes)",
@@ -274,13 +231,13 @@ def _generated_graph_block_source(name: str, nodes: tuple[str, ...], instrumenta
             "        )",
             "        runtime._call_runtime_plugins('block_failed', block_name, block_nodes, str(exc))",
             "        raise",
-            f"# trace={instrumentation.trace!r} node_hooks={instrumentation.node_hooks!r}",
+            "# runtime trace and hooks are selected per invocation",
         ]
     )
     return "\n".join(lines)
 
 
-def _loop_block_source(frame: "NodeFrame", instrumentation: _Instrumentation) -> str:
+def _loop_block_source(frame: "NodeFrame") -> str:
     return "\n".join(
         [
             "def compiled_loop_block(runtime, inputs):",
@@ -290,12 +247,12 @@ def _loop_block_source(frame: "NodeFrame", instrumentation: _Instrumentation) ->
             f"    # stop: {_loop_stop_text(frame)!r}",
             f"    outputs = runtime._execute_loop_block({frame.name!r}, inputs)",
             f"    return CompiledBlockResult(last_node={frame.name!r}, outputs=outputs)",
-            f"# trace={instrumentation.trace!r} node_hooks={instrumentation.node_hooks!r}",
+            "# runtime trace and hooks are selected per invocation",
         ]
     )
 
 
-def _nodeset_block_source(frame: "NodeFrame", instrumentation: _Instrumentation) -> str:
+def _nodeset_block_source(frame: "NodeFrame") -> str:
     return "\n".join(
         [
             "def compiled_nodeset_block(runtime, inputs):",
@@ -303,7 +260,7 @@ def _nodeset_block_source(frame: "NodeFrame", instrumentation: _Instrumentation)
             f"    # body: {frame.nodeset_type_key!r}",
             f"    outputs = runtime._execute_nodeset_block({frame.name!r}, inputs)",
             f"    return CompiledBlockResult(last_node={frame.name!r}, outputs=outputs)",
-            f"# trace={instrumentation.trace!r} node_hooks={instrumentation.node_hooks!r}",
+            "# runtime trace and hooks are selected per invocation",
         ]
     )
 
@@ -318,9 +275,7 @@ def _graph_block_compilable(plan: "ExecutionPlan") -> bool:
         frame = plan.frames[name]
         if frame.is_planned_stub:
             return False
-        if frame.is_nodeset and not frame.async_mode and not _nodeset_block_compilable(frame):
-            return False
-        if frame.is_loop and frame.async_mode:
+        if frame.is_nodeset and not _nodeset_block_compilable(frame):
             return False
         if frame.is_loop and not _loop_block_compilable(frame):
             return False
@@ -328,7 +283,7 @@ def _graph_block_compilable(plan: "ExecutionPlan") -> bool:
 
 
 def _nodeset_block_compilable(frame: "NodeFrame") -> bool:
-    if not frame.is_nodeset or frame.subplan is None or frame.async_mode or frame.is_planned_stub:
+    if not frame.is_nodeset or frame.subplan is None or frame.is_planned_stub:
         return False
     return graph_block(frame.subplan) is not None
 
@@ -387,13 +342,11 @@ def _graph_block_reason(plan: "ExecutionPlan") -> str:
         frame = plan.frames[name]
         if frame.is_planned_stub:
             return f"{name}:planned_stub"
-        if frame.is_nodeset and not frame.async_mode:
+        if frame.is_nodeset:
             reason = _nodeset_block_reason(frame)
             if reason:
                 return f"{name}:{reason}"
         if frame.is_loop:
-            if frame.async_mode:
-                return f"{name}:async_loop={frame.async_mode}"
             reason = _loop_block_reason(frame)
             if reason:
                 return f"{name}:{reason}"
@@ -403,8 +356,6 @@ def _graph_block_reason(plan: "ExecutionPlan") -> str:
 def _nodeset_block_reason(frame: "NodeFrame") -> str:
     if not frame.is_nodeset:
         return "not_nodeset"
-    if frame.async_mode:
-        return f"async_mode={frame.async_mode}"
     if frame.is_planned_stub:
         return "planned_stub"
     if frame.subplan is None:
@@ -418,8 +369,6 @@ def _nodeset_block_reason(frame: "NodeFrame") -> str:
 def _loop_block_reason(frame: "NodeFrame") -> str:
     if not frame.is_loop:
         return "not_loop"
-    if frame.async_mode:
-        return f"async_mode={frame.async_mode}"
     if frame.subplan is None:
         return "missing_subplan"
     if graph_block(frame.subplan) is None:

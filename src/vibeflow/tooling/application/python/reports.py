@@ -11,7 +11,7 @@ from vibeflow.core.findings import HealthFinding, HealthReport
 from vibeflow.core.flow import GraphConfigError
 from vibeflow.targets.python.project.policy import EffectivePolicy
 from vibeflow.tooling.project.config_loader import ConfigLoadError
-from vibeflow.tooling.application.python.project.types import WorkspaceConfig
+from vibeflow.tooling.project.workspace_model import WorkspaceConfig
 
 
 def error_report(
@@ -202,7 +202,7 @@ def _workspace_error_report(
     rule_id: str,
     message: str,
     path: Path,
-    effective_policy: EffectivePolicy,
+    effective_policy: EffectivePolicy | Mapping[str, object],
 ) -> HealthReport:
     return HealthReport(
         status="ERROR",
@@ -218,7 +218,7 @@ def _workspace_error_report(
                 suggested_fix_type="fix_config",
             ),
         ),
-        effective_policy=effective_policy.to_dict(),
+        effective_policy=(dict(effective_policy) if isinstance(effective_policy, Mapping) else effective_policy.to_dict()),
     )
 
 

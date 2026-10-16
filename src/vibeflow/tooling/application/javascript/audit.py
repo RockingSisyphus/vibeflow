@@ -896,7 +896,6 @@ def _javascript_node_document(
             "scope": graph_lock_scope,
             "inherited": True,
         }
-    async_mode = str(getattr(node, "async_mode", ""))
     status = str(getattr(node, "status", "implemented"))
     contract_source = (
         "planned_config"
@@ -942,11 +941,6 @@ def _javascript_node_document(
         "requires": requirements_to_dicts(getattr(node, "requires")),
         "provides": providers_to_dicts(getattr(node, "provides")),
         "join_policy": str(getattr(node, "join_policy", "")),
-        "async": (
-            {"mode": async_mode, "result_key": str(getattr(node, "result_key", "")) or None}
-            if async_mode
-            else None
-        ),
         "loop": getattr(node, "loop").to_dict() or None,
         "io": getattr(node, "io").to_dict() or None,
         "invokes": invokes,
@@ -969,7 +963,6 @@ def _javascript_edge_document(
         for name, values in (
             ("mainline", compiled.mainline_edges),
             ("data_bypass", compiled.data_bypass_edges),
-            ("async", compiled.async_edges),
             ("schedule", compiled.schedule_edges),
             ("transfer", compiled.transfer_edges),
         )

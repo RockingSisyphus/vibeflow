@@ -71,7 +71,7 @@ def test_run_rejects_javascript_root_without_importing_python_target(
     assert payload["details"]["actual"] == "javascript"
 
 
-def test_build_rejects_python_root_without_importing_javascript_target(
+def test_build_dispatches_python_root_without_importing_javascript_target(
     tmp_path,
     monkeypatch,
     capsys,
@@ -87,14 +87,19 @@ def test_build_rejects_python_root_without_importing_javascript_target(
         return original_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", guarded_import)
-    code = cli_main(
-        ["build", "--workspace", str(workspace), "--config", str(config)]
-    )
+    def build(request):
+        assert Path(request.workspace) == workspace
+        from vibeflow.core.findings import HealthReport
+        from vibeflow.tooling.application.python.build import PythonBuildResult
+        return PythonBuildResult(out_dir=tmp_path/'bundle',entry=tmp_path/'bundle/run.py',
+            manifest=tmp_path/'bundle/vibeflow-build.json',files=(),toolchain={},health=HealthReport(status="PASS"))
+    from vibeflow.tooling.application.python import build as application_build
+    monkeypatch.setattr(application_build,'build_python_aot',build)
+    code = cli_main(["build","--workspace",str(workspace),"--config",str(config),"--out-dir",str(tmp_path/'bundle')])
     payload = json.loads(capsys.readouterr().out)
-
-    assert code == 1
-    assert payload["code"] == "CLI.PROJECT_TARGET.MISMATCH"
-    assert payload["details"]["actual"] == "python"
+    assert code == 0
+    assert payload['status'] == 'PASS'
+    assert payload['entry'].endswith('/bundle/run.py')
 
 
 def test_shared_command_dispatches_javascript_root_without_python_import(

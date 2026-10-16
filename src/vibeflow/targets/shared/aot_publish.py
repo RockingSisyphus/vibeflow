@@ -14,26 +14,8 @@ from typing import Any, Mapping
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _RENAME_EXCHANGE = 2
 _AT_FDCWD = -100
-_MANIFEST_KEYS = frozenset(
-    {
-        "format",
-        "abi_version",
-        "project_target",
-        "workflow_id",
-        "entry_mode",
-        "target",
-        "profile",
-        "entry",
-        "plan_sha256",
-        "toolchain",
-        "external_packages",
-        "host_extensions",
-        "files",
-    }
-)
-_OPTIONAL_MANIFEST_KEYS = frozenset(
-    {"plugin_abi_version", "plugins"}
-)
+_MANIFEST_KEYS = frozenset({'format','abi_version','project_target','workflow_id','entry_mode',
+    'entry','plan_sha256','files','target_metadata'})
 _TOOLCHAIN_KEYS = frozenset(
     {"node", "typescript", "esbuild"}
 )
@@ -77,63 +59,24 @@ def validate_owned_build_directory(
             "VibeFlow AOT manifest must be a JSON object",
         )
     manifest_keys = set(manifest)
-    if (
-        not _MANIFEST_KEYS.issubset(manifest_keys)
-        or not manifest_keys.issubset(
-            _MANIFEST_KEYS | _OPTIONAL_MANIFEST_KEYS
-        )
-        or (("plugins" in manifest) != ("plugin_abi_version" in manifest))
-    ):
-        raise AotPublishError(
-            "VF_BUILD_REPLACE",
-            "VibeFlow AOT manifest fields do not match the current format",
-        )
+    if manifest_keys != _MANIFEST_KEYS:
+        _invalid_manifest("AOT manifest fields do not match v3; rebuild with current tools")
     if manifest.get("format") != manifest_format:
         raise AotPublishError(
             "VF_BUILD_REPLACE",
             "refusing to replace a directory not owned by this VibeFlow AOT format",
         )
     _require_text(manifest, "abi_version")
-    if manifest.get("project_target") != "javascript":
-        _invalid_manifest("project_target must be 'javascript'")
+    language = manifest.get("project_target")
+    if language not in {"javascript", "python"}:
+        _invalid_manifest("project_target must be javascript or python")
     _require_text(manifest, "workflow_id")
-    if "plugin_abi_version" in manifest:
-        if manifest.get("plugin_abi_version") != "vibeflow.plugin.v3":
-            _invalid_manifest("plugin_abi_version is invalid")
-        _validate_plugins(manifest.get("plugins"))
     if manifest.get("entry_mode") not in {"sync", "async"}:
         _invalid_manifest("entry_mode must be 'sync' or 'async'")
-    if manifest.get("target") not in {"browser", "node"}:
-        _invalid_manifest("target must be 'browser' or 'node'")
-    if manifest.get("profile") not in {
-        "esm-module",
-        "single-esm",
-        "web-app",
-    }:
-        _invalid_manifest("profile is invalid")
+    _validate_target_metadata(manifest.get('target_metadata'),language=language)
     plan_hash = manifest.get("plan_sha256")
     if not isinstance(plan_hash, str) or not _SHA256_RE.fullmatch(plan_hash):
         _invalid_manifest("plan_sha256 is invalid")
-    external = manifest.get("external_packages")
-    if (
-        not isinstance(external, list)
-        or any(not isinstance(item, str) or not item for item in external)
-        or external != sorted(set(external))
-    ):
-        _invalid_manifest("external_packages must be sorted unique strings")
-    host_extensions = manifest.get("host_extensions")
-    if (
-        not isinstance(host_extensions, list)
-        or any(
-            not isinstance(item, str) or not item
-            for item in host_extensions
-        )
-        or len(host_extensions) != len(set(host_extensions))
-    ):
-        _invalid_manifest(
-            "host_extensions must be unique non-empty strings"
-        )
-    _validate_toolchain(manifest.get("toolchain"))
 
     raw_files = manifest.get("files")
     if not isinstance(raw_files, Mapping) or not raw_files:
@@ -158,7 +101,7 @@ def validate_owned_build_directory(
     if entry not in files:
         _invalid_manifest("entry is not listed in files")
 
-    actual_files, actual_directories = _actual_tree(root)
+    actual_files, actual_directories = _actual_tree(root, python=language == "python")
     expected_files = set(files)
     if actual_files != expected_files:
         missing = sorted(expected_files - actual_files)
@@ -190,6 +133,32 @@ def validate_owned_build_directory(
                 f"refusing to replace a modified AOT file: {name}",
             )
     return manifest
+
+
+def _validate_target_metadata(value, *, language):
+    if not isinstance(value, Mapping):
+        _invalid_manifest('target_metadata must be an object')
+    if language == 'python':
+        if set(value) != {'target','profile','toolchain','bindings'} or value['target'] != 'python' or value['profile'] != 'python-package':
+            _invalid_manifest('invalid Python package metadata')
+        _require_text(value,'bindings')
+        _safe_relative_name(value['bindings'])
+        _validate_toolchain(value['toolchain'],python=True)
+        return
+    if set(value) != {'target','profile','toolchain','external_packages','host_extensions','plugin_abi_version','plugins'}:
+        _invalid_manifest('invalid JavaScript metadata fields')
+    if value['target'] not in {'browser','node'} or value['profile'] not in {'esm-module','single-esm','web-app'}:
+        _invalid_manifest('invalid JavaScript target or profile')
+    if value['plugin_abi_version'] != 'vibeflow.plugin.v3':
+        _invalid_manifest('plugin_abi_version is invalid')
+    _validate_toolchain(value['toolchain'])
+    _validate_plugins(value['plugins'])
+    external = value['external_packages']
+    if not isinstance(external,list) or any(not isinstance(item,str) or not item for item in external) or external != sorted(set(external)):
+        _invalid_manifest('external_packages must be sorted unique strings')
+    hosts = value['host_extensions']
+    if not isinstance(hosts,list) or any(not isinstance(item,str) or not item for item in hosts) or len(hosts) != len(set(hosts)):
+        _invalid_manifest('host_extensions must be unique non-empty strings')
 
 
 def _validate_plugins(value: Any) -> None:
@@ -320,7 +289,7 @@ def _exchange_directories(source: Path, target: Path) -> None:
     )
 
 
-def _actual_tree(root: Path) -> tuple[set[str], set[str]]:
+def _actual_tree(root: Path, *, python=False) -> tuple[set[str], set[str]]:
     files: set[str] = set()
     directories: set[str] = set()
     for current, dir_names, file_names in os.walk(root, followlinks=False):
@@ -332,6 +301,11 @@ def _actual_tree(root: Path) -> tuple[set[str], set[str]]:
                     "VF_BUILD_REPLACE",
                     f"AOT build directory contains a symlink: {path}",
                 )
+            if python and name == '__pycache__':
+                if any(item.is_symlink() or not item.is_file() or item.suffix != '.pyc' for item in path.iterdir()):
+                    _invalid_manifest(f'untracked files in Python bytecode cache: {path}')
+                dir_names.remove(name)
+                continue
             directories.add(path.relative_to(root).as_posix())
         for name in file_names:
             path = current_path / name
@@ -356,10 +330,11 @@ def _expected_directories(files: set[str]) -> set[str]:
     return directories
 
 
-def _validate_toolchain(value: object) -> None:
-    if not isinstance(value, Mapping) or set(value) != _TOOLCHAIN_KEYS:
+def _validate_toolchain(value: object, *, python=False) -> None:
+    keys = {"python"} if python else _TOOLCHAIN_KEYS
+    if not isinstance(value, Mapping) or set(value) != keys:
         _invalid_manifest("toolchain fields are invalid")
-    for key in ("node", "typescript", "esbuild"):
+    for key in keys:
         _require_text(value, key)
 
 

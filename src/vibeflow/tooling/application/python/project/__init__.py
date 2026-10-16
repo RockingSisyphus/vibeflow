@@ -19,7 +19,7 @@ _EXPORTS = {
         "WorkspaceEnvironment",
     ),
     "load_workspace_config": (
-        "vibeflow.tooling.application.python.project.core",
+        "vibeflow.tooling.project.workspace_loader",
         "load_workspace_config",
     ),
 }

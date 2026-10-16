@@ -20,7 +20,7 @@ def handle_export_graph(args, *, export_kind: str) -> int:
     from vibeflow.tooling.project.graph_config import parse_graph_config, project_root_for_config
     from vibeflow.core.findings import HealthReport
     from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid
-    from vibeflow.tooling.application.python.presentation.mermaid.render import (
+    from vibeflow.tooling.presentation.mermaid import (
         DEFAULT_MERMAID_MAX_EDGES,
         DEFAULT_MERMAID_MAX_TEXT_SIZE,
         EXPANDED_MERMAID_MAX_EDGES,
@@ -273,7 +273,7 @@ def _load_unowned_graph(args, *, validate_health: bool = False):
 def _export_svg(args, *, graph, compiled, registry, resources, prepared=None) -> int:
     from vibeflow.tooling.application.python.reports import fail_report
     from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid
-    from vibeflow.tooling.application.python.presentation.mermaid.render import (
+    from vibeflow.tooling.presentation.mermaid import (
         DEFAULT_MERMAID_MAX_EDGES,
         DEFAULT_MERMAID_MAX_TEXT_SIZE,
         EXPANDED_MERMAID_MAX_EDGES,

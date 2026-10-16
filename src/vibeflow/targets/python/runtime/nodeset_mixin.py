@@ -119,6 +119,9 @@ class RuntimeNodesetMixin:
         runtime._tasks = self._tasks
         runtime._signal = self._signal
         runtime._current_task = self._current_task
+        runtime._plugin_registry = self._plugin_registry
+        runtime._runtime_plugins = self._runtime_plugins
+        runtime._hook_plan = self._hook_plan
         return runtime
 
 

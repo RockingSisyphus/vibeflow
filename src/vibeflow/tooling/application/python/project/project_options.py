@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Mapping
 
 from vibeflow.targets.python.runtime.options import (
     RuntimeOptions,
-    runtime_options as normalize_runtime_options,
+    merge_runtime_options,
 )
 from vibeflow.tooling.project.architecture_types import WorkspaceConfigError
 from vibeflow.tooling.project.workspace_model import WorkspaceConfig
@@ -29,14 +28,8 @@ def _workspace_runtime_options(
             f"config is not under any workspace root: {resolved}",
             {"path": str(resolved)},
         )
-    if isinstance(overrides, RuntimeOptions):
-        return overrides
-    values = dict(root.runtime_options)
-    if overrides is not None:
-        if not isinstance(overrides, Mapping):
-            return normalize_runtime_options(overrides)
-        values.update(dict(overrides))
-    return normalize_runtime_options(values)
+    return merge_runtime_options(root.runtime_options, overrides)
+
 
 
 __all__ = ["_workspace_runtime_options"]

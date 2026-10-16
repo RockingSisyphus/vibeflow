@@ -1,56 +1,17 @@
 """Enumerate graph calls and assign unambiguous rule coverage."""
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 
-from vibeflow.core.flow import LOOP_NODE_TYPES, STATUS_PLANNED
+from vibeflow.core.flow import LOOP_NODE_TYPES
 from vibeflow.core.rules.selection import resolve_graph_selection
-from vibeflow.core.config.scope import normalize_config_scope, merge_config_scopes, node_invocation_scope, nested_node_config_overrides
+from vibeflow.core.config.scope import normalize_config_scope
 
 
-@dataclass(frozen=True)
-class GraphRuleSubject:
-    owner: str
-    graph: object
-    call_path: tuple[str, ...] = ()
-    call: object | None = None
-    declaration_only: bool = False
-    parent_path: tuple[str, ...] | None = None
-    definition: object | None = None
-    global_config: object | None = None
-    overrides: object = field(default_factory=dict)
-    available_nodesets: object = field(default_factory=dict)
+from vibeflow.core.graph_calls import GraphCallSubject as GraphRuleSubject, graph_call_subjects
 
 
-def graph_rule_subjects(graph, *, global_config=None):
-    found = [GraphRuleSubject("pipeline", graph, global_config=normalize_config_scope(global_config), available_nodesets=graph.nodesets)]
-
-    def walk(current, inherited, prefix=(), active=(), config=None, overrides=None):
-        definitions = {**inherited, **current.nodesets}
-        config = normalize_config_scope(config)
-        overrides = overrides or {}
-        for node in current.nodes:
-            if node.status == STATUS_PLANNED:
-                continue
-            from vibeflow.core.tasks import task_graph
-            for slot, target in node.task_targets.items():
-                nested = task_graph(current, target)
-                path = (*prefix, node.id, "tasks", slot)
-                found.append(GraphRuleSubject("task:" + slot, nested, path, node,
-                    parent_path=prefix, global_config=config, available_nodesets=definitions))
-                walk(nested, definitions, path, active, config, {})
-            key = node.loop.body if node.type_used in LOOP_NODE_TYPES else node.type_used
-            if key in definitions and key not in active:
-                nested, path = definitions[key].graph, (*prefix, node.id)
-                definition = definitions[key]
-                values = {**node.params, **config.values, **overrides.get(node.id, {})}
-                child_config = merge_config_scopes(normalize_config_scope(definition.global_config),
-                    node_invocation_scope(values, allow_config_override=node.allow_config_override))
-                child_overrides = nested_node_config_overrides(node, overrides)
-                found.append(GraphRuleSubject("nodeset:" + key, nested, path, node, parent_path=prefix,
-                    definition=definition, global_config=child_config, overrides=child_overrides,
-                    available_nodesets={**definitions, **nested.nodesets}))
-                walk(nested, definitions, path, (*active, key), child_config, child_overrides)
-
-    walk(graph, {}, config=global_config)
+def graph_rule_subjects(graph, *, global_config=None, node_config_overrides=None):
+    found = list(graph_call_subjects(graph, global_config=global_config,
+        node_config_overrides=node_config_overrides, include_planned=True))
     visited = {id(item.graph) for item in found}
     definitions = list(graph.nodesets.values())
     while definitions:
@@ -79,7 +40,6 @@ def _graph_selections(graph, rulesets, global_config=None):
     subjects = graph_rule_subjects(graph, global_config=global_config)
     selections, regions = {}, {}
     by_subject = {}
-    active = tuple(item for item in subjects if not item.declaration_only)
     for subject in subjects:
         parent = selections.get(subject.parent_path) if not subject.declaration_only else None
         selection = resolve_graph_selection(subject.graph, rulesets=rulesets, path=subject.call_path, parent=parent)

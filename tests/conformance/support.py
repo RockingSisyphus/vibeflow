@@ -19,7 +19,7 @@ from typing import Any, Mapping
 
 from vibeflow.targets.javascript.frontend.emitter import emit_workflow_module
 from vibeflow.targets.javascript.frontend.bindings import build_javascript_binding_plan
-from vibeflow.targets.javascript.frontend.facts import native_workflow_facts
+from vibeflow.targets.javascript.frontend.facts import native_call_execution_facts
 from vibeflow.core.contracts import (
     CARDINALITY_ALL,
     DataEnvelope,
@@ -126,7 +126,6 @@ def run_portable_conformance(
             provides=case.registry.descriptor(type_key).contract.provides,
             completion=case.javascript_completions.get(type_key, "immediate"),
             executor=("event_loop" if case.javascript_completions.get(type_key) == "suspend" else "current"),
-            async_executor="event_loop",
             source_kind=source.kind,
             source_ref=source.ref,
             source_export=source.export,
@@ -142,8 +141,8 @@ def run_portable_conformance(
     javascript_plan = compile_graph_plan(
         javascript_compilation.workflow.graph, javascript_compilation.compiled_graph, workflow_id=case.name,
         source_by_type=sources, implementation_facts=javascript_facts,
-        native_execution_facts=native_workflow_facts(javascript_compilation.workflow.graph),
-        target_features=javascript_features, compile_nested=True,
+        call_execution_facts=native_call_execution_facts(javascript_compilation.workflow.graph),
+        target_features=javascript_features, compile_nested=True, task_executor="event_loop",
     )
 
     python_observation = _run_python(

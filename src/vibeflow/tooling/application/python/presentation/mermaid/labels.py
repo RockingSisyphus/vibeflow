@@ -38,14 +38,6 @@ def _node_metadata_lines(node: NodeSpec) -> tuple[str, ...]:
         lines.append(f"desc: {metadata.description}")
     return tuple(lines)
 
-def _async_semantic_lines(node: NodeSpec) -> tuple[str, ...]:
-    if not node.async_mode:
-        return ()
-    lines = [f"async: {node.async_mode}"]
-    if node.result_key:
-        lines.append(f"result_key: {node.result_key}")
-    return tuple(lines)
-
 def _source_lines(root_id: object = "", root_path: object = "", source_path: object = "") -> tuple[str, ...]:
     lines: list[str] = []
     root_id_text = str(root_id or "").strip()

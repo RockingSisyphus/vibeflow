@@ -6,7 +6,7 @@ from typing import Any, Mapping
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.flow import GraphConfig
 from vibeflow.tooling.application.python.presentation.helpers import compile_for_render, nodeset_for_node
-from vibeflow.tooling.application.python.presentation.style import MERMAID_MAIN_CLASS_ORDER, mermaid_class_def_lines
+from vibeflow.tooling.presentation.style import MERMAID_MAIN_CLASS_ORDER, mermaid_class_def_lines
 
 
 @dataclass(frozen=True)

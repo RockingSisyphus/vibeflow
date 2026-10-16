@@ -218,8 +218,6 @@ def test_portable_block_plan_never_contains_python_binding_objects() -> None:
         join_policy="safe_any",
         status="implemented",
         planned_behavior="blocking_stub",
-        async_mode="",
-        result_key="",
         is_terminal=False,
         is_nodeset=False,
         is_loop=False,

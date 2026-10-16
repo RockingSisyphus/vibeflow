@@ -6,7 +6,7 @@ from vibeflow.core.descriptors import NodeContractDescriptor, NodeDescriptor
 from vibeflow.targets.python.project import NodeRegistry
 from vibeflow.tooling.application.python.presentation.ascii_flowchart import export_ascii_flowchart
 from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid, review_fragments, review_svg
-from vibeflow.tooling.application.python.presentation.mermaid.review_types import _SvgFragment
+from vibeflow.tooling.presentation.review_types import SvgFragment
 from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
 from vibeflow.tooling.project.graph_config import parse_graph_config
 
@@ -36,7 +36,7 @@ def test_python_display_stops_at_folded_definition(tmp_path, monkeypatch, loop, 
     rendered = []
     def fragment(title, mermaid, *_args, **_kwargs):
         rendered.append((title, mermaid))
-        return _SvgFragment(title, '<svg viewBox="0 0 120 60"><rect width="120" height="60"/></svg>', 120, 60)
+        return SvgFragment(title, '<svg viewBox="0 0 120 60"><rect width="120" height="60"/></svg>', 120, 60)
     monkeypatch.setattr(review_svg, "_render_fragment", fragment)
     monkeypatch.setattr(review_fragments, "_render_fragment", fragment)
     review_svg.render_review_columns_svg(graph, prepared.compiled, tmp_path / "diagram.svg",

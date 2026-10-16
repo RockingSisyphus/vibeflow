@@ -3,6 +3,7 @@ from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from tests.fixtures.support.declarations import node_declaration, configured_declaration, native_registry
 
 import sys
+from types import SimpleNamespace
 from threading import Event
 from pathlib import Path
 
@@ -12,7 +13,7 @@ from vibeflow.tooling.application.python.cli import main
 from vibeflow.tooling.application.python.cli.delegate_cli import extract_delegate_cli_exit_code, validate_delegate_cli_graph_contract
 from vibeflow.core.contracts import DataEnvelope, DataProvider, DataRequirement, RunResult
 from vibeflow.core import HealthReport
-from vibeflow.tooling.application.python.diagnostics import emit_core_diagnostic
+from vibeflow.tooling.project.diagnostic_sink import emit_core_diagnostic
 from vibeflow.tooling.application.python.runner import CheckedRunResult
 from vibeflow.tooling.project.graph_config import parse_graph_config
 
@@ -26,7 +27,7 @@ from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
 def _stub_delegate_workspace_loader(monkeypatch):
     monkeypatch.setattr(
         "vibeflow.tooling.application.python.cli._load_workspace_for_cli",
-        lambda path: object(),
+        lambda path: SimpleNamespace(roots=()),
     )
 
 

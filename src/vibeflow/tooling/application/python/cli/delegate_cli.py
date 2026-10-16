@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import argparse
 import sys
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, Iterator
+from typing import Callable
 
-from vibeflow.tooling.application.python.diagnostics import core_diagnostic_sink
+from vibeflow.tooling.project.diagnostic_sink import core_diagnostic_sink
+from vibeflow.targets.python.sdk.loading import source_paths
 from vibeflow.core.findings import HealthReport
 from vibeflow.tooling.application.python.run_directory import InvalidRunIdError, parse_run_id_argument, validate_run_id
 from vibeflow.tooling.application.python.delegate_contract import (
@@ -101,7 +101,7 @@ def handle_delegate_cli(args) -> int:
             options = _runtime_options_from_args(args)
             from vibeflow.tooling.application.python.workspace_service import run_workspace_checked
 
-            with _workspace_import_paths(workspace):
+            with source_paths(root.path for root in workspace.roots if root.project_target == "python"):
                 result = run_workspace_checked(
                     Path(args.config),
                     workspace=workspace,
@@ -174,25 +174,6 @@ def _artifact_line(run_dir: Path) -> str:
 
 def _single_line(message: str) -> str:
     return str(message).replace("\r", "\\r").replace("\n", "\\n")
-
-
-@contextmanager
-def _workspace_import_paths(workspace: object) -> Iterator[None]:
-    inserted: list[str] = []
-    roots = tuple(getattr(workspace, "roots", ()) or ())
-    for root in reversed(roots):
-        if getattr(root, "project_target", "python") != "python":
-            continue
-        value = str(getattr(root, "path", "") or "")
-        if value and value not in sys.path:
-            sys.path.insert(0, value)
-            inserted.append(value)
-    try:
-        yield
-    finally:
-        for value in inserted:
-            if value in sys.path:
-                sys.path.remove(value)
 
 
 def _finish_with_log(run_dir: Path, messages: list[str], exit_code: int) -> int:

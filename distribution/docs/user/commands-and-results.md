@@ -14,6 +14,7 @@ VibeFlow 的公开命令分别报告结构、质量、构建、审核产物或�
 | 查看有效规则图 | `python run.py review-rules --config <config> --json` |
 | 查询当前资源与来源 | `python run.py inspect-resources --config <config> --json` |
 | Python 执行 | `python run.py run --config <config> --input <input.json>` |
+| Python AOT | `python run.py build --config <config> --out-dir <dir>`，再以 `python <dir>/run.py run --input <input.json>` 运行 |
 | JavaScript AOT | `python run.py build --config <config> --target node --profile esm-module --out-dir <dir>` |
 | 内核完整性 | `python run.py verify-kernel` |
 
@@ -62,7 +63,7 @@ JavaScript/TypeScript 扫描 `.js`、`.jsx`、`.ts`、`.tsx`、`.mjs`、`.cjs`�
 
 Node、BaseLib、Plugin 和 Host 的入口与支撑文件由各自所选 Ruleset 检查。默认可维护性规则逐文件检查 500 行上限；默认依赖链包含入口本身，长度超过 4 为警告、超过 6 为错误，仅计入可解析的项目内导入。`policy` 数值配置提供内置 Rule 的默认参数，显式规则参数和覆盖关系优先。参数组合见[Rule 与 Node](rules-and-nodes.md#ruleset-与局部覆盖)，旧写法调整见[声明迁移](rule-system-migration.md)。
 
-`validate`、`review`、`build` 执行当前范围的静态入口；Python `run` 执行运行入口，新增领域规则默认进入静态入口。`review-rules --config CONFIG --node CALL_PATH` 展示该调用的有效规则及参数来源，支持 JSON、Mermaid 或 SVG。查询和预览的加载顺序见[加载与检查](plugins-and-integrations.md#加载与检查)。
+`validate`、`review` 和 JS `build` 执行当前范围的静态入口；Python `run` 和 Python AOT 构建执行运行入口的静态审查，bundle 运行复用构建结果，新增领域规则默认进入静态入口。`review-rules --config CONFIG --node CALL_PATH` 展示该调用的有效规则及参数来源，支持 JSON、Mermaid 或 SVG。查询和预览的加载顺序见[加载与检查](plugins-and-integrations.md#加载与检查)。
 
 ## 工作流执行探针
 
@@ -73,7 +74,7 @@ Node、BaseLib、Plugin 和 Host 的入口与支撑文件由各自所选 Ruleset
 - 声明的最终输出已经产生；
 - 执行中没有结构性错误。
 
-Python `run` 会在 run 目录写入 `workflow_execution_report.json`。JavaScript 最小项目先完成 AOT build，再导入生成入口并由 `scripts/workflow_execution_probe.mjs` 生成同形报告。
+Python 源码及 bundle 的 `run` 都在 run 目录写入 `workflow_execution_report.json`。JavaScript 最小项目先完成 AOT build，再导入生成入口并由 `scripts/workflow_execution_probe.mjs` 生成同形报告。
 
 ## 运行产物
 

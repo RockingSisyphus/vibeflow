@@ -493,10 +493,6 @@ def _graph_mermaid(
                     f"execution_lock: {_lock_text(graph, node) or 'none'}",
                 )
             )
-            if node.async_mode:
-                label.append(f"async: {node.async_mode}")
-            if node.result_key:
-                label.append(f"result_key: {node.result_key}")
             if is_external:
                 label.append("external: true")
         escaped = _escape_label("\\n".join(label))
@@ -517,7 +513,6 @@ def _graph_mermaid(
         for name, values in (
             ("mainline", compiled.mainline_edges),
             ("data_bypass", compiled.data_bypass_edges),
-            ("async", compiled.async_edges),
         )
     }
     for index, edge in enumerate(compiled.effective_edges):
@@ -539,8 +534,6 @@ def _graph_mermaid(
             lines.append(f"  linkStyle {index} stroke-width:4px;")
         elif pair in edge_pairs["data_bypass"]:
             lines.append(f"  linkStyle {index} stroke-dasharray:6 4,stroke-width:2px;")
-        elif pair in edge_pairs["async"]:
-            lines.append(f"  linkStyle {index} stroke-dasharray:3 3;")
     from vibeflow.tooling.presentation.task_targets import task_target_label
     def task_targets(manager,parent_id):
         for slot,target in manager.task_targets.items():

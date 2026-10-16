@@ -7,7 +7,7 @@ import pytest
 from tests.targets.python.test_code_plugins import executable_project
 from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_document
 from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid, review_fragments, review_svg
-from vibeflow.tooling.application.python.presentation.mermaid.review_types import _SvgFragment
+from vibeflow.tooling.presentation.review_types import SvgFragment
 from vibeflow.tooling.application.python.workspace_service import load_workspace_graph_for_export
 
 
@@ -124,7 +124,7 @@ def test_svg_uses_simple_directories_and_preserves_empty_selection(checked,tmp_p
 
     def render(title,text,*_args,**_kwargs):
         fragments.append((title,text))
-        return _SvgFragment(title,'<svg viewBox="0 0 100 40"><rect width="100" height="40"/></svg>',100,40)
+        return SvgFragment(title,'<svg viewBox="0 0 100 40"><rect width="100" height="40"/></svg>',100,40)
 
     monkeypatch.setattr(review_svg,"_render_fragment",render)
     monkeypatch.setattr(review_fragments,"_render_fragment",render)
@@ -159,7 +159,7 @@ def test_user_renderers_never_request_source_review_architecture(checked,tmp_pat
 
     monkeypatch.setattr(PreparedPythonPresentation,"architecture",forbidden)
     monkeypatch.setattr(review_svg,"_render_fragment",lambda title,*args,**kwargs:
-        _SvgFragment(title,'<svg viewBox="0 0 100 40"><rect width="100" height="40"/></svg>',100,40))
+        SvgFragment(title,'<svg viewBox="0 0 100 40"><rect width="100" height="40"/></svg>',100,40))
     for layout in ("default","review-columns"):
         assert_user_diagram(export_mermaid(graph,resources=resources,prepared=prepared,mermaid_layout=layout))
     review_svg.render_review_columns_svg(graph,compiled,tmp_path/"user.svg",prepared=prepared,resources=resources)

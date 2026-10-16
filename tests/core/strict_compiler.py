@@ -1028,7 +1028,7 @@ def test_task_reference_data_does_not_trigger_implicit_result_wait() -> None:
                         edges=(EdgeSpec("manager","relay"),))
     result = compile_core(CoreCompileRequest(graph=graph,implementation_facts=facts))
     assert result.compiled_graph.resolved_schedule_edges[0].pair == ("manager","relay")
-    assert result.compiled_graph.async_edges == ()
+    assert not hasattr(result.compiled_graph, "async_edges")
 
 
 def test_mermaid_renders_while_loop_shape_class_and_stop_condition() -> None:

@@ -7,7 +7,7 @@ from vibeflow.targets.python.quality.source_analysis.types import _default_rule_
 
 
 def test_mermaid_renderer_lists_unique_non_snap_browsers_in_priority_order(monkeypatch) -> None:
-    import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render
+    import vibeflow.tooling.presentation.mermaid as mermaid_render
 
     paths = {
         "chromium": "/snap/bin/chromium",
@@ -30,7 +30,7 @@ def test_mermaid_renderer_lists_unique_non_snap_browsers_in_priority_order(monke
 
 
 def test_mermaid_renderer_keeps_non_snap_chromium_candidate(monkeypatch) -> None:
-    import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render
+    import vibeflow.tooling.presentation.mermaid as mermaid_render
 
     paths = {
         "chromium": "/snap/bin/chromium",
@@ -49,7 +49,7 @@ def test_mermaid_renderer_keeps_non_snap_chromium_candidate(monkeypatch) -> None
 
 
 def test_mermaid_renderer_skips_snap_chromium_as_only_system_browser(monkeypatch) -> None:
-    import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render
+    import vibeflow.tooling.presentation.mermaid as mermaid_render
 
     paths = {
         "chromium": "/snap/bin/chromium",
@@ -65,7 +65,7 @@ def test_mermaid_renderer_skips_snap_chromium_as_only_system_browser(monkeypatch
 
 
 def test_mermaid_puppeteer_config_omits_executable_by_default(tmp_path) -> None:
-    import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render
+    import vibeflow.tooling.presentation.mermaid as mermaid_render
 
     path = tmp_path / "puppeteer.json"
     mermaid_render._write_puppeteer_config(path)
@@ -76,7 +76,7 @@ def test_mermaid_puppeteer_config_omits_executable_by_default(tmp_path) -> None:
 
 
 def test_mermaid_config_uses_readable_svg_spacing_defaults(tmp_path) -> None:
-    import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render
+    import vibeflow.tooling.presentation.mermaid as mermaid_render
 
     path = tmp_path / "mermaid.json"
     mermaid_render._write_mermaid_config(path, max_text_size=1234, max_edges=56, html_labels=False)
@@ -95,7 +95,7 @@ def test_mermaid_config_uses_readable_svg_spacing_defaults(tmp_path) -> None:
 
 
 def test_mermaid_svg_label_enhancement_styles_native_text_without_touching_edges(tmp_path) -> None:
-    import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render
+    import vibeflow.tooling.presentation.mermaid as mermaid_render
 
     svg = tmp_path / "graph.svg"
     svg.write_text(
@@ -139,7 +139,7 @@ def test_mermaid_svg_label_enhancement_styles_native_text_without_touching_edges
 
 
 def test_mermaid_svg_label_enhancement_recenters_native_cloud_text(tmp_path) -> None:
-    import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render
+    import vibeflow.tooling.presentation.mermaid as mermaid_render
 
     svg = tmp_path / "cloud.svg"
     svg.write_text(
@@ -185,7 +185,7 @@ def test_mermaid_svg_label_enhancement_recenters_native_cloud_text(tmp_path) -> 
 
 
 def test_mermaid_renderer_finds_distribution_kernel_tool_path(tmp_path, monkeypatch) -> None:
-    import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render
+    import vibeflow.tooling.presentation.mermaid as mermaid_render
 
     monkeypatch.delenv("VIBEFLOW_MERMAID_RENDERER_ROOT", raising=False)
 
@@ -200,7 +200,7 @@ def test_mermaid_renderer_finds_distribution_kernel_tool_path(tmp_path, monkeypa
 
 
 def test_mermaid_renderer_keeps_source_tool_path_precedence(tmp_path, monkeypatch) -> None:
-    import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render
+    import vibeflow.tooling.presentation.mermaid as mermaid_render
 
     monkeypatch.delenv("VIBEFLOW_MERMAID_RENDERER_ROOT", raising=False)
 
@@ -219,7 +219,7 @@ def test_mermaid_renderer_keeps_source_tool_path_precedence(tmp_path, monkeypatc
 
 
 def test_mermaid_renderer_prefers_explicit_temporary_root(tmp_path, monkeypatch) -> None:
-    import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render
+    import vibeflow.tooling.presentation.mermaid as mermaid_render
 
     configured = tmp_path / "temporary-renderer"
     executable = "mmdc.cmd" if mermaid_render._is_windows() else "mmdc"
@@ -235,7 +235,7 @@ def test_mermaid_renderer_prefers_explicit_temporary_root(tmp_path, monkeypatch)
 
 
 def test_mermaid_renderer_discovers_source_checkout_root(tmp_path, monkeypatch) -> None:
-    import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render
+    import vibeflow.tooling.presentation.mermaid as mermaid_render
 
     module_path = tmp_path / "src" / "vibeflow" / "rendering" / "mermaid" / "render.py"
     module_path.parent.mkdir(parents=True)
@@ -249,7 +249,7 @@ def test_mermaid_renderer_discovers_source_checkout_root(tmp_path, monkeypatch) 
 
 
 def test_mermaid_renderer_keeps_distribution_zip_root(tmp_path, monkeypatch) -> None:
-    import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render
+    import vibeflow.tooling.presentation.mermaid as mermaid_render
 
     module_path = tmp_path / "kernel" / "vibeflow-kernel.zip" / "vibeflow" / "rendering" / "mermaid" / "render.py"
     monkeypatch.setattr(mermaid_render, "__file__", str(module_path))
@@ -260,7 +260,7 @@ def test_mermaid_renderer_keeps_distribution_zip_root(tmp_path, monkeypatch) -> 
 @pytest.mark.parametrize("failed_attempts", (1, 2))
 def test_mermaid_renderer_falls_back_through_non_snap_system_browsers(tmp_path, monkeypatch, failed_attempts) -> None:
     import subprocess
-    import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render
+    import vibeflow.tooling.presentation.mermaid as mermaid_render
 
     mmdc = tmp_path / "mmdc"
     mmdc.write_text("", encoding="utf-8")

@@ -10,7 +10,7 @@ from vibeflow.tooling.presentation.review_types import (
     FRAGMENT_FRAME_PADDING as _FRAGMENT_FRAME_PADDING,
     REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH,
     REVIEW_COLUMNS_STYLE as _REVIEW_COLUMNS_STYLE,
-    _SvgFragment,
+    SvgFragment,
 )
 
 _SVG_NS = "http://www.w3.org/2000/svg"
@@ -22,7 +22,7 @@ ET.register_namespace("", _SVG_NS)
 ET.register_namespace("xlink", _XLINK_NS)
 
 def _compose_svg(
-    columns: list[list[_SvgFragment]],
+    columns: list[list[SvgFragment]],
     *,
     background: str,
     review_fragment_max_width: float = REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH,
@@ -61,7 +61,7 @@ def _compose_svg(
     return "\n".join(parts) + "\n"
 
 def _column_svg(
-    column: list[_SvgFragment],
+    column: list[SvgFragment],
     *,
     x: float,
     y: float,
@@ -106,7 +106,7 @@ def _column_svg(
     return parts
 
 def _column_height(
-    column: list[_SvgFragment],
+    column: list[SvgFragment],
     *,
     title_height: float,
     row_gap: float,
@@ -114,14 +114,14 @@ def _column_height(
 ) -> float:
     return sum(title_height + _display_size(fragment, max_width=review_fragment_max_width)[1] for fragment in column) + row_gap * max(0, len(column) - 1)
 
-def _display_size(fragment: _SvgFragment, *, max_width: float = REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH) -> tuple[float, float]:
+def _display_size(fragment: SvgFragment, *, max_width: float = REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH) -> tuple[float, float]:
     if fragment.width <= max_width:
         return fragment.width, fragment.height
     scale = max_width / fragment.width
     return max_width, fragment.height * scale
 
 def _inline_fragment_svg(
-    fragment: _SvgFragment,
+    fragment: SvgFragment,
     *,
     x: float,
     y: float,

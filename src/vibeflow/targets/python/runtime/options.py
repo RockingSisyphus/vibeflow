@@ -46,6 +46,13 @@ def runtime_options(value: RuntimeOptions | Mapping[str, object] | None) -> Runt
     return RuntimeOptions(**dict(value))
 
 
+def merge_runtime_options(defaults: Mapping[str, object], overrides=None) -> RuntimeOptions:
+    """Mappings overlay defaults; a complete RuntimeOptions instance replaces them."""
+    if isinstance(overrides, Mapping):
+        return runtime_options({**defaults, **overrides})
+    return runtime_options(defaults if overrides is None else overrides)
+
+
 @dataclass(frozen=True)
 class HookPlan:
     before_run: tuple[RuntimeHook, ...] = ()
@@ -104,4 +111,5 @@ __all__ = [
     "runtime_hook_plan",
     "runtime_hook_table",
     "runtime_options",
+    "merge_runtime_options",
 ]

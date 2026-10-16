@@ -122,7 +122,7 @@ def test_cli_export_svg_reads_jsonc(tmp_path, capsys) -> None:
 
 
 def test_cli_export_svg_expand_nodesets_forces_review_columns_layout(tmp_path, monkeypatch) -> None:
-    import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render_module
+    import vibeflow.tooling.presentation.mermaid as mermaid_render_module
     import vibeflow.tooling.application.python.presentation.mermaid.review_svg as review_svg_module
 
     config_path = tmp_path / "workflow.jsonc"
@@ -162,7 +162,7 @@ def test_cli_export_svg_expand_nodesets_forces_review_columns_layout(tmp_path, m
 
 
 def test_cli_export_svg_collapsed_default_uses_default_renderer(tmp_path, monkeypatch) -> None:
-    import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render_module
+    import vibeflow.tooling.presentation.mermaid as mermaid_render_module
     import vibeflow.tooling.application.python.presentation.mermaid.review_svg as review_svg_module
 
     config_path = tmp_path / "workflow.jsonc"
@@ -189,7 +189,7 @@ def test_cli_export_svg_collapsed_default_uses_default_renderer(tmp_path, monkey
 
 def test_cli_workspace_mermaid_and_collapsed_svg_keep_external_registry_metadata(tmp_path, monkeypatch, capsys) -> None:
     import vibeflow.tooling.application.python.cli.export as export_module
-    import vibeflow.tooling.application.python.presentation.mermaid.render as mermaid_render_module
+    import vibeflow.tooling.presentation.mermaid as mermaid_render_module
 
     registry = NodeRegistry()
     register_node(registry, CliExternalNode_DECLARATION, CliExternalNode)

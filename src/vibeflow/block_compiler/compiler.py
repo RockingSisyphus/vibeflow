@@ -79,7 +79,8 @@ def compile_workflow(
     workflow: ValidatedWorkflow,
     implementation_facts: ImplementationFacts,
     *,
-    native_execution_facts: ImplementationFacts | None = None,
+    call_execution_facts: Mapping[tuple[str, ...], object] | None = None,
+    task_executor: str = "thread",
 ) -> WorkflowPlan:
     """Compile a validated workflow using static Target implementation facts."""
 
@@ -99,9 +100,9 @@ def compile_workflow(
         compiled,
         source_by_type=_sources_from_facts(implementation_facts),
         implementation_facts=implementation_facts,
-        native_execution_facts=native_execution_facts,
+        call_execution_facts=call_execution_facts,
         target_features=workflow.target_features,
-        compile_nested=True,
+        compile_nested=True, task_executor=task_executor,
     )
 
 
@@ -116,9 +117,10 @@ def compile_graph_plan(
     pipeline_inputs: Sequence[PipelineInputSpec] | None = None,
     pipeline_outputs: Sequence[PipelineOutputSpec] | None = None,
     implementation_facts: ImplementationFacts | None = None,
-    native_execution_facts: ImplementationFacts | None = None,
+    call_execution_facts: Mapping[tuple[str, ...], object] | None = None,
     target_features: TargetFeatureSet | None = None,
     compile_nested: bool = False,
+    task_executor: str = "thread",
 ) -> WorkflowPlan:
     """Assemble canonical IR from a Core graph compilation."""
 
@@ -129,9 +131,9 @@ def compile_graph_plan(
         compiled_by_path=compiled_by_path,
         params_by_path=params_by_path,
         implementation_facts=implementation_facts,
-        native_execution_facts=native_execution_facts,
+        call_execution_facts=call_execution_facts,
         target_features=target_features,
-        compile_nested=compile_nested,
+        compile_nested=compile_nested, task_executor=task_executor,
     )
     root_id = _block_id(())
     state.add_graph_block(
@@ -170,12 +172,13 @@ class _PlannerState:
         compiled_by_path: Mapping[tuple[str, ...], CompiledGraph] | None = None,
         params_by_path: Mapping[tuple[str, ...], Mapping[str, object]] | None = None,
         implementation_facts: ImplementationFacts | None = None,
-        native_execution_facts: ImplementationFacts | None = None,
+        call_execution_facts: Mapping[tuple[str, ...], object] | None = None,
         target_features: TargetFeatureSet | None = None,
         compile_nested: bool = False,
+        task_executor: str = "thread",
     ) -> None:
         self.implementation_facts = implementation_facts or ImplementationFacts()
-        self.native_execution_facts = native_execution_facts or ImplementationFacts()
+        self.call_execution_facts = dict(call_execution_facts or {})
         self.source_by_type = _sources_from_facts(self.implementation_facts)
         self.source_by_type.update(_normalize_source_map(source_by_type))
         self.compiled_by_path = dict(compiled_by_path or {})
@@ -185,6 +188,9 @@ class _PlannerState:
         }
         self.target_features = target_features or TargetFeatureSet()
         self.compile_nested = compile_nested
+        if task_executor not in {"thread", "event_loop"}:
+            raise PortablePlanError("task executor must be thread or event_loop")
+        self.task_executor = task_executor
         self.blocks: list[BlockPlan] = []
 
     def add_graph_block(
@@ -321,7 +327,7 @@ class _PlannerState:
                 loop=loop,
                 nodes=tuple(nodes),
                 execution_lock=block_lock,
-                task_executor="event_loop" if self.target_features.target in {"javascript", "browser", "node"} else "thread",
+                task_executor=self.task_executor,
             )
         )
         for (
@@ -366,7 +372,7 @@ class _PlannerState:
             nodes=tuple(nodes),
             execution_lock=block_lock,
             contains_global_state=contains_global_state,
-            task_executor="event_loop" if self.target_features.target in {"javascript", "browser", "node"} else "thread",
+            task_executor=self.task_executor,
         )
         return contains_global_state
 
@@ -391,7 +397,7 @@ class _PlannerState:
             or getattr(nodeset, "status", "implemented") == STATUS_PLANNED
             else spec.status
         )
-        completion, schedule, executor = self._execution_semantics(spec, native=is_nodeset or is_loop)
+        completion, schedule, executor = self._execution_semantics(spec, call_path=call_path, native=is_nodeset or is_loop or spec.type_used == IO_NODE_TYPE)
         effect_scope = compiled.effect_scopes.get(
             spec.id,
             (
@@ -418,8 +424,6 @@ class _PlannerState:
             join_policy=spec.join_policy,
             status=status,
             planned_behavior=planned_behavior,
-            async_mode=spec.async_mode,
-            result_key=spec.result_key,
             is_terminal=(
                 flow_kind == "terminal"
                 or spec.type_used == IO_NODE_TYPE
@@ -452,16 +456,13 @@ class _PlannerState:
     def _source(self, type_used: str) -> SourceRef:
         return self.source_by_type.get(type_used, SourceRef(kind="catalog", ref=type_used))
 
-    def _execution_semantics(self, spec: NodeSpec, *, native: bool = False) -> tuple[str, str, str]:
-        if spec.type_used == IO_NODE_TYPE:
-            if spec.io.operation == "receive":
-                return ("suspend", "inline", "event_loop")
-            return ("immediate", "inline", "current")
-        fact = (self.native_execution_facts if native else self.implementation_facts).get(spec.type_used)
-        completion = fact.completion if fact is not None else "immediate"
+    def _execution_semantics(self, spec: NodeSpec, *, call_path, native=False):
+        fact = self.call_execution_facts.get(call_path)
+        if fact is None and not native:
+            fact = self.implementation_facts.get(spec.type_used)
         if fact is None:
-            return (completion, "inline", "current")
-        return (completion, fact.schedule, fact.executor)
+            return ("immediate", "inline", "current")
+        return (fact.completion, fact.schedule, fact.executor)
 
 
 def _block(
@@ -488,7 +489,7 @@ def _block(
         path=path,
         source=_graph_source(graph, _block_id(path)),
         inputs=_pipeline_inputs(graph),
-        outputs=_legacy_outputs(graph),
+        outputs=_pipeline_outputs(graph),
         nodes=nodes,
         routes=routes,
         order=compiled.order,
@@ -497,7 +498,7 @@ def _block(
         max_steps=graph.max_steps,
         tasks=tuple(TaskPlan(id=f"{_block_id(path)}:task:{node.id}:{key}",
             manager_node_id=node.id, key=key, block_id=target,
-            executor="event_loop" if node.executor == "event_loop" else task_executor)
+            executor=task_executor)
             for node in nodes for key, target in node.task_targets),
         loop=loop,
         execution_lock=(
@@ -520,7 +521,6 @@ def _routes(compiled: CompiledGraph) -> tuple[RoutePlan, ...]:
     explicit = set(compiled.explicit_edges)
     mainline = set(compiled.mainline_edges)
     bypass = set(compiled.data_bypass_edges)
-    asynchronous = set(compiled.async_edges)
     return tuple(
         RoutePlan(
             source=edge.source,
@@ -531,7 +531,6 @@ def _routes(compiled: CompiledGraph) -> tuple[RoutePlan, ...]:
             explicit=edge in explicit,
             mainline=edge in mainline,
             data_bypass=edge in bypass,
-            asynchronous=edge in asynchronous,
         )
         for edge in compiled.effective_edges
     )
@@ -640,7 +639,7 @@ def _pipeline_inputs(graph: GraphConfig) -> tuple[PipelineInputSpec, ...]:
     )
 
 
-def _legacy_outputs(graph: GraphConfig) -> tuple[PipelineOutputSpec, ...]:
+def _pipeline_outputs(graph: GraphConfig) -> tuple[PipelineOutputSpec, ...]:
     return tuple(
         PipelineOutputSpec(
             type=item.type,
@@ -668,7 +667,7 @@ def _root_outputs(
     graph: GraphConfig,
     supplied: Sequence[PipelineOutputSpec] | None,
 ) -> tuple[PipelineOutputSpec, ...]:
-    values = tuple(supplied) if supplied is not None else _legacy_outputs(graph)
+    values = tuple(supplied) if supplied is not None else _pipeline_outputs(graph)
     expected = tuple((item.type, item.cardinality) for item in graph.outputs)
     actual = tuple((item.type, item.cardinality) for item in values)
     if actual != expected:
