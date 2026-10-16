@@ -9,19 +9,19 @@ from typing import Mapping
 from vibeflow.core.flow import GraphConfig, NodeSpec, NodesetSpec, STATUS_PLANNED
 from vibeflow.tooling.application.python.presentation.helpers import compile_for_render
 from vibeflow.tooling.application.python.presentation.mermaid import MERMAID_LAYOUT_DEFAULT, _escape_label, _resource_label, _safe_id, export_mermaid
-from vibeflow.tooling.application.python.presentation.mermaid.render import DEFAULT_MERMAID_MAX_EDGES, DEFAULT_MERMAID_MAX_TEXT_SIZE, render_mermaid_svg
-from vibeflow.tooling.application.python.presentation.mermaid.review_layout import _column_height, _column_svg, _display_size, _validate_review_fragment_max_width, _viewbox_size
+from vibeflow.tooling.presentation.mermaid import DEFAULT_MERMAID_MAX_EDGES, DEFAULT_MERMAID_MAX_TEXT_SIZE, render_mermaid_svg
+from vibeflow.tooling.presentation.review_layout import _column_height, _column_svg, _display_size, _validate_review_fragment_max_width, _viewbox_size
 from vibeflow.tooling.application.python.presentation.review_model import invocation_for_node
-from vibeflow.tooling.application.python.presentation.mermaid.review_types import (
+from vibeflow.tooling.presentation.review_types import (
     DETAIL_PANEL_COLUMN_GAP as _DETAIL_PANEL_COLUMN_GAP,
     DETAIL_PANEL_ROW_GAP as _DETAIL_PANEL_ROW_GAP,
     DETAIL_PANEL_STYLE as _DETAIL_PANEL_STYLE,
     DETAIL_PANEL_TITLE_HEIGHT as _DETAIL_PANEL_TITLE_HEIGHT,
     PLACEHOLDER_STYLE as _PLACEHOLDER_STYLE,
     REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH,
-    _SvgFragment,
+    SvgFragment,
 )
-from vibeflow.tooling.application.python.presentation.style import MERMAID_RESOURCE_CLASS_ORDER, mermaid_class_def_lines
+from vibeflow.tooling.presentation.style import MERMAID_RESOURCE_CLASS_ORDER, mermaid_class_def_lines
 
 
 _MAX_GROUP_TITLE_CALL_IDS = 3
@@ -47,8 +47,8 @@ def _nodeset_fragments(
     max_edges: int | None,
     review_fragment_max_width: float,
     prepared=None,
-) -> list[_SvgFragment]:
-    fragments: list[_SvgFragment] = []
+) -> list[SvgFragment]:
+    fragments: list[SvgFragment] = []
     for group in _direct_nodeset_call_groups(graph):
         fragments.append(
             _render_nodeset_detail_fragment(
@@ -84,7 +84,7 @@ def _render_nodeset_detail_fragment(
     review_fragment_max_width: float = REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH,
     visited_nodesets: tuple[str, ...] = (),
     prepared=None,
-) -> _SvgFragment:
+) -> SvgFragment:
     if nodeset.type_key in visited_nodesets:
         return _placeholder_fragment(
             title,
@@ -157,7 +157,7 @@ def _render_nodeset_detail_fragment(
         review_fragment_max_width=review_fragment_max_width,
     )
     width, height = _viewbox_size(svg_text)
-    return _SvgFragment(title=title, svg_text=svg_text, width=width, height=height)
+    return SvgFragment(title=title, svg_text=svg_text, width=width, height=height)
 
 
 def _direct_nodeset_call_groups(graph: GraphConfig) -> tuple[_NodesetInvocationGroup, ...]:
@@ -194,10 +194,6 @@ def _nodeset_group_fragment_title(group: _NodesetInvocationGroup) -> str:
 
 def _nodeset_call_summary(node: NodeSpec) -> str:
     details: list[str] = []
-    if node.async_mode:
-        details.append(f"async={node.async_mode}")
-    if node.result_key:
-        details.append(f"result_key={node.result_key}")
     if node.params:
         details.append(f"config={len(node.params)}")
     if node.node_config_overrides:
@@ -265,8 +261,8 @@ def _unique_layout_id(base: str, reserved: tuple[str, ...]) -> str:
     return candidate
 
 def _compose_detail_panel_svg(
-    parent_fragment: _SvgFragment,
-    child_fragments: list[_SvgFragment],
+    parent_fragment: SvgFragment,
+    child_fragments: list[SvgFragment],
     *,
     background: str,
     review_fragment_max_width: float = REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH,
@@ -339,7 +335,7 @@ def _compose_detail_panel_svg(
     parts.append("</svg>")
     return "\n".join(parts) + "\n"
 
-def _placeholder_fragment(title: str, message: str, *, background: str) -> _SvgFragment:
+def _placeholder_fragment(title: str, message: str, *, background: str) -> SvgFragment:
     width = 520.0
     height = 110.0
     parts = [
@@ -365,7 +361,7 @@ def _placeholder_fragment(title: str, message: str, *, background: str) -> _SvgF
         )
     )
     svg_text = "\n".join(parts) + "\n"
-    return _SvgFragment(title=title, svg_text=svg_text, width=width, height=height)
+    return SvgFragment(title=title, svg_text=svg_text, width=width, height=height)
 
 def _render_fragment(
     title: str,
@@ -376,7 +372,7 @@ def _render_fragment(
     background: str,
     max_text_size: int | None,
     max_edges: int | None,
-) -> _SvgFragment:
+) -> SvgFragment:
     path = temp_dir / f"fragment_{len(list(temp_dir.glob('fragment_*.svg')))}.svg"
     render_mermaid_svg(
         mermaid_text,
@@ -388,7 +384,7 @@ def _render_fragment(
     )
     svg_text = path.read_text(encoding="utf-8")
     width, height = _viewbox_size(svg_text)
-    return _SvgFragment(title=title, svg_text=svg_text, width=width, height=height)
+    return SvgFragment(title=title, svg_text=svg_text, width=width, height=height)
 
 def _resource_mermaid(root_label: str, resources: tuple[Mapping[str, object], ...], *, kind: str) -> str:
     from vibeflow.tooling.presentation.node_presentation import resolve_presentation

@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import importlib.util
 import inspect
-import sys
-from contextlib import contextmanager
 from pathlib import Path
 
 from vibeflow.core.descriptors.models import NodeDescriptor
 from vibeflow.core.flow import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, STATUS_PLANNED
-from vibeflow.targets.python.project.registry import NodeRegistry, NodeRegistryError
+from vibeflow.targets.python.sdk.loading import source_paths, load_source_module
+from vibeflow.targets.python.project.registry import NodeRegistry, NodeRegistryError, load_node_implementation
 from vibeflow.targets.python.quality.source_context import PythonSourceFile, PythonSourceNode, PythonSourceCall, build_python_source_context
 from vibeflow.targets.python.project.source_closure import collect_python_source_facts, resolve_local_module_path
 from vibeflow.tooling.project.descriptor_loader import load_workflow_plugins
@@ -126,20 +124,9 @@ def _load_rule_handlers(registry, plan, workspace):
 
 
 def _load_rule_handler(path, symbol, owner, registry):
-    with _source_paths((owner.path,*registry.source_roots)):
+    with source_paths((owner.path,*registry.source_roots)):
         name = f"_vibeflow_rule_{abs(hash(str(path)))}"
-        module = sys.modules.get(name)
-        if module is None:
-            spec = importlib.util.spec_from_file_location(name,path)
-            if spec is None or spec.loader is None:
-                raise NodeRegistryError(f"cannot load rule source: {path}")
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[name] = module
-            try:
-                spec.loader.exec_module(module)
-            except BaseException:
-                sys.modules.pop(name,None)
-                raise
+        module = load_source_module(path, name)
         value = module
         for part in symbol.split("."):
             value = getattr(value,part)
@@ -169,7 +156,7 @@ def _implementation_path(kind: str, reference: str, root: Path, roots: tuple[Pat
         path = next((value for candidate in (root, *roots) if (value := resolve_local_module_path(reference, project_root=candidate)) is not None), None)
         if path is None:
             import importlib.util
-            with _source_paths((root, *roots)):
+            with source_paths((root, *roots)):
                 spec = importlib.util.find_spec(reference)
             if spec is None or not spec.origin:
                 raise NodeRegistryError(f"cannot resolve declared Python module '{reference}'")
@@ -200,33 +187,13 @@ def _bind_node(registry: NodeRegistry, key: str, roots: tuple[Path, ...]) -> typ
     path, symbol, _, root = registry.source_locations[key]
     relative = path.relative_to(root).with_suffix("")
     module_name = ".".join(relative.parts)
-    try:
-        with _source_paths((root, *roots)):
-            module = sys.modules.get(module_name)
-            if module is None or Path(getattr(module, "__file__", "")).resolve() != path:
-                specification = importlib.util.spec_from_file_location(module_name, path)
-                if specification is None or specification.loader is None:
-                    raise NodeRegistryError(f"cannot load declared Python source: {path}")
-                module = importlib.util.module_from_spec(specification)
-                sys.modules[module_name] = module
-                try:
-                    specification.loader.exec_module(module)
-                except BaseException:
-                    sys.modules.pop(module_name, None)
-                    raise
-            implementation = module
+    def load():
+        with source_paths((root, *roots)):
+            implementation = load_source_module(path, module_name)
             for member in symbol.split("."):
                 implementation = getattr(implementation, member)
-        if not isinstance(implementation, type):
-            raise NodeRegistryError(f"declared Python symbol '{symbol}' must be a class")
-    except Exception as exc:
-        from vibeflow.core.findings import HealthFinding
-        error = NodeRegistryError(f"node '{key}' implementation '{symbol}' could not be bound: {exc}")
-        error.findings = (HealthFinding(rule_id="NODE.IMPLEMENTATION.BINDING",severity="error",
-            object_type="node",object_id=key,failure_layer="implementation",message=str(error),
-            source_location={"path":registry.source_info(key).path, **({"line":registry.source_info(key).line} if registry.source_info(key).line else {})},
-            details={"implementation":{"path":str(path),"export":symbol}}),)
-        raise error from exc
+            return implementation
+    implementation = load_node_implementation(registry, key, path, symbol, load)
     publish_python_source_context(registry, context)
     return implementation
 
@@ -235,17 +202,6 @@ class PythonSourceRuleError(NodeRegistryError):
     def __init__(self, findings):
         self.findings = tuple(findings)
         super().__init__("; ".join(item.message for item in self.findings))
-
-
-@contextmanager
-def _source_paths(roots: tuple[Path, ...]):
-    additions = [str(root) for root in dict.fromkeys(roots) if str(root) not in sys.path]
-    sys.path[:0] = additions
-    try:
-        yield
-    finally:
-        for value in additions:
-            sys.path.remove(value)
 
 
 __all__ = ["declared_python_registry", "workflow_node_types", "collect_node_source_context", "collect_workflow_source_context", "PythonSourceRuleError"]

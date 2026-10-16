@@ -8,7 +8,6 @@ from vibeflow.core.flow import EdgeSpec, GraphConfig, JOIN_POLICY_ALL
 
 EDGE_CLASS_MAINLINE = "mainline"
 EDGE_CLASS_DATA_BYPASS = "data_bypass"
-EDGE_CLASS_ASYNC = "async"
 
 
 @dataclass(frozen=True)
@@ -25,16 +24,12 @@ class MainlineAnalysis:
     owner: str
     mainline_edges: tuple[EdgeSpec, ...]
     data_bypass_edges: tuple[EdgeSpec, ...]
-    async_edges: tuple[EdgeSpec, ...]
     schedule_edges: tuple[EdgeSpec, ...]
     transfer_edges: tuple[EdgeSpec, ...]
     mainline_nodes: tuple[str, ...]
-    async_nodes: tuple[str, ...]
     findings: tuple[MainlineFinding, ...] = ()
 
     def edge_class(self, edge: EdgeSpec) -> str:
-        if edge in self.async_edges:
-            return EDGE_CLASS_ASYNC
         if edge in self.data_bypass_edges:
             return EDGE_CLASS_DATA_BYPASS
         if edge in self.mainline_edges:
@@ -46,11 +41,9 @@ class MainlineAnalysis:
             "owner": self.owner,
             "mainline_edges": [_edge_summary(edge) for edge in self.mainline_edges],
             "data_bypass_edges": [_edge_summary(edge) for edge in self.data_bypass_edges],
-            "async_edges": [_edge_summary(edge) for edge in self.async_edges],
             "schedule_edges": [_edge_summary(edge) for edge in self.schedule_edges],
             "transfer_edges": [_edge_summary(edge) for edge in self.transfer_edges],
             "mainline_nodes": list(self.mainline_nodes),
-            "async_nodes": list(self.async_nodes),
             "findings": [
                 {
                     "rule_id": finding.rule_id,
@@ -65,10 +58,8 @@ class MainlineAnalysis:
 
 
 def analyze_mainline(graph: GraphConfig, edges: Sequence[EdgeSpec], flow_kinds: Mapping[str, str], *, owner: str = "pipeline") -> MainlineAnalysis:
-    async_nodes = {node.name for node in graph.nodes if node.async_mode}
     all_edges = tuple(edges)
-    async_edges = tuple(edge for edge in all_edges if edge.source in async_nodes or edge.target in async_nodes)
-    sync_edges = tuple(edge for edge in all_edges if edge.source not in async_nodes and edge.target not in async_nodes)
+    sync_edges = all_edges
 
     inferred_data_bypass_edges = tuple(
         edge
@@ -78,7 +69,7 @@ def analyze_mainline(graph: GraphConfig, edges: Sequence[EdgeSpec], flow_kinds: 
     inferred_scheduled = {
         edge
         for edge in all_edges
-        if edge in async_edges or edge not in inferred_data_bypass_edges
+        if edge not in inferred_data_bypass_edges
     }
     scheduled_sync_edges = tuple(
         edge
@@ -89,16 +80,7 @@ def analyze_mainline(graph: GraphConfig, edges: Sequence[EdgeSpec], flow_kinds: 
             else edge in inferred_scheduled
         )
     )
-    scheduled_async_edges = tuple(
-        edge
-        for edge in async_edges
-        if (
-            edge.schedule
-            if edge.schedule is not None
-            else edge in inferred_scheduled
-        )
-    )
-    schedule_edges = (*scheduled_sync_edges, *scheduled_async_edges)
+    schedule_edges = scheduled_sync_edges
     transfer_edges = tuple(
         edge
         for edge in all_edges
@@ -115,14 +97,13 @@ def analyze_mainline(graph: GraphConfig, edges: Sequence[EdgeSpec], flow_kinds: 
     mainline_nodes = tuple(
         node.name
         for node in graph.nodes
-        if node.name not in async_nodes and _node_on_mainline(node.name, mainline_edges, flow_kinds)
+        if _node_on_mainline(node.name, mainline_edges, flow_kinds)
     )
     findings = _mainline_findings(
         graph,
         sync_edges,
         mainline_edges,
         data_bypass_edges,
-        async_nodes=async_nodes,
         flow_kinds=flow_kinds,
         owner=owner,
     )
@@ -130,11 +111,9 @@ def analyze_mainline(graph: GraphConfig, edges: Sequence[EdgeSpec], flow_kinds: 
         owner=owner,
         mainline_edges=mainline_edges,
         data_bypass_edges=data_bypass_edges,
-        async_edges=async_edges,
         schedule_edges=schedule_edges,
         transfer_edges=transfer_edges,
         mainline_nodes=mainline_nodes,
-        async_nodes=tuple(sorted(async_nodes)),
         findings=findings,
     )
 
@@ -159,15 +138,14 @@ def _mainline_findings(
     mainline_edges: tuple[EdgeSpec, ...],
     data_bypass_edges: tuple[EdgeSpec, ...],
     *,
-    async_nodes: set[str],
     flow_kinds: Mapping[str, str],
     owner: str,
 ) -> tuple[MainlineFinding, ...]:
     findings: list[MainlineFinding] = []
     schedule_outgoing = _outgoing(mainline_edges)
     schedule_incoming = _incoming(mainline_edges)
-    starts = _start_nodes(graph, mainline_edges, flow_kinds, async_nodes)
-    ends = _end_nodes(graph, mainline_edges, flow_kinds, async_nodes)
+    starts = _start_nodes(graph, mainline_edges, flow_kinds)
+    ends = _end_nodes(graph, mainline_edges, flow_kinds)
     can_reach_end = _reverse_reachable(ends, mainline_edges)
     reachable_from_start = _walk(starts, schedule_outgoing) | starts
 
@@ -187,18 +165,15 @@ def _mainline_findings(
                 mainline_path=path,
                 branch_nodes=[edge.target],
                 branch_edges=[edge],
-                async_nodes_seen=async_nodes,
                 suggested_fixes=[
                     f"add a mainline edge into '{edge.target}'",
                     f"remove edge {edge.source}->{edge.target} if the target should not run",
-                    f"mark '{edge.target}' or its enclosing nodeset async if it is side work",
+                    f"use a task_manager with task_targets for side work",
                 ],
             )
         )
 
     for node in graph.nodes:
-        if node.name in async_nodes:
-            continue
         outgoing = schedule_outgoing.get(node.name, ())
         if len({edge.target for edge in outgoing}) <= 1 or flow_kinds.get(node.name) == FLOW_KIND_DECISION:
             continue
@@ -215,11 +190,10 @@ def _mainline_findings(
                 mainline_path=_first_mainline_path(starts, ends, mainline_edges),
                 branch_nodes=branch_nodes,
                 branch_edges=list(outgoing),
-                async_nodes_seen=async_nodes,
                 suggested_fixes=[
                     f"serialize the outgoing work after '{node.name}' into a single mainline chain",
                     "keep only shortcut/data-transfer edges when a downstream mainline path already exists",
-                    "mark side-work node or nodeset async='detached' or async='result_key'",
+                    "use a task_manager with task_targets for side work",
                 ],
             )
         )
@@ -239,17 +213,16 @@ def _mainline_findings(
                 mainline_path=_path_between(edge.target, next(iter(ends), edge.target), mainline_edges),
                 branch_nodes=sorted(_walk({edge.target}, schedule_outgoing) | {edge.target}),
                 branch_edges=[item for item in mainline_edges if item.source in _walk({edge.target}, schedule_outgoing) | {edge.target}],
-                async_nodes_seen=async_nodes,
                 suggested_fixes=[
                     f"connect branch '{edge.when or edge.target}' back to a node that reaches an end terminal",
                     f"remove edge {edge.source}->{edge.target} if this branch is not used",
-                    f"mark side-work node or nodeset async if the branch is not part of synchronous flow",
+                    f"use a task_manager with task_targets if the branch is side work",
                 ],
             )
         )
 
     for node in graph.nodes:
-        if node.name in async_nodes or node.name in reachable_from_start:
+        if node.name in reachable_from_start:
             continue
         related = tuple(edge for edge in sync_edges if edge.source == node.name or edge.target == node.name)
         if not related:
@@ -264,10 +237,9 @@ def _mainline_findings(
                 mainline_path=_first_mainline_path(starts, ends, mainline_edges),
                 branch_nodes=[node.name],
                 branch_edges=list(related),
-                async_nodes_seen=async_nodes,
                 suggested_fixes=[
                     f"connect '{node.name}' into the synchronous mainline",
-                    f"mark '{node.name}' or its nodeset call async if it is side work",
+                    f"use a task_manager with task_targets for side work",
                     "remove the side branch if it is only an unused data dependency sketch",
                 ],
             )
@@ -294,31 +266,28 @@ def _fanout_has_explicit_join(
     return False
 
 
-def _start_nodes(graph: GraphConfig, edges: tuple[EdgeSpec, ...], flow_kinds: Mapping[str, str], async_nodes: set[str]) -> set[str]:
+def _start_nodes(graph: GraphConfig, edges: tuple[EdgeSpec, ...], flow_kinds: Mapping[str, str]) -> set[str]:
     incoming = _incoming(edges)
     starts = {
         node.name
         for node in graph.nodes
-        if node.name not in async_nodes and flow_kinds.get(node.name) == FLOW_KIND_TERMINAL and not incoming.get(node.name)
+        if flow_kinds.get(node.name) == FLOW_KIND_TERMINAL and not incoming.get(node.name)
     }
     if starts:
         return starts
-    return {node.name for node in graph.nodes[:1] if node.name not in async_nodes}
+    return {node.name for node in graph.nodes[:1]}
 
 
-def _end_nodes(graph: GraphConfig, edges: tuple[EdgeSpec, ...], flow_kinds: Mapping[str, str], async_nodes: set[str]) -> set[str]:
+def _end_nodes(graph: GraphConfig, edges: tuple[EdgeSpec, ...], flow_kinds: Mapping[str, str]) -> set[str]:
     outgoing = _outgoing(edges)
     ends = {
         node.name
         for node in graph.nodes
-        if node.name not in async_nodes and flow_kinds.get(node.name) == FLOW_KIND_TERMINAL and not outgoing.get(node.name)
+        if flow_kinds.get(node.name) == FLOW_KIND_TERMINAL and not outgoing.get(node.name)
     }
     if ends:
         return ends
-    for node in reversed(graph.nodes):
-        if node.name not in async_nodes:
-            return {node.name}
-    return set()
+    return {graph.nodes[-1].name} if graph.nodes else set()
 
 
 def _finding(
@@ -331,7 +300,6 @@ def _finding(
     mainline_path: Sequence[str],
     branch_nodes: Sequence[str],
     branch_edges: Sequence[EdgeSpec],
-    async_nodes_seen: set[str],
     suggested_fixes: Sequence[str],
 ) -> MainlineFinding:
     details = {
@@ -344,7 +312,6 @@ def _finding(
         "mainline_variant": list(mainline_path),
         "branch_nodes": list(branch_nodes),
         "branch_edges": [_edge_summary(item) for item in branch_edges],
-        "async_nodes_seen": sorted(async_nodes_seen),
         "why_invalid": why_invalid,
         "suggested_fixes": list(suggested_fixes),
     }

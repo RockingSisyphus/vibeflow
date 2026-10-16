@@ -11,7 +11,6 @@ from vibeflow.tooling.application.python.presentation.helpers import effective_g
 from vibeflow.tooling.application.python.presentation.review_model import node_review_effect_scope
 
 from vibeflow.tooling.application.python.presentation.mermaid.labels import (
-    _async_semantic_lines,
     _comment_text,
     _edge_contract_text,
     _edge_style,
@@ -37,7 +36,7 @@ from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, NodeSpec, NodesetSp
 from vibeflow.core.constants import EFFECT_SCOPE_GLOBAL_STATE, EFFECT_SCOPE_NONE, FLOW_KIND_DATA_STORE, FLOW_KIND_DECISION, FLOW_KIND_DOCUMENT, FLOW_KIND_GLOBAL_STATE, FLOW_KIND_IO, FLOW_KIND_PREDEFINED, FLOW_KIND_PREPARATION, FLOW_KIND_PROCESS, FLOW_KIND_TERMINAL
 from vibeflow.core.planned import effective_planned_behavior, planned_behavior_label
 from vibeflow.targets.python.runtime.helpers import has_planned, planned_items
-from vibeflow.tooling.application.python.presentation.style import MERMAID_MAIN_CLASS_ORDER, mermaid_class_def_lines
+from vibeflow.tooling.presentation.style import MERMAID_MAIN_CLASS_ORDER, mermaid_class_def_lines
 
 if TYPE_CHECKING:
     from vibeflow.targets.python.project.registry import NodeRegistry
@@ -127,7 +126,6 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph, *, resou
         "effective_edges": [{"from": edge.source, "to": edge.target, "when": edge.when} for edge in compiled.effective_edges],
         "mainline_edges": [list(edge.pair) for edge in compiled.mainline_edges],
         "data_bypass_edges": [list(edge.pair) for edge in compiled.data_bypass_edges],
-        "async_edges": [list(edge.pair) for edge in compiled.async_edges],
         "schedule_edges": [list(edge.pair) for edge in compiled.schedule_edges],
         "transfer_edges": [list(edge.pair) for edge in compiled.transfer_edges],
         "providers": dict(compiled.providers),
@@ -577,7 +575,6 @@ class _MermaidRenderer:
                 f"flow_kind: {node_flow_kind(node, compiled) or nodeset.flow_kind}",
                 f"rulesets: {', '.join(str(getattr(ref, 'rule_id', ref)) for ref in nodeset.graph.rulesets or ()) or 'unconstrained'}",
                 *_node_metadata_lines(node),
-                *_async_semantic_lines(node),
             ]
             effect_scope = node_review_effect_scope(graph, node, self.registry, compiled=compiled)
             if effect_scope != EFFECT_SCOPE_NONE:
@@ -627,7 +624,6 @@ class _MermaidRenderer:
                 f"flow_kind: {node_flow_kind(node, compiled) or nodeset.flow_kind}",
                 f"rulesets: {', '.join(str(getattr(ref, 'rule_id', ref)) for ref in nodeset.graph.rulesets or ()) or 'unconstrained'}",
                 *_node_metadata_lines(node),
-                *_async_semantic_lines(node),
             ]
             effect_scope = node_review_effect_scope(graph, node, self.registry, compiled=compiled)
             if effect_scope != EFFECT_SCOPE_NONE:
@@ -688,7 +684,6 @@ class _MermaidRenderer:
                     text = str(value).strip()
                     if text:
                         lines.append(f"{label}: {text}")
-        lines.extend(_async_semantic_lines(node))
         effect_scope = node_review_effect_scope(graph, node, self.registry, compiled=compiled)
         if effect_scope != EFFECT_SCOPE_NONE:
             lines.append(f"effect_scope: {effect_scope}")

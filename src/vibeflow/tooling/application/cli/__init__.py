@@ -23,9 +23,10 @@ from vibeflow.tooling.project.workspace_loader import (
 
 
 _PYTHON_ONLY_COMMANDS = frozenset({"inspect-node", "run", "delegate-cli"})
-_JAVASCRIPT_ONLY_COMMANDS = frozenset({"build"})
+_JAVASCRIPT_ONLY_COMMANDS = frozenset()
 _SHARED_COMMANDS = frozenset(
     {
+        "build",
         "validate",
         "inspect-config",
         "export-mermaid",
@@ -111,7 +112,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="vibeflow")
     commands = parser.add_subparsers(dest="command")
     for name, help_text in (
-        ("build", "compile a JavaScript workflow into AOT output"),
+        ("build", "compile a workflow into an AOT bundle"),
         ("validate", "validate a workflow configuration"),
         ("inspect-node", "inspect a Python node implementation"),
         ("inspect-resources", "inspect resources selected by one workflow"),
@@ -199,12 +200,13 @@ def _command_target(command: str, args: list[str]) -> str:
 def _option_value(args: list[str], name: str) -> str:
     kernel_args = args[: args.index("--")] if "--" in args else args
     prefix = f"{name}="
+    value = ""
     for index, item in enumerate(kernel_args):
         if item.startswith(prefix):
-            return item[len(prefix) :]
-        if item == name and index + 1 < len(kernel_args):
-            return kernel_args[index + 1]
-    return ""
+            value = item[len(prefix) :]
+        elif item == name and index + 1 < len(kernel_args):
+            value = kernel_args[index + 1]
+    return value
 
 
 def _dispatch_mixed_workspace(command: str, args: list[str]) -> int:
@@ -236,6 +238,7 @@ def _is_command_help(args: list[str]) -> bool:
 
 def _show_shared_command_help(command: str) -> int:
     descriptions = {
+        "build": "compile a Python or JavaScript workflow into an AOT bundle",
         "validate": "validate a workflow configuration",
         "inspect-config": "inspect a workflow configuration",
         "export-mermaid": "export a workflow as Mermaid",
@@ -254,6 +257,17 @@ def _show_shared_command_help(command: str) -> int:
         ),
     )
     parser.add_argument("--workspace", help="workspace vibeflow_config.jsonc")
+    if command == "build":
+        parser.add_argument("--out-dir", required=True, help="bundle output directory")
+        parser.add_argument("--profile", help="python-package; JS esm-module/single-esm/web-app")
+        parser.add_argument("--include", action="append", help="Python project resource to include (repeatable)")
+        parser.add_argument("--replace", action="store_true")
+        parser.add_argument("--target", choices=("node","browser"), help="JavaScript platform")
+        parser.add_argument("--entry-name", help="JavaScript entry file name")
+        parser.add_argument("--sourcemap", choices=("none","external","inline"))
+        parser.add_argument("--html", help="web-app HTML template")
+        parser.add_argument("--app-entry", help="web-app source entry")
+        parser.add_argument("--workflow-id", help="JavaScript public workflow identifier")
     if command == "quality-check":
         parser.add_argument("--path", help="project root or source path")
         parser.add_argument("--config", help="workflow JSONC path")

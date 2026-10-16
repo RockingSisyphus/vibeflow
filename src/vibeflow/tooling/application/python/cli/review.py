@@ -356,7 +356,7 @@ def _render_canonical_review_svg(
     registry: object, resources: object,
     prepared=None,
 ) -> None:
-    from vibeflow.tooling.application.python.presentation.mermaid.render import (
+    from vibeflow.tooling.presentation.mermaid import (
         EXPANDED_MERMAID_MAX_EDGES,
         EXPANDED_MERMAID_MAX_TEXT_SIZE,
     )

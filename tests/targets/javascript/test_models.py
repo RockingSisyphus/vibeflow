@@ -157,8 +157,6 @@ def _portable_call(
         join_policy="safe_any",
         status="implemented",
         planned_behavior="blocking",
-        async_mode="",
-        result_key="",
         is_terminal=bool(io_operation),
         is_nodeset=is_nodeset,
         is_loop=is_loop,
@@ -233,7 +231,7 @@ def _binding_workflow_plan() -> WorkflowPlan:
         max_steps=20,
     )
     return WorkflowPlan(
-        abi_version="vibeflow.workflow.v6",
+        abi_version="vibeflow.workflow.v7",
         workflow_id="binding.workflow",
         source=SourceRef(kind="graph", ref="binding.workflow"),
         entry_block="block:/",

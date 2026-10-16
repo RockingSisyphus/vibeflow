@@ -1442,7 +1442,7 @@ def test_task_executor_queues_tasks_beyond_worker_limit():
     assert len(names)==3 and len(set(names))==2 and queued
 
 
-def test_async_result_key_joins_when_required() -> None:
+def test_task_result_joins_when_required() -> None:
     graph = parse_graph_config(
         {
             "pipeline": {
@@ -1464,7 +1464,7 @@ def test_async_result_key_joins_when_required() -> None:
     assert "task_exited" in [event["kind"] for event in _runtime_trace_events_from_context(context)]
 
 
-def test_async_result_key_not_joined_when_unconsumed() -> None:
+def test_task_result_not_delivered_when_unconsumed() -> None:
     SlowResultNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.slow_result', display_name='Slow Result', description='Slow result-key async task.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('value.async', 'value.async', display_name='value.async'),), examples=({'inputs': {}, 'params': {}},), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.async', 'value.async', display_name='value.async'),)}), rulesets=("vibeflow.process",))
 
     class SlowResultNode:
@@ -1559,7 +1559,7 @@ def test_runtime_no_longer_has_json_snapshot_output_mode() -> None:
     assert str(context.get("value.out")["value"]) == "nan"
 
 
-def test_async_nodeset_result_key_joins_when_required() -> None:
+def test_task_nodeset_result_joins_when_required() -> None:
     graph = parse_graph_config(
         {
             "nodesets": [

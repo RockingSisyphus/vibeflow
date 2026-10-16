@@ -15,7 +15,7 @@ from vibeflow.targets.shared.quality_support import (
     QualityThresholds,
 )
 from vibeflow.tooling.application.python.project.quality_scan import DEFAULT_EXCLUDED_DIRS, scan_code_quality
-from vibeflow.tooling.application.python.project.types import WorkspaceConfig, WorkspaceRoot
+from vibeflow.tooling.project.workspace_model import WorkspaceConfig, WorkspaceRoot
 
 
 def scan_workspace_code_quality(

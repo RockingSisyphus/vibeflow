@@ -9,6 +9,7 @@ from __future__ import annotations
 from vibeflow.core.rules.selection import selection_refs, selection_data
 
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Mapping, Protocol
 
@@ -154,6 +155,68 @@ class PluginRegistry:
             "plugins": [descriptor.to_dict() for descriptor in self.descriptors()]
         }
 
+
+
+def dispose_instances(instances, *, primary=None):
+    """Release every owned instance, preserving an existing execution failure."""
+    errors = []
+    for instance in reversed(tuple(instances)):
+        dispose = getattr(instance, "dispose", None)
+        if callable(dispose):
+            try:
+                dispose()
+            except BaseException as error:
+                errors.append(error)
+    if primary is not None:
+        for error in errors:
+            primary.add_note(f"plugin disposal failed: {error}")
+        if errors:
+            primary.cleanup_errors = [*getattr(primary, "cleanup_errors", ()), *errors]
+    elif errors:
+        if len(errors) == 1:
+            raise errors[0]
+        raise BaseExceptionGroup("plugin disposal failed", errors)
+
+
+def create_lifecycle_plugin(registry, descriptor, factory, context, **metadata):
+    """Create and adopt one native instance, releasing it if adoption fails."""
+    import inspect
+    instance = factory(context)
+    if inspect.isawaitable(instance):
+        if inspect.iscoroutine(instance):
+            instance.close()
+        raise ValueError("Python lifecycle factories must return an instance synchronously")
+    if instance is None:
+        raise ValueError("lifecycle factory must return an instance")
+    try:
+        registry.register(instance,plugin_type=descriptor.plugin_type,name=descriptor.id,
+            priority=descriptor.priority,declaration=descriptor,**metadata)
+    except BaseException as error:
+        dispose_instances((instance,),primary=error)
+        raise
+    return instance
+
+
+def release_plugins(plugin_registry, *, plugin_type, primary=None):
+    instances = plugin_registry.runtime_plugins() if plugin_type == "runtime" else plugin_registry.compiler_plugins()
+    dispose_instances(instances, primary=primary)
+
+
+def release_runtime_plugins(plugin_registry, *, primary=None):
+    release_plugins(plugin_registry, plugin_type="runtime", primary=primary)
+
+
+@contextmanager
+def plugin_lifetime(plugin_registry, *, plugin_type="runtime"):
+    """Release owned plugins without replacing an execution failure."""
+    primary = None
+    try:
+        yield plugin_registry
+    except BaseException as error:
+        primary = error
+        raise
+    finally:
+        release_plugins(plugin_registry, plugin_type=plugin_type, primary=primary)
 
 
 def plugin_error(

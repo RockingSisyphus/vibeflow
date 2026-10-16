@@ -206,12 +206,6 @@ class BoundNodeView:
     def join_policy(self) -> str:
         return self._source.join_policy
     @property
-    def async_mode(self) -> str:
-        return self._source.async_mode
-    @property
-    def result_key(self) -> str:
-        return self._source.result_key
-    @property
     def is_terminal(self) -> bool:
         return self._source.is_terminal
     @property
@@ -246,8 +240,6 @@ class BoundNodeView:
             task_plans={key: item.to_dict() for key, item in self.task_plans.items()},
             flow_kind=self.flow_kind,
             join_policy=self.join_policy,
-            async_mode=self.async_mode,
-            result_key=self.result_key,
             is_terminal=self.is_terminal,
             is_nodeset=self.is_nodeset,
             is_loop=self.is_loop,

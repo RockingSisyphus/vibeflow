@@ -6,20 +6,17 @@ from pathlib import Path
 
 from vibeflow.core.findings import HealthFinding
 from vibeflow.targets.python.project.plugins import PluginRegistry
-from vibeflow.targets.python.project.registry import NodeRegistry
 from vibeflow.tooling.application.python.project.policy import resolve_workspace_effective_policy
-from vibeflow.tooling.application.python.project.types import WorkspaceConfig, WorkspaceEnvironment, WorkspaceRoot
-from vibeflow.tooling.project.workspace_loader import load_workspace_config as _load_neutral_workspace_config
-
-
-def load_workspace_config(path: str | Path) -> WorkspaceConfig:
-    return _load_neutral_workspace_config(path)
+from vibeflow.tooling.application.python.project.types import WorkspaceEnvironment
+from vibeflow.tooling.project.workspace_model import WorkspaceConfig, WorkspaceRoot
+from vibeflow.tooling.application.python.project.declarations import declared_python_registry as build_workspace_node_registry
+from vibeflow.tooling.project.workspace_loader import load_workspace_config
 
 
 def build_workspace_environment(workspace: WorkspaceConfig, config_path=None) -> WorkspaceEnvironment:
     registry = build_workspace_node_registry(workspace, config_path=config_path)
-    from vibeflow.tooling.application.python.project.contributions import contributed_resources
-    available_resources, resource_findings = contributed_resources(workspace, registry)
+    from vibeflow.tooling.application.python.project.resource_selection import select_python_resources
+    available_resources, resource_findings = select_python_resources({}, registry=registry)
     policy_result = resolve_workspace_effective_policy(workspace.policy, workspace_path=workspace.path)
     return WorkspaceEnvironment(registry=registry, plugin_registry=PluginRegistry(),
         resources=available_resources, available_resources=available_resources,
@@ -27,14 +24,9 @@ def build_workspace_environment(workspace: WorkspaceConfig, config_path=None) ->
         findings=(*resource_findings, *policy_result.findings))
 
 
-def build_workspace_node_registry(workspace: WorkspaceConfig, config_path=None) -> NodeRegistry:
-    from vibeflow.tooling.application.python.project.declarations import declared_python_registry
-    return declared_python_registry(workspace, config_path=config_path)
-
-
 def load_workspace_resources(workspace: WorkspaceConfig, config_path=None):
-    from vibeflow.tooling.application.python.project.contributions import contributed_resources
-    return contributed_resources(workspace, build_workspace_node_registry(workspace, config_path=config_path))
+    from vibeflow.tooling.application.python.project.resource_selection import select_python_resources
+    return select_python_resources({}, registry=build_workspace_node_registry(workspace, config_path=config_path))
 
 
 def workspace_finding(

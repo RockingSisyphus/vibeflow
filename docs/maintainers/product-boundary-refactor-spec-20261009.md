@@ -342,7 +342,7 @@ Date、performance、crypto/webcrypto 和 Math 的部分使用与宿主权限混
 
 [probe_toolchain](../../src/vibeflow/targets/javascript/build/toolchain.py:90)、[run_build_driver](../../src/vibeflow/targets/javascript/build/toolchain.py:122) 都调用[_lock_identity](../../src/vibeflow/targets/javascript/build/toolchain.py:281)与[_validate_lock_tool_versions](../../src/vibeflow/targets/javascript/build/toolchain.py:319)。[ToolchainInfo 字段](../../src/vibeflow/targets/javascript/build/toolchain.py:43)携带 lock_sha256／lock_files。
 
-补充消费者：[publish.py 的 _TOOLCHAIN_KEYS](../../src/vibeflow/targets/javascript/build/publish.py:37)、[_validate_toolchain](../../src/vibeflow/targets/javascript/build/publish.py:359) 强制要求这两个字段。只删构建前调用会留下发布格式残余。
+补充消费者：[publish.py 的 _TOOLCHAIN_KEYS](../../src/vibeflow/targets/shared/aot_publish.py:37)、[_validate_toolchain](../../src/vibeflow/targets/shared/aot_publish.py:359) 强制要求这两个字段。只删构建前调用会留下发布格式残余。
 
 **当前逻辑**
 

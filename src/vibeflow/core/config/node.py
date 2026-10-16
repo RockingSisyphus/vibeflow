@@ -72,13 +72,16 @@ def merge_node_config(
     return merged
 
 
-def node_config_from_call_params(params: Mapping[str, Any]) -> dict[str, Any]:
+def node_config_from_call_params(
+    params: Mapping[str, Any], *, reserved: set[str] | None = None,
+) -> dict[str, Any]:
     raw_config = params.get("config", {})
     if raw_config in (None, {}):
         raw_config = {}
     if not isinstance(raw_config, Mapping):
         raise NodeConfigError("node config field must be an object")
-    reserved = {"config", "node_configs"}
+    if reserved is None:
+        reserved = {"config", "node_configs"}
     inline = {str(key): value for key, value in params.items() if key not in reserved}
     return {**{str(key): value for key, value in raw_config.items()}, **inline}
 

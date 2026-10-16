@@ -312,4 +312,4 @@ review-rules 加载选中插件的受信固定定义，再展开有效计划；�
 
 SDK 记录 Rule 的执行语言和源码入口。一个执行族最多一个实现，JS/TS 属于同一族；JS Rule 在 Node worker 中检查，业务的 Node.js/Browser 平台作为 `context.target` 资料供规则使用。BaseLib、Plugin 和 HostExtension 同样选择自己的 rulesets；插件声明源码使用独立的 declaration_rulesets。
 
-公开版本为 Plugin ABI v3、Rule ABI v2 和 Workflow ABI v6。升级旧项目的写法对应见[声明迁移](rule-system-migration.md)。
+公开版本为 Plugin ABI v3、Rule ABI v2 和 Workflow ABI v7。升级旧项目的写法对应见[声明迁移](rule-system-migration.md)。

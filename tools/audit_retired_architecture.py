@@ -9,6 +9,13 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 RETIRED_FILES = (
+    "tooling/application/python/diagnostics.py",
+    "tooling/application/python/project/contributions.py",
+    "tooling/application/python/presentation/style.py",
+    "tooling/application/python/presentation/mermaid/render.py",
+    "tooling/application/python/presentation/mermaid/review_layout.py",
+    "tooling/application/python/presentation/mermaid/review_types.py",
+    "targets/javascript/build/publish.py",
     'targets/python/quality/source_analysis/runtime_dispatch.py',
     'targets/python/quality/source_analysis/parameter_facts.py',
     'targets/python/quality/source_analysis/exit_stacks.py',

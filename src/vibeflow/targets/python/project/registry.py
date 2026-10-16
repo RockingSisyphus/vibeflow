@@ -18,6 +18,24 @@ class NodeRegistryError(ValueError):
         return f"Node registry error: {self.detail}"
 
 
+def load_node_implementation(registry, key, path, symbol, loader):
+    """Bind a declared class with one source-aware error contract."""
+    try:
+        implementation = loader()
+        if not isinstance(implementation, type):
+            raise NodeRegistryError(f"declared Python symbol '{symbol}' must be a class")
+        return implementation
+    except Exception as cause:
+        from vibeflow.core.findings import HealthFinding
+        info = registry.source_info(key)
+        error = NodeRegistryError(f"node '{key}' implementation '{symbol}' could not be bound: {cause}")
+        error.findings = (HealthFinding(rule_id="NODE.IMPLEMENTATION.BINDING",severity="error",
+            object_type="node",object_id=key,failure_layer="implementation",message=str(error),
+            source_location={"path":info.path, **({"line":info.line} if info.line else {})},
+            details={"implementation":{"path":str(path),"export":symbol}}),)
+        raise error from cause
+
+
 @dataclass(frozen=True)
 class NodeRegistrationInfo:
     key: str

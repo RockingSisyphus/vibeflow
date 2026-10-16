@@ -90,7 +90,6 @@ def plan_fixture(description, *, project_root=None, import_policy=None, host_ext
                 params=freeze_json_object(raw.get("params", {})), config_overrides=freeze_json_object({}),
                 flow_kind=raw.get("flow_kind", ""), join_policy=raw.get("join_policy", "safe_any"),
                 status=raw.get("status", "implemented"), planned_behavior=raw.get("planned_behavior", ""),
-                async_mode=raw.get("async_mode", ""), result_key=raw.get("result_key", ""),
                 is_terminal=raw.get("is_terminal", False), is_nodeset=raw.get("is_nodeset", False),
                 is_loop=raw.get("is_loop", False), nodeset_type_key="", child_block=child_id, exports=(),
                 completion=completion, schedule=schedule, executor=executor,

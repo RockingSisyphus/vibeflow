@@ -16,7 +16,7 @@
       },
       {
         "id": "side_task",
-        "type_used": "task.launch.side_async_value.background",
+        "type_used": "task.launch.side_task_value.background",
         "display_name": "任务管理：Async Side Task",
         "description": "Starts an explicitly declared workflow-owned task.",
         "task_targets": {
@@ -74,7 +74,7 @@
   },
   "nodeset_imports": [
     {
-      "path": "nodesets/pass_mainline_async_nodeset_side_task/side_async_value.jsonc"
+      "path": "nodesets/pass_mainline_nodeset_task/side_task_value.jsonc"
     }
   ],
   "plugins": [

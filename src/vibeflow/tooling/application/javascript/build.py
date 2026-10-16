@@ -42,7 +42,7 @@ from vibeflow.targets.javascript.frontend.facts import (
     JavascriptImplementationFactsError,
     implementation_facts_from_catalog,
     apply_call_effect_scopes,
-    native_workflow_facts,
+    native_call_execution_facts,
     validate_javascript_descriptor_catalogs,
 )
 from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
@@ -361,7 +361,8 @@ def prepare_project_build(
         compiled_by_path=state.compiled_by_path,
         params_by_path=state.params_by_path,
         implementation_facts=implementation_facts,
-        native_execution_facts=native_workflow_facts(graph),
+        call_execution_facts=native_call_execution_facts(graph),
+        task_executor="event_loop",
         target_features=target_features,
     )
     declared_host_extensions = selected_hosts

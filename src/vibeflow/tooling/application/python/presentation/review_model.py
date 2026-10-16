@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from vibeflow.targets.python.project.registry import NodeRegistry
 
 
-EDGE_ROLE_ORDER = ("mainline", "data_bypass", "async", "schedule", "transfer")
+EDGE_ROLE_ORDER = ("mainline", "data_bypass", "schedule", "transfer")
 
 
 def loop_field_schema() -> dict[str, object]:
@@ -133,7 +133,6 @@ def edge_roles(compiled: CompiledGraph, edge: object) -> tuple[str, ...]:
     role_pairs = {
         "mainline": _edge_pairs(compiled.mainline_edges),
         "data_bypass": _edge_pairs(compiled.data_bypass_edges),
-        "async": _edge_pairs(compiled.async_edges),
         "schedule": _edge_pairs(compiled.schedule_edges),
         "transfer": _edge_pairs(compiled.transfer_edges),
     }

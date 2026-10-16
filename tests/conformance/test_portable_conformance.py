@@ -1334,7 +1334,7 @@ def test_portable_conformance_port_receive_transform_and_send(
         )
         for key in ("receive", "send")
     } == {
-        "receive": ("suspend", "inline", "event_loop"),
+        "receive": ("immediate", "inline", "current"),
         "send": ("immediate", "inline", "current"),
     }
     assert root_block["tasks"] == []

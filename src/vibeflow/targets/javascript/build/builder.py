@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
-import shutil
-import tempfile
 from typing import Any, Mapping
 
 from vibeflow.block_compiler.model import WorkflowPlan
@@ -19,7 +17,6 @@ from vibeflow.targets.javascript.build.build_support import (
     build_manifest as _manifest,
     driver_import_policy as _driver_import_policy,
     entry_name as _entry_name,
-    publish as _publish,
     resolve_under_project as _resolve_under_project,
     validate_existing_target as _validate_existing_target,
     validate_modes as _validate_modes,
@@ -60,13 +57,8 @@ class BuildRequest:
     audit_sources: tuple[str, ...] = ()
 
 
-@dataclass(frozen=True)
-class BuildResult:
-    out_dir: Path
-    entry: Path
-    manifest: Path
-    toolchain: ToolchainInfo
-    files: tuple[str, ...]
+from vibeflow.targets.shared.aot import BuildResult, staged_build, write_manifest
+from vibeflow.targets.shared.aot_publish import AotPublishError
 
 
 def build_aot(request: BuildRequest) -> BuildResult:
@@ -89,7 +81,7 @@ def build_aot(request: BuildRequest) -> BuildResult:
         subject="package_root",
         require_file=False,
     )
-    out_dir = Path(request.out_dir).expanduser().resolve()
+    out_dir = Path(request.out_dir).expanduser().absolute()
     if (
         out_dir == project_root
         or project_root in out_dir.parents
@@ -110,131 +102,108 @@ def build_aot(request: BuildRequest) -> BuildResult:
         target=target,
         profile=profile,
     )
-    out_dir.parent.mkdir(parents=True, exist_ok=True)
-    build_root = Path(
-        tempfile.mkdtemp(
-            prefix=f".{out_dir.name}.vibeflow-aot-",
-            dir=out_dir.parent,
-        )
-    )
-    source_dir = build_root / "source"
-    staging = build_root / "dist"
-    source_dir.mkdir()
-    staging.mkdir()
-    workflow_entry = source_dir / "workflow-entry.mjs"
-    from vibeflow.targets.javascript.resources import read_text
-    runtime_source = (read_text("node_observation.mjs") + "\n" if target == "node" else "") + emitted.source
-    workflow_entry.write_text(runtime_source, encoding="utf-8")
-    contract_check = source_dir / "node-contract-check.ts"
-    contract_check.write_text(
-        _node_contract_check(workflow),
-        encoding="utf-8",
-    )
-    plugin_contract_check: Path | None = None
-    if request.javascript_bindings.runtime_plugins:
-        plugin_contract_check = source_dir / "runtime-plugin-contract-check.ts"
-        plugin_contract_check.write_text(
-            _runtime_plugin_contract_check(request.javascript_bindings),
-            encoding="utf-8",
-        )
-    ambient_module: Path | None = None
-    if profile == "web-app":
-        ambient_module = source_dir / "vibeflow-workflow.d.ts"
-        ambient_module.write_text(
-            'declare module "@vibeflow/workflow" {\n'
-            + "\n".join(f"  {line}" for line in emitted.declarations.splitlines())
-            + "\n}\n",
-            encoding="utf-8",
-        )
     try:
-        driver_request: dict[str, Any] = {
-            "target": target,
-            "profile": profile,
-            "workflowEntry": str(workflow_entry),
-            "outDir": str(staging),
-            "entryName": entry_name,
-            "sourcemap": sourcemap,
-            "external": sorted(set(request.external_packages)),
-            "runtimeBindings": [{"module": module, "export": exported} for module, exported in emitted.implementation_bindings]
-                + ([{"module": item.to_value()["module"], "export": item.to_value()["export"]} for item in request.javascript_bindings.host_extensions]
-                   + [{"module": item.implementation.ref, "export": item.implementation.export} for item in request.javascript_bindings.runtime_plugins]
-                   ),
-            "typecheckFiles": [
-                str(contract_check),
-                *(
-                    [str(plugin_contract_check)]
-                    if plugin_contract_check is not None
-                    else []
-                ),
-                *(str(item) for item in request.audit_sources),
-            ],
-            "contractCheckFiles": [
-                str(contract_check),
-                *(
-                    [str(plugin_contract_check)]
-                    if plugin_contract_check is not None
-                    else []
-                ),
-            ],
-            "importPolicy": _driver_import_policy(
-                import_policy,
-                external_packages=request.external_packages,
-                generated_root=source_dir,
-            ),
-        }
-        if app_entry is not None:
-            driver_request["appEntry"] = str(app_entry)
-            driver_request["typecheckFiles"].append(str(app_entry))
-        if ambient_module is not None:
-            driver_request["typecheckFiles"].append(str(ambient_module))
-        driver_result = run_build_driver(
-            driver_request,
-            package_root=package_root,
-            node_command=request.node_command,
-        )
-        _write_profile_companions(
-            staging,
-            emitted=emitted,
-            profile=profile,
-            entry_name=entry_name,
-            html_template=html_template,
-        )
-        _validate_profile_output(
-            staging,
-            profile=profile,
-            entry_name=entry_name,
-        )
-        manifest_payload = _manifest(
-            workflow,
-            emitted=emitted,
-            driver_result=driver_result,
-            target=target,
-            profile=profile,
-            entry_name=entry_name,
-            external_packages=request.external_packages,
-            staging=staging,
-            plugin_manifest=request.plugin_manifest,
-        )
-        manifest_path = staging / "vibeflow-build.json"
-        manifest_path.write_text(
-            json.dumps(
-                manifest_payload,
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-                allow_nan=False,
+        with staged_build(out_dir, replace=request.replace) as staging:
+            source_dir = staging.parent / "source"
+            source_dir.mkdir()
+            workflow_entry = source_dir / "workflow-entry.mjs"
+            from vibeflow.targets.javascript.resources import read_text
+            runtime_source = (read_text("node_observation.mjs") + "\n" if target == "node" else "") + emitted.source
+            workflow_entry.write_text(runtime_source, encoding="utf-8")
+            contract_check = source_dir / "node-contract-check.ts"
+            contract_check.write_text(
+                _node_contract_check(workflow),
+                encoding="utf-8",
             )
-            + "\n",
-            encoding="utf-8",
-        )
-        _publish(
-            staging,
-            out_dir,
-            replace=request.replace,
-            build_root=build_root,
-        )
+            plugin_contract_check: Path | None = None
+            if request.javascript_bindings.runtime_plugins:
+                plugin_contract_check = source_dir / "runtime-plugin-contract-check.ts"
+                plugin_contract_check.write_text(
+                    _runtime_plugin_contract_check(request.javascript_bindings),
+                    encoding="utf-8",
+                )
+            ambient_module: Path | None = None
+            if profile == "web-app":
+                ambient_module = source_dir / "vibeflow-workflow.d.ts"
+                ambient_module.write_text(
+                    'declare module "@vibeflow/workflow" {\n'
+                    + "\n".join(f"  {line}" for line in emitted.declarations.splitlines())
+                    + "\n}\n",
+                    encoding="utf-8",
+                )
+            driver_request: dict[str, Any] = {
+                "target": target,
+                "profile": profile,
+                "workflowEntry": str(workflow_entry),
+                "outDir": str(staging),
+                "entryName": entry_name,
+                "sourcemap": sourcemap,
+                "external": sorted(set(request.external_packages)),
+                "runtimeBindings": [{"module": module, "export": exported} for module, exported in emitted.implementation_bindings]
+                    + ([{"module": item.to_value()["module"], "export": item.to_value()["export"]} for item in request.javascript_bindings.host_extensions]
+                       + [{"module": item.implementation.ref, "export": item.implementation.export} for item in request.javascript_bindings.runtime_plugins]
+                       ),
+                "typecheckFiles": [
+                    str(contract_check),
+                    *(
+                        [str(plugin_contract_check)]
+                        if plugin_contract_check is not None
+                        else []
+                    ),
+                    *(str(item) for item in request.audit_sources),
+                ],
+                "contractCheckFiles": [
+                    str(contract_check),
+                    *(
+                        [str(plugin_contract_check)]
+                        if plugin_contract_check is not None
+                        else []
+                    ),
+                ],
+                "importPolicy": _driver_import_policy(
+                    import_policy,
+                    external_packages=request.external_packages,
+                    generated_root=source_dir,
+                ),
+            }
+            if app_entry is not None:
+                driver_request["appEntry"] = str(app_entry)
+                driver_request["typecheckFiles"].append(str(app_entry))
+            if ambient_module is not None:
+                driver_request["typecheckFiles"].append(str(ambient_module))
+            driver_result = run_build_driver(
+                driver_request,
+                package_root=package_root,
+                node_command=request.node_command,
+            )
+            _write_profile_companions(
+                staging,
+                emitted=emitted,
+                profile=profile,
+                entry_name=entry_name,
+                html_template=html_template,
+            )
+            _validate_profile_output(
+                staging,
+                profile=profile,
+                entry_name=entry_name,
+            )
+            manifest_payload = _manifest(
+                workflow,
+                emitted=emitted,
+                driver_result=driver_result,
+                target=target,
+                profile=profile,
+                entry_name=entry_name,
+                external_packages=request.external_packages,
+                staging=staging,
+                plugin_manifest=request.plugin_manifest,
+            )
+            write_manifest(staging, manifest_payload)
     except AotBuildError:
         raise
+    except AotPublishError as exc:
+        raise AotBuildError(exc.code, str(exc)) from exc
     except AotToolchainError as exc:
         raise AotBuildError(
             exc.code,
@@ -246,9 +215,6 @@ def build_aot(request: BuildRequest) -> BuildResult:
             "VF_BUILD_FAILED",
             f"JavaScript AOT build failed: {exc}",
         ) from exc
-    finally:
-        if build_root.exists():
-            shutil.rmtree(build_root)
     entry_path = out_dir / ("index.html" if profile == "web-app" else entry_name)
     files = tuple(
         path.relative_to(out_dir).as_posix()

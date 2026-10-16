@@ -12,7 +12,7 @@ Tooling → targets/python ──────┐
 - **Core**：语言无关模型、契约、有效图、图算法、finding，以及 Rule/Ruleset 的选择、组合、参数覆盖、类型化资料和执行计划；不定义具体内置规则或质量判断。
 - **Target 共用支持**：跨语言复用的纯检查算法、事实模型、政策、Records 与装配辅助；不贡献资源声明，也不依赖具体语言 Target。
 - **Block Compiler**：把已验证 workflow 编译为公共 `WorkflowPlan` / `BlockPlan`。
-- **Python Target**：Python 插件 SDK、按 workflow 装配的内部 NodeRegistry、直接与延迟绑定、源码服务、Rule handler、BindingPlan 和 Runtime。
+- **Python Target**：Python 插件 SDK、按 workflow 装配的内部 NodeRegistry、直接与延迟绑定、源码服务、Rule handler、BindingPlan、Runtime 与目录 AOT。
 - **JavaScript Target**：JS/TS 插件 SDK、worker 中的声明与函数绑定、源码服务、Rule ABI、BindingPlan、AOT emitter 与工具链协议。
 - **Tooling**：workspace 与 workflow 文件、选中插件装配、CLI、架构展示和 Target-specific Application 编排。
 
@@ -34,7 +34,7 @@ Core 在拓扑分析前解析调用契约：
 
 ## 公共计划
 
-Workflow ABI 为 `vibeflow.workflow.v6`。公共计划只保存稳定 ID、可移植值、端口、路由、合流、TaskPlan、Loop、SourceRef、effect scope 与 execution-lock 事实。Target BindingPlan 保存语言实现。
+Workflow ABI 为 `vibeflow.workflow.v7`。公共计划只保存稳定 ID、可移植值、端口、路由、合流、TaskPlan、Loop、SourceRef、effect scope 与 execution-lock 事实。Target BindingPlan 保存语言实现。
 
 Python 和 JavaScript Target 使用相同 Core 语义，但分别声明可执行 feature。Target 不支持的 implemented 语义以稳定 finding 拒绝；planned 内容仍可进入架构审核。
 
@@ -77,3 +77,12 @@ Architecture JSONC 的 implementation_graph 保存当前项目的资源、源码
 原生 task_manager 声明有限 task_targets；编译计划保存启动槽及目标绑定，TaskRef 数组作为普通数据传递。运行器每次 workflow 统一登记实际执行、协作停止与最终结果，完成通知只在实际收尾后产生。普通 Node 无控制接口；规则按真实接口绑定检查身份与资源归属，源码使用检查和图关系检查分工。默认 taskManagerNode 为 dbl-circ，填充 #FCE7F3、边框 #BE185D、文字 #831843，完整标签包含“任务管理”；错误／警告覆盖颜色时仍保留形状和身份。Decision 不变。
 
 当前任务编译、Runtime/AOT 实现位置和退出顺序见[原生任务管理设计](task-management.md)，维护时应同时核对公共计划、SDK 操作归属及最终收尾边界。
+
+
+## 双语言计划与 AOT
+
+`core.graph_calls` 统一实际调用身份、子图、Loop、任务目标与配置继承。Rule 在相同身份之上补充未调用定义的审查范围；它们不会成为执行调用。Block Compiler 生成可序列化及读取的 WorkflowPlan/BlockPlan，任务 executor 由 Target 显式提供。ABI v7 不携带旧 async/result_key 并发字段。
+
+Python 将准备与装配分开：静态阶段保存共同计划及有限的原生图/编译记录，运行阶段绑定类、独立参数容器、活对象和现有 PipelineRuntime。源码与目录 bundle 共用装配函数。生成块在调用时读取追踪和 Hook 选项，不为各 profile 复制编译逻辑。无法生成块的结构保留原动态调度。
+
+Python 的文件收集、加载 API 与 CLI 属于 Tooling；框架通过包资源读取，因此源码、wheel 和 ZIP 发行采用同一构建入口。两种 Target 共用暂存、原子发布、构建结果与 v3 元数据；JS 保留 emitter、esbuild、Node/Browser runtime。加载只解析格式、ABI 和运行所需字段，不重新扫描源码或校验文件哈希。

@@ -46,6 +46,7 @@ class CheckedRunResult:
     run_dir: Path
     health: HealthReport
     context: object | None = None
+    has_declared_outputs: bool = False
 
 
 @dataclass
@@ -55,6 +56,28 @@ class CheckedRunError(RuntimeError):
 
     def __str__(self) -> str:
         return self.message
+
+
+def _checked_run_error_payload(error):
+    from vibeflow.tooling.application.result_scope import add_result_scope
+    result = error.result
+    return add_result_scope({"status": result.health.status, "run_id": result.run_id,
+        "run_dir": str(result.run_dir), "error": str(error), "health": result.health.to_dict()},
+        "vibeflow_workflow_execution", checked_ids=())
+
+
+def _write_execution_report(result):
+    """Describe the completed runtime without reopening its source config."""
+    from vibeflow.tooling.application.result_scope import add_result_scope
+    checked = ["workflow_started", "structural_runtime"]
+    if result.context is not None and result.context.get("runtime.qualified_exec_order"):
+        checked.append("execution_order")
+    if result.has_declared_outputs:
+        checked.append("declared_outputs")
+    payload = add_result_scope({"status": result.health.status, "run_id": result.run_id,
+        "run_dir": str(result.run_dir)}, "vibeflow_workflow_execution", checked_ids=checked)
+    _write_json(result.run_dir / "workflow_execution_report.json", payload)
+    return payload
 
 
 @observed_checked_run
@@ -151,7 +174,7 @@ def run_checked(
             health=health,
         )
         _write_json(run_dir / "output_summary.json", _summarize_run_result(context))
-        return CheckedRunResult(actual_run_id, run_dir, health, context)
+        return CheckedRunResult(actual_run_id, run_dir, health, context, bool(graph.outputs))
 
 
 def _load_document_or_refuse(path: Path, run_dir: Path, run_id: str):
@@ -308,7 +331,7 @@ def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, heal
     from vibeflow.tooling.application.python.presentation.architecture_document import render_architecture_document
     from vibeflow.tooling.application.python.presentation.ascii_flowchart import export_ascii_flowchart
     from vibeflow.tooling.application.python.presentation.mermaid import compiled_graph_payload, export_mermaid
-    from vibeflow.tooling.application.python.presentation.mermaid.render import EXPANDED_MERMAID_MAX_EDGES, EXPANDED_MERMAID_MAX_TEXT_SIZE, MermaidRenderError, render_mermaid_svg
+    from vibeflow.tooling.presentation.mermaid import EXPANDED_MERMAID_MAX_EDGES, EXPANDED_MERMAID_MAX_TEXT_SIZE, MermaidRenderError, render_mermaid_svg
     from vibeflow.tooling.application.python.presentation.mermaid.review_svg import render_review_columns_svg
 
     from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
@@ -397,6 +420,20 @@ def _refuse_on_planned_run(
     raise CheckedRunError("run refused: planned nodes are not executable", result)
 
 
+def _checked_runtime_binding(factory, *, health, run_dir):
+    try:
+        return factory()
+    except NodeRegistryError as cause:
+        findings = getattr(cause, "findings", ())
+        if not findings:
+            raise
+        failed = replace(health or HealthReport(status="ERROR"), status="ERROR",
+            errors=(*(health.errors if health is not None else ()), *findings))
+        _write_refused_artifacts(run_dir, failed)
+        raise CheckedRunError("run refused: implementation binding failed",
+            CheckedRunResult(run_dir.name, run_dir, failed)) from cause
+
+
 def _execute_runtime(
     graph: GraphConfig,
     registry: NodeRegistry,
@@ -412,31 +449,18 @@ def _execute_runtime(
 ):
     from vibeflow.targets.python.runtime.engine import PipelineRuntime
 
-    try:
-        runtime = PipelineRuntime(
-            graph,
-            registry=registry,
-            plugin_registry=plugin_registry,
-            run_dir=run_dir,
-            global_config=resources.global_config,
-            runtime_options=runtime_options,
-            capabilities=capabilities,
-            delegate_cli=delegate_cli,
-        )
-    except NodeRegistryError as exc:
-        findings = getattr(exc,"findings",())
-        if not findings:
-            raise
-        failed = replace(health or HealthReport(status="ERROR"),status="ERROR",
-            errors=(*(health.errors if health is not None else ()),*findings))
-        _write_refused_artifacts(run_dir,failed)
-        raise CheckedRunError("run refused: implementation binding failed",
-            CheckedRunResult(run_dir.name,run_dir,failed)) from exc
-    try:
-        context = runtime.run(initial)
-    finally:
-        _ensure_trace_files(run_dir)
-    return context
+    from vibeflow.targets.python.sdk.loading import source_paths
+
+    with source_paths(getattr(registry, "source_roots", ())):
+        runtime = _checked_runtime_binding(lambda: PipelineRuntime(
+            graph, registry=registry, plugin_registry=plugin_registry, run_dir=run_dir,
+            global_config=resources.global_config, runtime_options=runtime_options,
+            capabilities=capabilities, delegate_cli=delegate_cli), health=health, run_dir=run_dir)
+        try:
+            context = runtime.run(initial)
+        finally:
+            _ensure_trace_files(run_dir)
+        return context
 
 
 def _write_refused_artifacts(run_dir: Path, health: HealthReport, *, include_effective_policy: bool = False) -> None:

@@ -6,14 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from vibeflow.targets.javascript.build.publish import (
+from vibeflow.targets.shared.aot_publish import (
     AotPublishError,
     atomic_publish_directory,
     validate_owned_build_directory,
 )
 
 
-FORMAT = "vibeflow.aot-build.v2"
+FORMAT = "vibeflow.aot-build.v3"
 
 
 def _artifact(path: Path, marker: str) -> None:
@@ -24,7 +24,7 @@ def _artifact(path: Path, marker: str) -> None:
     plan_hash = hashlib.sha256(marker.encode()).hexdigest()
     manifest = {
         "format": FORMAT,
-        "abi_version": "vibeflow.workflow.v6",
+        "abi_version": "vibeflow.workflow.v7",
         "project_target": "javascript",
         "workflow_id": "publish-test",
         "entry_mode": "sync",
@@ -41,6 +41,10 @@ def _artifact(path: Path, marker: str) -> None:
         "host_extensions": [],
         "files": {"index.js": entry_hash},
     }
+    keys = ('target','profile','toolchain','external_packages','host_extensions')
+    manifest['target_metadata'] = {key:manifest.pop(key) for key in keys}
+    manifest['target_metadata'].update(plugin_abi_version='vibeflow.plugin.v3',
+        plugins=dict(active=[],annotations=[],declared=[],planned=[]))
     (path / "vibeflow-build.json").write_text(
         json.dumps(manifest, sort_keys=True),
         encoding="utf-8",
@@ -120,7 +124,7 @@ def test_atomic_publish_failure_preserves_existing_artifact(
         )
 
     monkeypatch.setattr(
-        "vibeflow.targets.javascript.build.publish._exchange_directories",
+        "vibeflow.targets.shared.aot_publish._exchange_directories",
         fail_exchange,
     )
     with pytest.raises(AotPublishError) as captured:

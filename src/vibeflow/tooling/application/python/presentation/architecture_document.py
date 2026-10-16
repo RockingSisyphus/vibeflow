@@ -212,9 +212,6 @@ def _node_document(
     descriptor = registry_descriptor(registry, node.type_used)
     selected_rulesets = selection_data(target.graph.rulesets) if target is not None else selection_data(node.rulesets if node.rulesets is not None else registry.rulesets(node.type_used)) if descriptor is not None else []
     planned = node.status == STATUS_PLANNED or getattr(target, "status", "") == STATUS_PLANNED
-    async_config = None
-    if node.async_mode:
-        async_config = {"mode": node.async_mode, "result_key": node.result_key or None}
     invokes = None
     if invocation is not None:
         invokes = {
@@ -283,7 +280,6 @@ def _node_document(
         "provides": providers_to_dicts(node.provides),
         "contract_source": _contract_source(graph, node),
         "join_policy": node.join_policy,
-        "async": async_config,
         "loop": node.loop.to_dict() or None,
         "io": node.io.to_dict() or None,
         "invokes": invokes,

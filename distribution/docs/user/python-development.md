@@ -108,3 +108,48 @@ python run.py inspect-resources --config python_project/configs/main.jsonc --jso
 每次调用替换完整 `info` 数组。需要同时保留训练进度和指标时，在一次调用中提供两个对象；`[]` 清空信息。内核在下一次定时刷新、状态变化或结束时写入最新缓存。默认间隔为 60 秒，命令行用 `--status-interval` 调整。完整数据格式、日志位置和监控配置见[运行日志与状态接口](runtime-observation.md)。
 
 并发启动、任务引用、停止与实际收尾合同见[原生任务管理](task-management.md)。
+
+
+## AOT 目录部署
+
+开发时运行 `run` 会执行当前源码的静态审查和编译。部署时先构建一次：
+
+```bash
+python run.py build --config python_project/configs/main.jsonc --out-dir python_project/build/aot
+# 直接使用安装的工具时，显式提供 workspace：
+python -m vibeflow build --workspace vibeflow_config.jsonc --config python_project/configs/main.jsonc --out-dir python_project/build/aot
+python python_project/build/aot/run.py run --input python_project/probe_input.json --runtime-profile train
+```
+
+所属项目选择 Python target，默认 profile 为 `python-package`。输出目录包含匹配的 VibeFlow 框架、共同计划、Python 绑定、预生成块代码和项目实现。整目录可移到另一台机器；目标环境提供 Python 3.11+ 及业务依赖，例如 PyTorch、CUDA。运行无需原 workspace，也不会再次执行源码规则、图编译、计划推导或架构图生成。不适合块执行的图继续使用已准备结构动态调度。
+
+Node、插件及支撑代码按原包路径保留，包内资源随包收集。根目录数据、动态导入所需文件可用重复的 `--include assets --include extra_module.py` 添加，路径相对 workflow 所属 root。外部数据和 checkpoint 由调用者提供。框架拥有的定位会重定位；业务配置中的普通路径字符串不改写，相对路径继续以调用者工作目录为准。
+
+```python
+from vibeflow.tooling.application.python import PythonBuildRequest, build_python_aot, load_bundle
+
+build_python_aot(PythonBuildRequest(
+    workspace="vibeflow_config.jsonc", config="python_project/configs/main.jsonc",
+    out_dir="candidate-bundle", include=("assets",)))
+bundle = load_bundle("candidate-bundle")
+runtime = bundle.create_runtime(
+    run_dir="runs/embedded", runtime_options={"execution": "compiled", "trace": "boundary"},
+    global_config={"model": model}, capabilities={"device": device})
+result = runtime.run(initial)
+# 高层运行自动创建独立 run 目录，返回现有 CheckedRunResult：
+checked = bundle.run(initial, run_root="runs", runtime_options={"execution": "plan"})
+```
+
+搬迁后也可从 bundle 自带的框架导入 API：将 `<bundle>/_framework` 加入 Python 模块搜索路径，再调用 `load_bundle()`。构建返回的 `PythonBuildResult.health` 保留静态审查的 PASS/CONCERNS；运行沿用 CheckedRunResult/CheckedRunError 和执行报告。
+
+同一 bundle 可创建独立 runtime；节点实例、线程、取消与锁属于运行期。`create_runtime()` 准备结构，在首次 `run()` 中先创建运行时插件，再绑定 Node；复用这个 runtime 会保留 Node 实例，每次执行重新创建和释放运行时插件。输入、全局值和宿主能力保留对象引用，普通 Node 配置按现有规则生成独立容器。编译插件在构建时运行；runtime 插件按每次执行创建并在任务收尾后释放。`plan`、`block`、`compiled` 与 Hook/trace 选项沿用源码 runtime。
+
+声明 delegated CLI 合同的图可运行：
+
+```bash
+python candidate-bundle/run.py delegate-cli -- --help
+```
+
+业务标准流与退出码使用原 delegated CLI 协议；框架诊断写入 run 日志。构建保留原静态审查的 CONCERNS 和 planned stub 开发标记，不把它们改成 PASS。`--replace` 仅替换仍归本工具所有的完整构建目录。
+
+新计划为 Workflow ABI v7，构建元数据为 `vibeflow.aot-build.v3`；共同头保存工作流、ABI、入口和文件，`target_metadata` 保存该语言的 profile、工具链与绑定定位。旧计划或 manifest 不作兼容解码，请用当前源码重新构建；已有独立 JS 产物仍可继续使用其随附运行代码。

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping, TypeAlias
 
 
-WORKFLOW_ABI_VERSION = "vibeflow.workflow.v6"
+WORKFLOW_ABI_VERSION = "vibeflow.workflow.v7"
 _CARDINALITIES = frozenset({"exactly_one", "optional_one", "all"})
 _BLOCK_KINDS = frozenset({"workflow", "nodeset", "loop", "task"})
 _CONDITION_OPERATORS = frozenset({"==", "!="})
@@ -203,7 +203,6 @@ class RoutePlan:
     explicit: bool = False
     mainline: bool = False
     data_bypass: bool = False
-    asynchronous: bool = False
 
     @property
     def pair(self) -> tuple[str, str]:
@@ -219,7 +218,6 @@ class RoutePlan:
             "explicit": self.explicit,
             "mainline": self.mainline,
             "data_bypass": self.data_bypass,
-            "asynchronous": self.asynchronous,
         }
 
 
@@ -305,8 +303,6 @@ class NodeCallPlan:
     join_policy: str
     status: str
     planned_behavior: str
-    async_mode: str
-    result_key: str
     is_terminal: bool
     is_nodeset: bool
     is_loop: bool
@@ -336,8 +332,6 @@ class NodeCallPlan:
         slots = [key for key, _ in self.task_targets]
         if any(not isinstance(key,str) or not key for key in slots) or len(set(slots)) != len(slots):
             raise PortablePlanError("GRAPH.TASK.TARGET_INVALID: task slots must be distinct nonempty strings")
-        if self.async_mode or self.result_key:
-            raise PortablePlanError("GRAPH.ASYNC.MIGRATION: use task_manager/task_targets")
         if self.schedule not in _SCHEDULES:
             raise PortablePlanError(
                 f"node schedule must be one of {sorted(_SCHEDULES)}"
@@ -372,9 +366,7 @@ class NodeCallPlan:
             "join_policy": self.join_policy,
             "status": self.status,
             "planned_behavior": self.planned_behavior,
-            "task_targets": dict(self.task_targets),
-            "async_mode": self.async_mode,
-            "result_key": self.result_key,
+            "task_targets": [list(item) for item in self.task_targets],
             "is_terminal": self.is_terminal,
             "is_nodeset": self.is_nodeset,
             "is_loop": self.is_loop,

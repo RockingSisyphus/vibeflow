@@ -9,15 +9,14 @@ from vibeflow.targets.javascript.frontend.emitter import EmittedWorkflow
 from vibeflow.targets.javascript.frontend.errors import AotBuildError
 from vibeflow.targets.javascript.frontend.contracts import PROFILES, TARGETS
 from vibeflow.targets.javascript.frontend.emission_protocol import EmissionWorkflow
-from vibeflow.targets.javascript.build.publish import (
+from vibeflow.targets.shared.aot_publish import (
     AotPublishError,
-    atomic_publish_directory,
     validate_owned_build_directory,
 )
 from vibeflow.targets.javascript.build.toolchain import DriverBuildResult
 
 
-BUILD_MANIFEST_FORMAT = "vibeflow.aot-build.v2"
+from vibeflow.targets.shared.aot import BUILD_MANIFEST_FORMAT, artifact_manifest
 WEB_APP_MARKER = "<!-- VIBEFLOW_APP_ENTRY -->"
 SOURCEMAP_MODES = frozenset({"none", "external", "inline"})
 
@@ -183,53 +182,14 @@ def driver_import_policy(
     )
     allowed = {
         str(item)
-        for item in policy.get("allowed_external_packages", ())
+        for item in policy.get("allowed_external_packages", policy.get("allowedExternalPackages", ()))
     }
     allowed.update(str(item) for item in external_packages)
-    return {
-        "owners": owners,
-        "resourceBaseLibs": dict(policy.get("resource_base_libs",policy.get("resourceBaseLibs", {}))),
-        "pluginContributions": dict(policy.get("plugin_contributions",policy.get("pluginContributions", {}))),
-        "nodeBaseLibs": {
-            str(key): [str(item) for item in value]
-            for key, value in (
-                policy.get("node_base_libs", policy.get("nodeBaseLibs", {}))
-                or {}
-            ).items()
-        },
-        "baseLibDependencies": {
-            str(key): [str(item) for item in value]
-            for key, value in (
-                policy.get(
-                    "base_lib_dependencies",
-                    policy.get("baseLibDependencies", {}),
-                )
-                or {}
-            ).items()
-        },
-        "hostExtensionDependencies": {
-            str(key): [str(item) for item in value]
-            for key, value in (
-                policy.get(
-                    "host_extension_dependencies",
-                    policy.get("hostExtensionDependencies", {}),
-                )
-                or {}
-            ).items()
-        },
-        "pluginDependencies": {
-            str(key): [str(item) for item in value]
-            for key, value in (
-                policy.get(
-                    "plugin_dependencies",
-                    policy.get("pluginDependencies", {}),
-                )
-                or {}
-            ).items()
-        },
-        "allowedExternalPackages": sorted(allowed),
-        "sourceRoots": list(policy.get("source_roots", ())),
-    }
+    from vibeflow.targets.javascript.build.project_resources import driver_import_policy as project_driver_policy
+
+    policy["owners"] = owners
+    policy["allowed_external_packages"] = sorted(allowed)
+    return project_driver_policy(policy)
 
 
 def validate_profile_output(
@@ -282,36 +242,12 @@ def build_manifest(
     staging: Path,
     plugin_manifest: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    files = {}
-    for path in sorted(item for item in staging.rglob("*") if item.is_file()):
-        relative = path.relative_to(staging).as_posix()
-        files[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
-    manifest = {
-        "format": BUILD_MANIFEST_FORMAT,
-        "abi_version": workflow.abi_version,
-        "plugin_abi_version": "vibeflow.plugin.v3",
-        "project_target": "javascript",
-        "workflow_id": workflow.workflow_id,
-        "entry_mode": workflow.entry_mode,
-        "target": target,
-        "profile": profile,
-        "entry": "index.html" if profile == "web-app" else entry_name,
-        "plan_sha256": emitted.plan_sha256,
-        "toolchain": driver_result.toolchain.to_dict(),
-        "external_packages": sorted(set(external_packages)),
-        "host_extensions": list(emitted.host_extensions),
-        "files": files,
-    }
-    if plugin_manifest:
-        manifest["plugins"] = _plain_json_value(plugin_manifest)
-    else:
-        manifest["plugins"] = {
-            "active": [],
-            "annotations": [],
-            "declared": [],
-            "planned": [],
-        }
-    return manifest
+    return artifact_manifest(staging, workflow=workflow, project_target="javascript",
+        entry="index.html" if profile == "web-app" else entry_name,plan_sha256=emitted.plan_sha256,
+        target_metadata=dict(target=target,profile=profile,toolchain=driver_result.toolchain.to_dict(),
+            external_packages=sorted(set(external_packages)),host_extensions=list(emitted.host_extensions),
+            plugin_abi_version="vibeflow.plugin.v3",
+            plugins=_plain_json_value(plugin_manifest) if plugin_manifest else dict(active=[],annotations=[],declared=[],planned=[])))
 
 
 def _plain_json_value(value: Any) -> Any:
@@ -342,25 +278,6 @@ def validate_existing_target(out_dir: Path, *, replace: bool) -> None:
         raise AotBuildError(exc.code, str(exc)) from exc
 
 
-def publish(
-    staging: Path,
-    out_dir: Path,
-    *,
-    replace: bool,
-    build_root: Path,
-) -> None:
-    del build_root
-    try:
-        atomic_publish_directory(
-            staging,
-            out_dir,
-            replace=replace,
-            manifest_format=BUILD_MANIFEST_FORMAT,
-        )
-    except AotPublishError as exc:
-        raise AotBuildError(exc.code, str(exc)) from exc
-
-
 __all__ = [
     "BUILD_MANIFEST_FORMAT",
     "SOURCEMAP_MODES",
@@ -368,7 +285,6 @@ __all__ = [
     "build_manifest",
     "driver_import_policy",
     "entry_name",
-    "publish",
     "resolve_under_project",
     "resolved_implementations",
     "validate_existing_target",

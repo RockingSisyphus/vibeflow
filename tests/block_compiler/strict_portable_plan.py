@@ -244,7 +244,7 @@ def test_python_execution_plan_adapter_preserves_global_state_and_locks() -> Non
     root = plan.block(plan.entry_block)
     state = root.node("state")
 
-    assert plan.abi_version == "vibeflow.workflow.v6"
+    assert plan.abi_version == "vibeflow.workflow.v7"
     assert plan.contains_global_state is True
     assert "root_exclusive" not in plan.to_dict()
     assert plan.execution_lock.to_dict() == {

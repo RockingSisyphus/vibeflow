@@ -1,6 +1,8 @@
 # 发行与文档装配
 
-VibeFlow 当前发行版本为 0.20.0，准备 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目和 Workflow ABI。迁移入口与删除接口见 [统一资源迁移](../../distribution/docs/user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖归档发行包。
+VibeFlow 当前发行版本为 1.0.0，准备 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目和 Workflow ABI。迁移入口与删除接口见 [统一资源迁移](../../distribution/docs/user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖归档发行包。
+
+1.0.0 统一 Block Compiler，并新增 Python 目录 AOT：计划 ABI v7、构建 manifest v3。旧计划需重新构建；既有 0.20.0 发行资产保持原字节和 ABI v6。实施与完整验收见[双语言 AOT 与维护整理记录](aot-unification-implementation.md)，本版变更与发行验证见[1.0.0 发布说明](history/release-1.0.0.md)。
 
 0.20.0 将任务等待改为一次结果交付：接收后任务卡自动回收，结果由父流程保存和转交；旧重复等待和停止已消费引用的代码须迁移。Workflow ABI 仍为 v6，配置形状不变。接口与示例见[原生任务管理](../../distribution/docs/user/task-management.md)，开发、全量验收与构建见[本轮记录](history/task-result-delivery-20261014.md)。
 

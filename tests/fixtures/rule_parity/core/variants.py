@@ -188,6 +188,16 @@ def _graph_variants(emit, codes, support, variant):
     from vibeflow.targets.shared.quality_support.workflow_rules.planned import graph_has_blocking_planned, graph_has_planned, planned_health_events
     from vibeflow.core.planned import PlannedBehavior
 
+    def retired(mode, *, nested=False, planned=False):
+        from vibeflow.core.config.graph import parse_graph_config_data
+        call = {'id':'work','type_used':'variant.work','async':mode,
+            **({'result_key':'worker.out'} if mode == 'result_key' else {}),
+            **({'status':'planned','flow_kind':'process','requires':[],'provides':[]} if planned else {})}
+        data = {'pipeline':{'nodes':[call]}}
+        if nested:
+            data = {'pipeline':{'nodes':[]},'nodesets':[{'type_key':'variant.child','display_name':'Child',
+                'description':'Nested migration','requires':[],'provides':[],'pipeline':{'nodes':[call]}}]}
+        return parse_graph_config_data(data)
     def node(name, kind="process", **fields):
         return NodeSpec(name, "variant." + name, flow_kind=kind, metadata=NodeMetadata(name, "Portable branch probe."), **fields)
     def compile(graph):
@@ -206,21 +216,21 @@ def _graph_variants(emit, codes, support, variant):
         walk(graph, {})
         return compile_core(CoreCompileRequest(graph, ImplementationFacts(tuple(collected.values())),
             TargetFeatureSet("probe", frozenset({"global_state", "execution_locks"}))))
-    result = node("worker", provides=(DataProvider("worker.out", "worker.value"),), async_mode="result_key", result_key="worker.out")
+    result = node("worker", provides=(DataProvider("worker.out", "worker.value"),), **({"async_mode":"result_key","result_key":"worker.out"} if variant == "baseline" else {}))
     consumer = node("consumer", requires=(DataRequirement("worker.value", "exactly_one"),))
     for conditional in (False, True):
         graph = GraphConfig((result, consumer), (EdgeSpec("worker", "consumer", schedule=True, transfer=True, when="choice == 1" if conditional else ""),), execution_lock=ExecutionLockSpec("shared"))
         emit("native.result_consumer." + str(conditional), "锁域result静态消费者是否无条件", "native.async.variants",
-            lambda graph=graph: compile(graph), codes(*(("GRAPH.EXECUTION_LOCK.RESULT_UNJOINABLE", "error"),) if conditional else (),
+            lambda graph=graph: compile(graph) if variant == "baseline" else retired("result_key"), codes(*(("GRAPH.EXECUTION_LOCK.RESULT_UNJOINABLE", "error"),) if conditional else (),
                 **({"message_contains": "statically provable"} if conditional else {})), evidence="core/compiler.py:561-612,657-697")
     emit("native.result_without_outgoing", "无锁result且没有任何后继的原生编译边界", "native.async.variants",
-        lambda: compile(GraphConfig((result,))), codes(), classification="baseline_limitation",
+        lambda: compile(GraphConfig((result,))) if variant == "baseline" else retired("result_key"), codes(), classification="baseline_limitation",
         notes="Native route rejection is conditional on having an effective outgoing edge; absence alone is not rejected outside a lock. This is not proof of executable workflow health.", evidence="core/compiler.py:538-541")
     emit("native.detached_unlocked", "detached在无锁域可编译", "native.async.variants",
-        lambda: compile(GraphConfig((node("background", async_mode="detached"),))), codes(), evidence="core/compiler.py:575-593")
+        lambda: compile(GraphConfig((node("background", async_mode="detached"),))) if variant == "baseline" else retired("detached"), codes(), evidence="core/compiler.py:575-593")
     for invocation in ("nodeset", "loop"):
         for scenario in ("same_key", "different_key", "detached", "planned_detached"):
-            worker = node("work", async_mode="detached" if "detached" in scenario else "",
+            worker = node("work", **({"async_mode":"detached" if "detached" in scenario else ""} if variant == "baseline" else {}),
                 status="planned" if scenario == "planned_detached" else "implemented",
                 execution_lock=ExecutionLockSpec("other" if scenario == "different_key" else "shared") if "key" in scenario else None)
             child = NodesetSpec("variant.child", "Child", "Nested execution-lock branch.", (), (), GraphConfig((worker,)))
@@ -228,7 +238,7 @@ def _graph_variants(emit, codes, support, variant):
             graph = GraphConfig((call,), nodesets={child.type_key: child}, execution_lock=ExecutionLockSpec("shared"))
             diagnostic = "GRAPH.EXECUTION_LOCK.NESTED_KEY_CONFLICT" if scenario == "different_key" else "GRAPH.EXECUTION_LOCK.DETACHED_FORBIDDEN" if scenario == "detached" else ""
             emit(f"native.nested_lock.{invocation}.{scenario}", "Nodeset/Loop实际嵌套锁 " + scenario, "native.execution_lock.variants",
-                lambda graph=graph: compile(graph), codes(*((diagnostic, "error"),) if diagnostic else (),
+                lambda graph=graph,scenario=scenario: retired("detached",nested=True,planned=scenario=="planned_detached") if variant == "current" and "detached" in scenario else compile(graph), codes(*((diagnostic, "error"),) if diagnostic else (),
                     **({"message_contains": "incompatible key" if scenario == "different_key" else "cannot use async='detached'"} if diagnostic else {})),
                 evidence="core/compiler.py:561-655,979-1030; executable/planned distinction")
 

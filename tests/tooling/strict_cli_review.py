@@ -105,7 +105,7 @@ def test_review_refreshes_architecture_validates_and_atomically_publishes_svg(
     monkeypatch,
     capsys,
 ) -> None:
-    from vibeflow.tooling.application.python.presentation.mermaid.render import (
+    from vibeflow.tooling.presentation.mermaid import (
         EXPANDED_MERMAID_MAX_EDGES,
         EXPANDED_MERMAID_MAX_TEXT_SIZE,
     )

@@ -151,22 +151,6 @@ def _scope_values(raw: Mapping[str, Any]) -> dict[str, object]:
     nested = raw.get(CONFIG_VALUES_FIELD, raw.get(VALUES_FIELD, None))
     if isinstance(nested, Mapping):
         selected.update({str(key): value for key, value in nested.items()})
-    elif nested is None:
-        selected.update(
-            {
-                str(key): value
-                for key, value in raw.items()
-                if str(key) not in SCOPED_CONFIG_RESERVED_FIELDS
-            }
-        )
-    else:
-        selected.update(
-            {
-                str(key): value
-                for key, value in raw.items()
-                if str(key) not in SCOPED_CONFIG_RESERVED_FIELDS
-            }
-        )
     for key, value in raw.items():
         text_key = str(key)
         if text_key not in SCOPED_CONFIG_RESERVED_FIELDS:

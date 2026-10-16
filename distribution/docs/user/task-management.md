@@ -53,7 +53,7 @@ const results = [...(first ? [first] : []), ...await context.tasks.waitAllExited
 
 任务退出后释放活跃执行和控制资源；结果只暂存到接收它的 waitAny/waitAllExited 完成交付。交付后任务卡自动回收，无需 release 接口。父流程把结果作为普通数据传给其他节点，后者不再通过旧任务引用查询。常驻 workflow 持续创建并接收短任务时，已交付任务卡不会累积；一直不接收的结果仍会占用空间。业务保存的结果和 trace 历史由各自的用途决定保留期限。
 
-Workflow ABI 为 v6。旧 `async`、`result_key`、`detached` 调用入口与停止等待超时选项必须迁移，没有自动转换层。将旧启动点改为管理 Node 的声明目标，把引用通过数据连边传到显式等待点；独立后台任务也须归属于本次 workflow。迁移后重新生成 Architecture，再执行 validate、quality 和实际运行／构建。
+Workflow ABI 为 v7。旧 `async`、`result_key`、`detached` 调用入口与停止等待超时选项必须迁移，没有自动转换层。将旧启动点改为管理 Node 的声明目标，把引用通过数据连边传到显式等待点；独立后台任务也须归属于本次 workflow。迁移后重新生成 Architecture，再执行 validate、quality 和实际运行／构建。
 
 ## 输入与输出如何对应
 

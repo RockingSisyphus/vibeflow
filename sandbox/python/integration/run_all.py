@@ -283,12 +283,12 @@ VALID_RUN_CASES = [
         },
         "expected_blocks": [["start", "input", "prepare", "compute", "route", "external", "end", "again_end"]],
     },
-    {'name': 'async_result_key_join', 'config': 'pass_async_result_key_join.jsonc', 'initial': {}, 'expected_outputs': {'value.out': 12}, 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'seed', 'seed_join', 'add', 'end'], 'expected_portable_tasks': [{'manager_node_id': 'seed', 'key': 'work', 'executor': 'thread'}]},
-    {'name': 'semantic_async_result_key_unconsumed', 'config': 'pass_semantic_async_result_unconsumed.jsonc', 'initial': {'calc.a': 2, 'calc.b': 5, 'calc.c': 9, 'calc.d': 4}, 'expected_outputs': {'calc.sum': 7, 'calc.scaled': 21, 'route.branch': 'left', 'calc.branch': 21, 'calc.final': 17}, 'expected_absent_outputs': ['async.value'], 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'slow_async', 'add_pair', 'compare', 'scale', 'use_scaled', 'finalize', 'end']},
-    {'name': 'compiled_fallback_mixed_graph', 'config': 'pass_async_result_key_join.jsonc', 'initial': {}, 'runtime_options': {'trace': 'full', 'node_hooks': False, 'execution': 'compiled'}, 'expected_outputs': {'value.out': 12}, 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'seed', 'seed_join', 'add', 'end']},
-    {'name': 'async_nodeset_result_key_join', 'config': 'pass_async_nodeset_result_key_join.jsonc', 'initial': {'value.in': 3}, 'expected_outputs': {'value.out': 8}, 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'input', 'composite', 'composite_join', 'end']},
-    {'name': 'async_detached_metrics', 'config': 'pass_async_detached_metrics.jsonc', 'initial_factory': _batch_initial, 'expected_outputs': {'value.out': 10}, 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'metrics', 'seed', 'add', 'end'], 'expected_portable_tasks': [{'manager_node_id': 'metrics', 'key': 'work', 'executor': 'thread'}]},
-    {'name': 'mainline_async_nodeset_side_task', 'config': 'pass_mainline_async_nodeset_side_task.jsonc', 'initial': {}, 'expected_outputs': {'value.out': 10}, 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'seed', 'side_task', 'main_add', 'end']},
+    {'name': 'task_result_join', 'config': 'pass_task_result_join.jsonc', 'initial': {}, 'expected_outputs': {'value.out': 12}, 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'seed', 'seed_join', 'add', 'end'], 'expected_portable_tasks': [{'manager_node_id': 'seed', 'key': 'work', 'executor': 'thread'}]},
+    {'name': 'unconsumed_task_result', 'config': 'pass_unconsumed_task_result.jsonc', 'initial': {'calc.a': 2, 'calc.b': 5, 'calc.c': 9, 'calc.d': 4}, 'expected_outputs': {'calc.sum': 7, 'calc.scaled': 21, 'route.branch': 'left', 'calc.branch': 21, 'calc.final': 17}, 'expected_absent_outputs': ['async.value'], 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'slow_async', 'add_pair', 'compare', 'scale', 'use_scaled', 'finalize', 'end']},
+    {'name': 'compiled_fallback_mixed_graph', 'config': 'pass_task_result_join.jsonc', 'initial': {}, 'runtime_options': {'trace': 'full', 'node_hooks': False, 'execution': 'compiled'}, 'expected_outputs': {'value.out': 12}, 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'seed', 'seed_join', 'add', 'end']},
+    {'name': 'task_nodeset_result_join', 'config': 'pass_task_nodeset_result_join.jsonc', 'initial': {'value.in': 3}, 'expected_outputs': {'value.out': 8}, 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'input', 'composite', 'composite_join', 'end']},
+    {'name': 'background_task_metrics', 'config': 'pass_background_task_metrics.jsonc', 'initial_factory': _batch_initial, 'expected_outputs': {'value.out': 10}, 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'metrics', 'seed', 'add', 'end'], 'expected_portable_tasks': [{'manager_node_id': 'metrics', 'key': 'work', 'executor': 'thread'}]},
+    {'name': 'mainline_nodeset_task', 'config': 'pass_mainline_nodeset_task.jsonc', 'initial': {}, 'expected_outputs': {'value.out': 10}, 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'seed', 'side_task', 'main_add', 'end']},
 ]
 
 
@@ -606,7 +606,7 @@ def _run_published_diagram_audit_case(results: list[CaseResult]) -> CaseResult:
 
 
 def _audit_published_diagrams(results: list[CaseResult]) -> CaseResult:
-    from vibeflow.tooling.application.python.presentation.mermaid.render import (
+    from vibeflow.tooling.presentation.mermaid import (
         is_mermaid_svg_renderer_available,
     )
 
@@ -1582,7 +1582,7 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         prepare_python_presentation,
     )
     from vibeflow.targets.python.project.check_session import python_check_scope
-    from vibeflow.tooling.application.python.presentation.mermaid.render import (
+    from vibeflow.tooling.presentation.mermaid import (
         is_mermaid_svg_renderer_available,
         render_mermaid_svg,
     )
@@ -1981,9 +1981,9 @@ def _assert_execution_plan(case: dict[str, Any], plan) -> None:
                     f"got {actual_tasks!r}"
                 )
         if case.get("expected_workflow_global_state"):
-            if portable.abi_version != "vibeflow.workflow.v6":
+            if portable.abi_version != "vibeflow.workflow.v7":
                 raise AssertionError(
-                    f"expected WorkflowPlan v6, got {portable.abi_version!r}"
+                    f"expected WorkflowPlan v7, got {portable.abi_version!r}"
                 )
             if portable.contains_global_state is not True:
                 raise AssertionError("WorkflowPlan did not propagate global state")
@@ -2101,7 +2101,7 @@ def _assert_ascii_contains(name: str, collapsed: str, expanded: str) -> None:
 
 
 def _assert_artifacts(run_dir: Path) -> None:
-    from vibeflow.tooling.application.python.presentation.mermaid.render import (
+    from vibeflow.tooling.presentation.mermaid import (
         is_mermaid_svg_renderer_available,
     )
 

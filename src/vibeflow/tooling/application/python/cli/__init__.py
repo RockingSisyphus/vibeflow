@@ -125,6 +125,8 @@ def build_parser() -> argparse.ArgumentParser:
     from vibeflow.tooling.application.python.cli.quality import add_quality_parser
 
     add_quality_parser(sub)
+    from vibeflow.tooling.application.python.cli.build import add_build_parser
+    add_build_parser(sub)
     return parser
 
 
@@ -155,6 +157,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "export-mermaid": _handle_export_mermaid,
         "review": _handle_review,
         "run": _handle_run,
+        "build": _handle_build,
         "delegate-cli": _handle_delegate_cli,
         "quality-check": _handle_quality_check,
     }
@@ -256,7 +259,6 @@ from vibeflow.tooling.application.python.run_observation import observed_cli_run
 
 @observed_cli_run
 def _handle_run(args: argparse.Namespace) -> int:
-    from vibeflow.tooling.application.result_scope import add_result_scope
     from vibeflow.targets.python.project.registry import NodeRegistry
     from vibeflow.tooling.application.python.project.declarations import default_python_registry
     from vibeflow.tooling.application.python.runner import CheckedRunError, run_checked
@@ -312,40 +314,11 @@ def _handle_run(args: argparse.Namespace) -> int:
                 _prepared_run_dir=getattr(args, "_prepared_run_dir", None),
             )
     except CheckedRunError as exc:
-        payload = add_result_scope(
-            {"status": exc.result.health.status, "run_id": exc.result.run_id, "run_dir": str(exc.result.run_dir), "error": str(exc), "health": exc.result.health.to_dict()},
-            "vibeflow_workflow_execution",
-            checked_ids=(),
-        )
-        print_run_report(payload)
+        from vibeflow.tooling.application.python.runner import _checked_run_error_payload
+        print_run_report(_checked_run_error_payload(exc))
         return 1
-    checked = ["workflow_started", "structural_runtime"]
-    context = result.context
-    if context is not None and hasattr(context, "get"):
-        try:
-            if context.get("runtime.qualified_exec_order"):
-                checked.append("execution_order")
-        except Exception:
-            pass
-    try:
-        from vibeflow.tooling.project.config_loader import load_config_document
-
-        document = load_config_document(Path(args.config))
-        pipeline = document.data.get("pipeline", {})
-        if isinstance(pipeline, Mapping) and pipeline.get("outputs"):
-            checked.append("declared_outputs")
-    except Exception:
-        pass
-    payload = add_result_scope(
-        {"status": result.health.status, "run_id": result.run_id, "run_dir": str(result.run_dir)},
-        "vibeflow_workflow_execution",
-        checked_ids=checked,
-    )
-    (result.run_dir / "workflow_execution_report.json").write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-    print_run_report(payload)
+    from vibeflow.tooling.application.python.runner import _write_execution_report
+    print_run_report(_write_execution_report(result))
     return 0
 
 
@@ -536,3 +509,8 @@ def _runtime_options_from_args(args: argparse.Namespace):
 
 
 __all__ = ["build_parser", "main"]
+
+
+def _handle_build(args):
+    from vibeflow.tooling.application.python.cli.build import handle_build
+    return handle_build(args)

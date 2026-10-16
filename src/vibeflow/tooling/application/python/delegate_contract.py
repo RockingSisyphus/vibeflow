@@ -64,7 +64,7 @@ def validate_delegate_cli_graph_contract(
         )
 
     exit_providers = [
-        (node.id, provider.key, provider.type, node.async_mode)
+        (node.id, provider.key, provider.type)
         for node in graph.nodes
         for provider in node.provides
         if (
@@ -76,7 +76,6 @@ def validate_delegate_cli_graph_contract(
         len(exit_providers) != 1
         or exit_providers[0][1] != CLI_EXIT_CODE_TYPE
         or exit_providers[0][2] != CLI_EXIT_CODE_TYPE
-        or exit_providers[0][3] == "detached"
     ):
         findings.append(
             _contract_finding(
@@ -90,13 +89,11 @@ def validate_delegate_cli_graph_contract(
                             "node": node_id,
                             "key": key,
                             "type": data_type,
-                            "async": async_mode,
                         }
                         for (
                             node_id,
                             key,
                             data_type,
-                            async_mode,
                         ) in exit_providers
                     ],
                 },

@@ -99,7 +99,6 @@ def implementation_facts_from_catalog(
                 executor=(
                     "event_loop" if completion == "suspend" else "current"
                 ),
-                async_executor="event_loop",
                 source_kind=source.kind if source is not None else "",
                 source_ref=source.ref if source is not None else "",
                 source_export=(source.export or "") if source is not None else "",
@@ -152,7 +151,6 @@ def target_neutral_implementation_facts_from_catalog(
                 executor=(
                     "event_loop" if completion == "suspend" else "current"
                 ),
-                async_executor="event_loop",
             )
         )
     return ImplementationFacts(tuple(facts), strict=True)
@@ -173,28 +171,21 @@ def _effect_scope(policy: Mapping[str, Any] | None) -> str:
     return EFFECT_SCOPE_NONE
 
 
-def native_workflow_facts(graph: GraphConfig) -> ImplementationFacts:
-    """Supply this Target's execution facts for embedded workflows and loops."""
-    nodes = []
-    graph_states = (graph, *(nodeset.graph for nodeset in graph.nodesets.values()))
-    native_types = {node.type_used for state in graph_states for node in state.nodes
-                    if node.type_used in graph.nodesets or node.type_used in LOOP_NODE_TYPES}
-    for type_key in sorted(native_types):
-        nodeset = graph.nodesets.get(type_key)
-        nodes.append(ImplementationFact(
-            type_key=type_key,
-            flow_kind="predefined",
-            requires=tuple(nodeset.requires) if nodeset is not None else (),
-            provides=tuple(nodeset.provides) if nodeset is not None else (),
-            async_executor="event_loop",
-        ))
-    return ImplementationFacts(tuple(nodes))
+def native_call_execution_facts(graph: GraphConfig):
+    """Supply JS completion/executor facts at actual native call identities."""
+    from vibeflow.core.graph_calls import graph_call_subjects
+    from vibeflow.core.flow import IO_NODE_TYPE
+    return {(*subject.call_path,node.id):ImplementationFact(node.type_used,
+        completion="suspend" if node.io.operation == "receive" else "immediate",
+        executor="event_loop" if node.io.operation == "receive" else "current")
+        for subject in graph_call_subjects(graph) for node in subject.graph.nodes
+        if node.type_used == IO_NODE_TYPE}
 
 
 __all__ = [
     "JavascriptImplementationFactsError",
     "implementation_facts_from_catalog",
-    "native_workflow_facts",
+    "native_call_execution_facts",
     "target_neutral_implementation_facts_from_catalog",
     "validate_javascript_descriptor_catalogs",
 ]

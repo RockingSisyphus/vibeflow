@@ -20,6 +20,7 @@ from vibeflow.targets.python.project.compiler import GraphCompileError, GraphCom
 from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
 from vibeflow.targets.python.project.policy import default_effective_policy
 from vibeflow.targets.python.runtime.options import RuntimeOptions
+from vibeflow.targets.python.sdk.loading import source_paths
 from vibeflow.targets.python.runtime.summaries import summarize_mapping
 from vibeflow.tooling.application.python.run_directory import validate_run_id
 from vibeflow.tooling.application.python.runner import CheckedRunError, CheckedRunResult
@@ -61,14 +62,13 @@ from vibeflow.tooling.application.python.project.project_options import (
     _workspace_runtime_options,
 )
 from vibeflow.tooling.application.python.project.quality import scan_workspace_code_quality
-from vibeflow.tooling.application.python.project.types import (
-    ArchitectureDocumentSpec,
+from vibeflow.tooling.application.python.project.types import WorkspaceEnvironment
+from vibeflow.tooling.project.architecture_types import ArchitectureDocumentSpec, WorkspaceConfigError
+from vibeflow.tooling.project.workspace_model import (
     PROJECT_CONFIG_NAME,
     WORKSPACE_CONFIG_NAME,
     WORKSPACE_FORBIDDEN_CONFIG_FIELDS,
     WorkspaceConfig,
-    WorkspaceConfigError,
-    WorkspaceEnvironment,
     WorkspaceRoot,
 )
 from vibeflow.targets.python.project.check_session import python_check_scope as _python_check_scope
@@ -176,19 +176,16 @@ def run_workspace_checked(
         execute_kwargs = {"delegate_cli": True} if delegate_cli else {}
         if capabilities is not None:
             execute_kwargs["capabilities"] = capabilities
-        from vibeflow.tooling.application.python.project.contributions import lifecycle_registry, release_runtime_plugins
-        try:
-            runtime_registry = lifecycle_registry(env.registry, workflow_id=str(config_path), config_path=config_path,
-                                                 plugin_types=("runtime",))
-        except Exception as exc:
-            failed = _workspace_error_report("PLUGIN.FACTORY.LOAD", str(exc), Path(config_path), effective_policy)
-            _write_refused_artifacts(run_dir, failed)
-            raise CheckedRunError("run refused: runtime plugin creation failed", CheckedRunResult(actual_run_id, run_dir, failed)) from exc
+        from vibeflow.tooling.application.python.project.lifecycle import lifecycle_registry, checked_runtime_plugins
+        from vibeflow.targets.python.project.plugins import plugin_lifetime
+        runtime_registry = checked_runtime_plugins(
+            lambda: lifecycle_registry(env.registry, workflow_id=str(config_path), config_path=config_path,
+                                       plugin_types=("runtime",)),
+            config_path=config_path, effective_policy=effective_policy, run_dir=run_dir)
         health = replace(health, info={**health.info, "plugins": {"plugins": [
             *plugin_registry.to_dict()["plugins"], *runtime_registry.to_dict()["plugins"]]}})
         _write_json(run_dir / "health_report.json", health.to_dict())
-        context = None
-        try:
+        with source_paths(env.registry.source_roots), plugin_lifetime(runtime_registry):
             context = _execute_runtime(
             graph,
             env.registry,
@@ -200,10 +197,8 @@ def run_workspace_checked(
             health=health,
             **execute_kwargs,
             )
-        finally:
-            release_runtime_plugins(runtime_registry)
         _write_json(run_dir / "output_summary.json", _summarize_run_result(context))
-        return CheckedRunResult(actual_run_id, run_dir, health, context)
+        return CheckedRunResult(actual_run_id, run_dir, health, context, bool(graph.outputs))
 
 
 def load_workspace_graph_for_export(
@@ -340,7 +335,7 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
     preflight_findings = [*forbidden, *annotate_findings(env.findings, root=root, source_path=config_path)]
     source_policy = env.effective_policy if policy_override is None else policy_override.effective_policy
     env.registry.configure_rule_defaults(purity_policy=source_policy.to_purity_policy())
-    from vibeflow.tooling.application.python.project.contributions import lifecycle_registry
+    from vibeflow.tooling.application.python.project.lifecycle import lifecycle_registry
     from vibeflow.targets.python.project.resource_rules import review_python_resource
     descriptor_catalogs = env.registry.rule_catalogs[0]
     # Libraries are reviewed when reached by the Node source closure. Lifecycle
@@ -366,8 +361,8 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
                                              plugin_types=("compiler",))
     except Exception as exc:
         return _workspace_error_report("PLUGIN.FACTORY.LOAD", str(exc), config_path, env.effective_policy)
-    try:
-        selected_config = {**document.data, "plugins": list(env.registry.loaded_plugins.lifecycle_selections)}
+    from vibeflow.targets.python.project.plugins import plugin_lifetime
+    with source_paths(env.registry.source_roots), plugin_lifetime(plugin_registry, plugin_type="compiler"):
         resources, resource_findings = select_python_resources(document.data, registry=env.registry, base_path=root.path)
         if resources.host_extensions:
             resolved_extensions, extension_findings = resolve_host_extension_resources(resources.host_extensions,
@@ -413,9 +408,6 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
         except GraphCompileError as exc:
             return fail_report(exc.rule_id, str(exc), "pipeline", "pipeline", "topology", effective_policy=effective_policy.to_dict())
         return PreparedWorkspaceGraph(document, graph, compilation, resources, plugin_registry, effective_policy, warnings)
-    finally:
-        from vibeflow.tooling.application.python.project.contributions import release_plugins
-        release_plugins(plugin_registry, plugin_type="compiler")
 
 
 def _with_effective_resource_source(resources, *, root: WorkspaceRoot, source_path: Path) -> tuple[object, ...]:

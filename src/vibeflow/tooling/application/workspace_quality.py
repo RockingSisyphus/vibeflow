@@ -9,6 +9,7 @@ import subprocess
 import sys
 from typing import Sequence
 
+from vibeflow.tooling.application.cli import _option_value
 from vibeflow.tooling.project.workspace_loader import load_workspace_config
 
 
@@ -195,16 +196,6 @@ def _aggregate_status(reports: list[dict[str, object]]) -> str:
     if not statuses:
         return "PASS"
     return max(statuses, key=lambda item: _STATUS_RANK.get(item, 3))
-
-
-def _option_value(args: list[str], name: str) -> str:
-    prefix = f"{name}="
-    for index, item in enumerate(args):
-        if item.startswith(prefix):
-            return item[len(prefix) :]
-        if item == name and index + 1 < len(args):
-            return args[index + 1]
-    return ""
 
 
 def _print_payload(

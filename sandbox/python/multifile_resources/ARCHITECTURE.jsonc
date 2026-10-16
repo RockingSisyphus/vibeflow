@@ -43,6 +43,7 @@
           "description_source": "call"
         },
         "flow_kind": "terminal",
+        "task_targets": {},
         "rulesets": [],
         "selected_rulesets": [],
         "tags": [],
@@ -62,7 +63,6 @@
           }
         },
         "effect_scope": "unconstrained",
-        "runtime_dispatch": "none",
         "execution_lock": null,
         "effective_execution_lock": null,
         "contains_global_state": false,
@@ -72,7 +72,6 @@
         "provides": [],
         "contract_source": "node_type",
         "join_policy": "safe_any",
-        "async": null,
         "loop": null,
         "io": null,
         "invokes": null,
@@ -107,6 +106,7 @@
           "description_source": "call"
         },
         "flow_kind": "process",
+        "task_targets": {},
         "rulesets": [
           "vibeflow.process"
         ],
@@ -134,7 +134,6 @@
           }
         },
         "effect_scope": "none",
-        "runtime_dispatch": "none",
         "execution_lock": null,
         "effective_execution_lock": null,
         "contains_global_state": false,
@@ -150,7 +149,6 @@
         ],
         "contract_source": "node_type",
         "join_policy": "safe_any",
-        "async": null,
         "loop": null,
         "io": null,
         "invokes": null,
@@ -185,6 +183,7 @@
           "description_source": "call"
         },
         "flow_kind": "terminal",
+        "task_targets": {},
         "rulesets": [],
         "selected_rulesets": [],
         "tags": [],
@@ -204,7 +203,6 @@
           }
         },
         "effect_scope": "unconstrained",
-        "runtime_dispatch": "none",
         "execution_lock": null,
         "effective_execution_lock": null,
         "contains_global_state": false,
@@ -214,7 +212,6 @@
         "provides": [],
         "contract_source": "node_type",
         "join_policy": "safe_any",
-        "async": null,
         "loop": null,
         "io": null,
         "invokes": null,
@@ -388,22 +385,42 @@
     }
   },
   "resources": {
-    "base_lib": [],
+    "base_lib": [
+      {
+        "module": "math_resource",
+        "id": "demo.math",
+        "status": "implemented",
+        "display_name": "demo.math",
+        "category": "",
+        "description": "demo.math",
+        "version": "",
+        "rulesets": [
+          "vibeflow.base_lib"
+        ],
+        "source": {
+          "root_id": "resource-python",
+          "path": "math_resource.py"
+        }
+      }
+    ],
     "plugins": [
       {
-        "name": "demo.runtime",
+        "name": "",
         "type": "runtime",
         "targets": [
           "python"
         ],
         "dependencies": [],
-        "config": {},
+        "config": {
+          "defaults": {},
+          "schema": {}
+        },
         "config_keys": [],
         "id": "demo.runtime",
         "status": "implemented",
         "display_name": "demo",
         "category": "",
-        "description": "demo.runtime",
+        "description": "",
         "version": "",
         "rulesets": [
           "vibeflow.plugin"
@@ -412,7 +429,7 @@
           "root_id": "resource-python",
           "path": "plugin.py"
         },
-        "module": "plugin.py",
+        "module": "plugin",
         "class": "create_runtime",
         "priority": 100
       }
@@ -501,6 +518,7 @@
             {
               "ruleset_id": "vibeflow.process",
               "entrypoint": "import",
+              "graph_scope": "current_graph",
               "order": [
                 "imports"
               ],
@@ -531,12 +549,40 @@
             {
               "ruleset_id": "vibeflow.process",
               "entrypoint": "static",
+              "graph_scope": "current_graph",
               "order": [
+                "architecture",
+                "async",
                 "effects",
+                "inputs",
                 "interface",
                 "maintainability"
               ],
               "calls": [
+                {
+                  "id": "architecture",
+                  "rule_id": "vibeflow.node_architecture",
+                  "original_rule_id": "vibeflow.node_architecture",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "vibeflow.process"
+                  ],
+                  "parameter_sources": {}
+                },
+                {
+                  "id": "async",
+                  "rule_id": "vibeflow.async_lifecycle",
+                  "original_rule_id": "vibeflow.async_lifecycle",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "vibeflow.process"
+                  ],
+                  "parameter_sources": {}
+                },
                 {
                   "id": "effects",
                   "rule_id": "vibeflow.no_side_effects",
@@ -553,6 +599,33 @@
                   "parameter_sources": {
                     "effect_scope": "call:effects",
                     "policy": "default:vibeflow.no_side_effects"
+                  }
+                },
+                {
+                  "id": "inputs",
+                  "rule_id": "vibeflow.input_writes",
+                  "original_rule_id": "vibeflow.input_writes",
+                  "params": {
+                    "mutating_methods": [
+                      "append",
+                      "clear",
+                      "extend",
+                      "insert",
+                      "pop",
+                      "popitem",
+                      "remove",
+                      "setdefault",
+                      "sort",
+                      "update"
+                    ]
+                  },
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "vibeflow.process"
+                  ],
+                  "parameter_sources": {
+                    "mutating_methods": "default:vibeflow.input_writes"
                   }
                 },
                 {
@@ -595,12 +668,40 @@
             {
               "ruleset_id": "vibeflow.process",
               "entrypoint": "run",
+              "graph_scope": "current_graph",
               "order": [
+                "architecture",
+                "async",
                 "effects",
+                "inputs",
                 "interface",
                 "maintainability"
               ],
               "calls": [
+                {
+                  "id": "architecture",
+                  "rule_id": "vibeflow.node_architecture",
+                  "original_rule_id": "vibeflow.node_architecture",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "vibeflow.process"
+                  ],
+                  "parameter_sources": {}
+                },
+                {
+                  "id": "async",
+                  "rule_id": "vibeflow.async_lifecycle",
+                  "original_rule_id": "vibeflow.async_lifecycle",
+                  "params": {},
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "vibeflow.process"
+                  ],
+                  "parameter_sources": {}
+                },
                 {
                   "id": "effects",
                   "rule_id": "vibeflow.no_side_effects",
@@ -617,6 +718,33 @@
                   "parameter_sources": {
                     "effect_scope": "call:effects",
                     "policy": "default:vibeflow.no_side_effects"
+                  }
+                },
+                {
+                  "id": "inputs",
+                  "rule_id": "vibeflow.input_writes",
+                  "original_rule_id": "vibeflow.input_writes",
+                  "params": {
+                    "mutating_methods": [
+                      "append",
+                      "clear",
+                      "extend",
+                      "insert",
+                      "pop",
+                      "popitem",
+                      "remove",
+                      "setdefault",
+                      "sort",
+                      "update"
+                    ]
+                  },
+                  "dependencies": [],
+                  "inputs": {},
+                  "origins": [
+                    "vibeflow.process"
+                  ],
+                  "parameter_sources": {
+                    "mutating_methods": "default:vibeflow.input_writes"
                   }
                 },
                 {
@@ -821,6 +949,7 @@
             {
               "ruleset_id": "vibeflow.base_lib",
               "entrypoint": "import",
+              "graph_scope": "current_graph",
               "order": [
                 "imports"
               ],
@@ -851,6 +980,7 @@
             {
               "ruleset_id": "vibeflow.base_lib",
               "entrypoint": "static",
+              "graph_scope": "current_graph",
               "order": [
                 "effects",
                 "maintainability"
@@ -898,6 +1028,7 @@
             {
               "ruleset_id": "vibeflow.base_lib",
               "entrypoint": "run",
+              "graph_scope": "current_graph",
               "order": [
                 "effects",
                 "maintainability"
@@ -1038,6 +1169,7 @@
             {
               "ruleset_id": "vibeflow.plugin",
               "entrypoint": "import",
+              "graph_scope": "current_graph",
               "order": [
                 "imports"
               ],
@@ -1068,6 +1200,7 @@
             {
               "ruleset_id": "vibeflow.plugin",
               "entrypoint": "static",
+              "graph_scope": "current_graph",
               "order": [
                 "effects",
                 "interface",
@@ -1132,6 +1265,7 @@
             {
               "ruleset_id": "vibeflow.plugin",
               "entrypoint": "run",
+              "graph_scope": "current_graph",
               "order": [
                 "effects",
                 "interface",
@@ -1276,6 +1410,7 @@
             {
               "ruleset_id": "vibeflow.plugin_declaration",
               "entrypoint": "import",
+              "graph_scope": "current_graph",
               "order": [
                 "imports"
               ],
@@ -1306,6 +1441,7 @@
             {
               "ruleset_id": "vibeflow.plugin_declaration",
               "entrypoint": "static",
+              "graph_scope": "current_graph",
               "order": [
                 "maintainability"
               ],
@@ -1334,6 +1470,7 @@
             {
               "ruleset_id": "vibeflow.plugin_declaration",
               "entrypoint": "run",
+              "graph_scope": "current_graph",
               "order": [
                 "maintainability"
               ],
@@ -1621,5 +1758,90 @@
         "relation": "contributes"
       }
     ]
-  }
+  },
+  "call_effect_scopes": [
+    {
+      "call_path": [
+        "end"
+      ],
+      "effect_scope": "unconstrained"
+    },
+    {
+      "call_path": [
+        "model"
+      ],
+      "effect_scope": "none"
+    },
+    {
+      "call_path": [
+        "start"
+      ],
+      "effect_scope": "unconstrained"
+    }
+  ],
+  "rule_selections": [
+    {
+      "kind": "graph",
+      "owner": "pipeline",
+      "call_path": [],
+      "declaration_only": false,
+      "selection": {
+        "references": [
+          "vibeflow.workflow"
+        ],
+        "source": "dynamic",
+        "origin": "pipeline",
+        "replaced": [
+          "vibeflow.workflow"
+        ]
+      }
+    },
+    {
+      "kind": "node",
+      "owner": "pipeline",
+      "type_key": "demo.start",
+      "call_path": [
+        "start"
+      ],
+      "declaration_only": false,
+      "selection": {
+        "references": [],
+        "source": "static",
+        "origin": "demo.start",
+        "replaced": []
+      }
+    },
+    {
+      "kind": "node",
+      "owner": "pipeline",
+      "type_key": "demo.model",
+      "call_path": [
+        "model"
+      ],
+      "declaration_only": false,
+      "selection": {
+        "references": [
+          "vibeflow.process"
+        ],
+        "source": "static",
+        "origin": "demo.model",
+        "replaced": []
+      }
+    },
+    {
+      "kind": "node",
+      "owner": "pipeline",
+      "type_key": "demo.start",
+      "call_path": [
+        "end"
+      ],
+      "declaration_only": false,
+      "selection": {
+        "references": [],
+        "source": "static",
+        "origin": "demo.start",
+        "replaced": []
+      }
+    }
+  ]
 }

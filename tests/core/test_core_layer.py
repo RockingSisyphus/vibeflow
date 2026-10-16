@@ -781,15 +781,22 @@ def test_task_target_validation_covers_nested_declarations(invalid):
     elif invalid=='unknown_target':
         target=NodeSpec('work','fixture.unknown')
         code='NODE.TYPE.UNKNOWN'
-    elif invalid=='retired_target':
-        target=NodeSpec('work','fixture.work',async_mode='detached',status='planned')
-        code='GRAPH.ASYNC.MIGRATION'
     else:
-        definition=NodesetSpec('fixture.body','Body','Legacy nested declaration',(),(),
-            GraphConfig((NodeSpec('work','fixture.work',async_mode='detached',status='planned'),)))
-        definitions={definition.type_key:definition}
-        target=NodeSpec('body',definition.type_key)
-        code='GRAPH.ASYNC.MIGRATION'
+        # Retired fields cannot enter the v7 model, including task targets and
+        # nested definitions. JSON users still receive the migration diagnostic.
+        with pytest.raises(TypeError, match='async_mode'):
+            NodeSpec('work','fixture.work',async_mode='detached',status='planned')
+        from vibeflow.core.config import parse_graph_config_data
+        from vibeflow.core.flow import GraphConfigError
+        call = {'id':'work','type_used':'fixture.work','async':'detached'}
+        if invalid == 'retired_target':
+            data = {'pipeline':{'nodes':[{'id':'manager','type_used':'fixture.manager','task_targets':{'work':call}}]}}
+        else:
+            data = {'pipeline':{'nodes':[]},'nodesets':[{'type_key':'fixture.body','display_name':'Body',
+                'description':'Nested definition','requires':[],'provides':[],'pipeline':{'nodes':[call]}}]}
+        with pytest.raises(GraphConfigError,match='GRAPH.ASYNC.MIGRATION'):
+            parse_graph_config_data(data)
+        return
     graph=GraphConfig((NodeSpec('manage','fixture.manager',task_targets={'work':target}),),nodesets=definitions)
     facts=ImplementationFacts((ImplementationFact('fixture.manager',flow_kind='task_manager'),
                                ImplementationFact('fixture.work',flow_kind='process')),strict=True)

@@ -12,7 +12,7 @@ terminal start → input I/O → process / nodeset → output I/O → terminal e
 
 ## 主要能力
 
-- Python Runtime 与 JavaScript/TypeScript AOT；
+- Python Runtime、Python 目录 AOT 与 JavaScript/TypeScript AOT；
 - Python 和 JS/TS 插件 SDK，以代码声明 Node、Rule、Ruleset 等资源，由 workflow 显式选择；
 - 可组合的 Rule/Ruleset，以及 Node、Nodeset、Loop、Capability 与显式副作用边界；
 - Node、BaseLib、Plugin 与 Host 的多文件实现、源码归属、逐文件审查和默认图形样式；
@@ -60,7 +60,7 @@ node javascript_project/scripts/workflow_execution_probe.mjs
 python tools/verify_project.py --full
 ```
 
-当前发行包版本为 `0.20.0`，Workflow ABI 为 `vibeflow.workflow.v6`，AOT manifest 为 `vibeflow.aot-build.v2`。等待结果现在会消费任务引用；已接收结果由父流程保存和传递。旧并发入口须迁移为任务管理 Node 与声明目标；旧计划与构建目录需重新生成。接口见[原生任务管理](distribution/docs/user/task-management.md)。
+当前发行包版本为 `1.0.0`，Workflow ABI 为 `vibeflow.workflow.v7`，AOT manifest 为 `vibeflow.aot-build.v3`。Python 与 JavaScript 共用执行计划和构建编排；Python bundle 随附匹配框架，可搬离原项目运行。旧计划与构建目录需重新生成；已有独立 JS 产物仍可使用其随附运行代码。使用方法见[Python AOT](distribution/docs/user/python-development.md#aot-目录部署)，完整变更见[1.0.0 发布说明](docs/maintainers/history/release-1.0.0.md)。
 
 质量检查只覆盖当前实际选择的 Rule；不证明业务正确、代码安全、算法确定性或全部无副作用。有限 Python 输入写入规则独立于效果政策，详见[产品检查边界](distribution/docs/user/product-check-boundaries.md)。
 

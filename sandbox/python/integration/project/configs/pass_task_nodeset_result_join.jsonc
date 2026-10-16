@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "name": "pass.async_nodeset_result_key_join",
+    "name": "pass.task_nodeset_result_join",
     "version": "0.1.0"
   },
   "pipeline": {
@@ -80,7 +80,7 @@
   },
   "nodeset_imports": [
     {
-      "path": "nodesets/pass_async_nodeset_result_key_join/math_add_five.jsonc"
+      "path": "nodesets/pass_task_nodeset_result_join/math_add_five.jsonc"
     }
   ],
   "plugins": [

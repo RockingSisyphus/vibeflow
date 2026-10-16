@@ -16,7 +16,7 @@ Python 可按 plan、block 或 compiled 模式执行；JavaScript emitter 将同
 
 ## 异步所有权
 
-TaskPlan ABI v6 保存 task_manager 调用、有限任务槽、目标 Block 和 Target 执行器。TaskRef 普通数组沿数据连边传递，显式 start、waitAny、requestStop、waitAllExited 控制实际执行。结果只在实际工作、finally、SDK 操作及后代收尾后通知；正常结束、异常、外部取消统一停止并等待所属工作。失败由管理 Node 作为数据处理，未消费失败在最终收尾时报错。旧 async/result_key/detached 调用入口报迁移错误，不再维护 pending/detached 容器。编译链路、任务记录、线程/事件循环、SDK 操作归属及收尾错误机制见[任务管理设计](task-management.md)。
+TaskPlan ABI v7 保存 task_manager 调用、有限任务槽、目标 Block 和 Target 执行器。TaskRef 普通数组沿数据连边传递，显式 start、waitAny、requestStop、waitAllExited 控制实际执行。结果只在实际工作、finally、SDK 操作及后代收尾后通知；正常结束、异常、外部取消统一停止并等待所属工作。失败由管理 Node 作为数据处理，未消费失败在最终收尾时报错。旧 async/result_key/detached 调用入口报迁移错误，不再维护 pending/detached 容器。编译链路、任务记录、线程/事件循环、SDK 操作归属及收尾错误机制见[任务管理设计](task-management.md)。
 
 ## 副作用与执行锁
 
@@ -28,7 +28,7 @@ effect scope 来自选中 Rule 的有效 `vibeflow.effect_policy.v1` 资料，�
 
 ## 检查与执行入口
 
-固定插件入口及直接导入先初始化以提供资源定义。import 检查在后续绑定前执行：已加载源码接受诊断，尚未加载的延迟实现及闭包在检查失败后保持未加载。static 用于 quality、validate、review 和构建审查；Python run 执行选定运行入口，JS AOT 产物按原生计划执行业务。新领域 Ruleset 未声明 run/import 时，这两个入口为空。
+固定插件入口及直接导入先初始化以提供资源定义。import 检查在后续绑定前执行：已加载源码接受诊断，尚未加载的延迟实现及闭包在检查失败后保持未加载。static 用于 quality、validate、review 和 JS 构建审查；Python 源码 run 与 AOT 构建执行选定 run 入口的静态审查，Python bundle 运行复用构建结果。两端 AOT 产物按保存的原生计划执行业务。新领域 Ruleset 未声明 run/import 时，这两个入口为空。
 
 规则结果记录健康判断，解析、符号绑定和执行计划提供原生成功或失败事实；两者分别汇入正式报告。资源查询和 review-rules 加载声明，框架不调用检查函数、业务入口或生命周期工厂。装配职责见[系统架构的插件装配与多文件源码](system-architecture.md#插件装配与多文件源码)。
 
@@ -38,7 +38,7 @@ source 范围的规则只能按本次检查内明确的源码快照、声明、�
 
 JS/TS Host 由一个 createHost 工厂创建一个具有 capabilities/start/stop 的实例。入口及 implementation_files 中的支撑实现共同服务该实例；订阅、FIFO、取消、计时器、IO 与回执保留即时处理时机。会话状态在工厂内建立或显式传给支撑对象，各 createWorkflowHost 调用持有独立状态。Host dependencies 表达其他宿主实例依赖，base_libs 表达独立辅助库引用。
 
-AOT 打包实际运行依赖，TS 类型在构建时擦除；Rule 和 compiler 专用代码留在检查与编译环境。多文件登记提供完整审查资料，文件是否初始化仍由真实运行引用决定。
+JS AOT 打包实际运行依赖，TS 类型在构建时擦除；Rule 和 compiler 专用代码留在检查与编译环境。Python 目录 bundle 附带匹配框架、项目实现与资源，保存计划和生成代码，运行时不重复执行 Rule 或编译插件；收集源码文件不意味着运行时调用其检查或编译入口。多文件登记提供完整审查资料，文件是否初始化仍由真实运行引用决定。
 
 ## Trace 与执行证据
 
