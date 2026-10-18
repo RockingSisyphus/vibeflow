@@ -67,7 +67,7 @@ python distribution/build.py --profile autonomous --output-dir /tmp/vf-autonomou
 
 先完成文档、版本、正式 ZIP、解压部署与哈希验证，再提交并推送不可变标签。Release 使用已有空草稿和审核后的发布说明，附件为两个 ZIP 与对应的 SHA256SUMS 文件；上传完成后下载核对字节，再发布为正式版本。
 
-本地上传端点不可用时，可手动运行 `.github/workflows/release.yml`，传入标签、已验证的完整 commit 和两个 ZIP 的 SHA256。workflow 从标签构建，哈希不匹配即停止；只有产物与已验证包一致才使用 GitHub 的标准 job token 上传并发布。不得为重试移动标签、覆盖既有资产或降低哈希检查。构建与上传失败时草稿保持未发布。
+本地上传端点不可用时，可手动运行 `.github/workflows/release.yml`，通过 Git Database API 将已验证的 ZIP 写为临时传输 blob，不提交到源码历史；传入标签、已验证的完整 commit、两个 blob ID 和 ZIP 的 SHA256。workflow 检出标签核对版本及提交，取回原始 ZIP，哈希不匹配即停止；只有原始字节一致才使用 GitHub 的标准 job token 上传并发布。这样不会因另一主机重新压缩而换成未经验证的归档。不得为重试移动标签、覆盖既有资产或降低哈希检查。构建与上传失败时草稿保持未发布。
 
 ## 文档装配
 
