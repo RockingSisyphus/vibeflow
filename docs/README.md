@@ -49,6 +49,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - [综合数学沙箱说明](maintainers/comprehensive-math-sandbox.md)
 - [VibeFlow 职责边界与整改规格](maintainers/product-boundary-refactor-spec-20261009.md)：完整职责定义、11 项源码定位、当前与目标逻辑、删改停止点和实施后验收。
 - [双语言 AOT 与维护整理实施记录](maintainers/aot-unification-implementation.md)
+- [1.0.2 发布说明](maintainers/history/release-1.0.2.md)：普通并发节点的双圆图形修复。
 - [1.0.1 发布说明](maintainers/history/release-1.0.1.md)：并发迁移、局部队列与真实沙箱验收。
 - [1.0.0 发布说明](maintainers/history/release-1.0.0.md)
 - [开发与验证](maintainers/development.md)

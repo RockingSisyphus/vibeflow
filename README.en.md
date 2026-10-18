@@ -60,5 +60,5 @@ Run the complete source-repository gate with:
 python tools/verify_project.py --full
 ```
 
-Current distribution package version: `1.0.1`. Workflow ABI: `vibeflow.workflow.v8`. AOT manifest: `vibeflow.aot-build.v3`.
-This release removes the task-management API in favor of ordinary nodes, explicit branches and separate all-join collectors. Each dispatch node has its own `config.max_concurrency` limit, defaulting to 8, with queued calls admitted after actual cleanup. Migrate old configurations and rebuild plans and AOT artifacts. See [graph concurrency and migration](distribution/docs/user/graph-concurrency.md) and the [1.0.1 release notes](docs/maintainers/history/release-1.0.1.md).
+Current distribution package version: `1.0.2`. Workflow ABI: `vibeflow.workflow.v8`. AOT manifest: `vibeflow.aot-build.v3`.
+This release restores the default double-circle shapes for ordinary dispatch and all-join collector nodes. Regenerate Architecture and SVG outputs when upgrading from 1.0.1; no additional configuration migration is required. Earlier versions still require the [graph concurrency migration](distribution/docs/user/graph-concurrency.md). See the [1.0.2 release notes](docs/maintainers/history/release-1.0.2.md).
