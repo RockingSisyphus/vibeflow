@@ -10,14 +10,25 @@ def append_join_policy_health(graph, compiled, state, *, owner: str = "pipeline"
     schedule_edges = tuple(compiled.resolved_schedule_edges)
     transfer_edges = tuple(compiled.resolved_transfer_edges)
     incoming_edges: dict[str, list[object]] = {node.name: [] for node in graph.nodes}
+    outgoing_targets: dict[str, set[str]] = {}
     transfer_incoming: dict[str, list[object]] = {node.name: [] for node in graph.nodes}
     for edge in schedule_edges:
         incoming_edges.setdefault(edge.target, []).append(edge)
+        outgoing_targets.setdefault(edge.source, set()).add(edge.target)
     for edge in transfer_edges:
         transfer_incoming.setdefault(edge.target, []).append(edge)
     paths = BranchPaths(graph, compiled)
     for node in graph.nodes:
         if node.join_policy == JOIN_POLICY_ALL:
+            successors = outgoing_targets.get(node.name, set())
+            predecessors = {edge.source for edge in incoming_edges.get(node.name, ())}
+            if len(predecessors) > 1 and len(successors) > 1:
+                state.errors.append(_data_finding(
+                    "GRAPH.JOIN.FORK_CONFLICT", node.name,
+                    f"node '{node.name}' cannot collect multiple branches and dispatch another fanout in the same call",
+                    node=node.name, severity="error", details={"owner": owner,
+                        "predecessors": sorted(predecessors), "successors": sorted(successors),
+                        "suggestion": "Add a separate downstream dispatch node after the all-join."}))
             _append_all_join_edge_class_findings(
                 node,
                 incoming_edges.get(node.name, ()),

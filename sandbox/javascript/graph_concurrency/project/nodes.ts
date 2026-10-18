@@ -1,17 +1,43 @@
 let started=0,release:()=>void;
 let barrier=new Promise<void>(resolve=>release=resolve);
+const queueStarted=new Set<number>();
+let initialReady:()=>void,refillReady:()=>void;
+let initial:Promise<void>,refill:Promise<void>;
+function resetQueue(){
+ queueStarted.clear();
+ initial=new Promise<void>(resolve=>initialReady=resolve);
+ refill=new Promise<void>(resolve=>refillReady=resolve);
+}
+resetQueue();
+async function waitForQueue(index:number,capacity:number){
+ queueStarted.add(index);
+ if(queueStarted.size===capacity)initialReady();
+ if(index===capacity)refillReady();
+ let timer:ReturnType<typeof setTimeout>;
+ try {
+  await Promise.race([(async()=>{await initial;if(index<capacity-1)await refill;})(),
+   new Promise<never>((_,reject)=>timer=setTimeout(()=>reject(Error('queue did not refill')),5000))]);
+ } finally {clearTimeout(timer!);}
+}
 export function terminal(){return {};}
 async function worker(inputs:any,params:any,context:any){
  const index=params.index;context.trace('worker_started',{index});
  try {
-  const phase=barrier;
-  if(++started===12){release();started=0;barrier=new Promise<void>(resolve=>release=resolve);}
-  await phase;
+  const scenario=inputs.scenario.value;
+  if(scenario==='queue4'||scenario==='queue8')await waitForQueue(index,Number(scenario.slice(5)));
+  else {
+   const phase=barrier;
+   if(++started===12){release();started=0;barrier=new Promise<void>(resolve=>release=resolve);}
+   await phase;
+  }
   await new Promise(resolve=>setTimeout(resolve,12-index));
   return index as number;
  } finally {await new Promise(resolve=>setTimeout(resolve,5));context.trace('cleanup_finished',{index});}
 }
-export function collect(inputs:any){return {report:inputs.receipt.map((item:any)=>item.value)};}
+export function collect(inputs:any,params:any,context:any){
+ context.trace('collector_started',{});resetQueue();
+ return {report:inputs.receipt.map((item:any)=>item.value)};
+}
 
 export async function worker0(inputs:any,params:any,context:any){return {receipt0:await worker(inputs,params,context)};}
 export async function worker1(inputs:any,params:any,context:any){return {receipt1:await worker(inputs,params,context)};}

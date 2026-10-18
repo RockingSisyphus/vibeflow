@@ -16,4 +16,8 @@ const r13=defineNode({"type_key": "native.collect", "display_name": "collect", "
 const r14=defineDataSchema({"type_key": "scenario", "representation": "json", "schema": {"type": "string"}});
 const r15=defineDataSchema({"type_key": "receipt", "representation": "json", "schema": {"type": "integer"}});
 const r16=defineDataSchema({"type_key": "report", "representation": "json", "schema": {"type": "array", "items": {"type": "integer"}}});
-export const plugin=definePlugin({id:"graph.concurrency",resources:[r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,r15,r16]});
+const r17=defineNode({type_key:'native.noop',display_name:'Noop',description:'Contract-free topology probe',version:'1',
+ flow_kind:'process',rulesets:[],contract:{requires:[],provides:[],params_schema:{},params_defaults:{}},
+ implementations:[{language:'typescript',targets:['node','browser'],completion:'immediate',
+ source:{kind:'file',ref:'nodes.ts',export:'terminal'}}]});
+export const plugin=definePlugin({id:"graph.concurrency",resources:[r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,r15,r16,r17]});

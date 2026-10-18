@@ -7,7 +7,7 @@
       }
     }
   ],
-  "rulesets": [],
+  "rulesets": ["vibeflow.workflow"],
   "pipeline": {
     "entry_mode": "sync",
     "inputs": [

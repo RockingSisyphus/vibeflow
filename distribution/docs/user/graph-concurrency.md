@@ -13,6 +13,8 @@ flowchart LR
 
 分发与收集是不同的普通节点。分发节点通过输出和正常边激活分支；收集节点使用 `join_policy: all`，等所有直接前驱本轮完成后执行一次。多值输入使用 `cardinality: all`，保留完整 envelope；结果按图中节点声明顺序交付，不按实际完成先后排序。收集后需要再次分发时，增加独立的下游分发节点。
 
+标准 Workflow 规则将同一节点既回收又分发报告为错误 `GRAPH.JOIN.FORK_CONFLICT`，分支无法到达结束节点报告为错误 `GRAPH.FLOW.CANNOT_REACH_END`；验证和构建均拒绝这两类配置。
+
 在分发节点的 `config` 中设置 `max_concurrency`，省略时默认 **8**，只接受正整数：
 
 ```jsonc
