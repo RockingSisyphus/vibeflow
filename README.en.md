@@ -60,5 +60,5 @@ Run the complete source-repository gate with:
 python tools/verify_project.py --full
 ```
 
-Current distribution package version: `1.0.0`. Workflow ABI: `vibeflow.workflow.v7`. AOT manifest: `vibeflow.aot-build.v3`.
-Python and JavaScript share workflow plans and build orchestration. Python bundles include the matching framework and run independently of the original project. Rebuild old plans and build directories; existing standalone JS artifacts can continue using their bundled runtime. See [Python AOT](distribution/docs/user/python-development.md#aot-目录部署) and the [1.0.0 release notes](docs/maintainers/history/release-1.0.0.md).
+Current distribution package version: `1.0.1`. Workflow ABI: `vibeflow.workflow.v8`. AOT manifest: `vibeflow.aot-build.v3`.
+This release removes the task-management API in favor of ordinary nodes, explicit branches and separate all-join collectors. Each dispatch node has its own `config.max_concurrency` limit, defaulting to 8, with queued calls admitted after actual cleanup. Migrate old configurations and rebuild plans and AOT artifacts. See [graph concurrency and migration](distribution/docs/user/graph-concurrency.md) and the [1.0.1 release notes](docs/maintainers/history/release-1.0.1.md).

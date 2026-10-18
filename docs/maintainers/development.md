@@ -39,13 +39,15 @@ python tests/fixtures/rule_gaps/run_all.py --workers 8
 VIBEFLOW_TEST_WORKERS=4 python tools/verify_project.py --full
 ```
 
-优先级为命令行、`VIBEFLOW_TEST_WORKERS`、默认值 8；`--workers 1` 使用串行调度，0、负数和非整数报参数错误。该设置控制验收调度，与业务 Runtime 的线程池设置分别配置。
+优先级为命令行、`VIBEFLOW_TEST_WORKERS`、默认值 8；`--workers 1` 使用串行调度，0、负数和非整数报参数错误。该设置只控制验收调度；业务并发由各分发调用的 `config.max_concurrency` 独立控制，不存在全局业务线程池设置。
 
 pytest 使用独立进程，并按文件分组；同一文件内的测试按顺序执行。每个 worker 有自己的工作目录和临时资料。沙箱使用线程池调度隔离子进程；接口组及资源的六个子组进入同一个队列，避免嵌套线程池叠加并发数。组内的修改、验证、恢复步骤保持顺序；完整验收各阶段及共享一套产物的旧集成场景也保留原先顺序。
 
 该入口固定本仓 `src`、关闭用户站点和自动加载的第三方 pytest 插件，并明确加载 xdist 与工作目录适配器，在结束后移除临时目录。这样运行时默认的 `runs/vibeflow` 与测试缓存不会污染工作树。
 
 完整入口覆盖仓库质量、pytest、Python sandbox、JavaScript integration、真实浏览器、基线规则对照、接口与多文件资源沙箱、wheel 隔离、双发行 smoke、确定性归档及清洁工作树检查。
+
+并发改动的专项入口为两个 Target 的 `sandbox/<target>/graph_concurrency/run_all.py`。它们固定验证正常容量 12、容量 4 和默认 8 的真实峰值及清理后补位，并要求回收兼分发、断路配置同时被 `validate` 和 `build` 拒绝。JavaScript 必须提供 `--puppeteer-root` 才能计为完整通过；缺少浏览器时报告 `REDUCED`。命令、逐项判定和报告位置见 [Python 沙箱](../../sandbox/python/graph_concurrency/README.md)与 [JavaScript 沙箱](../../sandbox/javascript/graph_concurrency/README.md)。发布验证保留本次实际批次，不把此前测试结果改称新全量。
 
 资源专项使用正式 CLI，覆盖登记、归属、规则、修改、展示和原生运行。单独重跑见[sandbox/resources](history/multifile-resource-sandbox.md)；稳定案例与历史验收分别见[案例对应表](../design/history/multifile-resource-cases.md)和[实现验收记录](../design/history/multifile-resources-results.md)。
 
