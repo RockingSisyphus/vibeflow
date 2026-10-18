@@ -1,6 +1,6 @@
-# 待发布：并发节点 SVG 图形修复
+# VibeFlow 1.0.2
 
-恢复普通 process 分发与多前驱 all 回收节点的双圆默认图形。识别只读取正常调度边，在共享展示级联中实现，保留 Node 和调用级形状覆盖；没有恢复旧任务管理类型。Python、JavaScript 的 Architecture、Mermaid 及真实 SVG 回归验证这两种图形。此修复尚未进入已发布的 1.0.1 资产。
+恢复普通 process 分发与多前驱 all 回收节点的双圆默认图形。识别只读取正常调度边，在共享展示级联中实现，保留 Node 和调用级形状覆盖；没有恢复旧任务管理类型。Python、JavaScript 的 Architecture、Mermaid 及真实 SVG 回归验证这两种图形。此修复进入 1.0.2；1.0.1 历史资产保持原样。ABI、运行和并发容量规则不变，从 1.0.1 升级只需重新生成 Architecture 和 SVG。详见 [1.0.2 发布说明](history/release-1.0.2.md)。
 
 # VibeFlow 1.0.1
 
@@ -12,7 +12,7 @@
 
 # 发行与文档装配
 
-VibeFlow 当前发行版本为 1.0.1，提供 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目、Workflow ABI v8 和 AOT manifest v3。并发升级见[普通图并发迁移](../../distribution/docs/user/graph-concurrency.md#从旧任务接口迁移)，更早资源接口迁移见 [统一资源迁移](../../distribution/docs/user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖历史发行包。
+VibeFlow 当前发行版本为 1.0.2，提供 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目、Workflow ABI v8 和 AOT manifest v3。并发升级见[普通图并发迁移](../../distribution/docs/user/graph-concurrency.md#从旧任务接口迁移)，更早资源接口迁移见 [统一资源迁移](../../distribution/docs/user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖历史发行包。
 
 此前 1.0.0 统一 Block Compiler，并新增 Python 目录 AOT：计划 ABI v7、构建 manifest v3。旧计划需重新构建；历史发行资产保持原字节。实施与完整验收见[双语言 AOT 与维护整理记录](aot-unification-implementation.md)，历史变更与发行验证见[1.0.0 发布说明](history/release-1.0.0.md)。
 
