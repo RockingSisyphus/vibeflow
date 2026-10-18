@@ -254,7 +254,7 @@ def _node_document(
         "selected_rulesets": selected_rulesets,
         "tags": list(descriptor.tags) if descriptor is not None else [],
         "metadata": dict(descriptor.metadata) if descriptor is not None else {},
-        "presentation": resolve_presentation(registry_descriptor(registry, node.type_used), flow_kind=node_flow_kind(node, compiled), native_class=("loopNode" if node.type_used in LOOP_NODE_TYPES else "nodesetNode") if invocation is not None else "", status_class="plannedNode" if planned else "", call_style=node.style).to_dict(),
+        "presentation": resolve_presentation(registry_descriptor(registry, node.type_used), flow_kind=node_flow_kind(node, compiled), native_class=("loopNode" if node.type_used in LOOP_NODE_TYPES else "nodesetNode") if invocation is not None else "", status_class="plannedNode" if planned else "", call_style=node.style, node=node, compiled=compiled).to_dict(),
         "effect_scope": node_review_effect_scope(graph, node, registry, compiled=compiled),
 
         "execution_lock": (

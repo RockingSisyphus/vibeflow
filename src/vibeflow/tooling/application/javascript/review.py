@@ -449,7 +449,7 @@ def _graph_mermaid(
         node_class = _node_class(node, nodeset=nodeset, flow_kind=flow_kind, is_external=is_external)
         presentation = _node_presentation_fact(result, graph, node) or resolve_presentation(descriptor, flow_kind=flow_kind,
             native_class="externalDependency" if descriptor is not None and bool(getattr(descriptor, "external", False)) and nodeset is None else "loopNode" if node.type_used in LOOP_NODE_TYPES else "nodesetNode" if nodeset is not None else "documentNode" if flow_kind == FLOW_KIND_DOCUMENT else "defaultNode",
-            status_class=node_class if node_class == "plannedNode" else "", call_style=node.style)
+            status_class=node_class if node_class == "plannedNode" else "", call_style=node.style, node=node, compiled=compiled)
         label = [display_name, "", f"id: {node.id}", f"type_used: {node.type_used}"]
         if presentation.values.get("icon"):
             label[0] = f"{presentation.values['icon']} {label[0]}"

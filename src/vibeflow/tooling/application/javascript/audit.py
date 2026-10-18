@@ -900,7 +900,7 @@ def _javascript_node_document(
     descriptor = catalogs.nodes.get(type_used)
     native_class = "externalDependency" if descriptor is not None and descriptor.external and nodeset is None else "loopNode" if is_loop else "nodesetNode" if nodeset is not None else "documentNode" if flow_kind == "document" else "defaultNode"
     planned = status == STATUS_PLANNED or nodeset is not None and nodeset.status == STATUS_PLANNED
-    presentation = resolve_presentation(descriptor, native_class=native_class, status_class="plannedNode" if planned else (health_classes or {}).get((id(graph), node_id), ""), call_style=getattr(node, "style", None), flow_kind=flow_kind)
+    presentation = resolve_presentation(descriptor, native_class=native_class, status_class="plannedNode" if planned else (health_classes or {}).get((id(graph), node_id), ""), call_style=getattr(node, "style", None), flow_kind=flow_kind, node=node, compiled=compiled)
     return {
         "id": node_id,
         "type_used": type_used,

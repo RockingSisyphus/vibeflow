@@ -15,6 +15,8 @@ flowchart LR
 
 标准 Workflow 规则将同一节点既回收又分发报告为错误 `GRAPH.JOIN.FORK_CONFLICT`，分支无法到达结束节点报告为错误 `GRAPH.FLOW.CANNOT_REACH_END`；验证和构建均拒绝这两类配置。
 
+流程图中，普通 process Node 的多路分发和多前驱 `all` 回收默认显示为双圆形。它们仍是普通节点，图形由实际调度边推导；纯数据边不改变并发图形，起止、Decision、Nodeset 等保留各自形状。Node 的 `presentation.shape` 和调用的 `style.shape` 仍可按正常优先级覆盖默认图形。
+
 这里的连接是实际调度边。仅传数据的 `schedule: false` 边不构成到结束节点的执行路径；需要传数据时可另外声明，不能用它替代工作节点到收集节点的正常下游连接。
 
 在分发节点的 `config` 中设置 `max_concurrency`，省略时默认 **8**，只接受正整数：

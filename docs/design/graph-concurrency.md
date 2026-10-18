@@ -20,6 +20,10 @@ JavaScript 的 [codegen_scheduler.py](../../src/vibeflow/targets/javascript/fron
 
 多个分发同时激活同一调用时，准入检查取所有所属额度的交集，并在实际退出后一起释放；使用分发对象身份去重，同容量的两个来源仍独立计数。
 
+## 展示
+
+共享 `node_presentation.resolve_presentation` 从已解析的正常调度边识别普通 process 调用的多路分发和多前驱 all 回收，默认使用双圆图形；Node 声明和调用级样式继续覆盖默认值。Python、JavaScript 的 Architecture 与 Mermaid 均传入同一调用和编译事实，颜色沿用现有级联。这个展示规则不创建新的 flow_kind、运行边界或任务管理类型，也不将纯传输边当作分发；起止、Decision 和复合块保留原生形状。
+
 ## 完成与观察
 
 Python NodeRunContext 只提供自身取消、能力访问与 trace。JavaScript NodeExecution 持有本次调用发起的 SDK 操作，包含 Promise.race 的未胜出操作。完成通知位于 finally 和能力清理之后；框架失败触发兄弟调用协作停止，仍等待不响应取消的工作实际返回。
