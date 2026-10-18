@@ -13,8 +13,8 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 ## 系统设计
 
 - [系统架构](design/system-architecture.md)：当前内核分层、插件装配与共享架构资料。
-- [执行模型](design/execution-model.md)：原生路由、任务、规则入口与宿主生命周期。
-- [普通图并发设计](design/graph-concurrency.md)：ABI v8 编译链路、任务归属、两侧执行器、取消收尾与维护验证。
+- [执行模型](design/execution-model.md)：普通图调度、显式汇合、规则入口与宿主生命周期。
+- [普通图并发设计](design/graph-concurrency.md)：ABI v8 编译链路、分发局部额度、两侧执行器、取消收尾与维护验证。
 - [Rule 机制设计](design/rule-system.md)：统一选择、资料与负责范围、协作、复用及维护边界。
 
 ## 设计演进与验收记录
@@ -49,6 +49,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - [综合数学沙箱说明](maintainers/comprehensive-math-sandbox.md)
 - [VibeFlow 职责边界与整改规格](maintainers/product-boundary-refactor-spec-20261009.md)：完整职责定义、11 项源码定位、当前与目标逻辑、删改停止点和实施后验收。
 - [双语言 AOT 与维护整理实施记录](maintainers/aot-unification-implementation.md)
+- [1.0.1 发布说明](maintainers/history/release-1.0.1.md)：并发迁移、局部队列与真实沙箱验收。
 - [1.0.0 发布说明](maintainers/history/release-1.0.0.md)
 - [开发与验证](maintainers/development.md)
 - [架构质检的阻断边界](maintainers/quality-boundaries.md)

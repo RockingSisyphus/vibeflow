@@ -1,5 +1,7 @@
 # 快速开始
 
+从 1.0.0 升级到 1.0.1 的项目须先完成[并发接口迁移](graph-concurrency.md#从旧任务接口迁移)，再重新构建。旧任务管理配置和 ABI v7 产物不能直接交给当前运行器。
+
 发行包包含两个最小可运行项目：`python_project` 使用 Python Runtime，`javascript_project` 使用 JavaScript/TypeScript AOT。每个项目都采用 start、输入边界、一个业务处理 Node、输出边界和 end 的结构。
 
 ## 选择项目根

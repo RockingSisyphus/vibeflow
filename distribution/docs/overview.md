@@ -38,4 +38,6 @@ VibeFlow 检查工程结构、源码健康度与所选领域约束。项目测�
 
 两个 profile 使用同一 Core、quality policy、项目模板和 Workflow ABI `vibeflow.workflow.v8`。profile 只改变开发协议、提示词和随包文档选择。
 
+1.0.1 使用普通图承载并发，旧任务管理接口已删除；分发与回收使用不同节点，每条分支显式连接到结束节点。已有项目升级时先按[并发迁移步骤](user/graph-concurrency.md#从旧任务接口迁移)更新配置，再重建计划和 AOT 产物。
+
 从发行包开始开发时，先阅读[快速开始](user/quickstart.md)，再按任务进入对应接口文档。

@@ -60,7 +60,7 @@ node javascript_project/scripts/workflow_execution_probe.mjs
 python tools/verify_project.py --full
 ```
 
-当前发行包版本为 `1.0.0`，Workflow ABI 为 `vibeflow.workflow.v7`，AOT manifest 为 `vibeflow.aot-build.v3`。Python 与 JavaScript 共用执行计划和构建编排；Python bundle 随附匹配框架，可搬离原项目运行。旧计划与构建目录需重新生成；已有独立 JS 产物仍可使用其随附运行代码。使用方法见[Python AOT](distribution/docs/user/python-development.md#aot-目录部署)，完整变更见[1.0.0 发布说明](docs/maintainers/history/release-1.0.0.md)。
+当前发行包版本为 `1.0.1`，Workflow ABI 为 `vibeflow.workflow.v8`，AOT manifest 为 `vibeflow.aot-build.v3`。本版删除旧任务管理接口，以普通节点、显式分支和独立 all 汇合承载并发；分发节点通过 `config.max_concurrency` 设置局部容量，默认 8，完成清理后即时补位。升级须迁移旧配置并重新生成计划和 AOT 产物。使用与迁移见[普通图并发](distribution/docs/user/graph-concurrency.md)，完整变更见[1.0.1 发布说明](docs/maintainers/history/release-1.0.1.md)。
 
 质量检查只覆盖当前实际选择的 Rule；不证明业务正确、代码安全、算法确定性或全部无副作用。有限 Python 输入写入规则独立于效果政策，详见[产品检查边界](distribution/docs/user/product-check-boundaries.md)。
 

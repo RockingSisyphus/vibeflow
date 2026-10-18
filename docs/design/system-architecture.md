@@ -76,7 +76,7 @@ Architecture JSONC 的 implementation_graph 保存当前项目的资源、源码
 
 并发工作使用普通节点和显式边：分发、工作、统一 all 汇合、结束。所有分支接受相同的断路检查；取消和真实清理由 Target 调度器持有，不再存在独立任务管理层。
 
-当前任务编译、Runtime/AOT 实现位置和退出顺序见[普通图并发设计](graph-concurrency.md)，维护时应同时核对公共计划、SDK 操作归属及最终收尾边界。
+当前并发编译、Runtime/AOT 实现位置和退出顺序见[普通图并发设计](graph-concurrency.md)，维护时应同时核对公共计划、分发局部额度、SDK 操作归属及最终收尾边界。
 
 
 ## 双语言计划与 AOT

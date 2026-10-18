@@ -73,6 +73,8 @@ Python Runtime 与 JavaScript/TypeScript AOT 使用同一公共输入契约。�
 
 `schedule: false` 只传数据，`transfer: false` 只调度；两者不能同时为 `false`。同步并行分支需要等待全部分支时，在汇合调用写 `join_policy: "all"`。互斥 decision 分支通常使用默认 safe-OR 合流。
 
+分发调用可以设置 `"config": {"max_concurrency": 4}`；未配置时默认 8。该字段是框架保留的正整数配置，不加入业务 `params_schema`，也不传给业务 `params`。完整的局部额度、排队补位、独立收集及断路规则见[普通图并发](graph-concurrency.md)。
+
 只有起点、终点、`when`、`schedule`、`transfer` 全部相同的重复声明会合并。未填写的角色设置与显式填写的设置保持为不同声明，不推断条件是否等价。同一对节点可以声明多条不同条件的路线，每条路线分别按自己的条件和角色生效；同一次输出不会因为多条路线匹配而重复执行目标或重复接收同一份 envelope。
 
 ## Decision

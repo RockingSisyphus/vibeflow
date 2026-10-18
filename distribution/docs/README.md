@@ -7,7 +7,7 @@
 - [workflow-and-config](user/workflow-and-config.md)
 - [python-development](user/python-development.md)
 - [javascript-development](user/javascript-development.md)
-- [普通图并发](user/graph-concurrency.md)：显式分发与汇合、真实清理和旧配置迁移。
+- [普通图并发](user/graph-concurrency.md)：1.0.1 的局部额度、排队补位、独立汇合、断路错误和旧配置迁移。
 - [nodesets-and-loops](user/nodesets-and-loops.md)
 - [plugins-and-integrations](user/plugins-and-integrations.md)
 - [multifile-resources](user/multifile-resources.md)
