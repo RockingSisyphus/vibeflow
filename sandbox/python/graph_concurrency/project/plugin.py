@@ -16,4 +16,8 @@ r13=node(**{'type_key': 'native.collect', 'display_name': 'collect', 'descriptio
 r14=data_schema(**{'type_key': 'scenario', 'representation': 'json', 'schema': {'type': 'string'}})
 r15=data_schema(**{'type_key': 'receipt', 'representation': 'json', 'schema': {'type': 'integer'}})
 r16=data_schema(**{'type_key': 'report', 'representation': 'json', 'schema': {'type': 'array', 'items': {'type': 'integer'}}})
-plugin=Plugin(id="graph.concurrency",resources=(r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,r15,r16,))
+r17=node(type_key='native.noop',display_name='Noop',description='Contract-free topology probe',version='1',
+    flow_kind='process',rulesets=[],contract={'requires': [], 'provides': [], 'params_schema': {}, 'params_defaults': {}},
+    implementations=[{'language':'python','targets':['python'],'source':{'kind':'file','ref':'nodes.py','export':'Terminal'}}],
+    source={'kind':'file','ref':'nodes.py','export':'Terminal'})
+plugin=Plugin(id="graph.concurrency",resources=(r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,r15,r16,r17,))

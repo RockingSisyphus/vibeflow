@@ -175,14 +175,6 @@ def _mainline_findings(
         outgoing = schedule_outgoing.get(node.name, ())
         if len({edge.target for edge in outgoing}) <= 1:
             continue
-        if node.join_policy == JOIN_POLICY_ALL and len({edge.source for edge in schedule_incoming.get(node.name, ())}) > 1:
-            findings.append(_finding(
-                "GRAPH.JOIN.FORK_CONFLICT", owner, outgoing[0],
-                f"node '{node.name}' cannot collect multiple branches and dispatch another fanout in the same call",
-                attempted=EDGE_CLASS_MAINLINE, mainline_path=(),
-                branch_nodes=[edge.target for edge in outgoing], branch_edges=list(outgoing),
-                suggested_fixes=["add a separate downstream dispatch node after the all-join"],
-            ))
         if flow_kinds.get(node.name) == FLOW_KIND_DECISION:
             continue
         if _fanout_has_explicit_join(outgoing, schedule_outgoing, {item.name: item for item in graph.nodes}):

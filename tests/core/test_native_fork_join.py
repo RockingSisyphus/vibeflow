@@ -34,7 +34,12 @@ def test_collector_cannot_also_dispatch_next_parallel_stage():
     graph=_graph((("collect","next_left"),("collect","next_right"),("next_left","next_join"),("next_right","next_join"),("next_join","end")),
         (NodeSpec("next_left","work"),NodeSpec("next_right","work"),NodeSpec("next_join","work",join_policy="all")))
     graph=replace(graph,edges=tuple(edge for edge in graph.edges if edge.pair!=("collect","end")))
-    assert "GRAPH.JOIN.FORK_CONFLICT" in {finding.rule_id for finding in _compile(graph).findings}
+    from types import SimpleNamespace
+    from vibeflow.targets.shared.quality_support.workflow_rules.joins import append_join_policy_health
+    state = SimpleNamespace(errors=[], warnings=[])
+    append_join_policy_health(graph, _compile(graph).compiled_graph, state)
+    assert any(finding.rule_id == "GRAPH.JOIN.FORK_CONFLICT" and finding.severity == "error"
+        for finding in state.errors)
 
 
 def test_unconnected_worker_still_reports_cannot_reach_end():

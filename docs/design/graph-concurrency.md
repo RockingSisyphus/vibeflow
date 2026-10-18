@@ -4,7 +4,7 @@
 
 ## Core 与公共计划
 
-NodeSpec 只描述正常调用；Nodeset 和 Loop 继续复用普通子图。断路检查沿正常调度边反向分析结束可达性，所有 worker 都参加检查。分支的首个必经合流点必须是多前驱 all 汇合节点；绕过收集器的出口、先隐式合流再放单输入标记都不构成有效收集。多前驱 all 节点继续分发多路时产生 `GRAPH.JOIN.FORK_CONFLICT`。
+NodeSpec 只描述正常调用；Nodeset 和 Loop 继续复用普通子图。断路检查沿正常调度边反向分析结束可达性，所有 worker 都参加检查。分支的首个必经合流点必须是多前驱 all 汇合节点；绕过收集器的出口、先隐式合流再放单输入标记都不构成有效收集。多前驱 all 节点继续分发多路时，由两 Target 共用的 join 检查产生错误级 `GRAPH.JOIN.FORK_CONFLICT`，阻止验证和构建；不再保留 mainline review 中仅作警告的重复路径。
 
 Workflow ABI v8 的 Block 种类限定为 workflow、nodeset、loop。解码器拒绝旧 ABI 和已删除字段，调用方必须重建产物。Core 和 Block Compiler 保存纯数据，不持有线程、Promise 或语言 callable。
 
