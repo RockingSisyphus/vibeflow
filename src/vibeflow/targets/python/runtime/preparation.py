@@ -13,6 +13,7 @@ from vibeflow.core.flow import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, STATU
 from vibeflow.core.models import TargetFeatureSet
 from vibeflow.core.planned import effective_planned_behavior
 from vibeflow.core.graph_calls import graph_call_subjects
+from vibeflow.core.config.concurrency import business_config, scheduling_config
 from vibeflow.targets.python.project.compiler import GraphCompiler
 
 
@@ -55,14 +56,16 @@ def prepare_python_workflow(graph, compiled, *, registry, global_config=None, no
         for spec in current.nodes:
             nodeset = current.nodesets.get(spec.loop.body if spec.type_used in LOOP_NODE_TYPES else spec.type_used)
             if effective_planned_behavior(spec, nodeset).kind == 'python_stub':
-                parameters[(*path, spec.id)] = spec.params
+                parameters[(*path, spec.id)] = {**spec.params, **local_overrides.get(spec.id, {})}
                 continue
             composite = spec.type_used in current.nodesets or spec.type_used in LOOP_NODE_TYPES
             if composite or spec.type_used == IO_NODE_TYPE:
-                parameters[(*path, spec.id)] = {}
+                parameters[(*path, spec.id)] = scheduling_config(
+                    {**spec.params, **local_overrides.get(spec.id, {})}
+                )
                 continue
             if spec.status == STATUS_PLANNED:
-                parameters[(*path, spec.id)] = spec.params
+                parameters[(*path, spec.id)] = {**spec.params, **local_overrides.get(spec.id, {})}
                 continue
             config_spec = registry.get_config_spec(spec.type_used)
             scoped = scoped_node_params(spec.params, scope, declared_keys=set(config_spec.schema))
@@ -120,12 +123,12 @@ def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_reg
                     stub_hash = hash_file(path)
             params = call.params.to_value()
             if behavior.kind == 'python_stub':
-                params = {**spec.params, **prepared.globals[block_id], **prepared.overrides[block_id].get(call.id,{})}
+                params = business_config({**spec.params, **prepared.globals[block_id], **prepared.overrides[block_id].get(call.id,{})})
             bound_params = params if (call.is_nodeset or call.is_loop or spec.type_used == IO_NODE_TYPE) and behavior.kind != 'python_stub' else attach_global_config(params, prepared.globals[block_id])
             frames[call.id] = NodeFrame(
                 id=call.id, type_used=call.type_used, node=implementation,
                 requires=spec.requires, provides=spec.provides,
-                params=bound_params,
+                params=bound_params, max_concurrency=call.max_concurrency,
                 incoming=tuple(e for e in compiled.resolved_schedule_edges if e.target == call.id),
                 outgoing=tuple(e for e in compiled.resolved_schedule_edges if e.source == call.id),
                 transfer_incoming=tuple(e for e in compiled.resolved_transfer_edges if e.target == call.id),

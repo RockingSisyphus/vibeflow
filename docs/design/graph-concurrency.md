@@ -14,7 +14,11 @@ Python 的 [scheduler.py](../../src/vibeflow/targets/python/runtime/scheduler.py
 
 JavaScript 的 [codegen_scheduler.py](../../src/vibeflow/targets/javascript/frontend/codegen_scheduler.py) 发射事件循环调度。running Map 保存已启动调用，失败后向共享 AbortController 发出停止请求，并等待剩余调用结束。同步入口保持同步 ABI，不创建 Worker。
 
-普通调度边激活与数据传输分别处理；all 交付保留每个 envelope，按节点声明顺序排序。每轮消费 all 的入边完成信号，避免下一轮复用旧信号。并发数量不进入公共配置，容量不足时由实际执行错误触发清理。
+普通调度边激活与数据传输分别处理；all 交付保留每个 envelope，按节点声明顺序排序。每轮消费 all 的入边完成信号，避免下一轮复用旧信号。
+
+配置层从每个调用的 config 提取 `max_concurrency`，编译为 NodeCallPlan 的独立字段，业务 params 不包含它。默认值为 8；父图的全局配置不传播此额度。每次普通分发创建局部准入计数，直接目标就绪后才占名额；完成线程 join 或调用 Promise 结算后释放，随后从队列补位。Node、Nodeset 和 Loop 使用相同的调用完成边界。不存在全局线程池、SDK 管理器或额外任务子图。
+
+多个分发同时激活同一调用时，准入检查取所有所属额度的交集，并在实际退出后一起释放；使用分发对象身份去重，同容量的两个来源仍独立计数。
 
 ## 完成与观察
 

@@ -453,9 +453,12 @@ def _parse_node_params(item: Mapping[str, Any], *, reserved: set[str], field: st
     from vibeflow.core.config.node import NodeConfigError, node_config_from_call_params
 
     try:
-        return node_config_from_call_params(item, reserved=reserved)
+        from vibeflow.core.config.concurrency import dispatch_limit
+        params = node_config_from_call_params(item, reserved=reserved)
+        dispatch_limit(params)
+        return params
     except NodeConfigError as error:
-        raise GraphConfigError(f"{field} must be an object") from error
+        raise GraphConfigError(f"{field}: {error}") from error
 
 
 def _parse_node_metadata(item: Mapping[str, Any]) -> NodeMetadata:
@@ -562,6 +565,7 @@ def _validate_nodeset_call_targets(nodes: tuple[NodeSpec, ...], nodesets: set[st
 
 
 def _parse_node_config_overrides(value: Any, *, field: str) -> dict[str, dict[str, Any]]:
+    from vibeflow.core.config.scope import normalize_node_config_overrides, ConfigBindingError
     if value in (None, {}):
         return {}
     if not isinstance(value, Mapping):
@@ -574,7 +578,10 @@ def _parse_node_config_overrides(value: Any, *, field: str) -> dict[str, dict[st
         if not isinstance(item, Mapping):
             raise GraphConfigError(f"{field}.{text_key} must be an object")
         out[text_key] = {str(k): v for k, v in item.items()}
-    return out
+    try:
+        return normalize_node_config_overrides(out)
+    except ConfigBindingError as error:
+        raise GraphConfigError(f"{field}: {error}") from error
 
 
 def _nodeset_reference_targets(nodes: tuple[NodeSpec, ...]) -> tuple[str, ...]:

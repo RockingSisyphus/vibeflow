@@ -34,6 +34,7 @@ class NodeFrame:
     is_loop: bool = False
     is_io: bool = False
     join_policy: str = ""
+    max_concurrency: int = 8
     nodeset_type_key: str = ""
     exports: tuple[DataProvider, ...] = ()
     loop_spec: LoopSpec = field(default_factory=LoopSpec)

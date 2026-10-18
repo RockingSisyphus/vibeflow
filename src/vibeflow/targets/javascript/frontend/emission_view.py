@@ -204,6 +204,9 @@ class BoundNodeView:
     def join_policy(self) -> str:
         return self._source.join_policy
     @property
+    def max_concurrency(self) -> int:
+        return self._source.max_concurrency
+    @property
     def is_terminal(self) -> bool:
         return self._source.is_terminal
     @property
@@ -237,6 +240,7 @@ class BoundNodeView:
             params=dict(self.params),
             flow_kind=self.flow_kind,
             join_policy=self.join_policy,
+            max_concurrency=self.max_concurrency,
             is_terminal=self.is_terminal,
             is_nodeset=self.is_nodeset,
             is_loop=self.is_loop,

@@ -539,7 +539,15 @@
             }
           },
           "config": {
-            "type": "object"
+            "type": "object",
+            "properties": {
+              "max_concurrency": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 8,
+                "description": "Capacity of this dispatch invocation; refill after each actual call exit."
+              }
+            }
           },
           "node_configs": {
             "type": "object"
@@ -1071,7 +1079,15 @@
           }
         },
         "config": {
-          "type": "object"
+          "type": "object",
+          "properties": {
+            "max_concurrency": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 8,
+              "description": "Capacity of this dispatch invocation; refill after each actual call exit."
+            }
+          }
         },
         "node_configs": {
           "type": "object"

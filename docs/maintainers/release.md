@@ -1,6 +1,6 @@
 # 当前开发变更
 
-普通图调度统一承载并发，分发与 all 汇合分离，取消与真实清理由运行器持有。删除独立任务图、控制器及数量上限；Workflow ABI v8，旧配置与构建产物须迁移重建。详见[普通图并发](../../distribution/docs/user/graph-concurrency.md)。
+普通图调度统一承载并发，分发与 all 汇合分离，取消与真实清理由运行器持有。删除独立任务图、控制器及旧全局线程池配置；分发节点使用 `config.max_concurrency` 设置局部容量，默认 8，结束一个补入一个。Workflow ABI v8，旧配置与构建产物须迁移重建。详见[普通图并发](../../distribution/docs/user/graph-concurrency.md)。
 
 沙箱验收同时发现并修复 CLI 标准流的收尾竞争：读取轮询超时与最终 flush 之间到达的数据，在收到结束标志后仍须排空。确定性回归覆盖最后一批 stdout/stderr 的转发与业务日志记录。
 

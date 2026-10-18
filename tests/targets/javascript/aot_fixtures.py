@@ -83,6 +83,7 @@ def plan_fixture(description, *, project_root=None, import_policy=None, host_ext
                 provides=tuple(DataProviderPlan(value["key"], value["type"]) for value in raw.get("provides", ())),
                 params=freeze_json_object(raw.get("params", {})), config_overrides=freeze_json_object({}),
                 flow_kind=raw.get("flow_kind", ""), join_policy=raw.get("join_policy", "safe_any"),
+                max_concurrency=raw.get("max_concurrency", 8),
                 status=raw.get("status", "implemented"), planned_behavior=raw.get("planned_behavior", ""),
                 is_terminal=raw.get("is_terminal", False), is_nodeset=raw.get("is_nodeset", False),
                 is_loop=raw.get("is_loop", False), nodeset_type_key="", child_block=child_id, exports=(),

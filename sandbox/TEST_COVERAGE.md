@@ -4,7 +4,7 @@
 
 | 使用情境 | 实际验证入口 |
 | --- | --- |
-| 普通图并发、独立分发与 all 汇合、无数量上限、协作取消与实际清理、Node／Chromium AOT | 两 Target 的 graph_concurrency/run_all.py；integration 与根目录 `--full`；屏障与嵌套循环回归见 tests/conformance/test_graph_concurrency.py，清理回归见两个 Target 的 test_node_lifecycle.py |
+| 普通图并发、独立分发与 all 汇合、节点局部容量与即时补位、协作取消与实际清理、Node／Chromium AOT | 两 Target 的 graph_concurrency/run_all.py；integration 与根目录 `--full`；屏障与嵌套循环回归见 tests/conformance/test_graph_concurrency.py 与 test_dispatch_concurrency.py，清理回归见两个 Target 的 test_node_lifecycle.py |
 | Nodeset 声明源码归属、planned/implemented 对照及未登记导入 | tests/targets/javascript/test_source_audit_subjects.py、test_nodeset_rules.py 和 integration 源码规则负例；已删除任务目标专用 fixture |
 | 综合数学应用：自定义源码 Rule、typed records、warning 对照、配置覆盖、分支/汇合、Nodeset/Loop、Port 与复用并发 | 两 Target 的 comprehensive_math/run_all.py；各 integration runner 自动执行；[公式与通过判定](../docs/maintainers/comprehensive-math-sandbox.md) |
 | 简单数学使用场景：CLI、对象、插件修改、异步/Port | 五个 addition 独立入口；各 integration runner 自动执行；[替代与通过判定](../docs/maintainers/history/audits/addition-sandboxes-20261009.md) |

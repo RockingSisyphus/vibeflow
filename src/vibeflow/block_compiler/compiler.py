@@ -46,6 +46,7 @@ from vibeflow.core.models import (
     ValidatedWorkflow,
 )
 from vibeflow.core.planned import effective_planned_behavior
+from vibeflow.core.config.concurrency import business_config, dispatch_limit
 
 
 def normalize_condition(expression: str) -> ConditionPlan | None:
@@ -377,6 +378,7 @@ class _PlannerState:
                 else EFFECT_SCOPE_NONE
             ),
         )
+        config = self.params_by_path.get(call_path, spec.params)
         return NodeCallPlan(
             id=spec.id,
             type_used=spec.type_used,
@@ -384,7 +386,7 @@ class _PlannerState:
             requires=_requirements(spec.requires),
             provides=_providers(spec.provides),
             params=freeze_json_object(
-                self.params_by_path.get(call_path, spec.params),
+                business_config(config),
                 path=f"node[{'.'.join(call_path)}].params",
             ),
             config_overrides=freeze_json_object(
@@ -393,6 +395,7 @@ class _PlannerState:
             ),
             flow_kind=flow_kind,
             join_policy=spec.join_policy,
+            max_concurrency=dispatch_limit(config),
             status=status,
             planned_behavior=planned_behavior,
             is_terminal=(

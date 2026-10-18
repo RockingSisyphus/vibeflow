@@ -217,35 +217,35 @@ def _emission_cases() -> dict[str, tuple[dict[str, object], tuple[dict, ...]]]:
 # These hashes intentionally freeze generated source formatting as well as its
 # semantic plan.  Update them only after reviewing an intentional ABI change.
 # Workflow ABI v8 uses only ordinary graph calls and explicit routes.
-EMISSION_GOLDENS = {'async': ('fe68b2431807b8637e62e52a8716491275f194ec212737c4d99500076b2a58e4',
+EMISSION_GOLDENS = {'async': ('8e8f7cd8ebb8604793962158560925889a9db4c57274f239e08e87d0d6341c08',
            '742f4b399ddd9748b718454000b36adba1063c23733c72aef5b5cd13fd22f880',
-           '472bcffb0d29d7605febd305b0ae52b293df6aa54ef24c63dcd39fb24eaf7c5e'),
- 'bounded_loop': ('f8602c3fbe3090f8b1ecd42be1d0ea1d21b77e14af0bf3f786377da9030e2ee8',
+           '555be8452240b24a1e65d2d4b56b23ffe073c6fc30652d5c8c306faf2a79e44d'),
+ 'bounded_loop': ('c38b1f5c51e76d3200b780f0b84411392d5be788561e89a88396e14375a4257e',
                   '2873b3ce54254ebee51701947852fd5bf26ff3fd5d4cd8634baf0fe3515684fc',
-                  '3448492c3a639921e0b9ec4114c68bf94189e883fce635ab5f9c18aaa938dd62'),
- 'deferred': ('fe68b2431807b8637e62e52a8716491275f194ec212737c4d99500076b2a58e4',
+                  '9c864ab89e146eb0081ca521c84b5846c84948c4c464b525c8f6e1fe34a0d875'),
+ 'deferred': ('8e8f7cd8ebb8604793962158560925889a9db4c57274f239e08e87d0d6341c08',
               '742f4b399ddd9748b718454000b36adba1063c23733c72aef5b5cd13fd22f880',
-              '472bcffb0d29d7605febd305b0ae52b293df6aa54ef24c63dcd39fb24eaf7c5e'),
- 'detached': ('6765da5627fcd086b92ca50c6aa51b143fe1ff759217155a0bba82282571104f',
+              '555be8452240b24a1e65d2d4b56b23ffe073c6fc30652d5c8c306faf2a79e44d'),
+ 'detached': ('e4e66d79920fe7cc85e8fb1b3e15da259f45b895d9413678177e38510acadf8c',
               '931f71c1a6f98d4c06ca1d11231f68fa8e780e24c080db6488f350ab5480ec40',
-              '4244f051585190317d83f89203f61795300a4c22668370a4ae9631ed19b70c66'),
- 'host_extension': ('dfef2309d3738c3b145f46993eca3662aff540d0d30627911ea904cb9d6580b1',
+              '33bfd9c480276f0a0e02f3a87298330020efe4fed76ae91d1811784b068bc98b'),
+ 'host_extension': ('0928f72316af232cbb6c0c806c9453fe15453be6cc50f98a62c08df8a81083af',
                     '7d42f7e7aa8acf3bab7e23816bd025e45f65c766352a4f9ea564c920c58f723f',
-                    'e947c6f040dbcbf002e3853cc10341364e6c8e3b3999620b4e4cbe311bd258ba'),
- 'nested_nodeset': ('fcc1bea37425dd14f5141bf36dc9b42f22f0beb4710eaadee6c00ddb77f55dd2',
+                    '4b62225b03fe3327ac97dbd72d1ccdfdaed5cfdc71f7076b9a54b9f4664a5518'),
+ 'nested_nodeset': ('18c448e9f2bfd13ed6b791432f20f6058509519ce3c51f390fc9253948888223',
                     '2873b3ce54254ebee51701947852fd5bf26ff3fd5d4cd8634baf0fe3515684fc',
-                    '1471d70ea42dd53e17e6c6959a93d11448ad1838e8fa779efc31a197f8879c05'),
- 'port': ('4927778d36fdb72101accaae193dc21576eb4f0a372262edd35e37f9137f0005',
+                    '9fccbffe7dc902cc4d1d7fbf4d746b6efc0af754bcce5333dcd43e851af216e9'),
+ 'port': ('1837c7d6eedd7ff7aae2fa054dbe4ef9d1c479fa96f69adac9389b5e2c700078',
           '3b7386483d8723d3fcac187b1ad052d370af5c763086fee71a3c47043a8f0666',
-          'dfbd068bf9622c4aedeba46023ec1518bbc0d4b75e71ca4d443b60b47a68fa34'),
- 'sync': ('2fd6c778488149cf3707eb6d7eb1ce3c8223953e90c7e8855c5008b11abdb1f9',
+          '886d31b738bf71b7ced69de258ae465c6c6f1288b7ad5c275e2976f0e5f7f599'),
+ 'sync': ('cfc806ac80a62edba7147b52879e1cc411e8c2679f3c1a0390225be5fd06dbf7',
           '2873b3ce54254ebee51701947852fd5bf26ff3fd5d4cd8634baf0fe3515684fc',
-          'e947c6f040dbcbf002e3853cc10341364e6c8e3b3999620b4e4cbe311bd258ba'),
- 'unbounded_loop': ('11591c4a75bcf60e09526eb03659f3c4acf0dae9cfb60a494ee51abbff7d9715',
+          '4b62225b03fe3327ac97dbd72d1ccdfdaed5cfdc71f7076b9a54b9f4664a5518'),
+ 'unbounded_loop': ('f1fb25bb0a21b8be68bde6818e1ff9ac5887ff0c21e55b5791dbafef399f9ff1',
                     '2873b3ce54254ebee51701947852fd5bf26ff3fd5d4cd8634baf0fe3515684fc',
-                    '8bddb96ae82e67c341c91d5391bb9794d6a9b74dc344ef2c4ce832be9da24d06')}
+                    'bdc3b5bede59c77114d7037c96be8a34b9bcad6c784ecf394b7e2fa9adc13505')}
 
-NORMALIZED_WORKFLOW_SHA256 = 'cec2288b59b9ff67c1d609564b1ea4215189700a6ceb526cc73233f4d3669972'
+NORMALIZED_WORKFLOW_SHA256 = '1cda3058d78da824e62934a5db16f25a8cbd8831c368933ff3ac56d94e2e2f27'
 
 def test_canonical_bound_view_payload_is_frozen() -> None:
     workflow = view_fixture(_sync_plan())

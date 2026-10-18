@@ -23,10 +23,10 @@ from vibeflow.core.flow import (
 from vibeflow.core.planned import effective_planned_behavior
 from vibeflow.core.config.node import (
     NodeConfigError,
-    merge_node_config,
     normalize_node_config_spec,
 )
 from vibeflow.block_compiler import SourceRef
+from vibeflow.core.config.concurrency import merge_call_config, scheduling_config
 from vibeflow.core.config.scope import (
     ConfigScope,
     attach_global_config,
@@ -90,7 +90,7 @@ def _prepare_calls(graph, *, state, path, overrides, global_scope):
             )
         if spec.type_used == IO_NODE_TYPE:
             state.used_io_operations.add(spec.io.operation)
-            state.params_by_path[call_path] = {}
+            state.params_by_path[call_path] = scheduling_config({**spec.params, **overrides.get(spec.id, {})})
             continue
         is_loop = spec.type_used in LOOP_NODE_TYPES
         is_nodeset = spec.type_used in graph.nodesets and not is_loop
@@ -113,7 +113,7 @@ def _prepare_calls(graph, *, state, path, overrides, global_scope):
                     ),
                     call_path,
                 )
-            state.params_by_path[call_path] = {}
+            state.params_by_path[call_path] = scheduling_config({**spec.params, **overrides.get(spec.id, {})})
             continue
 
         descriptor = state.catalog.get(spec.type_used)
@@ -184,7 +184,7 @@ def _effective_params(
             global_scope,
             declared_keys=set(config_spec.schema),
         )
-        merged = merge_node_config(
+        merged = merge_call_config(
             config_spec,
             {**local, **dict(overrides.get(spec.id, {}))},
         )

@@ -184,6 +184,8 @@ class NodeSpec:
 
     def __post_init__(self) -> None:
         from vibeflow.core.rules.selection.models import selection_refs
+        from vibeflow.core.config.concurrency import dispatch_limit
+        dispatch_limit(self.params)
         object.__setattr__(self, "rulesets", selection_refs(self.rulesets, optional=True))
         if self.execution_lock is not None and not isinstance(
             self.execution_lock, ExecutionLockSpec

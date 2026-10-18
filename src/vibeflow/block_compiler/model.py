@@ -320,8 +320,11 @@ class NodeCallPlan:
     effect_scope: str = "none"
     execution_lock: ExecutionLockPlan | None = None
     contains_global_state: bool = False
+    max_concurrency: int = 8
 
     def __post_init__(self) -> None:
+        if not isinstance(self.max_concurrency, int) or isinstance(self.max_concurrency, bool) or self.max_concurrency < 1:
+            raise PortablePlanError("node max_concurrency must be a positive integer")
         if self.completion not in _COMPLETIONS:
             raise PortablePlanError(
                 f"node completion must be one of {sorted(_COMPLETIONS)}"
@@ -358,6 +361,7 @@ class NodeCallPlan:
             "config_overrides": self.config_overrides.to_value(),
             "flow_kind": self.flow_kind,
             "join_policy": self.join_policy,
+            "max_concurrency": self.max_concurrency,
             "status": self.status,
             "planned_behavior": self.planned_behavior,
             "is_terminal": self.is_terminal,

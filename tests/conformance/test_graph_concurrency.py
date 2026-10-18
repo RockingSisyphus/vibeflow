@@ -20,7 +20,7 @@ def _call(name, key, **options):
 
 @pytest.mark.parametrize('execution', ['plan', 'block', 'compiled'])
 @pytest.mark.parametrize('nested', [False,True])
-def test_python_all_ready_branches_run_without_a_concurrency_cap(tmp_path, execution, nested):
+def test_python_dispatch_limit_can_exceed_default_and_repeats_in_nested_loops(tmp_path, execution, nested):
     count = 12
     barrier = Barrier(count)
     registry = native_registry()
@@ -50,7 +50,7 @@ def test_python_all_ready_branches_run_without_a_concurrency_cap(tmp_path, execu
             return Worker
         registry.register(NodeDescriptor(f'native.work{index}', 'Work', 'Independent work', '1', 'process',
             contract=NodeContractDescriptor(provides=(DataProvider(f'receipt{index}','receipt',display_name='Receipt'),), output_semantics={f'receipt{index}':('Independent receipt',)}), rulesets=()), implementation(index))
-    nodes = [_call('start','native.terminal'), *[_call(f'w{i}',f'native.work{i}') for i in range(count)],
+    nodes = [_call('start','native.terminal',config={'max_concurrency':count}), *[_call(f'w{i}',f'native.work{i}') for i in range(count)],
              _call('collect','native.collect',join_policy='all'), _call('end','native.terminal')]
     graph = parse_graph_config({'pipeline':{'nodes':nodes,
         'edges':[['start',f'w{i}'] for i in range(count)]+[[f'w{i}','collect'] for i in range(count)]+[['collect','end']],
@@ -116,7 +116,7 @@ def test_javascript_all_ready_branches_execute_and_join_once(tmp_path):
     def node(name, export, **extra):
         return {'id':name,'type_used':'native.'+name,'flow_kind':'process',
                     'implementation':{'kind':'file','ref':'./nodes.mjs','export':export},**extra}
-    terminal = lambda name: node(name,'terminal',flow_kind='terminal',is_terminal=True)
+    terminal = lambda name: node(name,'terminal',flow_kind='terminal',is_terminal=True,max_concurrency=count)
     workers = [node(f'w{i}','work',completion='suspend',params={'index':i},
                     provides=[{'key':'receipt','type':'receipt'}]) for i in range(count)]
     plan = {'entry_mode':'async','nodes':[terminal('start'),*workers,
