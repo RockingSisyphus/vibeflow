@@ -1,0 +1,94 @@
+name: Publish verified release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag, for example v1.0.1
+        required: true
+        type: string
+      expected_commit:
+        description: Full commit SHA already verified for this tag
+        required: true
+        type: string
+      collaborative_sha256:
+        description: SHA256 of the verified collaborative ZIP
+        required: true
+        type: string
+      autonomous_sha256:
+        description: SHA256 of the verified autonomous ZIP
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      RELEASE_TAG: ${{ inputs.tag }}
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+      COLLABORATIVE_SHA256: ${{ inputs.collaborative_sha256 }}
+      AUTONOMOUS_SHA256: ${{ inputs.autonomous_sha256 }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Check immutable source and verified inputs
+        run: |
+          python - <<'PY'
+          import os, re, subprocess, tomllib
+          from pathlib import Path
+          version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+          assert os.environ["RELEASE_TAG"] == "v" + version
+          commit = os.environ["EXPECTED_COMMIT"]
+          assert re.fullmatch(r"[0-9a-f]{40}", commit)
+          assert subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip() == commit
+          for key in ("COLLABORATIVE_SHA256", "AUTONOMOUS_SHA256"):
+              assert re.fullmatch(r"[0-9a-f]{64}", os.environ[key])
+          PY
+      - name: Build both profiles
+        run: python distribution/build.py
+      - name: Require byte-identical verified packages
+        run: |
+          python - <<'PY'
+          import hashlib, os, tomllib
+          from pathlib import Path
+          version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+          lines = []
+          for prefix, key in (("vibeflow-distribution", "COLLABORATIVE_SHA256"),
+                              ("vibeflow-distribution-autonomous", "AUTONOMOUS_SHA256")):
+              name = f"{prefix}-{version}.zip"
+              digest = hashlib.sha256((Path("dist") / name).read_bytes()).hexdigest()
+              assert digest == os.environ[key], f"Verified package mismatch: {name}: {digest}"
+              lines.append(f"{digest}  {name}\n")
+          Path(f"dist/SHA256SUMS-{version}.txt").write_text("".join(lines))
+          PY
+      - name: Upload, download-verify, then publish existing draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = true
+          test "$(gh release view "$RELEASE_TAG" --json assets --jq '.assets | length')" = 0
+          version="${RELEASE_TAG#v}"
+          gh release upload "$RELEASE_TAG" "dist/vibeflow-distribution-${version}.zip" "dist/vibeflow-distribution-autonomous-${version}.zip" "dist/SHA256SUMS-${version}.txt"
+          verify_dir="${RUNNER_TEMP}/release-verification"
+          gh release download "$RELEASE_TAG" --dir "$verify_dir"
+          cd "$verify_dir"
+          sha256sum -c "SHA256SUMS-${version}.txt"
+          gh release edit "$RELEASE_TAG" --draft=false --latest
+          gh release view "$RELEASE_TAG" --json url,isDraft,assets

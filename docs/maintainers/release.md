@@ -63,6 +63,12 @@ python distribution/build.py --profile collaborative --output-dir /tmp/vf-collab
 python distribution/build.py --profile autonomous --output-dir /tmp/vf-autonomous --archive-dir /tmp/vf-candidate-zips
 ```
 
+## GitHub 发布
+
+先完成文档、版本、正式 ZIP、解压部署与哈希验证，再提交并推送不可变标签。Release 使用已有空草稿和审核后的发布说明，附件为两个 ZIP 与对应的 SHA256SUMS 文件；上传完成后下载核对字节，再发布为正式版本。
+
+本地上传端点不可用时，可手动运行 `.github/workflows/release.yml`，传入标签、已验证的完整 commit 和两个 ZIP 的 SHA256。workflow 从标签构建，哈希不匹配即停止；只有产物与已验证包一致才使用 GitHub 的标准 job token 上传并发布。不得为重试移动标签、覆盖既有资产或降低哈希检查。构建与上传失败时草稿保持未发布。
+
 ## 文档装配
 
 构建器按 profile 复制 canonical 用户文档并保留其相对路径，生成 `kernel/docs/README.md` 导航，再从 prompt fragments 确定性合成根 `AGENTS.md`。根 README 只提供 profile、最小项目和文档入口。
