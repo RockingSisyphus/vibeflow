@@ -269,7 +269,7 @@ class _MermaidRenderer:
                 flow_kind = node_flow_kind(node, compiled) or FLOW_KIND_PROCESS
                 preferred_class = self._preferred_class_for_node(flow_kind=flow_kind, is_external=is_external)
                 class_name = self._class_for_node(node_id, preferred_class=preferred_class, planned=node.status == STATUS_PLANNED)
-                presentation = self._presentation(node, node_id, native_class=preferred_class, status_class=class_name, flow_kind=flow_kind)
+                presentation = self._presentation(node, compiled, native_class=preferred_class, status_class=class_name, flow_kind=flow_kind)
                 lines.append(
                     f"{indent}{_node_shape(node_id, self._node_label(node, graph, compiled, effective_lock=effective_lock, is_external=is_external), flow_kind, shape=presentation.shape)}"
                 )
@@ -285,7 +285,7 @@ class _MermaidRenderer:
             is_loop = node.type_used in LOOP_NODE_TYPES
             native_class = "loopNode" if is_loop else "nodesetNode"
             class_name = self._class_for_node(node_id, preferred_class=native_class, planned=node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED)
-            presentation = self._presentation(node, node_id, native_class=native_class, status_class=class_name, flow_kind=flow_kind)
+            presentation = self._presentation(node, compiled, native_class=native_class, status_class=class_name, flow_kind=flow_kind)
             label = (
                 self._loop_label(
                     node,
@@ -467,9 +467,9 @@ class _MermaidRenderer:
         return "defaultNode"
 
 
-    def _presentation(self, node: NodeSpec, node_id: str, *, native_class: str, status_class: str, flow_kind: str):
+    def _presentation(self, node: NodeSpec, compiled: CompiledGraph, *, native_class: str, status_class: str, flow_kind: str):
         descriptor = registry_descriptor(self.registry, node.type_used)
-        return resolve_presentation(descriptor, native_class=native_class, status_class=status_class if status_class in {"healthError", "healthWarning", "plannedNode"} else "", call_style=node.style, flow_kind=flow_kind)
+        return resolve_presentation(descriptor, native_class=native_class, status_class=status_class if status_class in {"healthError", "healthWarning", "plannedNode"} else "", call_style=node.style, flow_kind=flow_kind, node=node, compiled=compiled)
 
     def _node_is_external(self, node: NodeSpec) -> bool:
         return node_is_external(node, self.registry)

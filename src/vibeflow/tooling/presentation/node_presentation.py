@@ -35,6 +35,8 @@ def resolve_presentation(
     call_style: object | None = None,
     flow_kind: str = "",
     resource_kind: str = "node",
+    node: object | None = None,
+    compiled: object | None = None,
 ) -> EffectivePresentation:
     """Native → Node → status → call, with per-field provenance."""
     identity = flow_kind or _get(descriptor, "flow_kind", "process")
@@ -43,6 +45,8 @@ def resolve_presentation(
     native = SYSTEM_STYLE_COLORS.get(native_class, SYSTEM_STYLE_COLORS["defaultNode"])
     values = {"fill": native.fill, "stroke": native.stroke, "text": native.text,
               "shape": "trap-b" if native_class == "loopNode" else mermaid_shape_for_flow_kind(identity)}
+    if identity == "process" and native_class not in {"loopNode", "nodesetNode"} and _parallel_call(node, compiled):
+        values["shape"] = "dbl-circ"
     sources = dict.fromkeys(values, "native")
 
     def apply(presentation: object, origin: str) -> None:
@@ -65,6 +69,17 @@ def resolve_presentation(
     if values["shape"] == "diamond":
         values["shape"] = "diam"
     return EffectivePresentation(MappingProxyType(values), MappingProxyType(sources))
+
+
+def _parallel_call(node: object | None, compiled: object | None) -> bool:
+    """A visual role derived solely from ordinary resolved scheduling edges."""
+    if node is None or compiled is None:
+        return False
+    name = _get(node, "id", "")
+    edges = _get(compiled, "resolved_schedule_edges", ())
+    outgoing = {edge.target for edge in edges if edge.source == name}
+    incoming = {edge.source for edge in edges if edge.target == name}
+    return len(outgoing) > 1 or (_get(node, "join_policy", "") == "all" and len(incoming) > 1)
 
 
 def registry_descriptor(registry: object | None, type_key: str) -> object | None:

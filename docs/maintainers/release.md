@@ -1,3 +1,7 @@
+# 待发布：并发节点 SVG 图形修复
+
+恢复普通 process 分发与多前驱 all 回收节点的双圆默认图形。识别只读取正常调度边，在共享展示级联中实现，保留 Node 和调用级形状覆盖；没有恢复旧任务管理类型。Python、JavaScript 的 Architecture、Mermaid 及真实 SVG 回归验证这两种图形。此修复尚未进入已发布的 1.0.1 资产。
+
 # VibeFlow 1.0.1
 
 普通图调度统一承载并发，分发与 all 汇合分离，取消与真实清理由运行器持有。删除独立任务图、控制器及旧全局线程池配置；分发节点使用 `config.max_concurrency` 设置局部容量，默认 8，结束一个补入一个。Workflow ABI v8，旧配置与构建产物须迁移重建。详见[普通图并发](../../distribution/docs/user/graph-concurrency.md)。
