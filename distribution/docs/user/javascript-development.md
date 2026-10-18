@@ -1,6 +1,6 @@
 # JavaScript/TypeScript 资源与 AOT
 
-用户资源从 `@vibeflow/plugin` 的 SDK 定义。声明与执行代码可以放在一起；workflow 显式选择固定插件对象。JS/TS 属于同一执行族，生成物继续是普通 ESM，使用原生 Workflow ABI v7。
+用户资源从 `@vibeflow/plugin` 的 SDK 定义。声明与执行代码可以放在一起；workflow 显式选择固定插件对象。JS/TS 属于同一执行族，生成物继续是普通 ESM，使用原生 Workflow ABI v8。
 
 ## Node 与固定插件
 
@@ -62,7 +62,7 @@ workflow 显式启用：
 
 发行包和 wheel 包含 SDK 运行文件及类型声明。VibeFlow worker、分析器和构建器统一解析 `@vibeflow/plugin`。发行模板的 `tsconfig.json` 将 TypeScript 的 `paths["@vibeflow/plugin"]` 指向 `../kernel/javascript/sdk.d.ts`。这些文件由内核的同一 SDK 复制生成，受到发行清单保护。源码沙箱的 tsconfig 直接引用内核资源目录；wheel 用户可以通过 `importlib.resources.files("vibeflow.targets.javascript.resources")` 定位同一文件。无需另装一个同名 npm SDK。
 
-Node 返回普通对象，key 对应 `provides`。`completion: "immediate"` 使用同步返回；`"suspend"` 返回 Promise，并要求 workflow 的 `pipeline.entry_mode: "async"`。并发任务使用管理 Node 的 `task_targets` 与 `context.tasks`，声明和完整示例见[原生任务管理](task-management.md)。
+Node 返回普通对象，key 对应 `provides`。`completion: "immediate"` 使用同步返回；`"suspend"` 返回 Promise，并要求 workflow 的 `pipeline.entry_mode: "async"`。并发使用普通节点、显式分支边和独立的 all 汇合节点，见[普通图并发](graph-concurrency.md)。
 
 ```bash
 npm ci --prefix javascript_project
@@ -87,4 +87,4 @@ Browser/Node 平台由 `build --target` 选择。Rule 始终在 Node worker 环�
 
 传入普通 JSON 对象数组，每次调用替换全部 `info`；`[]` 清空信息。缓存会在下次刷新、状态变化或结束时发布，默认间隔为 60000 毫秒，运行选项 `statusIntervalMs` 可调整。Node.js 写入状态文件，浏览器通过 `onStatus` 向宿主提供快照。文件路径、Host 会话及完整格式见[运行日志与状态接口](runtime-observation.md)。
 
-并发启动、任务引用、停止与实际收尾合同见[原生任务管理](task-management.md)。
+普通节点的并发分发、显式汇合、取消与实际收尾合同见[普通图并发](graph-concurrency.md)。

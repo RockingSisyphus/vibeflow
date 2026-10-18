@@ -181,7 +181,6 @@ class NodeSpec:
     execution_lock: ExecutionLockSpec | None = None
     rulesets: tuple | None = None
 
-    task_targets: dict[str, "NodeSpec"] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         from vibeflow.core.rules.selection.models import selection_refs
@@ -257,7 +256,6 @@ class GraphConfig:
     source_path: str = ""
     execution_lock: ExecutionLockSpec | None = None
     rulesets: tuple | None = None
-    task_entry: str = ""
 
     def __post_init__(self) -> None:
         from vibeflow.core.rules.selection.models import selection_refs

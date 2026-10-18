@@ -105,9 +105,8 @@ def compile_core(request: CoreCompileRequest) -> CoreCompilation:
     nodesets = set(request.known_nodesets or graph.nodesets)
     nodes_by_name = {node.id: node for node in graph.nodes}
     _validate_resolved_node_contracts(graph, implementations=implementations)
-    from vibeflow.core.tasks import call_specs
     _validate_node_types(
-        tuple(call_specs(graph.nodes)),
+        tuple(graph.nodes),
         implementations=implementations,
         nodesets=nodesets,
     )
@@ -271,7 +270,6 @@ def _resolve_effective_nodes(
 
     resolved_nodes: list[NodeSpec] = []
     for node in nodes:
-        node = replace(node, task_targets={key: _resolve_effective_nodes((target,), definition_by_key=definition_by_key, facts_by_type=facts_by_type)[0] for key, target in node.task_targets.items()})
         if node.status == STATUS_PLANNED or node.type_used in LOOP_NODE_TYPES or node.type_used == IO_NODE_TYPE:
             resolved_nodes.append(node)
             continue
@@ -311,11 +309,6 @@ def _validate_resolved_node_contracts(
     if id(graph) in visited:
         return
     visited.add(id(graph))
-    from vibeflow.core.tasks import call_specs
-    for node in call_specs(graph.nodes):
-        fact = implementations.get(node.type_used)
-        if node.task_targets and (fact.flow_kind if fact else node.flow_kind) != "task_manager":
-            raise GraphCompileError("task_targets requires a task_manager", "GRAPH.TASK.CONTROL_FORBIDDEN")
     for type_key, nodeset in graph.nodesets.items():
         if type_key in visited_nodesets:
             continue
@@ -687,12 +680,6 @@ def _collect_implemented_global_state_lock_keys(
         effective_lock_key = node_lock_key or active_lock_key
         if flow_kinds.get(node.id) == FLOW_KIND_GLOBAL_STATE:
             found[".".join(node_path)] = effective_lock_key
-        from vibeflow.core.tasks import task_graph
-        for slot, task_target in node.task_targets.items():
-            found.update(_collect_implemented_global_state_lock_keys(task_graph(graph, task_target),
-                implementations=implementations, known_nodesets=available_nodesets,
-                nodeset_registry=local_registry, path=(*node_path,"tasks",slot),
-                inherited_lock_key=effective_lock_key, active_nodesets=active_nodesets))
         target = _executed_nodeset_target(node, local_registry)
         if not target or target in active_nodesets:
             continue
@@ -766,11 +753,6 @@ def _validate_execution_lock_nesting(
             node_key,
             subject=f"node '{'.'.join(node_path)}'",
         )
-        from vibeflow.core.tasks import task_graph
-        for slot, task_target in node.task_targets.items():
-            _validate_execution_lock_nesting(task_graph(graph, task_target), known_nodesets=available_nodesets,
-                owner=owner, inherited_key=nested_key, nodeset_registry=local_registry,
-                path=(*node_path,"tasks",slot), active_nodesets=active_nodesets)
         target = _executed_nodeset_target(node, local_registry)
         if not target or target in active_nodesets:
             continue
@@ -833,11 +815,6 @@ def _collect_implemented_execution_lock_paths(
         qualified_node = ".".join(node_path)
         if node.execution_lock is not None:
             found.add(qualified_node)
-        from vibeflow.core.tasks import task_graph
-        for slot, task_target in node.task_targets.items():
-            found.update(_collect_implemented_execution_lock_paths(task_graph(graph, task_target),
-                known_nodesets=available_nodesets, nodeset_registry=local_registry,
-                path=(*node_path,"tasks",slot), active_nodesets=active_nodesets))
         target = _executed_nodeset_target(node, local_registry)
         if not target or target in active_nodesets:
             continue

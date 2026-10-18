@@ -1,173 +1,70 @@
 {
   "pipeline": {
-    "inputs": [
-      {
-        "key": "calc.a",
-        "type": "calc.a",
-        "display_name": "Calc A",
-        "required": true
-      },
-      {
-        "key": "calc.b",
-        "type": "calc.b",
-        "display_name": "Calc B",
-        "required": true
-      },
-      {
-        "key": "calc.c",
-        "type": "calc.c",
-        "display_name": "Calc C",
-        "required": true
-      },
-      {
-        "key": "calc.d",
-        "type": "calc.d",
-        "display_name": "Calc D",
-        "required": true
-      }
-    ],
     "nodes": [
       {
         "id": "start",
         "type_used": "sandbox.start",
-        "display_name": "Start",
-        "description": "Runs start."
+        "display_name": "start",
+        "description": "Ordinary graph result visibility example"
       },
       {
-        "id": "slow_async",
-        "type_used": "task.launch.semantic_slow_async_value.waited",
-        "display_name": "任务管理：Slow Async",
-        "description": "Starts an explicitly declared workflow-owned task.",
-        "task_targets": {
-          "work": {
-            "config": {
-              "value": 99
-            },
-            "id": "work",
-            "type_used": "semantic.slow_async_value",
-            "display_name": "Slow Async",
-            "description": "Runs slow_async."
-          }
+        "id": "slow",
+        "type_used": "semantic.slow_async_value",
+        "display_name": "slow",
+        "description": "Ordinary graph result visibility example",
+        "config": {
+          "value": 99
         }
       },
       {
-        "id": "add_pair",
-        "type_used": "semantic.add_pair",
-        "display_name": "Add Pair",
-        "description": "Runs add_pair."
+        "id": "seed",
+        "type_used": "sandbox.constant",
+        "display_name": "seed",
+        "description": "Ordinary graph result visibility example",
+        "value": 4
       },
       {
-        "config": {
-          "factor": 3
-        },
-        "id": "scale",
-        "type_used": "semantic.scale",
-        "display_name": "Scale",
-        "description": "Runs scale."
-      },
-      {
-        "id": "compare",
-        "type_used": "semantic.compare_gt",
-        "display_name": "Compare",
-        "description": "Runs compare."
-      },
-      {
-        "id": "use_scaled",
-        "type_used": "semantic.use_scaled",
-        "display_name": "Use Scaled",
-        "description": "Runs use_scaled."
-      },
-      {
-        "config": {
-          "offset": -4
-        },
-        "id": "finalize",
-        "type_used": "semantic.finalize",
-        "display_name": "Finalize",
-        "description": "Runs finalize."
+        "id": "add",
+        "type_used": "sandbox.add",
+        "display_name": "add",
+        "description": "Ordinary graph result visibility example",
+        "delta": 5
       },
       {
         "id": "end",
-        "type_used": "semantic.final_end",
-        "display_name": "End",
-        "description": "Runs end."
-      },
-      {
-        "id": "right_end",
-        "type_used": "sandbox.start",
-        "display_name": "Right End",
-        "description": "Runs right_end."
+        "type_used": "sandbox.out_value_end",
+        "display_name": "end",
+        "description": "Ordinary graph result visibility example",
+        "join_policy": "all"
       }
     ],
     "edges": [
       {
         "from": "start",
-        "to": "slow_async"
+        "to": "slow"
       },
       {
-        "from": "add_pair",
-        "to": "scale"
+        "from": "start",
+        "to": "seed"
       },
       {
-        "from": "compare",
-        "to": "use_scaled",
-        "when": "route.branch == 'left'"
+        "from": "seed",
+        "to": "add"
       },
       {
-        "from": "compare",
-        "to": "right_end",
-        "when": "route.branch == 'right'"
-      },
-      {
-        "from": "use_scaled",
-        "to": "finalize"
-      },
-      {
-        "from": "finalize",
+        "from": "slow",
         "to": "end"
       },
       {
-        "from": "start",
-        "to": "add_pair"
-      },
-      {
-        "from": "start",
-        "to": "compare"
-      },
-      {
-        "from": "scale",
-        "to": "use_scaled"
-      },
-      {
-        "from": "slow_async",
+        "from": "add",
         "to": "end"
       }
     ],
     "outputs": [
       {
-        "type": "calc.final",
+        "type": "value.out",
         "cardinality": "exactly_one",
-        "display_name": "Calc Final"
-      },
-      {
-        "type": "calc.branch",
-        "cardinality": "optional_one",
-        "display_name": "Calc Branch"
-      },
-      {
-        "type": "calc.scaled",
-        "cardinality": "optional_one",
-        "display_name": "Calc Scaled"
-      },
-      {
-        "type": "calc.sum",
-        "cardinality": "optional_one",
-        "display_name": "Calc Sum"
-      },
-      {
-        "type": "route.branch",
-        "cardinality": "optional_one",
-        "display_name": "Route Branch"
+        "display_name": "Selected result"
       }
     ]
   },

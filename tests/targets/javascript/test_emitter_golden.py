@@ -16,7 +16,7 @@ from tests.targets.javascript.test_aot_core import (
     _node,
     _provider,
     _requirement,
-    _managed_task,
+    _ordinary_worker,
 )
 from vibeflow.targets.javascript.build import BuildRequest, build_aot
 from vibeflow.targets.javascript.frontend.emitter import emit_workflow_module
@@ -106,7 +106,7 @@ def _loop_plan(max_iterations: int | None) -> dict[str, object]:
 
 def _deferred_plan() -> dict[str, object]:
     return _linear_plan(
-        middle=_managed_task("calculate", "calculate", requires=[_requirement("number")],
+        middle=_ordinary_worker("calculate", "calculate", requires=[_requirement("number")],
                              provides=[_provider("out", "answer")]),
         entry_mode="async",
     )
@@ -114,14 +114,14 @@ def _deferred_plan() -> dict[str, object]:
 
 def _detached_plan() -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v7",
+        "abi_version": "vibeflow.workflow.v8",
         "workflow_id": "baseline.detached",
         "entry_mode": "async",
         "inputs": [],
         "outputs": [],
         "nodes": [
             _node("start", "start", terminal=True),
-            _managed_task("audit", "audit", wait=False),
+            _ordinary_worker("audit", "audit"),
             _node("end", "end", terminal=True),
         ],
         "routes": [
@@ -156,7 +156,7 @@ def _port_plan() -> dict[str, object]:
     )
     send["type_used"] = "vibeflow.io"
     return {
-        "abi_version": "vibeflow.workflow.v7",
+        "abi_version": "vibeflow.workflow.v8",
         "workflow_id": "baseline.port",
         "entry_mode": "async",
         "inputs": [],
@@ -216,36 +216,36 @@ def _emission_cases() -> dict[str, tuple[dict[str, object], tuple[dict, ...]]]:
 
 # These hashes intentionally freeze generated source formatting as well as its
 # semantic plan.  Update them only after reviewing an intentional ABI change.
-# Workflow ABI v6 uses declared managed tasks; source and plan hashes migrate together.
-EMISSION_GOLDENS = {'async': ('0005e7e704bfe903404cfc70d8fdce40ac9d7d1b804f54326ef3378f608873b3',
+# Workflow ABI v8 uses only ordinary graph calls and explicit routes.
+EMISSION_GOLDENS = {'async': ('fe68b2431807b8637e62e52a8716491275f194ec212737c4d99500076b2a58e4',
            '742f4b399ddd9748b718454000b36adba1063c23733c72aef5b5cd13fd22f880',
-           'edb965afe2850a9c1dd165d17055799a31163325951136df3714078d67de951c'),
- 'bounded_loop': ('b83bd32962669859e57d966f897c472017c5884286b0d5077c89baf7a8e8f5ae',
+           '472bcffb0d29d7605febd305b0ae52b293df6aa54ef24c63dcd39fb24eaf7c5e'),
+ 'bounded_loop': ('f8602c3fbe3090f8b1ecd42be1d0ea1d21b77e14af0bf3f786377da9030e2ee8',
                   '2873b3ce54254ebee51701947852fd5bf26ff3fd5d4cd8634baf0fe3515684fc',
-                  'fdf0d490e1c10239af299a1a64754817087d33acf5e7e184f2cf8e53d0056b5c'),
- 'deferred': ('f268c3f7576dc8e118ffd5c6345bf0fc7928b694424975326f6ddf1a07673984',
+                  '3448492c3a639921e0b9ec4114c68bf94189e883fce635ab5f9c18aaa938dd62'),
+ 'deferred': ('fe68b2431807b8637e62e52a8716491275f194ec212737c4d99500076b2a58e4',
               '742f4b399ddd9748b718454000b36adba1063c23733c72aef5b5cd13fd22f880',
-              'b7d09ce3e465de879c9715ccfc2acb248854fc12e4e89aa83dfcf1f40739ea8a'),
- 'detached': ('3429fdb56d0a57b5775eeb8710e5e11c883a7e7944e6cb5a078ae5850c878079',
+              '472bcffb0d29d7605febd305b0ae52b293df6aa54ef24c63dcd39fb24eaf7c5e'),
+ 'detached': ('6765da5627fcd086b92ca50c6aa51b143fe1ff759217155a0bba82282571104f',
               '931f71c1a6f98d4c06ca1d11231f68fa8e780e24c080db6488f350ab5480ec40',
-              'd48c09c2ed062c3dc60094c9dd1c3237c81d4af88e0e9be0bfa0893bcf85f4ac'),
- 'host_extension': ('6a54efc307bf659a7b5e7edf5946e1eca56d381f0ce3d49ca1c470068f9e2372',
+              '4244f051585190317d83f89203f61795300a4c22668370a4ae9631ed19b70c66'),
+ 'host_extension': ('dfef2309d3738c3b145f46993eca3662aff540d0d30627911ea904cb9d6580b1',
                     '7d42f7e7aa8acf3bab7e23816bd025e45f65c766352a4f9ea564c920c58f723f',
-                    '00f4c9c6e93b80560931eb85b5979a54e59b89a81d65831a8a805d9b3cb12931'),
- 'nested_nodeset': ('899c4410f854400e0f6a126e1c3b513d84933a1bbda0daf010d0cec61c8c43ec',
+                    'e947c6f040dbcbf002e3853cc10341364e6c8e3b3999620b4e4cbe311bd258ba'),
+ 'nested_nodeset': ('fcc1bea37425dd14f5141bf36dc9b42f22f0beb4710eaadee6c00ddb77f55dd2',
                     '2873b3ce54254ebee51701947852fd5bf26ff3fd5d4cd8634baf0fe3515684fc',
-                    'e03779b85fa8f96be4186b60fc87c61da24eb3ff2390c692a473540269e2da12'),
- 'port': ('6ee7af190eb2313db1623ff93004a2dc533abd55a206523a16c2603d76b2108a',
+                    '1471d70ea42dd53e17e6c6959a93d11448ad1838e8fa779efc31a197f8879c05'),
+ 'port': ('4927778d36fdb72101accaae193dc21576eb4f0a372262edd35e37f9137f0005',
           '3b7386483d8723d3fcac187b1ad052d370af5c763086fee71a3c47043a8f0666',
-          'f6f650d359a5defa16b646148ecc7fae693cf3884feef35762b28a97da0ac718'),
- 'sync': ('01c4cfb1f2a2709d7e20624e4fe5e4e6679b67aefe7d9f9695175716e1b29d70',
+          'dfbd068bf9622c4aedeba46023ec1518bbc0d4b75e71ca4d443b60b47a68fa34'),
+ 'sync': ('2fd6c778488149cf3707eb6d7eb1ce3c8223953e90c7e8855c5008b11abdb1f9',
           '2873b3ce54254ebee51701947852fd5bf26ff3fd5d4cd8634baf0fe3515684fc',
-          '00f4c9c6e93b80560931eb85b5979a54e59b89a81d65831a8a805d9b3cb12931'),
- 'unbounded_loop': ('508168ba3419ff66d0fd156298563304a281135d0a5ff76063c14f87988fd5ae',
+          'e947c6f040dbcbf002e3853cc10341364e6c8e3b3999620b4e4cbe311bd258ba'),
+ 'unbounded_loop': ('11591c4a75bcf60e09526eb03659f3c4acf0dae9cfb60a494ee51abbff7d9715',
                     '2873b3ce54254ebee51701947852fd5bf26ff3fd5d4cd8634baf0fe3515684fc',
-                    'f85ce3ebd26f738341160044a8b23d999c0af95b83b7f43361a89dd3a935bfe9')}
+                    '8bddb96ae82e67c341c91d5391bb9794d6a9b74dc344ef2c4ce832be9da24d06')}
 
-NORMALIZED_WORKFLOW_SHA256 = 'cdb0dd2475424a03fbd7ae902f1e40dff5f3a6bae8c6e4120e929891c782181b'
+NORMALIZED_WORKFLOW_SHA256 = 'cec2288b59b9ff67c1d609564b1ea4215189700a6ceb526cc73233f4d3669972'
 
 def test_canonical_bound_view_payload_is_frozen() -> None:
     workflow = view_fixture(_sync_plan())
@@ -265,7 +265,6 @@ def test_canonical_bound_view_payload_is_frozen() -> None:
         "schemas",
         "capabilities",
         "entry_mode",
-        "tasks",
     )
     assert payload["entries"] == ["start"]
     assert payload["entry_mode"] == "sync"
@@ -324,24 +323,6 @@ def test_representative_emission_source_declarations_and_plan_hash_are_frozen(
             "sync workflow contains suspending node 'calculate'",
         ),
         (
-            "sync_deferred",
-            lambda plan: (
-                plan.update(entry_mode="sync"),
-                plan["nodes"][1].update(completion="immediate"),
-            ),
-            "VF_ENTRY_MODE_TASK_IN_SYNC",
-            "JavaScript task management requires an async workflow",
-        ),
-        (
-            "sync_detached",
-            lambda plan: (
-                plan.update(entry_mode="sync"),
-                plan["nodes"][1].update(completion="immediate"),
-            ),
-            "VF_ENTRY_MODE_TASK_IN_SYNC",
-            "JavaScript task management requires an async workflow",
-        ),
-        (
             "port_missing_name",
             lambda plan: plan["nodes"][1].update(io_port=""),
             "VF_IO_PORT",
@@ -357,7 +338,7 @@ def test_representative_emission_source_declarations_and_plan_hash_are_frozen(
         ),
     ],
 )
-def test_sync_task_and_port_diagnostics_are_frozen(
+def test_sync_completion_and_port_diagnostics_are_frozen(
     case_name: str,
     mutate,
     code: str,
@@ -365,8 +346,6 @@ def test_sync_task_and_port_diagnostics_are_frozen(
 ) -> None:
     source = {
         "sync_suspend": _async_plan,
-        "sync_deferred": _deferred_plan,
-        "sync_detached": _detached_plan,
         "port_missing_name": _port_plan,
         "port_bad_send_contract": _port_plan,
     }[case_name]
@@ -543,7 +522,7 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
         "files": sorted(manifest["files"]),
     } == {
         "format": "vibeflow.aot-build.v3",
-        "abi_version": "vibeflow.workflow.v7",
+        "abi_version": "vibeflow.workflow.v8",
         "project_target": "javascript",
         "workflow_id": "test.workflow",
         "entry_mode": "sync",

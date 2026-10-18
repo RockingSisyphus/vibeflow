@@ -13,7 +13,7 @@
       "distribution/docs/user/rules-and-nodes.md",
       "distribution/docs/user/rule-system-migration.md",
       "distribution/docs/user/runtime-observation.md",
-      "distribution/docs/user/task-management.md",
+      "distribution/docs/user/graph-concurrency.md",
       "distribution/docs/user/commands-and-results.md",
       "distribution/docs/user/product-check-boundaries.md"
     ],

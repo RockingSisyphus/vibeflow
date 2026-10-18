@@ -140,7 +140,7 @@ def test_overlapping_import_scopes_keep_lazy_modules_available(tmp_path):
     sys.modules.pop('aot_lazy_support',None)
 
 
-def test_native_subplan_projection_and_task_order_roundtrip():
+def test_native_subplan_projection_and_node_order_roundtrip():
     from tests.block_compiler.strict_portable_plan import _loop_graph, _registry
     from tests.block_compiler.test_block_compiler import _compile_global
     from vibeflow.targets.python.project.compiler import GraphCompiler
@@ -154,12 +154,11 @@ def test_native_subplan_projection_and_task_order_roundtrip():
     child = native.frames['repeat'].subplan.to_workflow_plan()
     assert child.block(child.entry_block).path == ()
     assert child.blocks[0].order == native.frames['repeat'].subplan.order
-    graph = GraphConfig(nodes=(NodeSpec('manager','manager',task_targets={
-        'z':NodeSpec('z','worker'),'a':NodeSpec('a','worker')}),))
-    plan = _compile_global(graph,ImplementationFacts((ImplementationFact('manager',flow_kind='task_manager'),ImplementationFact('worker',flow_kind='process'))))
+    graph = GraphConfig(nodes=(NodeSpec('z','worker'),NodeSpec('a','worker')))
+    plan = _compile_global(graph,ImplementationFacts((ImplementationFact('worker',flow_kind='process'),)))
     restored = workflow_plan_from_json(plan.to_json())
     assert restored == plan
-    assert [key for key,_ in restored.blocks[0].nodes[0].task_targets] == ['z','a']
+    assert list(restored.blocks[0].order) == ['z','a']
 
 
 def test_installed_plugin_package_is_collected_without_its_environment(tmp_path, monkeypatch):

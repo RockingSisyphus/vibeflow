@@ -31,7 +31,7 @@ def has_planned(graph: GraphConfig) -> bool:
 
 
 def planned_items(graph: GraphConfig, *, prefix: str = "") -> tuple[dict[str, object], ...]:
-    """Inventory declarations and task targets once, including unused definitions."""
+    """Inventory declarations once, including unused definitions."""
     items: list[dict[str, object]] = []
     seen_graphs: set[int] = set()
     seen_definitions: set[int] = set()
@@ -48,8 +48,6 @@ def planned_items(graph: GraphConfig, *, prefix: str = "") -> tuple[dict[str, ob
         try:
             if spec.status == STATUS_PLANNED:
                 add(label, "node", effective_planned_behavior(spec, current.nodesets.get(spec.type_used)))
-            for name, target in spec.task_targets.items():
-                node(target, current, f"{label}.$task.{name}")
         finally:
             active_nodes.remove(id(spec))
 

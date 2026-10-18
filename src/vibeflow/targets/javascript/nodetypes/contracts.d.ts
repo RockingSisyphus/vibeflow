@@ -1,34 +1,5 @@
 import type {Options, Resource} from "../resources/sdk";
 
-export interface TaskRef { readonly run_id: string; readonly task_id: string; }
-export interface TaskError {
-  readonly code: string;
-  readonly message: string;
-  readonly node_path: string;
-  readonly source_location?: {readonly path?: string; readonly symbol?: string; readonly line?: number};
-  readonly exception_type?: string;
-  readonly stack?: string;
-  readonly cause?: TaskError;
-  readonly errors?: readonly TaskError[];
-  readonly task_errors?: readonly TaskOutcome[];
-  readonly cleanup_errors?: readonly TaskError[];
-}
-export interface TaskOutcome {
-  readonly task: TaskRef;
-  readonly status: "succeeded" | "failed" | "cancelled";
-  readonly outputs?: Readonly<Record<string, any>>;
-  readonly error?: TaskError;
-}
-export interface StopAck {readonly task: TaskRef; readonly state: "stop_requested" | "already_exited";}
-export interface TaskController {
-  start(key: string, inputs?: Readonly<Record<string, any>>): TaskRef;
-  /** Receive one final result and retire its reference. */
-  waitAny(refs: readonly TaskRef[]): Promise<TaskOutcome | null>;
-  requestStop(refs: readonly TaskRef[], reason?: any): readonly StopAck[];
-  /** Receive all final results and retire the supplied references. */
-  waitAllExited(refs: readonly TaskRef[]): Promise<readonly TaskOutcome[]>;
-}
-export interface TaskManagerContext extends NodeRunContext {readonly tasks: TaskController;}
 export interface NodeRunContext {
   readonly signal?: AbortSignal;
   readonly capabilities: Readonly<Record<string, any>>;

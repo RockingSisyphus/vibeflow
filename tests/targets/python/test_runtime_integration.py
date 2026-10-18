@@ -1,4 +1,4 @@
-from tests.fixtures.support.task_management import task_call, register_task_manager
+from tests.fixtures.support.graph_calls import normal_call
 """Integration gates for the Python Target runtime."""
 
 from tests.fixtures.support.declarations import native_registry
@@ -256,7 +256,7 @@ def test_result_key_semantics_and_trace_match_all_execution_modes(
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the flow."),
-                    task_call(
+                    normal_call(
                         "seed",
                         "test.seed",
                         "Produces an asynchronous value.",
@@ -284,7 +284,7 @@ def test_result_key_semantics_and_trace_match_all_execution_modes(
     )
     result = PipelineRuntime(
         graph,
-        registry=register_task_manager(_registry(), "test.seed"),
+        registry=_registry(),
         runtime_options=RuntimeOptions(execution=execution, trace="full"),
         run_dir=tmp_path / execution,
     ).run()
@@ -292,8 +292,8 @@ def test_result_key_semantics_and_trace_match_all_execution_modes(
 
     assert result.get("value.out")["value"] == 7
     assert result.get("runtime.stop_reason") == "completed"
-    assert "task_started" in kinds
-    assert "task_exited" in kinds
+    assert "node" in kinds
+    assert "node" in kinds
     assert kinds[-1] == "runtime_summary"
 
 
@@ -307,7 +307,7 @@ def test_detached_failure_cleanup_and_trace_match_all_execution_modes(
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the flow."),
-                    task_call(
+                    normal_call(
                         "metrics",
                         "test.runtime_fail",
                         "Fails in a detached task.",
@@ -333,12 +333,12 @@ def test_detached_failure_cleanup_and_trace_match_all_execution_modes(
             }
         }
     )
-    runtime=PipelineRuntime(graph,registry=register_task_manager(_registry(),'test.runtime_fail'),
+    runtime=PipelineRuntime(graph,registry=_registry(),
         runtime_options=RuntimeOptions(execution=execution,trace='full'),run_dir=tmp_path/execution)
     with pytest.raises(RuntimeError,match='boom'):runtime.run()
     lines=[json.loads(line) for line in (tmp_path/execution/'runtime_trace.jsonl').read_text().splitlines()]
-    assert any(line['kind']=='task_started' for line in lines)
-    assert any(line['kind']=='task_exited' and line['details']['status']=='failed' for line in lines)
+    assert any(line['kind']=='node_failed' for line in lines)
+    assert runtime.trace.node_runs.get('seed',0)==0
     assert lines[-1]['kind']=='runtime_summary'
 
 

@@ -98,8 +98,6 @@ class StaticWorkflowEmitter(
             payload_nodes,
             strict=True,
         ):
-            for key, task in node.task_plans.items():
-                children[(node.id, key)] = self._register(task, node_payload["task_plans"][key])
             if node.subplan is None:
                 continue
             if not isinstance(node_payload, Mapping):
@@ -129,7 +127,8 @@ class StaticWorkflowEmitter(
         workflow = code.workflow
         metadata = {
             "kind": workflow.kind,
-            "task_input_cardinalities": {item.type:item.cardinality for node in workflow.nodes for item in node.requires} if workflow.kind=="task" else {},
+            "routes": [route.to_dict() for route in workflow.routes],
+            "node_order": [node.id for node in workflow.nodes],
             "abi_version": workflow.abi_version,
             "workflow_id": workflow.workflow_id,
             "inputs": [item.to_dict() for item in workflow.inputs],
@@ -216,8 +215,6 @@ class StaticWorkflowEmitter(
                         requirement.id,
                         set(),
                     ).update(operations)
-                for task in node.task_plans.values():
-                    visit(task)
                 if node.subplan is not None:
                     visit(node.subplan)
 

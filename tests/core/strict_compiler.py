@@ -766,7 +766,7 @@ def test_compiler_applies_explicit_edge_roles_after_default_inference() -> None:
     ]
 
 
-def test_old_implicit_scheduling_requires_explicit_task_manager() -> None:
+def test_old_implicit_scheduling_requires_graph_migration() -> None:
     from vibeflow.core.flow import GraphConfigError
     for mode in ("detached", "result_key"):
         with pytest.raises(GraphConfigError, match="GRAPH.ASYNC.MIGRATION"):
@@ -1017,11 +1017,11 @@ def test_cycle_validation_is_role_specific() -> None:
     ]
 
 
-def test_task_reference_data_does_not_trigger_implicit_result_wait() -> None:
+def test_ordinary_reference_data_does_not_trigger_implicit_result_wait() -> None:
     from vibeflow.core.flow import GraphConfig, NodeSpec, EdgeSpec
     from vibeflow.core.models import ImplementationFact, ImplementationFacts
     from vibeflow.core.compiler import CoreCompileRequest, compile_core
-    facts = ImplementationFacts((ImplementationFact("fixture.manager",flow_kind="task_manager",
+    facts = ImplementationFacts((ImplementationFact("fixture.manager",flow_kind="process",
         provides=(DataProvider("refs","fixture.refs"),)),ImplementationFact("fixture.relay",flow_kind="process",
         requires=(DataRequirement("fixture.refs","exactly_one"),))),strict=True)
     graph = GraphConfig(nodes=(NodeSpec("manager","fixture.manager"),NodeSpec("relay","fixture.relay")),

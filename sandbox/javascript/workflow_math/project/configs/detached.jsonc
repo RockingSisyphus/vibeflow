@@ -18,19 +18,11 @@
       },
       {
         "id": "audit",
-        "type_used": "task.launch.sandbox_detached_audit.background",
-        "display_name": "任务管理：Audit asynchronously",
-        "description": "Starts an explicitly declared workflow-owned task.",
-        "task_targets": {
-          "work": {
-            "id": "work",
-            "type_used": "sandbox.detached_audit",
-            "display_name": "Audit asynchronously",
-            "description": "Runs independently but is cleaned up before the call returns.",
-            "config": {
-              "label": "detached-complete"
-            }
-          }
+        "type_used": "sandbox.detached_audit",
+        "display_name": "audit",
+        "description": "Executes the declared ordinary workflow node.",
+        "config": {
+          "label": "detached-complete"
         }
       },
       {

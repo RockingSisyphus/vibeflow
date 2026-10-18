@@ -38,7 +38,6 @@ def resolve_presentation(
 ) -> EffectivePresentation:
     """Native → Node → status → call, with per-field provenance."""
     identity = flow_kind or _get(descriptor, "flow_kind", "process")
-    native_class = "taskManagerNode" if identity == "task_manager" else native_class
     native_class = native_class or ("externalDependency" if _get(descriptor, "external", False)
                                     else "documentNode" if identity == "document" else "defaultNode")
     native = SYSTEM_STYLE_COLORS.get(native_class, SYSTEM_STYLE_COLORS["defaultNode"])

@@ -21,18 +21,10 @@ class NodeCodegenMixin:
         lines = [
             (
                 f"function {code.activate_names[node.id]}"
-                "(outputs, inputs, state, deferred = false) {"
+                "(outputs, inputs, state) {"
             ),
             "  const targets = [];",
         ]
-        scheduled = [route.target for route in routes if route.schedule]
-        if scheduled:
-            lines.append("  if (deferred) {")
-            for target in scheduled:
-                lines.append(f"    targets.push({js(target)});")
-            lines.extend(["    return targets;", "  }"])
-        else:
-            lines.append("  if (deferred) return targets;")
         lines.extend(
             [
                 "  const values = conditionValues(inputs, outputs);",

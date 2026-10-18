@@ -40,7 +40,6 @@ class NodeFrame:
     io_spec: IoSpec = field(default_factory=IoSpec)
     execution_lock: ExecutionLockSpec | None = None
     subplan: "ExecutionPlan | None" = None
-    task_plans: Mapping[str, "ExecutionPlan"] = field(default_factory=dict)
     accepts_context: bool = False
     planned_behavior: PlannedBehavior = field(default_factory=blocking_planned_behavior)
     planned_stub_module: str = ""

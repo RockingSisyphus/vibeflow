@@ -5,8 +5,7 @@ from pathlib import Path
 from tests.targets.javascript.test_aot_core import (
     _linear_plan,
     _node,
-    _managed_task,
-    _TASK_MANAGER_SOURCE,
+    _ordinary_worker,
     _provider,
     _requirement,
     _run_esm,
@@ -14,7 +13,7 @@ from tests.targets.javascript.test_aot_core import (
 )
 
 
-_NESTED_SOURCE = _TASK_MANAGER_SOURCE + """
+_NESTED_SOURCE = """
 export function start() { return {}; }
 export function end() { return {}; }
 export function unused() { throw new Error("nodeset binding must not run"); }
@@ -47,7 +46,7 @@ def _nested_result_plan(
     schedule: str = "result_key",
 ) -> dict[str, object]:
     leaf = {
-        "abi_version": "vibeflow.workflow.v7",
+        "abi_version": "vibeflow.workflow.v8",
         "workflow_id": "nested.leaf",
         "entry_mode": "async",
         "inputs": [{"key": "number", "type": "number", "required": True}],
@@ -56,7 +55,7 @@ def _nested_result_plan(
         ],
         "nodes": [
             _node("leaf_start", "start", terminal=True),
-            _managed_task(
+            _ordinary_worker(
                 "work",
                 implementation,
                 requires=[_requirement("number")],
@@ -78,7 +77,7 @@ def _nested_result_plan(
         "max_steps": 10,
     }
     outer = {
-        "abi_version": "vibeflow.workflow.v7",
+        "abi_version": "vibeflow.workflow.v8",
         "workflow_id": "nested.outer",
         "entry_mode": "async",
         "inputs": [{"key": "number", "type": "number", "required": True}],
@@ -130,7 +129,7 @@ def _nested_result_plan(
 
 def _nested_detached_plan() -> dict[str, object]:
     leaf = {
-        "abi_version": "vibeflow.workflow.v7",
+        "abi_version": "vibeflow.workflow.v8",
         "workflow_id": "nested.detached.leaf",
         "entry_mode": "async",
         "inputs": [{"key": "number", "type": "number", "required": True}],
@@ -139,11 +138,11 @@ def _nested_detached_plan() -> dict[str, object]:
         ],
         "nodes": [
             _node("leaf_start", "start", terminal=True),
-            _managed_task(
+            _ordinary_worker(
                 "side",
                 "hang",
                 completion="suspend",
-                wait=False,
+
             ),
             _node(
                 "value",
@@ -190,7 +189,7 @@ def _nested_detached_plan() -> dict[str, object]:
 
 def _nested_max_steps_plan() -> dict[str, object]:
     leaf = {
-        "abi_version": "vibeflow.workflow.v7",
+        "abi_version": "vibeflow.workflow.v8",
         "workflow_id": "nested.steps.leaf",
         "entry_mode": "async",
         "inputs": [],
@@ -207,7 +206,7 @@ def _nested_max_steps_plan() -> dict[str, object]:
         "max_steps": 3,
     }
     outer = {
-        "abi_version": "vibeflow.workflow.v7",
+        "abi_version": "vibeflow.workflow.v8",
         "workflow_id": "nested.steps.outer",
         "entry_mode": "async",
         "inputs": [],
@@ -231,7 +230,7 @@ def _nested_max_steps_plan() -> dict[str, object]:
         "max_steps": 10,
     }
     return {
-        "abi_version": "vibeflow.workflow.v7",
+        "abi_version": "vibeflow.workflow.v8",
         "workflow_id": "nested.steps",
         "entry_mode": "async",
         "inputs": [],
@@ -274,7 +273,7 @@ const value = await workflow.runWorkflowAsync(
   { trace: "full", onTrace: event => trace.push(event) },
 );
 const tasks = trace
-  .filter(event => event.kind === "task_started" || event.kind === "task_exited")
+  .filter(event => event.nodePath === "outer.inner.work" && (event.kind === "node_start" || event.kind === "node_end"))
   .map(event => ({
     kind: event.kind,
     nodePath: event.nodePath,
@@ -288,12 +287,12 @@ console.log(JSON.stringify({ value, tasks, calls: globalThis.__vfCalls }));
         "value": {"answer": 12},
         "tasks": [
             {
-                "kind": "task_started",
+                "kind": "node_start",
                 "nodePath": "outer.inner.work",
                 "blockPath": "/outer/inner",
             },
             {
-                "kind": "task_exited",
+                "kind": "node_end",
                 "nodePath": "outer.inner.work",
                 "blockPath": "/outer/inner",
             },
@@ -368,7 +367,7 @@ try {
     blockPath: error.blockPath,
   };
 }
-const task = trace.find(event => event.kind === "task_started");
+const task = trace.find(event => event.kind === "node_start" && event.nodePath === "outer.inner.work");
 console.log(JSON.stringify({
   failure,
   task: {
@@ -398,7 +397,7 @@ console.log(JSON.stringify({
 
 def test_nested_task_cancellation_waits_for_actual_cleanup(tmp_path):
     plan=_nested_detached_plan()
-    target=plan['nodes'][1]['subplan']['nodes'][1]['subplan']['nodes'][1]['task_targets']['work']['nodes'][0]
+    target=plan['nodes'][1]['subplan']['nodes'][1]['subplan']['nodes'][1]
     target['implementation']['export']='uncooperative'
     workflow=_write_emitted(tmp_path,plan,_NESTED_SOURCE)
     result=_run_esm(workflow,"""
@@ -411,7 +410,7 @@ await Promise.resolve();if(settled)throw new Error('returned before underlying e
 globalThis.__releaseTask();
 let code;try{await pending;}catch(error){code=error.code;}
 console.log(JSON.stringify({code,calls:globalThis.__vfCalls,
- tasks:trace.filter(event=>event.kind==='task_exited').map(event=>event.nodePath)}));
+ tasks:trace.filter(event=>event.kind==='node_start' && event.nodePath==='outer.inner.side').map(event=>event.nodePath)}));
 """)
     assert result['code']=='VF_ABORTED',result
     assert 'cleanup' in result['calls'],result

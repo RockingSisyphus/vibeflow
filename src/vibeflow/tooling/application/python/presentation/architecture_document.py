@@ -1,5 +1,4 @@
 from __future__ import annotations
-from vibeflow.tooling.presentation.task_targets import task_target_document
 
 from vibeflow.core.rules.selection import selection_data
 
@@ -251,7 +250,6 @@ def _node_document(
         "source": source,
         "role": node_review_metadata(graph, node, registry),
         "flow_kind": node_flow_kind(node, compiled),
-        "task_targets": task_target_document(node, lambda key:registry_descriptor(registry,key)),
         "rulesets": selected_rulesets,
         "selected_rulesets": selected_rulesets,
         "tags": list(descriptor.tags) if descriptor is not None else [],
@@ -399,9 +397,8 @@ def _node_types_document(
 def _node_type_occurrences(graph: GraphConfig) -> dict[str, list[tuple[GraphConfig, NodeSpec]]]:
     occurrences: dict[str, list[tuple[GraphConfig, NodeSpec]]] = {}
     bodies = [graph, *(nodeset.graph for _, nodeset in sorted(graph.nodesets.items()))]
-    from vibeflow.core.tasks import call_specs
     for body in bodies:
-        for node in call_specs(body.nodes):
+        for node in body.nodes:
             if node.type_used not in LOOP_NODE_TYPES and invocation_for_node(body, node) is not None:
                 continue
             occurrences.setdefault(node.type_used, []).append((body, node))

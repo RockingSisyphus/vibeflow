@@ -29,7 +29,7 @@
 
 - Workflow ABI 从 **v5 升至 v6**。旧调用级 `async`、`result_key`、`detached` 和停止等待超时入口须改用任务管理接口，没有自动转换层。JS workflow 的 `pipeline.entry_mode="async"` 仍用于异步执行入口。
 - 从本地 0.19.x 升级也须修改重复等待逻辑：收到结果后从 pending 名单删除其引用，保存 outcome，再等待剩余任务。其他节点需要结果时，由父流程传递 outcome。
-- 修改真实声明与配置后重新生成 Architecture、计划和构建产物。详见分发包中的 `kernel/docs/user/task-management.md`。
+- 修改真实声明与配置后重新生成 Architecture、计划和构建产物。详见分发包中的 `kernel/docs/user/graph-concurrency.md`。
 
 ### 资产与验证
 
@@ -66,7 +66,7 @@ This release compares against the previous published distribution, **v0.18.3 (`6
 
 Workflow ABI advances from **v5 to v6**. Replace legacy call-level `async`, `result_key`, `detached` and stop-wait timeout APIs with declared task targets and manager controls. Workflow-level `pipeline.entry_mode="async"` remains the JS asynchronous entry selector. There is no automatic migration layer.
 
-Projects using local 0.19.x must also remove received refs from pending lists and keep returned outcomes instead of querying task results again. Regenerate Architecture, plans and build output after changing declarations or configuration. See `kernel/docs/user/task-management.md` in either package.
+Projects using local 0.19.x must also remove received refs from pending lists and keep returned outcomes instead of querying task results again. Regenerate Architecture, plans and build output after changing declarations or configuration. See `kernel/docs/user/graph-concurrency.md` in either package.
 
 ### Assets and validation
 

@@ -1,0 +1,27 @@
+# 图并发实现约束
+
+配置示例与升级步骤统一放在[用户并发手册](../../distribution/docs/user/graph-concurrency.md)。本页描述框架实现，避免维护两份使用文档。
+
+## Core 与公共计划
+
+NodeSpec 只描述正常调用；Nodeset 和 Loop 继续复用普通子图。断路检查沿正常调度边反向分析结束可达性，所有 worker 都参加检查。分支的首个必经合流点必须是多前驱 all 汇合节点；绕过收集器的出口、先隐式合流再放单输入标记都不构成有效收集。多前驱 all 节点继续分发多路时产生 `GRAPH.JOIN.FORK_CONFLICT`。
+
+Workflow ABI v8 的 Block 种类限定为 workflow、nodeset、loop。解码器拒绝旧 ABI 和已删除字段，调用方必须重建产物。Core 和 Block Compiler 保存纯数据，不持有线程、Promise 或语言 callable。
+
+## Target 调度
+
+Python 的 [scheduler.py](../../src/vibeflow/targets/python/runtime/scheduler.py) 是唯一图协调器：先在协调线程解析输入、消费汇合信号，再提交所有独立就绪调用；完成队列仅接收真实退出后的输出或异常。节点执行时继承 contextvars，锁租约覆盖正在运行的工作。plan、block、compiled 入口共用这个协调器；生成的块只调用公共块包装函数。
+
+JavaScript 的 [codegen_scheduler.py](../../src/vibeflow/targets/javascript/frontend/codegen_scheduler.py) 发射事件循环调度。running Map 保存已启动调用，失败后向共享 AbortController 发出停止请求，并等待剩余调用结束。同步入口保持同步 ABI，不创建 Worker。
+
+普通调度边激活与数据传输分别处理；all 交付保留每个 envelope，按节点声明顺序排序。每轮消费 all 的入边完成信号，避免下一轮复用旧信号。并发数量不进入公共配置，容量不足时由实际执行错误触发清理。
+
+## 完成与观察
+
+Python NodeRunContext 只提供自身取消、能力访问与 trace。JavaScript NodeExecution 持有本次调用发起的 SDK 操作，包含 Promise.race 的未胜出操作。完成通知位于 finally 和能力清理之后；框架失败触发兄弟调用协作停止，仍等待不响应取消的工作实际返回。
+
+Trace 的事件、计数和子图摘要在共用锁内更新；协调器维护调度状态。块失败回调的错误附在原始错误上，不能覆盖业务错误。Python 的执行锁释放和 JavaScript 的插件释放均发生在所属调用退出之后。
+
+## 删除范围
+
+独立任务图、任务注册表、控制器、结果引用、线程池补位逻辑与专用图形已删除。解析层仅保留明确的迁移错误，源码规则禁止访问已撤销的控制接口；没有兼容执行路径或备用实现。

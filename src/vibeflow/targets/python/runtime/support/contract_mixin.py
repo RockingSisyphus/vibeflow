@@ -38,12 +38,7 @@ class RuntimeContractMixin:
                 continue
             values=getattr(initial,'multiple',{}).get(provider.key)
             if values is None:
-                all_inputs={r.type for r in self._frames[self.graph.task_entry].requires if r.cardinality==CARDINALITY_ALL} if self.graph.task_entry else set()
-                if provider.type in all_inputs:
-                    values=initial[provider.key]
-                    if not isinstance(values,(list,tuple)):
-                        raise PipelineRuntimeError(f"VF_TASK_INPUT_INVALID: all input '{provider.key}' requires an array")
-                else:values=[initial[provider.key]]
+                values = [initial[provider.key]]
             input_envelopes.extend(DataEnvelope(key=provider.key,type=provider.type,value=value,source_node='pipeline.input') for value in values)
         for node_name in self._initial_input_nodes():
             frame = self._frames[node_name]
@@ -90,6 +85,7 @@ class RuntimeContractMixin:
                 for envelope in state.inboxes[frame.name]
                 if envelope.type == requirement.type
             ]
+            matches.sort(key=lambda item: self._plan.order.index(item.source_node) if item.source_node in self._plan.order else -1)
             self._record_type_resolution(frame, requirement, matches)
             if requirement.cardinality == CARDINALITY_EXACTLY_ONE:
                 if len(matches) != 1:

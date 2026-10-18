@@ -19,7 +19,7 @@ FIXTURE = Path(__file__).resolve().parent
 REPOSITORY = FIXTURE.parents[2]
 sys.path[:0] = [str(REPOSITORY), str(REPOSITORY / "src")]
 
-from tests.fixtures.support.comprehensive_math import SCENARIOS, assert_warning_feedback, expected_order
+from tests.fixtures.support.comprehensive_math import SCENARIOS, assert_warning_feedback, assert_execution_order
 from vibeflow.core.findings import HealthReport
 from vibeflow.targets.python.runtime import PipelineRuntime, RuntimeOptions
 from vibeflow.targets.python.runtime.planning import build_execution_plan
@@ -55,7 +55,7 @@ def _assert_result(case, context, trace_path, received, sent):
     assert len(iterations) == 3, iterations
     assert [event["path"] for event in iterations] == [["loop", f"iter_{index}"] for index in range(3)], iterations
     summary = next(event for event in events if event["kind"] == "runtime_summary")
-    assert summary["exec_order"] == expected_order(case), summary
+    assert_execution_order(summary["exec_order"], case)
     runs = summary["node_runs"]
     assert runs[case["selected"]] == 1 and runs.get({"square": "negative", "negative": "square"}[case["selected"]], 0) == 0, runs
     assert runs["choice"] == runs["join"] == 1, runs
@@ -93,7 +93,7 @@ def run(work):
     inner = next(block for block in portable.blocks if any(node.id == "affine" for node in block.nodes))
     assert [node.id for node in inner.nodes] == ["start", "affine", "end"]
     assert all([node.completion, node.schedule, node.executor] == ["immediate", "inline", "current"] for node in inner.nodes)
-    assert not inner.tasks
+    assert "tasks" not in inner.to_dict()
     prepare_frame = plan.frame("prepare")
     inner_frame = prepare_frame.subplan.frame("inner")
     affine_params = inner_frame.subplan.frame("affine").params

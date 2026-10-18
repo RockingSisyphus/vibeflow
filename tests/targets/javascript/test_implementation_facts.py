@@ -87,40 +87,22 @@ def test_target_mismatch_keeps_contract_fact_for_precise_frontend_error() -> Non
     assert fact.source_ref == ""
 
 
-@pytest.mark.parametrize("managed", (False, True))
+@pytest.mark.parametrize("suspend", (False, True))
 @pytest.mark.parametrize("neutral", (False, True))
-def test_immediate_javascript_implementation_scheduling_uses_target_facts(
-    managed, neutral,
-) -> None:
-    descriptor = _descriptor()
-    descriptor = replace(descriptor, contract=replace(descriptor.contract,
-        provides=(DataProvider("value", "value", display_name="Value"),),
-        output_semantics={"value": ("The fetched value",)}))
-    manager=replace(descriptor,type_key="demo.manager",flow_kind="task_manager",implementations=tuple(replace(item,completion="suspend") for item in descriptor.implementations))
-    start=replace(_descriptor(),type_key="demo.start")
-    catalog = NodeCatalog((descriptor, manager, start) if managed else (descriptor,))
+def test_javascript_ordinary_call_scheduling_uses_target_facts(suspend, neutral):
+    descriptor = _descriptor(completion="suspend" if suspend else "immediate")
+    catalog = NodeCatalog((descriptor,))
     facts = (target_neutral_implementation_facts_from_catalog(catalog) if neutral
-             else implementation_facts_from_catalog(catalog, target="browser"))
-    graph = GraphConfig(
-        nodes=(NodeSpec("start","demo.start"),NodeSpec("fetch", "demo.manager", task_targets={"work":NodeSpec("execution","demo.fetch")}),NodeSpec("end","demo.start")) if managed else (NodeSpec("fetch","demo.fetch"),),
-        edges=(EdgeSpec("start","fetch"),EdgeSpec("fetch","end")) if managed else (),
-        entry_mode="async" if managed else "sync",
-    )
+             else implementation_facts_from_catalog(catalog,target="browser"))
+    graph = GraphConfig(nodes=(NodeSpec("fetch","demo.fetch"),),entry_mode="async" if suspend else "sync")
     features = TargetFeatureSet(target="browser")
-    compilation = compile_core(CoreCompileRequest(graph=graph, implementation_facts=facts, target_features=features))
-    plan = compile_graph_plan(compilation.workflow.graph, compilation.compiled_graph,
-        implementation_facts=facts, target_features=features,task_executor="event_loop",
-        call_execution_facts={("unused",):ImplementationFact("demo.fetch",executor="thread")})
+    compilation = compile_core(CoreCompileRequest(graph=graph,implementation_facts=facts,target_features=features))
+    plan = compile_graph_plan(compilation.workflow.graph,compilation.compiled_graph,
+        implementation_facts=facts,target_features=features)
     root = plan.block(plan.entry_block)
-    assert root.node("fetch").completion == ("suspend" if managed else "immediate")
-    assert (root.node("fetch").schedule, root.node("fetch").executor) == ("inline", "event_loop" if managed else "current")
-    assert [task.executor for task in root.tasks] == (["event_loop"] if managed else [])
-    bound_workflow_view(plan, build_javascript_binding_plan(plan))
-
-    if managed:
-        threaded = replace(plan, blocks=tuple(replace(root,
-            nodes=tuple(replace(node,executor="thread") if node.id=="fetch" else node for node in root.nodes),
-            tasks=tuple(replace(task, executor="thread") for task in root.tasks)) if block.id==root.id else block for block in plan.blocks))
-        with pytest.raises(AotPlanError, match="thread_executor") as error:
-            bound_workflow_view(threaded, build_javascript_binding_plan(threaded))
-        assert error.value.code == "TARGET.FEATURE.UNSUPPORTED"
+    assert root.node("fetch").completion == ("suspend" if suspend else "immediate")
+    assert (root.node("fetch").schedule,root.node("fetch").executor) == ("inline","event_loop" if suspend else "current")
+    bound_workflow_view(plan,build_javascript_binding_plan(plan))
+    threaded = replace(plan,blocks=(replace(root,nodes=(replace(root.nodes[0],executor="thread"),)),))
+    with pytest.raises(AotPlanError,match="thread_executor"):
+        bound_workflow_view(threaded,build_javascript_binding_plan(threaded))

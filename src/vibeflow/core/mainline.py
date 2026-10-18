@@ -59,28 +59,26 @@ class MainlineAnalysis:
 
 def analyze_mainline(graph: GraphConfig, edges: Sequence[EdgeSpec], flow_kinds: Mapping[str, str], *, owner: str = "pipeline") -> MainlineAnalysis:
     all_edges = tuple(edges)
-    sync_edges = all_edges
 
     inferred_data_bypass_edges = tuple(
         edge
-        for edge in sync_edges
-        if _is_data_bypass_candidate(edge, sync_edges, flow_kinds)
+        for edge in all_edges
+        if _is_data_bypass_candidate(edge, all_edges, flow_kinds)
     )
     inferred_scheduled = {
         edge
         for edge in all_edges
         if edge not in inferred_data_bypass_edges
     }
-    scheduled_sync_edges = tuple(
+    schedule_edges = tuple(
         edge
-        for edge in sync_edges
+        for edge in all_edges
         if (
             edge.schedule
             if edge.schedule is not None
             else edge in inferred_scheduled
         )
     )
-    schedule_edges = scheduled_sync_edges
     transfer_edges = tuple(
         edge
         for edge in all_edges
@@ -88,10 +86,10 @@ def analyze_mainline(graph: GraphConfig, edges: Sequence[EdgeSpec], flow_kinds: 
     )
     scheduled = set(schedule_edges)
     transferred = set(transfer_edges)
-    mainline_edges = scheduled_sync_edges
+    mainline_edges = schedule_edges
     data_bypass_edges = tuple(
         edge
-        for edge in sync_edges
+        for edge in all_edges
         if edge not in scheduled and edge in transferred
     )
     mainline_nodes = tuple(
@@ -101,7 +99,7 @@ def analyze_mainline(graph: GraphConfig, edges: Sequence[EdgeSpec], flow_kinds: 
     )
     findings = _mainline_findings(
         graph,
-        sync_edges,
+        all_edges,
         mainline_edges,
         data_bypass_edges,
         flow_kinds=flow_kinds,
@@ -168,14 +166,24 @@ def _mainline_findings(
                 suggested_fixes=[
                     f"add a mainline edge into '{edge.target}'",
                     f"remove edge {edge.source}->{edge.target} if the target should not run",
-                    f"use a task_manager with task_targets for side work",
+                    f"connect the work to an explicit downstream all-join",
                 ],
             )
         )
 
     for node in graph.nodes:
         outgoing = schedule_outgoing.get(node.name, ())
-        if len({edge.target for edge in outgoing}) <= 1 or flow_kinds.get(node.name) == FLOW_KIND_DECISION:
+        if len({edge.target for edge in outgoing}) <= 1:
+            continue
+        if node.join_policy == JOIN_POLICY_ALL and len({edge.source for edge in schedule_incoming.get(node.name, ())}) > 1:
+            findings.append(_finding(
+                "GRAPH.JOIN.FORK_CONFLICT", owner, outgoing[0],
+                f"node '{node.name}' cannot collect multiple branches and dispatch another fanout in the same call",
+                attempted=EDGE_CLASS_MAINLINE, mainline_path=(),
+                branch_nodes=[edge.target for edge in outgoing], branch_edges=list(outgoing),
+                suggested_fixes=["add a separate downstream dispatch node after the all-join"],
+            ))
+        if flow_kinds.get(node.name) == FLOW_KIND_DECISION:
             continue
         if _fanout_has_explicit_join(outgoing, schedule_outgoing, {item.name: item for item in graph.nodes}):
             continue
@@ -185,7 +193,7 @@ def _mainline_findings(
                 "GRAPH.MAINLINE.UNDECLARED_SYNC_FANOUT",
                 owner,
                 outgoing[0],
-                f"sync node '{node.name}' has multiple mainline outgoing edges but is not a decision node",
+                f"node '{node.name}' dispatches multiple branches without an explicit downstream all-join",
                 attempted=EDGE_CLASS_MAINLINE,
                 mainline_path=_first_mainline_path(starts, ends, mainline_edges),
                 branch_nodes=branch_nodes,
@@ -193,7 +201,7 @@ def _mainline_findings(
                 suggested_fixes=[
                     f"serialize the outgoing work after '{node.name}' into a single mainline chain",
                     "keep only shortcut/data-transfer edges when a downstream mainline path already exists",
-                    "use a task_manager with task_targets for side work",
+                    "connect the work to an explicit downstream all-join",
                 ],
             )
         )
@@ -216,7 +224,7 @@ def _mainline_findings(
                 suggested_fixes=[
                     f"connect branch '{edge.when or edge.target}' back to a node that reaches an end terminal",
                     f"remove edge {edge.source}->{edge.target} if this branch is not used",
-                    f"use a task_manager with task_targets if the branch is side work",
+                    f"connect every branch to an explicit downstream all-join",
                 ],
             )
         )
@@ -239,7 +247,7 @@ def _mainline_findings(
                 branch_edges=list(related),
                 suggested_fixes=[
                     f"connect '{node.name}' into the synchronous mainline",
-                    f"use a task_manager with task_targets for side work",
+                    f"connect the work to an explicit downstream all-join",
                     "remove the side branch if it is only an unused data dependency sketch",
                 ],
             )
@@ -252,18 +260,31 @@ def _fanout_has_explicit_join(
     schedule_outgoing: Mapping[str, Sequence[EdgeSpec]],
     nodes_by_name: Mapping[str, object],
 ) -> bool:
-    branch_reachable = [
-        _walk({edge.target}, schedule_outgoing) | {edge.target}
-        for edge in outgoing
-    ]
-    if len(branch_reachable) <= 1:
+    if len(outgoing) <= 1:
         return False
-    common = set.intersection(*branch_reachable)
-    for name in sorted(common):
-        node = nodes_by_name.get(name)
-        if getattr(node, "join_policy", "") == JOIN_POLICY_ALL:
-            return True
-    return False
+    # Every terminating branch path must pass the join. Mere reachability
+    # would also accept a branch that bypasses it and reaches an early end.
+    names = set(nodes_by_name)
+    successors = {name: {edge.target for edge in schedule_outgoing.get(name, ())} for name in names}
+    post = {name: ({name} if not successors[name] else set(names)) for name in names}
+    changed = True
+    while changed:
+        changed = False
+        for name in sorted(names):
+            children = successors[name]
+            value = {name} | (set.intersection(*(post[child] for child in children)) if children else set())
+            if value != post[name]:
+                post[name] = value
+                changed = True
+    common = set.intersection(*(post[edge.target] for edge in outgoing))
+    # The first mandatory convergence must collect the branches. A later
+    # one-input all marker cannot repair an earlier implicit merge.
+    nearest = [name for name in common if common - {name} <= post[name]]
+    if len(nearest) != 1:
+        return False
+    join = nearest[0]
+    predecessors = {source for source, children in successors.items() if join in children}
+    return len(predecessors) > 1 and getattr(nodes_by_name[join], "join_policy", "") == JOIN_POLICY_ALL
 
 
 def _start_nodes(graph: GraphConfig, edges: tuple[EdgeSpec, ...], flow_kinds: Mapping[str, str]) -> set[str]:

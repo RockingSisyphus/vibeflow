@@ -50,7 +50,7 @@ if (records.filter(record => record.state === "starting").some(record => record.
 console.log(JSON.stringify({{states: records.map(record => record.state)}}));'''
     result = subprocess.run(["node", "--input-type=module", "-e", script], capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout)["states"] == ["starting", "running", "succeeded", "starting", "running", "failed"]
+    assert json.loads(result.stdout)["states"] == ["starting", "running", "succeeded", "starting", "running", *(["stopping"] if async_mode else []), "failed"]
     assert not (tmp_path / "runs").exists()
 
 

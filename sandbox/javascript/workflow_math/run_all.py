@@ -1,4 +1,4 @@
-"""One reusable arithmetic project for nesting, loops, tasks and trace settings."""
+"""One reusable arithmetic project for nesting, loops, concurrency and trace settings."""
 import os
 from pathlib import Path
 import sys
@@ -22,14 +22,14 @@ def run(work, *, toolchain=None):
     def build(name):
         return cache.build(name, name + ".jsonc")
     observations = []
-    # Existing assertion helpers preserve the old path, route and task checks.
+    # Shared observers verify paths, routes and ordinary call metadata.
     for name, invoke in [
         ("nested_override", lambda: nested_override_case(build("nested_override").entry)),
         ("loop", lambda: loop_case(build("loop").entry)),
         ("loop_max_failure", lambda: loop_max_error_case(build("loop_max_failure").entry)),
         ("edge_roles", lambda: edge_role_case(build("edge_roles"))),
         ("nested_async", lambda: nested_async_case(build("nested_async"))),
-        ("task_metadata", lambda: execution_model_case(build("linear"), build("async_capability"), build("detached"))),
+        ("call_metadata", lambda: execution_model_case(build("linear"), build("async_capability"), build("detached"))),
     ]:
         observations.append(dict(config=name, result=invoke(), checks={"migrated_assertions":"PASS"}))
     nested = build("nested_loop")

@@ -17,8 +17,6 @@ def execution_model_case(
         return {node.id: prepared.javascript_bindings.binding((*block.path, node.id)).to_dict()
                 for node in block.nodes}
 
-    def tasks(prepared: Any) -> list[dict[str, Any]]:
-        return [task.to_dict() for task in prepared.plan.block(prepared.plan.entry_block).tasks]
 
     sync_nodes = nodes(sync_result.prepared)
     async_nodes = nodes(async_result.prepared)
@@ -28,8 +26,6 @@ def execution_model_case(
     if any((item["completion"], item["schedule"], item["executor"])
            != ("immediate", "inline", "current") for item in sync_nodes.values()):
         raise AssertionError(sync_nodes)
-    if tasks(sync_result.prepared):
-        raise AssertionError(tasks(sync_result.prepared))
     if async_result.prepared.plan.entry_mode != "async":
         raise AssertionError(async_result.prepared.plan.entry_mode)
     expected_async = {
@@ -45,11 +41,6 @@ def execution_model_case(
         )
         if actual != expected:
             raise AssertionError((node_id, actual, expected))
-    async_tasks = tasks(async_result.prepared)
-    if async_tasks != [
-        {'id': 'block:/:task:double:work', 'manager_node_id': 'double', 'key': 'work', 'block_id': 'block:/double/tasks/work', 'executor': 'event_loop'},
-    ]:
-        raise AssertionError(async_tasks)
 
     audit = detached_nodes["audit"]
     if (
@@ -58,11 +49,6 @@ def execution_model_case(
         audit["executor"],
     ) != ("suspend", "inline", "event_loop"):
         raise AssertionError(audit)
-    detached_tasks = tasks(detached_result.prepared)
-    if detached_tasks != [
-        {'id': 'block:/:task:audit:work', 'manager_node_id': 'audit', 'key': 'work', 'block_id': 'block:/audit/tasks/work', 'executor': 'event_loop'},
-    ]:
-        raise AssertionError(detached_tasks)
     all_nodes = [
         *sync_nodes.values(),
         *async_nodes.values(),
@@ -139,8 +125,8 @@ process.stdout.write(JSON.stringify({
                 }
                 for node_id, item in sync_nodes.items()
             },
-            "asyncTasks": async_tasks,
-            "detachedTasks": detached_tasks,
+            "asyncCalls": async_nodes,
+            "auditCalls": detached_nodes,
         },
         "runtime": {
             "sync": sync_runtime,
@@ -152,11 +138,11 @@ process.stdout.write(JSON.stringify({
 def nested_async_case(result: Any) -> Any:
     inner = next(block for block in result.prepared.plan.blocks
                  if block.path == ("outer", "inner")).to_dict()
-    if inner["tasks"] != [
-        {'id': 'block:/outer/inner:task:double:work', 'manager_node_id': 'double', 'key': 'work', 'block_id': 'block:/outer/inner/double/tasks/work', 'executor': 'event_loop'},
-        {'id': 'block:/outer/inner:task:audit:work', 'manager_node_id': 'audit', 'key': 'work', 'block_id': 'block:/outer/inner/audit/tasks/work', 'executor': 'event_loop'},
-    ]:
-        raise AssertionError(inner["tasks"])
+    assert "tasks" not in inner, inner
+    nodes = {node["id"]: node for node in inner["nodes"]}
+    for name in ("double", "audit"):
+        assert nodes[name]["schedule"] == "inline", nodes[name]
+        assert nodes[name]["executor"] == "event_loop", nodes[name]
 
     runtime = run_node(
         result.entry,
@@ -178,23 +164,23 @@ const value = await workflow.runWorkflowAsync(
   },
 );
 assert(value.doubled === 14, JSON.stringify(value));
-const taskEvents = trace
+const nodeEvents = trace
   .filter(event => [
-    "task_started",
-    "task_exited",
-  ].includes(event.kind))
+    "node_start",
+    "node_end",
+  ].includes(event.kind) && ["outer.inner.double","outer.inner.audit"].includes(event.nodePath))
   .map(event => ({
     kind: event.kind,
     nodePath: event.nodePath,
     blockPath: event.blockPath,
   }));
-for (const event of taskEvents) {
+for (const event of nodeEvents) {
   assert(
     event.nodePath === "outer.inner.double"
       || event.nodePath === "outer.inner.audit",
-    JSON.stringify(taskEvents),
+    JSON.stringify(nodeEvents),
   );
-  assert(event.blockPath === "/outer/inner", JSON.stringify(taskEvents));
+  assert(event.blockPath === "/outer/inner", JSON.stringify(nodeEvents));
 }
 let releaseAudit;let finished=false;
 const controller=new AbortController();
@@ -221,14 +207,14 @@ const recovered = await workflow.runWorkflowAsync(
 assert(recovered.doubled === 8, JSON.stringify(recovered));
 process.stdout.write(JSON.stringify({
   value,
-  taskEvents,
+  nodeEvents,
   stopped,
   recovered,
 }));
 """,
     )
     return {
-        "tasks": inner["tasks"],
+        "nodes": inner["nodes"],
         "runtime": runtime,
     }
 
@@ -303,8 +289,8 @@ assert(result.result === 7, JSON.stringify(result));
 assert(completed, "runWorkflow returned before detached cleanup");
 assert(receivedSignal, "Capability did not receive its Node invocation signal");
 const kinds = trace.map(event => event.kind);
-assert(kinds.includes("task_started"), JSON.stringify(kinds));
-assert(kinds.includes("task_exited"), JSON.stringify(kinds));
+assert(kinds.includes("node_start"), JSON.stringify(kinds));
+assert(kinds.includes("node_end"), JSON.stringify(kinds));
 let releaseAudit;let settled=false;
 const stopController=new AbortController();
 const pending=workflow.runWorkflowAsync({x:9},{signal:stopController.signal,
@@ -381,7 +367,7 @@ assert(rightResolved, "right detached task did not complete");
 assert(concurrentLeft.result === 21, JSON.stringify(concurrentLeft));
 assert(concurrentRight.result === 34, JSON.stringify(concurrentRight));
 assert(
-  leftTrace.some(event => event.kind === "task_exited"),
+  leftTrace.some(event => event.kind === "node_end"),
   JSON.stringify(leftTrace),
 );
 assert(

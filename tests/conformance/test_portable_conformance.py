@@ -405,18 +405,6 @@ JAVASCRIPT_EXPORTS = {
     "vibeflow.loop.while": "unusedComposite",
 }
 
-JAVASCRIPT_SOURCE += """
-export async function taskManager(inputs,params,context) {
- const values=Object.fromEntries(Object.entries(inputs).map(([key,value])=>[key,Array.isArray(value)?value.map(item=>item.value):value.value]));
- const ref=context.tasks.start('work',values);
- const outcome=(await context.tasks.waitAllExited([ref]))[0];
- if(outcome.status!=='succeeded')throw new Error(outcome.error.message);
- return outcome.outputs;
-}
-"""
-for _key in ('fixture.async_route','fixture.double','fixture.async_double','fixture.detached_audit'):
-    JAVASCRIPT_EXPORTS['manage.'+_key]='taskManager'
-    JAVASCRIPT_COMPLETIONS['manage.'+_key]='suspend'
 
 
 def _registry() -> NodeRegistry:
@@ -466,16 +454,6 @@ def _registry() -> NodeRegistry:
         ("fixture.detached_audit", _DetachedAuditNode),
     ):
         registry.register(declarations[type_key], node)
-    class TaskManager:
-        def run_pure(self,inputs,params,context):
-            values={key:[item['value'] for item in value] if isinstance(value,list) else value['value'] for key,value in inputs.items()}
-            ref=context.tasks.start('work',values)
-            outcome=context.tasks.wait_all_exited([ref])[0]
-            if outcome['status']!='succeeded':raise RuntimeError(outcome['error']['message'])
-            return outcome['outputs']
-    for key in ('fixture.async_route','fixture.double','fixture.async_double','fixture.detached_audit'):
-        descriptor=registry.descriptor(key)
-        registry.register(replace(descriptor,type_key='manage.'+key,flow_kind='task_manager',rulesets=()),TaskManager)
     return registry
 
 
@@ -543,9 +521,8 @@ def _node(
     return node
 
 
-def _task_call(node_id,type_key,*,requires=None,provides=None,**options):
-    target=_node('execution',type_key,requires=requires,provides=provides,**options)
-    return _node(node_id,'manage.'+type_key,requires=requires,provides=provides,task_targets={'work':target})
+def _worker_call(node_id, type_key, *, requires=None, provides=None, **options):
+    return _node(node_id, type_key, requires=requires, provides=provides, **options)
 
 
 def _edge(
@@ -587,8 +564,7 @@ def _branch_document(
     route_fields: dict[str, object] = {}
     route_type = "fixture.route"
     if managed:
-        route_type = "manage.fixture.async_route"
-        route_fields = {"task_targets":{"work":_node("execution","fixture.async_route")}}
+        route_type = "fixture.async_route"
     branch_cardinality = "optional_one" if optional_targets else "exactly_one"
     left_type = "fixture.optional_left" if optional_targets else "fixture.left"
     right_type = "fixture.optional_right" if optional_targets else "fixture.right"
@@ -646,7 +622,7 @@ def _input_preflight_document(
             "inputs": [input_spec],
             "nodes": [
                 _node("start", "fixture.terminal"),
-                _node("end", "fixture.terminal"),
+                _node("end", "fixture.terminal", join_policy="all"),
             ],
             "edges": [_edge("start", "end")],
             "outputs": [],
@@ -673,7 +649,7 @@ def _unbounded_loop_document() -> dict[str, object]:
                             requires=[_requirement("loop.current")],
                             provides=[_provider("loop.next")],
                         ),
-                        _node("end", "fixture.terminal"),
+                        _node("end", "fixture.terminal", join_policy="all"),
                     ],
                     "edges": [
                         _edge("start", "increment"),
@@ -741,7 +717,7 @@ def test_python_runtime_projects_every_output_cardinality_through_public_name(
                             _provider("item", "value.item"),
                         ],
                     ),
-                    _node("end", "fixture.terminal"),
+                    _node("end", "fixture.terminal", join_policy="all"),
                 ],
                 "edges": [_edge("start", "values"), _edge("values", "end")],
                 "outputs": [
@@ -788,7 +764,7 @@ def test_python_runtime_output_without_alias_keeps_type_name(
                             _provider("item", "value.item"),
                         ],
                     ),
-                    _node("end", "fixture.terminal"),
+                    _node("end", "fixture.terminal", join_policy="all"),
                 ],
                 "edges": [_edge("start", "values"), _edge("values", "end")],
                 "outputs": [_pipeline_output("value.exact")],
@@ -935,7 +911,7 @@ def test_portable_conformance_linear_alias_and_optional_output(
                     provides=[_provider("answer")],
                     config={"delta": 3},
                 ),
-                _node("end", "fixture.terminal"),
+                _node("end", "fixture.terminal", join_policy="all"),
             ],
             "edges": [_edge("start", "add"), _edge("add", "end")],
             "outputs": [
@@ -1130,8 +1106,8 @@ def test_python_result_key_activates_unconditional_route_once(
                 "inputs": [_pipeline_input("number")],
                 "nodes": [
                     _node("start", "fixture.terminal"),
-                    _task_call('calculate', 'fixture.async_double', requires=[_requirement('number')], provides=[_provider('answer')]),
-                    _node("end", "fixture.terminal"),
+                    _worker_call('calculate', 'fixture.async_double', requires=[_requirement('number')], provides=[_provider('answer')]),
+                    _node("end", "fixture.terminal", join_policy="all"),
                 ],
                 "edges": [
                     _edge("start", "calculate"),
@@ -1164,8 +1140,8 @@ def test_portable_conformance_immediate_implementation_scheduled_as_task(
         "inputs": [_pipeline_input("number")],
         "nodes": [
             _node("start", "fixture.terminal"),
-            _task_call("calculate", "fixture.detached_audit" if async_mode == "detached" else "fixture.double", **call),
-            _node("end", "fixture.terminal"),
+            _worker_call("calculate", "fixture.detached_audit" if async_mode == "detached" else "fixture.double", **call),
+            _node("end", "fixture.terminal", join_policy="all"),
         ],
         "edges": [_edge("start", "calculate"),
                   _edge("start" if async_mode == "detached" else "calculate", "end")],
@@ -1186,12 +1162,8 @@ def test_portable_conformance_immediate_implementation_scheduled_as_task(
     _assert_success(result, {"answer": 12} if async_mode == "result_key" else {"value": 1} if public_output else {})
     python_root = next(block for block in result.portable_plan["blocks"] if block["id"] == "block:/")
     javascript_root = next(block for block in result.javascript_plan["blocks"] if block["id"] == "block:/")
-    assert python_root["tasks"][0]["executor"] == "thread"
-    assert javascript_root["tasks"][0]["executor"] == "event_loop"
     calls = {node["id"]: node for node in javascript_root["nodes"]}
-    assert calls["calculate"]["completion"] == "suspend"
-    child=next(block for block in result.javascript_plan["blocks"] if block["id"]==javascript_root["tasks"][0]["block_id"])
-    assert child["nodes"][0]["completion"]=="immediate"
+    assert calls["calculate"]["completion"] == "immediate"
     assert calls["start"]["executor"] == calls["end"]["executor"] == "current"
 
 
@@ -1212,18 +1184,11 @@ def test_portable_conformance_result_key_async_conditional_route(
     assert node_runs["route"] == 1
     assert node_runs["left"] == 1
     assert "right" not in node_runs
-    assert result.python.task_events == (
-        ("task_exited", "route"),
-        ("task_started", "route"),
-    )
     root_block = next(
         block
         for block in result.portable_plan["blocks"]
         if block["id"] == "block:/"
     )
-    assert root_block["tasks"] == [
-        {'id': 'block:/:task:route:work', 'manager_node_id': 'route', 'key': 'work', 'block_id': 'block:/route/tasks/work', 'executor': 'thread'},
-    ]
 
 
 def test_portable_conformance_detached_task_is_settled_before_return(
@@ -1234,13 +1199,13 @@ def test_portable_conformance_detached_task_is_settled_before_return(
             "entry_mode": "async",
             "nodes": [
                 _node("start", "fixture.terminal"),
-                _task_call('audit', 'fixture.detached_audit'),
+                _worker_call('audit', 'fixture.detached_audit'),
                 _node(
                     "value",
                     "fixture.left_item",
                     provides=[_provider("left", "item")],
                 ),
-                _node("end", "fixture.terminal"),
+                _node("end", "fixture.terminal", join_policy="all"),
             ],
             "edges": [
                 _edge("start", "audit"),
@@ -1257,18 +1222,11 @@ def test_portable_conformance_detached_task_is_settled_before_return(
     )
 
     _assert_success(result, {"value": 1})
-    assert result.python.task_events == (
-        ("task_exited", "audit"),
-        ("task_started", "audit"),
-    )
     root_block = next(
         block
         for block in result.portable_plan["blocks"]
         if block["id"] == "block:/"
     )
-    assert root_block["tasks"] == [
-        {'id': 'block:/:task:audit:work', 'manager_node_id': 'audit', 'key': 'work', 'block_id': 'block:/audit/tasks/work', 'executor': 'thread'},
-    ]
 
 
 def test_portable_conformance_port_receive_transform_and_send(
@@ -1337,7 +1295,6 @@ def test_portable_conformance_port_receive_transform_and_send(
         "receive": ("immediate", "inline", "current"),
         "send": ("immediate", "inline", "current"),
     }
-    assert root_block["tasks"] == []
 
 
 def test_portable_conformance_nested_nodeset(tmp_path: Path) -> None:
@@ -1359,7 +1316,7 @@ def test_portable_conformance_nested_nodeset(tmp_path: Path) -> None:
                             requires=[_requirement("number")],
                             provides=[_provider("answer")],
                         ),
-                        _node("end", "fixture.terminal"),
+                        _node("end", "fixture.terminal", join_policy="all"),
                     ],
                     "edges": [
                         _edge("start", "double"),
@@ -1381,7 +1338,7 @@ def test_portable_conformance_nested_nodeset(tmp_path: Path) -> None:
                     requires=[_requirement("number")],
                     provides=[_provider("answer")],
                 ),
-                _node("end", "fixture.terminal"),
+                _node("end", "fixture.terminal", join_policy="all"),
             ],
             "edges": [
                 _edge("start", "composite"),
@@ -1415,8 +1372,8 @@ def test_portable_conformance_nested_nodeset_deferred_result_key(
                     "inputs": [_pipeline_input("number")],
                     "nodes": [
                         _node("start", "fixture.terminal"),
-                        _task_call('calculate', 'fixture.async_double', requires=[_requirement('number')], provides=[_provider('answer')]),
-                        _node("end", "fixture.terminal"),
+                        _worker_call('calculate', 'fixture.async_double', requires=[_requirement('number')], provides=[_provider('answer')]),
+                        _node("end", "fixture.terminal", join_policy="all"),
                     ],
                     "edges": [
                         _edge("start", "calculate"),
@@ -1437,7 +1394,7 @@ def test_portable_conformance_nested_nodeset_deferred_result_key(
                     requires=[_requirement("number")],
                     provides=[_provider("answer")],
                 ),
-                _node("end", "fixture.terminal"),
+                _node("end", "fixture.terminal", join_policy="all"),
             ],
             "edges": [
                 _edge("start", "composite"),
@@ -1463,18 +1420,11 @@ def test_portable_conformance_nested_nodeset_deferred_result_key(
     result = run_portable_conformance(case, work_dir=tmp_path)
 
     _assert_success(result, {"doubled": 12})
-    assert result.python.task_events == (
-        ("task_exited", "composite.calculate"),
-        ("task_started", "composite.calculate"),
-    )
     child = next(
         block
         for block in result.portable_plan["blocks"]
         if block["path"] == ["composite"]
     )
-    assert child["tasks"] == [
-        {'id': 'block:/composite:task:calculate:work', 'manager_node_id': 'calculate', 'key': 'work', 'block_id': 'block:/composite/calculate/tasks/work', 'executor': 'thread'},
-    ]
 
 
 def test_portable_conformance_nested_nodeset_detached_cleanup(
@@ -1491,13 +1441,13 @@ def test_portable_conformance_nested_nodeset_detached_cleanup(
                 "pipeline": {
                     "nodes": [
                         _node("start", "fixture.terminal"),
-                        _task_call('audit', 'fixture.detached_audit'),
+                        _worker_call('audit', 'fixture.detached_audit'),
                         _node(
                             "value",
                             "fixture.left_item",
                             provides=[_provider("left", "item")],
                         ),
-                        _node("end", "fixture.terminal"),
+                        _node("end", "fixture.terminal", join_policy="all"),
                     ],
                     "edges": [
                         _edge("start", "audit"),
@@ -1517,7 +1467,7 @@ def test_portable_conformance_nested_nodeset_detached_cleanup(
                     "fixture.detached_flow",
                     provides=[_provider("left", "item")],
                 ),
-                _node("end", "fixture.terminal"),
+                _node("end", "fixture.terminal", join_policy="all"),
             ],
             "edges": [
                 _edge("start", "composite"),
@@ -1543,18 +1493,11 @@ def test_portable_conformance_nested_nodeset_detached_cleanup(
     result = run_portable_conformance(case, work_dir=tmp_path)
 
     _assert_success(result, {"value": 1})
-    assert result.python.task_events == (
-        ("task_exited", "composite.audit"),
-        ("task_started", "composite.audit"),
-    )
     child = next(
         block
         for block in result.portable_plan["blocks"]
         if block["path"] == ["composite"]
     )
-    assert child["tasks"] == [
-        {'id': 'block:/composite:task:audit:work', 'manager_node_id': 'audit', 'key': 'work', 'block_id': 'block:/composite/audit/tasks/work', 'executor': 'thread'},
-    ]
 
 
 def test_portable_conformance_nested_nodeset_all_output(
@@ -1603,7 +1546,7 @@ def test_portable_conformance_nested_nodeset_all_output(
                     "fixture.items_flow",
                     provides=[_provider("items", "item")],
                 ),
-                _node("end", "fixture.terminal"),
+                _node("end", "fixture.terminal", join_policy="all"),
             ],
             "edges": [
                 _edge("start", "composite"),
@@ -1702,7 +1645,7 @@ def test_portable_conformance_bounded_loop(tmp_path: Path) -> None:
                             requires=[_requirement("loop.current")],
                             provides=[_provider("loop.next")],
                         ),
-                        _node("end", "fixture.terminal"),
+                        _node("end", "fixture.terminal", join_policy="all"),
                     ],
                     "edges": [
                         _edge("start", "increment"),
@@ -1737,7 +1680,7 @@ def test_portable_conformance_bounded_loop(tmp_path: Path) -> None:
                         ],
                     },
                 ),
-                _node("end", "fixture.terminal"),
+                _node("end", "fixture.terminal", join_policy="all"),
             ],
             "edges": [_edge("start", "loop"), _edge("loop", "end")],
             "outputs": [_pipeline_output("loop.final", alias="final")],
@@ -1776,7 +1719,7 @@ def test_portable_conformance_loop_body_contains_nested_nodeset(
                             requires=[_requirement("loop.current")],
                             provides=[_provider("loop.next")],
                         ),
-                        _node("end", "fixture.terminal"),
+                        _node("end", "fixture.terminal", join_policy="all"),
                     ],
                     "edges": [
                         _edge("start", "increment"),
@@ -1801,7 +1744,7 @@ def test_portable_conformance_loop_body_contains_nested_nodeset(
                             requires=[_requirement("loop.current")],
                             provides=[_provider("loop.next")],
                         ),
-                        _node("end", "fixture.terminal"),
+                        _node("end", "fixture.terminal", join_policy="all"),
                     ],
                     "edges": [
                         _edge("start", "calculate"),
@@ -1836,7 +1779,7 @@ def test_portable_conformance_loop_body_contains_nested_nodeset(
                         ],
                     },
                 ),
-                _node("end", "fixture.terminal"),
+                _node("end", "fixture.terminal", join_policy="all"),
             ],
             "edges": [_edge("start", "loop"), _edge("loop", "end")],
             "outputs": [_pipeline_output("loop.final", alias="final")],
@@ -1887,7 +1830,7 @@ def test_portable_conformance_nested_loops_carry_collect_and_stop(
                             requires=[_requirement("loop.current")],
                             provides=[_provider("loop.next")],
                         ),
-                        _node("end", "fixture.terminal"),
+                        _node("end", "fixture.terminal", join_policy="all"),
                     ],
                     "edges": [
                         _edge("start", "increment"),
@@ -1943,7 +1886,7 @@ def test_portable_conformance_nested_loops_carry_collect_and_stop(
                             ],
                             config={"target": 6},
                         ),
-                        _node("end", "fixture.terminal"),
+                        _node("end", "fixture.terminal", join_policy="all"),
                     ],
                     "edges": [
                         _edge("start", "inner"),
@@ -1994,7 +1937,7 @@ def test_portable_conformance_nested_loops_carry_collect_and_stop(
                         ],
                     },
                 ),
-                _node("end", "fixture.terminal"),
+                _node("end", "fixture.terminal", join_policy="all"),
             ],
             "edges": [_edge("start", "outer"), _edge("outer", "end")],
             "outputs": [
@@ -2059,7 +2002,7 @@ def test_portable_conformance_stop_when_loop_with_carry_and_collect(
                             ],
                             config={"target": 3},
                         ),
-                        _node("end", "fixture.terminal"),
+                        _node("end", "fixture.terminal", join_policy="all"),
                     ],
                     "edges": [
                         _edge("start", "increment"),
@@ -2115,7 +2058,7 @@ def test_portable_conformance_stop_when_loop_with_carry_and_collect(
                         ],
                     },
                 ),
-                _node("end", "fixture.terminal"),
+                _node("end", "fixture.terminal", join_policy="all"),
             ],
             "edges": [_edge("start", "loop"), _edge("loop", "end")],
             "outputs": [
@@ -2166,7 +2109,7 @@ def test_portable_conformance_normalizes_node_failure(
             "nodes": [
                 _node("start", "fixture.terminal"),
                 _node("fail", "fixture.fail"),
-                _node("end", "fixture.terminal"),
+                _node("end", "fixture.terminal", join_policy="all"),
             ],
             "edges": [_edge("start", "fail"), _edge("fail", "end")],
             "outputs": [],

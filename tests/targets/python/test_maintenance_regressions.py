@@ -56,7 +56,7 @@ def test_source_failure_keeps_primary_and_releases_every_plugin(tmp_path, monkey
     assert len(captured.value.cleanup_errors) == 2
 
 
-def test_planned_inventory_handles_deep_same_named_definitions_tasks_and_cycles():
+def test_planned_inventory_handles_deep_same_named_definitions_and_cycles():
     from vibeflow.core.flow import GraphConfig, NodeSpec, NodesetSpec
     from vibeflow.targets.python.runtime.helpers import has_planned, planned_items
     leaf = NodeSpec("leaf", "future", status="planned")
@@ -64,11 +64,11 @@ def test_planned_inventory_handles_deep_same_named_definitions_tasks_and_cycles(
     inner = NodesetSpec("same", "Same", "Inner", (), (), deep)
     middle = GraphConfig(nodes=(), nodesets={"same": inner})
     outer = NodesetSpec("same", "Same", "Outer", (), (), middle)
-    root = GraphConfig(nodes=(NodeSpec("manager", "manager", task_targets={"future": leaf}),), nodesets={"same": outer})
+    root = GraphConfig(nodes=(leaf,), nodesets={"same": outer})
     deep.nodesets["cycle"] = outer
     assert has_planned(root)
     assert [item["id"] for item in planned_items(root)] == [
-        "manager.$task.future", "nodeset.same.nodeset.same.leaf"]
+        "leaf", "nodeset.same.nodeset.same.leaf"]
 
 
 def test_dispatch_option_selection_matches_argparse_and_stops_at_delegated_argv():

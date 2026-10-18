@@ -1,4 +1,4 @@
-from tests.fixtures.support.task_management import task_call, register_task_manager
+from tests.fixtures.support.graph_calls import normal_call
 from tests.fixtures.support.declarations import native_registry
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 import threading
@@ -860,7 +860,7 @@ def test_multiple_active_exactly_one_join_errors_at_runtime() -> None:
                     _node_call("start", "test.start", "Starts the conflicting join fixture."),
                     _node_call("left", "test.left_value", "Produces left value.in."),
                     _node_call("right", "test.right_value", "Produces right value.in."),
-                    _node_call("join", "test.join_passthrough", "Conflicts on value.in."),
+                    _node_call("join", "test.join_passthrough", "Conflicts on value.in.",join_policy="all"),
                 ],
                 "edges": [{"from": "start", "to": "left"}, {"from": "start", "to": "right"}, {"from": "left", "to": "join"}, {"from": "right", "to": "join"}],
             }
@@ -1181,14 +1181,13 @@ def test_runtime_options_compiled_generates_block_with_async_barrier() -> None:
     registry = _registry()
     register_node(registry, OutToNextNode_DECLARATION, OutToNextNode)
     register_node(registry, NextEndNode_DECLARATION, NextEndNode)
-    register_task_manager(registry,'test.add',join=True)
     graph = parse_graph_config(
         {
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the async barrier fixture."),
                     _node_call("seed", "test.seed", "Produces value.in.",  config={"value": 4}),
-                    task_call('async_add', 'test.add', 'Adds asynchronously.', config={'delta': 3}),
+                    normal_call('async_add', 'test.add', 'Adds asynchronously.', config={'delta': 3}),
                     _node_call("out_to_next", "test.out_to_next", "Copies value.out to value.next."),
                     _node_call("end", "test.next_end", "Consumes value.next."),
                 ],
@@ -1200,19 +1199,19 @@ def test_runtime_options_compiled_generates_block_with_async_barrier() -> None:
     runtime = PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, execution="compiled"))
     assert [(block.kind, block.nodes) for block in runtime._plan.blocks] == [("graph", ("start", "seed", "async_add", "out_to_next", "end"))]
     interpreted_nodes = []
-    original_run_compiled_frame = PipelineRuntime._run_compiled_frame
+    original_execute_frame = PipelineRuntime._execute_frame
 
-    def spy_run_compiled_frame(self, frame, context):
+    def spy_execute_frame(self, frame, context):
         interpreted_nodes.append(frame.name)
-        return original_run_compiled_frame(self, frame, context)
+        return original_execute_frame(self, frame, context)
 
-    PipelineRuntime._run_compiled_frame = spy_run_compiled_frame
+    PipelineRuntime._execute_frame = spy_execute_frame
     try:
         context = runtime.run({})
     finally:
-        PipelineRuntime._run_compiled_frame = original_run_compiled_frame
+        PipelineRuntime._execute_frame = original_execute_frame
 
-    assert interpreted_nodes == ["start", "seed", "async_add", "work", "out_to_next", "end"]
+    assert interpreted_nodes == ["start", "seed", "async_add", "out_to_next", "end"]
     assert context.get("value.next")["value"] == 7
     assert any(event["kind"] == "block_enter" for event in _runtime_trace_events_from_context(context))
 
@@ -1333,8 +1332,8 @@ def test_runtime_options_rejects_unknown_execution() -> None:
 
 
 @pytest.mark.parametrize("value", [0, -1, True, 1.5, "4"])
-def test_runtime_options_rejects_invalid_async_max_workers(value) -> None:
-    with pytest.raises(ValueError, match="async_max_workers"):
+def test_runtime_options_rejects_removed_concurrency_cap(value) -> None:
+    with pytest.raises(TypeError, match="async_max_workers"):
         RuntimeOptions(async_max_workers=value)
 
 
@@ -1391,55 +1390,12 @@ def test_loop_iterations_do_not_increase_nodeset_nesting_depth() -> None:
     assert context.get("loop.final")["value"] == 5
 
 
-def _task_pool_probe(workers, *, queued=False):
-    ready=threading.Barrier(workers+1); release=threading.Event(); queued_started=threading.Event()
-    class Work:
-        def run_pure(self,inputs,params,context):
-            if params.get('queued'):queued_started.set()
-            else:ready.wait(timeout=2)
-            assert release.wait(2)
-            return {'worker.name':threading.current_thread().name}
-    class Manager:
-        def run_pure(self,inputs,params,context):
-            refs=[context.tasks.start('work',{}) for _ in range(workers)]
-            ready.wait(timeout=2)
-            if queued:
-                refs.append(context.tasks.start('queued',{}))
-                assert not queued_started.is_set()
-            release.set()
-            outcomes=context.tasks.wait_all_exited(refs)
-            assert all(item['status']=='succeeded' for item in outcomes)
-            return {'worker.report':[item['outputs']['worker.name'] for item in outcomes]}
-    registry=_registry()
-    contract=NodeContractDescriptor(provides=(DataProvider('worker.name','worker.name',display_name='Thread'),),
-        output_semantics={'worker.name':('Actual worker thread',)},params_schema={'queued':{'type':'boolean'}},params_defaults={'queued':False})
-    registry.register(NodeDescriptor('pool.work','Worker','Pool probe','1','process',contract=contract,rulesets=()),Work)
-    registry.register(NodeDescriptor('pool.manager','Manager','Controls a bounded pool','1','task_manager',
-        contract=NodeContractDescriptor(provides=(DataProvider('worker.report','worker.report',display_name='Threads'),),output_semantics={'worker.report':('Actual execution report',)}),rulesets=()),Manager)
-    graph=parse_graph_config({'pipeline':{'nodes':[_node_call('start','test.start','Start'),
-        {'id':'manager','type_used':'pool.manager','display_name':'Manager','description':'Pool manager','task_targets':{
-            'work':{'type_used':'pool.work'},'queued':{'type_used':'pool.work','config':{'queued':True}}}},
-        _node_call('end','test.start','End')],'edges':_edge_chain('start','manager','end'),
-        'outputs':[REQ_SPEC('worker.report')]}})
-    runtime=PipelineRuntime(graph,registry=registry,runtime_options=RuntimeOptions(async_max_workers=workers))
-    try:return runtime.run({}).get('worker.report')['value'],queued_started.is_set()
-    finally:release.set()
 
 
-def test_task_executor_defaults_to_four_workers():
-    assert RuntimeOptions().async_max_workers==4
-    names,queued=_task_pool_probe(RuntimeOptions().async_max_workers)
-    assert len(set(names))==4 and not queued
 
 
-def test_task_executor_can_run_six_tasks_concurrently():
-    names,queued=_task_pool_probe(6)
-    assert len(set(names))==6 and not queued
 
 
-def test_task_executor_queues_tasks_beyond_worker_limit():
-    names,queued=_task_pool_probe(2,queued=True)
-    assert len(names)==3 and len(set(names))==2 and queued
 
 
 def test_task_result_joins_when_required() -> None:
@@ -1448,7 +1404,7 @@ def test_task_result_joins_when_required() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the async join fixture."),
-                    task_call('seed', 'test.seed', 'Produces value.in asynchronously.', config={'value': 4}),
+                    normal_call('seed', 'test.seed', 'Produces value.in asynchronously.', config={'value': 4}),
                     _node_call("add", "test.add", "Adds delta to value.in.",  config={"delta": 3}),
                     _node_call("end", "test.out_end", "Consumes value.out."),
                 ],
@@ -1458,10 +1414,10 @@ def test_task_result_joins_when_required() -> None:
         }
     )
 
-    context = PipelineRuntime(graph, registry=register_task_manager(_registry(), 'test.seed', join=True)).run({})
+    context = PipelineRuntime(graph, registry=_registry()).run({})
 
     assert context.get("value.out")["value"] == 7
-    assert "task_exited" in [event["kind"] for event in _runtime_trace_events_from_context(context)]
+    assert context.get("runtime.node_runs")["seed"] == 1
 
 
 def test_task_result_not_delivered_when_unconsumed() -> None:
@@ -1475,13 +1431,12 @@ def test_task_result_not_delivered_when_unconsumed() -> None:
 
     registry = _registry()
     register_node(registry, SlowResultNode_DECLARATION, SlowResultNode)
-    register_task_manager(registry,'test.slow_result',join=False)
     graph = parse_graph_config(
         {
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the unconsumed async fixture."),
-                    task_call('slow', 'test.slow_result', 'Produces an unconsumed async result.', join=False),
+                    normal_call('slow', 'test.slow_result', 'Produces an unconsumed async result.'),
                     _node_call("seed", "test.seed", "Produces value.in.",  config={"value": 2}),
                     _node_call("end", "test.in_end", "Consumes value.in."),
                 ],
@@ -1495,7 +1450,7 @@ def test_task_result_not_delivered_when_unconsumed() -> None:
 
     assert context.get("value.in")["value"] == 2
     assert not context.exists("value.async")
-    assert "task_exited" in [event["kind"] for event in _runtime_trace_events_from_context(context)]
+    assert context.get("runtime.node_runs")["slow"] == 1
 
 
 def test_async_detached_failure_records_warning_and_completes() -> None:
@@ -1504,7 +1459,7 @@ def test_async_detached_failure_records_warning_and_completes() -> None:
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the detached failure fixture."),
-                    task_call('metrics', 'test.runtime_fail', 'Fails in a detached task.', config={'fail': True}),
+                    normal_call('metrics', 'test.runtime_fail', 'Fails in a detached task.', config={'fail': True}),
                     _node_call("seed", "test.seed", "Produces value.in.",  config={"value": 2}),
                     _node_call("end", "test.in_end", "Consumes value.in."),
                 ],
@@ -1515,13 +1470,13 @@ def test_async_detached_failure_records_warning_and_completes() -> None:
     )
 
     with pytest.raises(RuntimeError,match="boom"):
-        PipelineRuntime(graph, registry=register_task_manager(_registry(),'test.runtime_fail')).run({})
+        PipelineRuntime(graph, registry=_registry()).run({})
 
 
 def test_async_result_key_requires_migration():
     from vibeflow.core.flow import GraphConfigError
     with pytest.raises(GraphConfigError,match='GRAPH.ASYNC.MIGRATION'):
-        parse_graph_config({'pipeline':{'nodes':[task_call('seed','test.seed','Worker') | {'async':'result_key','result_key':'value.missing'}]}})
+        parse_graph_config({'pipeline':{'nodes':[normal_call('seed','test.seed','Worker') | {'async':'result_key','result_key':'value.missing'}]}})
 
 
 def test_config_schema_reports_async_result_key_not_in_provides() -> None:
@@ -1575,7 +1530,7 @@ def test_task_nodeset_result_joins_when_required() -> None:
                 "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
                     _node_call("start", "test.start", "Starts the async nodeset fixture."),
-                    task_call('composite', 'math.add_one', 'Calls add-one asynchronously.'),
+                    normal_call('composite', 'math.add_one', 'Calls add-one asynchronously.'),
                     _node_call("end", "test.out_end", "Consumes value.out."),
                 ],
                 "edges": _edge_chain("start", "composite", "end"),
@@ -1584,11 +1539,11 @@ def test_task_nodeset_result_joins_when_required() -> None:
         }
     )
 
-    context = PipelineRuntime(graph, registry=register_task_manager(_registry(), 'math.add_one', requires=['value.in'], provides=['value.out'])).run({"value.in": 5})
+    context = PipelineRuntime(graph, registry=_registry()).run({"value.in": 5})
 
     assert context.get("value.out")["value"] == 7
-    assert "task_exited" in [event["kind"] for event in _runtime_trace_events_from_context(context)]
-    assert "composite.tasks.work.task_1.work.add" in context.get("runtime.qualified_exec_order")
+    assert context.get("runtime.node_runs")["composite"] == 1
+    assert "composite.add" in context.get("runtime.qualified_exec_order")
 
 
 def test_async_detached_timeout_records_warning_and_does_not_block() -> None:
@@ -1602,13 +1557,12 @@ def test_async_detached_timeout_records_warning_and_does_not_block() -> None:
 
     registry = _registry()
     register_node(registry, SlowNode_DECLARATION, SlowNode)
-    register_task_manager(registry,'test.slow',join=False)
     graph = parse_graph_config(
         {
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts the detached timeout fixture."),
-                    task_call('slow', 'test.slow', 'Runs a slow detached task.', join=False),
+                    normal_call('slow', 'test.slow', 'Runs a slow detached task.'),
                     _node_call("seed", "test.seed", "Produces value.in.",  config={"value": 3}),
                     _node_call("end", "test.in_end", "Consumes value.in."),
                 ],
@@ -1621,7 +1575,7 @@ def test_async_detached_timeout_records_warning_and_does_not_block() -> None:
     context = PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(trace="full")).run({})
 
     assert context.get("value.in")["value"] == 3
-    assert any(event["kind"] == "task_exited" for event in _runtime_trace_events_from_context(context))
+    assert any(event["kind"] == "node" for event in _runtime_trace_events_from_context(context))
 
 
 def test_runtime_options_node_hooks_false_skips_per_node_hooks(tmp_path) -> None:

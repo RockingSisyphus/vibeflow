@@ -165,8 +165,6 @@ class BoundNodeView:
         self._source = source
         self._binding = binding
         self.subplan = subplan
-        self.task_plans = {key: BoundWorkflowView(context, context.blocks[block_id],
-            f"task.{source.id}.{key}", active=()) for key, block_id in source.task_targets}
 
         self.loop = BoundLoopView.from_plan(
             context.blocks[source.child_block].loop
@@ -237,7 +235,6 @@ class BoundNodeView:
             requires=[item.to_dict() for item in self.requires],
             provides=[item.to_dict() for item in self.provides],
             params=dict(self.params),
-            task_plans={key: item.to_dict() for key, item in self.task_plans.items()},
             flow_kind=self.flow_kind,
             join_policy=self.join_policy,
             is_terminal=self.is_terminal,
@@ -298,7 +295,6 @@ class BoundWorkflowView:
             for item in output_specs
         )
         self.routes = tuple(BoundRouteView(item) for item in block.routes)
-        self.tasks = block.tasks
         self.kind = block.kind
         self.order = tuple(block.order)
         self.entries = tuple(block.entries)
@@ -362,7 +358,6 @@ class BoundWorkflowView:
             },
             "capabilities": [item.to_dict() for item in self.capabilities],
             "entry_mode": self.entry_mode,
-            "tasks": [task.to_dict() for task in self.tasks],
         }
 
 

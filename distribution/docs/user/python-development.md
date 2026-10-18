@@ -107,7 +107,7 @@ python run.py inspect-resources --config python_project/configs/main.jsonc --jso
 
 每次调用替换完整 `info` 数组。需要同时保留训练进度和指标时，在一次调用中提供两个对象；`[]` 清空信息。内核在下一次定时刷新、状态变化或结束时写入最新缓存。默认间隔为 60 秒，命令行用 `--status-interval` 调整。完整数据格式、日志位置和监控配置见[运行日志与状态接口](runtime-observation.md)。
 
-并发启动、任务引用、停止与实际收尾合同见[原生任务管理](task-management.md)。
+普通节点的并发分发、显式汇合、取消与实际收尾合同见[普通图并发](graph-concurrency.md)。
 
 
 ## AOT 目录部署
@@ -152,4 +152,4 @@ python candidate-bundle/run.py delegate-cli -- --help
 
 业务标准流与退出码使用原 delegated CLI 协议；框架诊断写入 run 日志。构建保留原静态审查的 CONCERNS 和 planned stub 开发标记，不把它们改成 PASS。`--replace` 仅替换仍归本工具所有的完整构建目录。
 
-新计划为 Workflow ABI v7，构建元数据为 `vibeflow.aot-build.v3`；共同头保存工作流、ABI、入口和文件，`target_metadata` 保存该语言的 profile、工具链与绑定定位。旧计划或 manifest 不作兼容解码，请用当前源码重新构建；已有独立 JS 产物仍可继续使用其随附运行代码。
+新计划为 Workflow ABI v8，构建元数据为 `vibeflow.aot-build.v3`；共同头保存工作流、ABI、入口和文件，`target_metadata` 保存该语言的 profile、工具链与绑定定位。旧计划或 manifest 不作兼容解码，请用当前源码重新构建；已有独立 JS 产物仍可继续使用其随附运行代码。

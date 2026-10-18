@@ -91,12 +91,6 @@ def _callback_initial() -> dict[str, Any]:
     return {"callback.in": lambda: 23}
 
 
-COMPILED_SOURCE_FULL_REQUIRED = ("runtime._run_compiled_frame",)
-COMPILED_SOURCE_FAST_REQUIRED = ("runtime._run_compiled_frame",)
-COMPILED_SOURCE_FORBIDDEN = ("_run_node(",)
-COMPILED_SOURCE_FAST_FORBIDDEN = ("_run_node(",)
-
-
 VALID_RUN_CASES = [
     {"name": "free_nodes", "config": "pass_free_nodes.jsonc", "initial": {}, "expected_status": {"PASS", "CONCERNS"}},
     {"name": "io_data_store", "config": "pass_io_data_store.jsonc", "initial": {"io.result": 20}},
@@ -283,12 +277,12 @@ VALID_RUN_CASES = [
         },
         "expected_blocks": [["start", "input", "prepare", "compute", "route", "external", "end", "again_end"]],
     },
-    {'name': 'task_result_join', 'config': 'pass_task_result_join.jsonc', 'initial': {}, 'expected_outputs': {'value.out': 12}, 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'seed', 'seed_join', 'add', 'end'], 'expected_portable_tasks': [{'manager_node_id': 'seed', 'key': 'work', 'executor': 'thread'}]},
-    {'name': 'unconsumed_task_result', 'config': 'pass_unconsumed_task_result.jsonc', 'initial': {'calc.a': 2, 'calc.b': 5, 'calc.c': 9, 'calc.d': 4}, 'expected_outputs': {'calc.sum': 7, 'calc.scaled': 21, 'route.branch': 'left', 'calc.branch': 21, 'calc.final': 17}, 'expected_absent_outputs': ['async.value'], 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'slow_async', 'add_pair', 'compare', 'scale', 'use_scaled', 'finalize', 'end']},
-    {'name': 'compiled_fallback_mixed_graph', 'config': 'pass_task_result_join.jsonc', 'initial': {}, 'runtime_options': {'trace': 'full', 'node_hooks': False, 'execution': 'compiled'}, 'expected_outputs': {'value.out': 12}, 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'seed', 'seed_join', 'add', 'end']},
-    {'name': 'task_nodeset_result_join', 'config': 'pass_task_nodeset_result_join.jsonc', 'initial': {'value.in': 3}, 'expected_outputs': {'value.out': 8}, 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'input', 'composite', 'composite_join', 'end']},
-    {'name': 'background_task_metrics', 'config': 'pass_background_task_metrics.jsonc', 'initial_factory': _batch_initial, 'expected_outputs': {'value.out': 10}, 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'metrics', 'seed', 'add', 'end'], 'expected_portable_tasks': [{'manager_node_id': 'metrics', 'key': 'work', 'executor': 'thread'}]},
-    {'name': 'mainline_nodeset_task', 'config': 'pass_mainline_nodeset_task.jsonc', 'initial': {}, 'expected_outputs': {'value.out': 10}, 'expected_trace_kind_counts': {'task_started': 1, 'task_exited': 1}, 'expected_runtime_exec_order': ['start', 'seed', 'side_task', 'main_add', 'end']},
+    {'name': 'task_result_join', 'config': 'pass_task_result_join.jsonc', 'initial': {}, 'expected_outputs': {'value.out': 12}, 'expected_runtime_exec_order': ['start', 'seed', 'add', 'end']},
+    {'name': 'unpublished_branch_output', 'config': 'pass_unconsumed_task_result.jsonc', 'initial': {}, 'expected_outputs': {'value.out': 9}, 'expected_absent_outputs': ['async.value'], 'expected_runtime_nodes': ['start', 'slow', 'seed', 'add', 'end']},
+    {'name': 'compiled_fallback_mixed_graph', 'config': 'pass_task_result_join.jsonc', 'initial': {}, 'runtime_options': {'trace': 'full', 'node_hooks': False, 'execution': 'compiled'}, 'expected_outputs': {'value.out': 12}, 'expected_runtime_exec_order': ['start', 'seed', 'add', 'end']},
+    {'name': 'task_nodeset_result_join', 'config': 'pass_task_nodeset_result_join.jsonc', 'initial': {'value.in': 3}, 'expected_outputs': {'value.out': 8}, 'expected_runtime_exec_order': ['start', 'input', 'composite', 'end']},
+    {'name': 'background_task_metrics', 'config': 'pass_background_task_metrics.jsonc', 'initial_factory': _batch_initial, 'expected_outputs': {'value.out': 10}, 'expected_runtime_nodes': ['start', 'metrics', 'seed', 'add', 'end']},
+    {'name': 'mainline_nodeset_task', 'config': 'pass_mainline_nodeset_task.jsonc', 'initial': {}, 'expected_outputs': {'value.out': 10}, 'expected_runtime_nodes': ['start', 'seed', 'side_task', 'main_add', 'end']},
 ]
 
 
@@ -411,7 +405,7 @@ def _run_sandbox(work_root: Path) -> int:
             _run_comprehensive_math_case(),
             _run_rule_selection_case(),
             *_run_review_cases(),
-            *(_run_addition_case(name) for name in ("cli_addition", "object_addition", "plugin_addition", "piecewise_math", "workflow_math", "task_management")),
+            *(_run_addition_case(name) for name in ("cli_addition", "object_addition", "plugin_addition", "piecewise_math", "workflow_math", "graph_concurrency")),
             *_run_execution_model_cases(),
             *_run_source_preflight_cases(),
             *_run_global_state_cases(),
@@ -1042,12 +1036,8 @@ def _run_valid_cases() -> list[CaseResult]:
 def _run_execution_model_cases() -> list[CaseResult]:
     cases = (
         (
-            "execution:python-sync-vs-result-key-thread",
-            _run_python_sync_async_thread_case,
-        ),
-        (
-            "execution:python-thread-pool-boundaries",
-            _run_python_thread_pool_boundary_case,
+            "execution:python-single-call-inline",
+            _run_python_inline_thread_case,
         ),
     )
     results: list[CaseResult] = []
@@ -1388,7 +1378,7 @@ def _run_global_state_failure_release_case() -> CaseResult:
     )
 
 
-def _thread_probe_graph(*, managed: bool):
+def _thread_probe_graph():
     from vibeflow.tooling.project.graph_config import parse_graph_config
 
     probe: dict[str, Any] = {
@@ -1397,9 +1387,6 @@ def _thread_probe_graph(*, managed: bool):
         "display_name": "Thread probe",
         "description": "Reports the Python thread used to execute this node.",
     }
-    if managed:
-        probe = {"id":"probe","type_used":"sandbox.thread_manager","display_name":"Thread manager",
-                 "description":"Starts and joins the declared worker", "task_targets":{"work":dict(probe)}}
     return parse_graph_config(
         {
             "pipeline": {
@@ -1473,96 +1460,18 @@ def _thread_probe_registry():
         ThreadEndNode_DECLARATION,
         ThreadEndNode,
     )
-    from vibeflow.core.descriptors import NodeDescriptor,NodeContractDescriptor
-    class ThreadManager:
-        def run_pure(self, inputs, params, context):
-            ref=context.tasks.start("work",{})
-            outcome=context.tasks.wait_all_exited([ref])[0]
-            if outcome["status"] != "succeeded":raise RuntimeError(outcome["error"]["message"])
-            return outcome["outputs"]
-    registry.register(NodeDescriptor("sandbox.thread_manager","Thread manager","Declared concurrent worker","1","task_manager",
-        contract=registry.descriptor("sandbox.thread_probe").contract,rulesets=()),ThreadManager)
     return registry
 
 
-def _run_python_sync_async_thread_case() -> CaseResult:
-    from vibeflow.targets.python.runtime.engine import PipelineRuntime
-    from vibeflow.targets.python.runtime.options import RuntimeOptions
-
-    registry = _thread_probe_registry()
-    main_thread = threading.current_thread().name
-    sync_context = PipelineRuntime(
-        _thread_probe_graph(managed=False),
-        registry=registry,
-        runtime_options=RuntimeOptions(trace="full"),
-    ).run({})
-    async_context = PipelineRuntime(
-        _thread_probe_graph(managed=True),
-        registry=registry,
-        runtime_options=RuntimeOptions(trace="full", async_max_workers=2),
-    ).run({})
-    sync_thread = _context_value(sync_context, "thread.result")
-    async_thread = _context_value(async_context, "thread.result")
-    if sync_thread != main_thread:
-        raise AssertionError(
-            f"sync node ran on {sync_thread!r}, expected {main_thread!r}"
-        )
-    if async_thread == main_thread:
-        raise AssertionError(
-            "managed task did not leave the caller thread"
-        )
-    if async_context.get("runtime.stop_reason") != "completed":
-        raise AssertionError(async_context.to_dict())
-    return CaseResult(
-        "execution:python-sync-vs-result-key-thread",
-        "PASS",
-        payload={
-            "main_thread": main_thread,
-            "sync_thread": sync_thread,
-            "async_thread": async_thread,
-            "runtime_run_blocked_until_join": True,
-        },
-    )
+def _run_python_inline_thread_case() -> CaseResult:
+    from vibeflow.targets.python.runtime import PipelineRuntime
+    result=PipelineRuntime(_thread_probe_graph(),registry=_thread_probe_registry()).run({})
+    assert _context_value(result,"thread.result")==threading.current_thread().name
+    return CaseResult("execution:python-single-call-inline","PASS")
 
 
-def _run_python_thread_pool_boundary_case() -> CaseResult:
-    from vibeflow.targets.python.runtime import PipelineRuntime,RuntimeOptions
-    from vibeflow.core.descriptors import NodeDescriptor,NodeContractDescriptor
-    from vibeflow.tooling.project.graph_config import parse_graph_config
-    entered=threading.Event(); queued=threading.Event()
-    class Work:
-        def run_pure(self, inputs, params, context):
-            if params.get("queued"):queued.set()
-            entered.set();context.signal.wait()
-            return {}
-    class Manager:
-        def run_pure(self, inputs, params, context):
-            first=context.tasks.start("first",{})
-            assert entered.wait(2)
-            second=context.tasks.start("queued",{})
-            assert not queued.is_set()
-            context.tasks.request_stop([second,first])
-            outcomes=context.tasks.wait_all_exited([first,second])
-            assert all(outcome["status"]=="cancelled" for outcome in outcomes)
-            assert not queued.is_set()
-            return {}
-    registry=_thread_probe_registry()
-    registry.register(NodeDescriptor("sandbox.queue_work","Work","Cooperative worker","1","process",
-        contract=NodeContractDescriptor(params_schema={"queued":{"type":"boolean"}},params_defaults={"queued":False}),rulesets=()),Work)
-    registry.register(NodeDescriptor("sandbox.queue_manager","Manager","Stops queued work","1","task_manager",contract=NodeContractDescriptor(),rulesets=()),Manager)
-    graph=parse_graph_config({"pipeline":{"nodes":[
-        {"id":"start","type_used":"sandbox.thread_start","display_name":"Start","description":"Start"},
-        {"id":"manager","type_used":"sandbox.queue_manager","display_name":"Manager","description":"Manager","task_targets":{
-            "first":{"type_used":"sandbox.queue_work"},"queued":{"type_used":"sandbox.queue_work","config":{"queued":True}}}},
-        {"id":"end","type_used":"sandbox.thread_start","display_name":"End","description":"End"}],
-        "edges":[{"from":"start","to":"manager"},{"from":"manager","to":"end"}]}})
-    PipelineRuntime(graph,registry=registry,run_dir=RUN_ROOT/"pool-boundary",runtime_options=RuntimeOptions(async_max_workers=1)).run({})
-    rejected=[]
-    for value in (0,-1,True,1.5):
-        try:RuntimeOptions(async_max_workers=value)
-        except ValueError:rejected.append(value)
-        else:raise AssertionError("invalid worker limit was accepted")
-    return CaseResult("execution:python-thread-pool-boundaries","PASS",payload={"single_worker_queued":True,"invalid_worker_limits_rejected":rejected})
+
+
 
 
 
@@ -1740,6 +1649,14 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         missing = [item for item in case["expected_qualified_exec_contains"] if item not in actual]
         if missing:
             raise AssertionError(f"qualified_exec_order missing {missing!r}, got {sorted(actual)!r}")
+    if "expected_runtime_nodes" in case:
+        actual=list(run_result.context.get("runtime.exec_order"))
+        assert len(actual)==len(case["expected_runtime_nodes"]) and set(actual)==set(case["expected_runtime_nodes"]),actual
+        assert actual[0]=="start" and actual[-1]=="end",actual
+        # Explicit completion routes require each source to finish before the collector.
+        for edge in graph.edges:
+            if edge.source in actual and edge.target in actual and edge.schedule is not False:
+                assert actual.index(edge.source)<actual.index(edge.target),(edge.pair,actual)
     if "expected_runtime_exec_order" in case:
         actual = list(run_result.context.get("runtime.exec_order"))
         if actual != case["expected_runtime_exec_order"]:
@@ -1947,7 +1864,6 @@ def _mapping_contains(actual: Any, expected: Any) -> bool:
 def _assert_execution_plan(case: dict[str, Any], plan) -> None:
     if (
         "expected_portable_execution" in case
-        or "expected_portable_tasks" in case
         or case.get("expected_workflow_global_state")
     ):
         portable = plan.to_workflow_plan(
@@ -1965,25 +1881,10 @@ def _assert_execution_plan(case: dict[str, Any], plan) -> None:
                     f"portable execution {node_id} expected "
                     f"{list(expected)!r}, got {actual!r}"
                 )
-        actual_tasks = [
-            {
-                "manager_node_id": task.manager_node_id,
-                "key": task.key,
-                "executor": task.executor,
-            }
-            for task in block.tasks
-        ]
-        if "expected_portable_tasks" in case:
-            expected_tasks = list(case["expected_portable_tasks"])
-            if actual_tasks != expected_tasks:
-                raise AssertionError(
-                    f"portable tasks expected {expected_tasks!r}, "
-                    f"got {actual_tasks!r}"
-                )
         if case.get("expected_workflow_global_state"):
-            if portable.abi_version != "vibeflow.workflow.v7":
+            if portable.abi_version != "vibeflow.workflow.v8":
                 raise AssertionError(
-                    f"expected WorkflowPlan v7, got {portable.abi_version!r}"
+                    f"expected WorkflowPlan v8, got {portable.abi_version!r}"
                 )
             if portable.contains_global_state is not True:
                 raise AssertionError("WorkflowPlan did not propagate global state")

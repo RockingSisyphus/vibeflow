@@ -8,9 +8,9 @@ from dataclasses import dataclass
 from typing import Any, Mapping, TypeAlias
 
 
-WORKFLOW_ABI_VERSION = "vibeflow.workflow.v7"
+WORKFLOW_ABI_VERSION = "vibeflow.workflow.v8"
 _CARDINALITIES = frozenset({"exactly_one", "optional_one", "all"})
-_BLOCK_KINDS = frozenset({"workflow", "nodeset", "loop", "task"})
+_BLOCK_KINDS = frozenset({"workflow", "nodeset", "loop"})
 _CONDITION_OPERATORS = frozenset({"==", "!="})
 _ENTRY_MODES = frozenset({"sync", "async"})
 _COMPLETIONS = frozenset({"immediate", "suspend"})
@@ -320,18 +320,12 @@ class NodeCallPlan:
     effect_scope: str = "none"
     execution_lock: ExecutionLockPlan | None = None
     contains_global_state: bool = False
-    task_targets: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
         if self.completion not in _COMPLETIONS:
             raise PortablePlanError(
                 f"node completion must be one of {sorted(_COMPLETIONS)}"
             )
-        if self.task_targets and self.flow_kind != "task_manager":
-            raise PortablePlanError("GRAPH.TASK.CONTROL_FORBIDDEN: task_targets requires task_manager")
-        slots = [key for key, _ in self.task_targets]
-        if any(not isinstance(key,str) or not key for key in slots) or len(set(slots)) != len(slots):
-            raise PortablePlanError("GRAPH.TASK.TARGET_INVALID: task slots must be distinct nonempty strings")
         if self.schedule not in _SCHEDULES:
             raise PortablePlanError(
                 f"node schedule must be one of {sorted(_SCHEDULES)}"
@@ -366,7 +360,6 @@ class NodeCallPlan:
             "join_policy": self.join_policy,
             "status": self.status,
             "planned_behavior": self.planned_behavior,
-            "task_targets": [list(item) for item in self.task_targets],
             "is_terminal": self.is_terminal,
             "is_nodeset": self.is_nodeset,
             "is_loop": self.is_loop,
@@ -392,23 +385,6 @@ class NodeCallPlan:
         }
 
 
-@dataclass(frozen=True)
-class TaskPlan:
-    id: str
-    manager_node_id: str
-    key: str
-    block_id: str
-    executor: str
-
-    def __post_init__(self):
-        if not all(isinstance(value,str) and value for value in (self.id,self.manager_node_id,self.key,self.block_id)):
-            raise PortablePlanError("GRAPH.TASK.TARGET_INVALID: task plan must name manager, slot and block")
-        if self.executor not in {"event_loop", "thread"}:
-            raise PortablePlanError("GRAPH.TASK.EXECUTOR_INVALID: task executor must be event_loop or thread")
-
-    def to_dict(self) -> dict[str, str]:
-        return {"id": self.id, "manager_node_id": self.manager_node_id,
-                "key": self.key, "block_id": self.block_id, "executor": self.executor}
 
 
 @dataclass(frozen=True)
@@ -425,7 +401,6 @@ class BlockPlan:
     entries: tuple[str, ...]
     exits: tuple[str, ...]
     max_steps: int
-    tasks: tuple[TaskPlan, ...] = ()
     loop: LoopPlan | None = None
     execution_lock: ExecutionLockPlan | None = None
     contains_global_state: bool = False
@@ -464,7 +439,6 @@ class BlockPlan:
             "entries": list(self.entries),
             "exits": list(self.exits),
             "max_steps": self.max_steps,
-            "tasks": [item.to_dict() for item in self.tasks],
             "loop": self.loop.to_dict() if self.loop is not None else None,
             "execution_lock": (
                 self.execution_lock.to_dict()
@@ -509,18 +483,7 @@ class WorkflowPlan:
             raise PortablePlanError(
                 "workflow contains_global_state must be a boolean"
             )
-        self.validate_task_targets()
 
-    def validate_task_targets(self):
-        blocks = {block.id:block for block in self.blocks}
-        for block in self.blocks:
-            declared = {(node.id,key,target) for node in block.nodes for key,target in node.task_targets}
-            planned = {(task.manager_node_id,task.key,task.block_id) for task in block.tasks}
-            if declared != planned:
-                raise PortablePlanError("GRAPH.TASK.PLAN_INVALID: task plan must match declared manager slots")
-            for _, _, target in declared:
-                if target not in blocks or blocks[target].kind != "task":
-                    raise PortablePlanError("GRAPH.TASK.TARGET_INVALID: task target must bind a compiled task block")
 
     def block(self, block_id: str) -> BlockPlan:
         for block in self.blocks:

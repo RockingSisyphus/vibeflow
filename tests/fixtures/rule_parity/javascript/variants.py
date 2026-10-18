@@ -187,16 +187,15 @@ def variants(f: Any) -> tuple[Variation, ...]:
         add('numeric.dependency-' + str(depth + 1), '实际依赖链指标 ' + str(depth + 1), 'maintainability.dependencies', 'import {step} from "./chain1.ts";\nexport function increment(value: number): number {return step(value);}\n', 'NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP' if depth + 1 > 4 else '', role='base_lib', severity='warning',
             case_options={'extras': extras, 'extra_manifests': manifests, 'metrics': {'dependency_chain_length': depth + 1} if depth + 1 > 4 else {'source_files': depth + 1}})
 
-    # JS TaskPlan is generated from JSONC call metadata; there is no Python-like
-    # public constructor to inject into the implementation.
+    # Historical scheduling probes now execute ordinary graph calls in the current variant.
     for mode in ('result_key', 'detached'):
         patch = {'async': mode, **({'result_key': 'result'} if mode == 'result_key' else {})}
-        add('task.' + mode + '.normal', '真实 JSONC ' + mode + ' TaskPlan 构建和执行', 'native.task_plan', node, case_options={'entrypoint': 'build-run', 'metrics': {'business_result': 4}}, call_patch=patch)
-        add('task.' + mode + '.sync', '同步 workflow 原生生成 TaskPlan ' + mode + ' 元数据', 'native.task_plan', node, call_patch=patch, pipeline_patch={'entry_mode': 'sync'}, located=False,
+        add('task.' + mode + '.normal', '真实 JSONC ' + mode + ' 普通图构建和执行', 'native.task_plan', node, case_options={'entrypoint': 'build-run', 'metrics': {'business_result': 4}}, call_patch=patch)
+        add('task.' + mode + '.sync', '同步 workflow 普通节点 ' + mode + ' 元数据', 'native.task_plan', node, call_patch=patch, pipeline_patch={'entry_mode': 'sync'}, located=False,
             case_options={'notes': 'metadata 本身不是同步调用 Promise；不把 Python 线程资格假设套给 JavaScript 计划。'})
-    add('task.result-missing-contract', 'TaskPlan result_key 必须是实际声明输出', 'native.task_plan', node, 'GRAPH.ASYNC.RESULT_KEY_CONTRACT', call_patch={'async': 'result_key', 'result_key': 'missing'}, located=False)
+    add('task.result-missing-contract', '旧 result_key 必须显式迁移', 'native.task_plan', node, 'GRAPH.ASYNC.RESULT_KEY_CONTRACT', call_patch={'async': 'result_key', 'result_key': 'missing'}, located=False, case_options={'current_code':'GRAPH.ASYNC.MIGRATION','classification':'approved_change','notes':'Retired scheduling fields are rejected; positive execution uses ordinary graph calls.'})
     add('task.helper-timer-escape', '实际调用的独立 helper timer 未被 Node export visitor 递归审查', 'async.analysis_boundary', 'function launch() {setTimeout(() => 1, 1);}\n' + body(f.NODE, 'launch();'),
-        case_options={'classification': 'baseline_limitation', 'notes': '实际到达 helper，但 completion visitor 不沿调用图展开；通过只能证明旧边界，不证明 timer 获得了 TaskPlan owner。'})
+        case_options={'classification': 'baseline_limitation', 'notes': '实际到达 helper，但 completion visitor 不沿调用图展开；通过只能证明旧边界，不证明 helper 内部 timer 的生命周期受当前 Node 持有。'})
     add('task.helper-promise-escape', '返回 void 的 helper 隐藏丢弃 Promise 工作', 'async.analysis_boundary', 'function launch(): void {void Promise.resolve(1);}\n' + body(f.NODE, 'launch();'),
         case_options={'classification': 'baseline_limitation'})
     for name, app_source in (
@@ -248,27 +247,9 @@ def _task_route(fixture, root, variant, document, mode):
     document['pipeline']['nodes'].append(call)
     document['pipeline']['edges'] = [{'from': 'calculate', 'to': 'consume'}]
     if variant == 'current':
-        source_file = root / 'nodes/manage.ts'
-        manager = fixture._node_descriptor(variant,'parity.manager','nodes/manage.ts',fixture.Case('manager','','control'))
-        manager['flow_kind']='task_manager'
-        manager['rulesets']=['vibeflow.task_manager']
-        manager['implementations'][0]['completion']='suspend'
-        if mode=='result_key':
-            manager['contract']['requires'][0]['type']='parity.value'
-            manager['contract']['input_semantics']={'parity.value':['Input for the finite target.']}
-            body="const ref=context.tasks.start('work',{'parity.value':inputs['parity.value'].value}); const outcome=(await context.tasks.waitAllExited([ref]))[0]; if(outcome.status!=='succeeded')throw new Error(JSON.stringify(outcome.error)); return {result:outcome.outputs!.result};"
-            current_call=document['pipeline']['nodes'][0]
-            current_call.pop('async',None);current_call.pop('result_key',None)
-            current_call['type_used']='parity.manager'
-            current_call['task_targets']={'work':{'type_used':'parity.calc'}}
-        else:
-            manager['contract'].update(requires=[],provides=[],input_semantics={},output_semantics={})
-            body="const ref=context.tasks.start('work',{}); await context.tasks.waitAllExited([ref]); return {};"
-            current_call=document['pipeline']['nodes'][-1]
-            current_call.pop('async',None);current_call['type_used']='parity.manager'
-            current_call['task_targets']={'work':{'type_used':'parity.consume'}}
-        source_file.write_text('import type {TaskManagerContext} from "@vibeflow/plugin";\nexport async function run(inputs:any,params:any,context:TaskManagerContext){'+body+'}\n')
-        fixture._write_json(fixture.definition(root,variant,'node','parity.manager','nodes/manage.jsonc'),manager)
+        for current_call in document['pipeline']['nodes']:
+            current_call.pop('async',None)
+            current_call.pop('result_key',None)
         terminal=fixture._node_descriptor(variant,'parity.terminal','nodes/terminal.ts',fixture.Case('terminal','','control'))
         terminal['contract'].update(requires=[],provides=[],input_semantics={},output_semantics={})
         terminal['flow_kind']='terminal'

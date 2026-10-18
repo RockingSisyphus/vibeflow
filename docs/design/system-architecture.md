@@ -34,7 +34,7 @@ Core 在拓扑分析前解析调用契约：
 
 ## 公共计划
 
-Workflow ABI 为 `vibeflow.workflow.v7`。公共计划只保存稳定 ID、可移植值、端口、路由、合流、TaskPlan、Loop、SourceRef、effect scope 与 execution-lock 事实。Target BindingPlan 保存语言实现。
+Workflow ABI 为 `vibeflow.workflow.v8`。公共计划只保存稳定 ID、可移植值、端口、路由、合流、普通图 Block、Loop、SourceRef、effect scope 与 execution-lock 事实。Target BindingPlan 保存语言实现。
 
 Python 和 JavaScript Target 使用相同 Core 语义，但分别声明可执行 feature。Target 不支持的 implemented 语义以稳定 finding 拒绝；planned 内容仍可进入架构审核。
 
@@ -74,14 +74,14 @@ Architecture JSONC 的 implementation_graph 保存当前项目的资源、源码
 
 公开状态范围模型位于 Core/Tooling 共享边界，使 Python 与 JavaScript presenter 使用相同 coverage ID，同时只报告本次命令实际完成的检查。
 
-原生 task_manager 声明有限 task_targets；编译计划保存启动槽及目标绑定，TaskRef 数组作为普通数据传递。运行器每次 workflow 统一登记实际执行、协作停止与最终结果，完成通知只在实际收尾后产生。普通 Node 无控制接口；规则按真实接口绑定检查身份与资源归属，源码使用检查和图关系检查分工。默认 taskManagerNode 为 dbl-circ，填充 #FCE7F3、边框 #BE185D、文字 #831843，完整标签包含“任务管理”；错误／警告覆盖颜色时仍保留形状和身份。Decision 不变。
+并发工作使用普通节点和显式边：分发、工作、统一 all 汇合、结束。所有分支接受相同的断路检查；取消和真实清理由 Target 调度器持有，不再存在独立任务管理层。
 
-当前任务编译、Runtime/AOT 实现位置和退出顺序见[原生任务管理设计](task-management.md)，维护时应同时核对公共计划、SDK 操作归属及最终收尾边界。
+当前任务编译、Runtime/AOT 实现位置和退出顺序见[普通图并发设计](graph-concurrency.md)，维护时应同时核对公共计划、SDK 操作归属及最终收尾边界。
 
 
 ## 双语言计划与 AOT
 
-`core.graph_calls` 统一实际调用身份、子图、Loop、任务目标与配置继承。Rule 在相同身份之上补充未调用定义的审查范围；它们不会成为执行调用。Block Compiler 生成可序列化及读取的 WorkflowPlan/BlockPlan，任务 executor 由 Target 显式提供。ABI v7 不携带旧 async/result_key 并发字段。
+`core.graph_calls` 统一实际调用身份、子图、Loop、配置继承。Rule 在相同身份之上补充未调用定义的审查范围；它们不会成为执行调用。Block Compiler 生成可序列化及读取的 WorkflowPlan/BlockPlan，实际并发执行由 Target 的通用图调度器持有。ABI v8 不携带旧 async/result_key 并发字段。
 
 Python 将准备与装配分开：静态阶段保存共同计划及有限的原生图/编译记录，运行阶段绑定类、独立参数容器、活对象和现有 PipelineRuntime。源码与目录 bundle 共用装配函数。生成块在调用时读取追踪和 Hook 选项，不为各 profile 复制编译逻辑。无法生成块的结构保留原动态调度。
 

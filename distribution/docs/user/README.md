@@ -11,4 +11,4 @@
 
 完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。
 
-并发启动、任务引用、停止与实际收尾合同见[原生任务管理](task-management.md)。
+普通节点的并发分发、显式汇合、取消与实际收尾合同见[普通图并发](graph-concurrency.md)。

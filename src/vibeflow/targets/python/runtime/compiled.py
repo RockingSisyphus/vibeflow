@@ -1,40 +1,10 @@
-from __future__ import annotations
+"""Bind compiled blocks to the ordinary graph executor."""
+from .block_compiler import graph_block
+from .scheduler import run_graph
 
-from vibeflow.targets.python.runtime.block_compiler import graph_block
-from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
-
-
-def run_compiled_steps(runtime, state) -> None:
+def run_compiled_steps(runtime, state):
     block = graph_block(runtime._plan)
     if block is not None:
         block.callable(runtime, state)
-        return
-    ready = list(runtime._initial_ready_nodes(state))
-    queued = set(ready)
-    for _ in range(runtime._plan.max_steps):
-        if not ready:
-            runtime.trace.stop_reason = "no_ready_nodes"
-            return
-        node_name = ready.pop(0)
-        queued.discard(node_name)
-        if not runtime._requirements_available(node_name, state):
-            continue
-        outputs = runtime._run_node(node_name, state)
-        runtime.trace.step_count += 1
-        runtime._clear_conditional_outgoing(node_name, state)
-        active_edges = runtime._activated_edges(node_name, outputs, state)
-        for edge in active_edges:
-            runtime._activate_edge(edge, state)
-        for target in runtime._scheduled_targets(node_name, active_edges):
-            if target not in queued:
-                ready.append(target)
-                queued.add(target)
-        runtime._deliver_transfer_edges(node_name, outputs, state)
-        if runtime._is_end_terminal(node_name):
-            runtime.trace.stop_reason = "completed"
-            return
-    runtime.trace.stop_reason = "max_steps"
-    raise PipelineRuntimeError(f"pipeline exceeded max_steps={runtime._plan.max_steps}")
-
-
-__all__ = ["run_compiled_steps"]
+    else:
+        run_graph(runtime, state)

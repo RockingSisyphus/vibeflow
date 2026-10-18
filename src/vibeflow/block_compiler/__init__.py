@@ -25,7 +25,6 @@ from vibeflow.block_compiler.model import (
     PortableValue,
     RoutePlan,
     SourceRef,
-    TaskPlan,
     WorkflowPlan,
     freeze_json_object,
 )
@@ -50,7 +49,6 @@ __all__ = [
     "PortableValue",
     "RoutePlan",
     "SourceRef",
-    "TaskPlan",
     "WorkflowPlan",
     "compile_graph_plan",
     "compile_workflow",

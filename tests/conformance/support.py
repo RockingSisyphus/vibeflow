@@ -142,7 +142,7 @@ def run_portable_conformance(
         javascript_compilation.workflow.graph, javascript_compilation.compiled_graph, workflow_id=case.name,
         source_by_type=sources, implementation_facts=javascript_facts,
         call_execution_facts=native_call_execution_facts(javascript_compilation.workflow.graph),
-        target_features=javascript_features, compile_nested=True, task_executor="event_loop",
+        target_features=javascript_features, compile_nested=True,
     )
 
     python_observation = _run_python(

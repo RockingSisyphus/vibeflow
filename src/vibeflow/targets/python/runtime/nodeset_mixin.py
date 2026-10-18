@@ -116,9 +116,7 @@ class RuntimeNodesetMixin:
                 raise PipelineRuntimeError(f"nodeset node '{frame.name}' has no execution plan")
             runtime = type(self)._from_plan(self, frame.subplan)
             self._nodeset_runtimes[frame.name] = runtime
-        runtime._tasks = self._tasks
         runtime._signal = self._signal
-        runtime._current_task = self._current_task
         runtime._plugin_registry = self._plugin_registry
         runtime._runtime_plugins = self._runtime_plugins
         runtime._hook_plan = self._hook_plan

@@ -1,4 +1,4 @@
-export type {NodeRunContext, NodeOptions, TaskManagerContext, TaskController, TaskRef, TaskOutcome, TaskError, StopAck} from "../nodetypes/contracts";
+export type {NodeRunContext, NodeOptions} from "../nodetypes/contracts";
 export {defineNode} from "../nodetypes/contracts";
 /** Plugin ABI v3 declarations. Resource objects are fixed, not factories. */
 export type Json = null | boolean | number | string | Json[] | {[key: string]: Json};

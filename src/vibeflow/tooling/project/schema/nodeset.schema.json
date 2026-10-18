@@ -44,8 +44,7 @@
         "data_store",
         "document",
         "preparation",
-        "global_state",
-        "task_manager"
+        "global_state"
       ]
     },
     "planned_behavior": {

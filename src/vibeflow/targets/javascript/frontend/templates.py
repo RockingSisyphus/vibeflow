@@ -9,7 +9,7 @@ def _runtime_source() -> str:
     )
     return (resource.read_text(encoding="utf-8").strip() + "\n"
             + files("vibeflow.targets.javascript.resources").joinpath("status_helpers.mjs").read_text(encoding="utf-8")
-            + "\n" + files("vibeflow.targets.javascript.resources").joinpath("task_helpers.mjs").read_text(encoding="utf-8"))
+            + "\n" + files("vibeflow.targets.javascript.resources").joinpath("execution_helpers.mjs").read_text(encoding="utf-8"))
 
 
 RUNTIME_SOURCE = _runtime_source()

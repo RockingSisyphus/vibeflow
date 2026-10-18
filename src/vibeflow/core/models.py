@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 COMPLETIONS = frozenset({"immediate", "suspend"})
-SCHEDULES = frozenset({"inline", "deferred", "detached"})
+SCHEDULES = frozenset({"inline"})
 EXECUTORS = frozenset({"current", "event_loop", "thread"})
 
 

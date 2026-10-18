@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Callable, Mapping, Protocol
 
 from vibeflow.core.compiler import explicit_flow_cycles
 from vibeflow.core.flow import EdgeSpec
-from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
+from vibeflow.targets.python.runtime.errors import DelegateCliExit
 from vibeflow.targets.python.runtime.helpers import elapsed_ms
 from vibeflow.targets.python.runtime.summaries import summarize_mapping
 
@@ -87,13 +87,7 @@ def _compile_generated_graph_block(plan: "ExecutionPlan") -> CompiledBlock:
     block_name = f"graph:{plan.order[0]}"
     nodes = tuple(plan.order)
     source = _generated_graph_block_source(block_name, nodes)
-    namespace = {
-        "CompiledBlockResult": CompiledBlockResult,
-        "elapsed_ms": elapsed_ms,
-        "now": time.perf_counter,
-        "PipelineRuntimeError": PipelineRuntimeError,
-        "summarize_mapping": summarize_mapping,
-    }
+    namespace = {}
     exec(source, namespace)
     compiled_block = namespace["compiled_block"]
 
@@ -158,83 +152,35 @@ def _compile_nodeset_block(frame: "NodeFrame") -> CompiledBlock:
     )
 
 
+def run_graph_block(runtime, state, name, nodes):
+    """Generated blocks add observation around the same graph coordinator."""
+    from .scheduler import run_graph
+    started = time.perf_counter()
+    runtime._record_runtime_event("block_enter", name, "block")
+    runtime._call_runtime_plugins("before_block", name, nodes)
+    try:
+        last_node, outputs = run_graph(runtime, state)
+        summary = {"output_summary": summarize_mapping(outputs)} if runtime.runtime_options.trace == "full" or runtime.runtime_options.node_hooks else {}
+        runtime._record_runtime_event("block_exit", name, "block", elapsed_ms=elapsed_ms(started), **summary)
+        runtime._call_runtime_plugins("after_block", name, nodes)
+        return CompiledBlockResult(last_node=last_node, outputs=outputs)
+    except DelegateCliExit:
+        raise
+    except BaseException as error:
+        runtime._record_runtime_event("block_failed", name, "block", failure=str(error), elapsed_ms=elapsed_ms(started))
+        try:
+            runtime._call_runtime_plugins("block_failed", name, nodes, str(error))
+        except BaseException as cleanup:
+            error.cleanup_errors = [*getattr(error,"cleanup_errors",()),cleanup]
+        raise
+
+
 def _generated_graph_block_source(name: str, nodes: tuple[str, ...]) -> str:
-    lines = [
+    return "\n".join([
         "def compiled_block(runtime, state):",
-        f"    # generated ready-queue graph block: {name}",
-        f"    # nodes: {nodes!r}",
-        "    frames = runtime._frames",
-        "    started = now()",
-        f"    block_name = {name!r}",
-        f"    block_nodes = {nodes!r}",
-        "    runtime._record_runtime_event('block_enter', block_name, 'block')",
-        "    runtime._call_runtime_plugins('before_block', block_name, block_nodes)",
-        "    ready = list(runtime._initial_ready_nodes(state))",
-        "    queued = set(ready)",
-        "    outputs = {}",
-        "    last_node = ''",
-        "    steps = 0",
-        "    counted = False",
-        "    def finish(last_node):",
-        "        nonlocal counted",
-        "        if not counted:",
-        "            runtime.trace.step_count += steps",
-        "            counted = True",
-    ]
-    lines.extend([
-        "        summary = {'output_summary': summarize_mapping(outputs)} if runtime.runtime_options.trace == 'full' or runtime.runtime_options.node_hooks else {}",
-        "        runtime._record_runtime_event('block_exit', block_name, 'block', elapsed_ms=elapsed_ms(started), **summary)",
+        "    from vibeflow.targets.python.runtime.block_compiler import run_graph_block",
+        f"    return run_graph_block(runtime, state, {name!r}, {nodes!r})",
     ])
-    lines.extend(
-        [
-            "        runtime._call_runtime_plugins('after_block', block_name, block_nodes)",
-            "        return CompiledBlockResult(last_node=last_node, outputs=outputs)",
-            "    try:",
-            "        for _ in range(runtime._plan.max_steps):",
-            "            if not ready:",
-            "                runtime.trace.stop_reason = 'no_ready_nodes'",
-            "                return finish(last_node)",
-            "            current = ready.pop(0)",
-            "            queued.discard(current)",
-            "            if current not in frames:",
-            "                raise PipelineRuntimeError(f'compiled block reached unknown node: {current}')",
-            "            if not runtime._requirements_available(current, state):",
-            "                continue",
-            "            frame = frames[current]",
-            "            outputs = runtime._run_compiled_frame(frame, state)",
-            "            last_node = current",
-            "            steps += 1",
-            "            runtime._clear_conditional_outgoing(current, state)",
-            "            active_edges = runtime._activated_edges(current, outputs, state)",
-            "            for edge in active_edges:",
-            "                runtime._activate_edge(edge, state)",
-            "            for target in runtime._scheduled_targets(current, active_edges):",
-            "                if target not in queued:",
-            "                    ready.append(target)",
-            "                    queued.add(target)",
-            "            runtime._deliver_transfer_edges(current, outputs, state)",
-            "            if runtime._is_end_terminal(current):",
-            "                runtime.trace.stop_reason = 'completed'",
-            "                return finish(current)",
-            "        runtime.trace.stop_reason = 'max_steps'",
-            "        raise PipelineRuntimeError(f'pipeline exceeded max_steps={runtime._plan.max_steps}')",
-            "    except Exception as exc:",
-            "        if not counted:",
-            "            runtime.trace.step_count += steps",
-            "            counted = True",
-            "        runtime._record_runtime_event(",
-            "            'block_failed',",
-            "            block_name,",
-            "            'block',",
-            "            failure=str(exc),",
-            "            elapsed_ms=elapsed_ms(started),",
-            "        )",
-            "        runtime._call_runtime_plugins('block_failed', block_name, block_nodes, str(exc))",
-            "        raise",
-            "# runtime trace and hooks are selected per invocation",
-        ]
-    )
-    return "\n".join(lines)
 
 
 def _loop_block_source(frame: "NodeFrame") -> str:

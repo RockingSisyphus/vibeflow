@@ -284,7 +284,7 @@ def test_abi_v5_serializes_global_state_and_locks_without_dispatch() -> None:
     payload = plan.to_dict()
     root = plan.block(plan.entry_block)
 
-    assert plan.abi_version == WORKFLOW_ABI_VERSION == "vibeflow.workflow.v7"
+    assert plan.abi_version == WORKFLOW_ABI_VERSION == "vibeflow.workflow.v8"
     assert plan.contains_global_state is True
     assert "root_exclusive" not in payload
     assert payload["execution_lock"] == {"key": "trainer", "scope": "root"}
@@ -305,47 +305,20 @@ def test_abi_v5_serializes_global_state_and_locks_without_dispatch() -> None:
         replace(plan, abi_version="vibeflow.workflow.v3")
 
 
-def test_nested_global_state_and_declared_tasks_have_independent_plan_facts() -> None:
-    facts = ImplementationFacts(
-        (
-            ImplementationFact("fixture.state", flow_kind=FLOW_KIND_GLOBAL_STATE),
-            ImplementationFact("fixture.side", flow_kind="process"),
-            ImplementationFact("fixture.manager", flow_kind="task_manager"),
-        ),
-        strict=True,
-    )
-    child = GraphConfig(nodes=(NodeSpec("state", "fixture.state"),))
-    nodeset = NodesetSpec(
-        type_key="fixture.group",
-        display_name="Group",
-        description="Contains process-global work.",
-        requires=(),
-        provides=(),
-        graph=child,
-    )
-    safe_graph = GraphConfig(
-        nodes=(NodeSpec("group", "fixture.group"),),
-        nodesets={nodeset.type_key: nodeset},
-    )
-    plan = _compile_global(safe_graph, facts)
-    assert plan.contains_global_state is True
-    assert plan.block(plan.entry_block).node(
-        "group"
-    ).contains_global_state is True
+def test_nested_global_state_and_ordinary_calls_have_independent_plan_facts():
+    facts = ImplementationFacts((ImplementationFact("fixture.state",flow_kind=FLOW_KIND_GLOBAL_STATE),
+        ImplementationFact("fixture.side",flow_kind="process")),strict=True)
+    child = GraphConfig(nodes=(NodeSpec("state","fixture.state"),))
+    group = NodesetSpec("fixture.group","Group","Contains process-global work",(),(),child)
+    graph = GraphConfig(nodes=(NodeSpec("group","fixture.group"),NodeSpec("side","fixture.side")),
+        nodesets={group.type_key:group})
+    plan = _compile_global(graph,facts)
+    root = plan.block(plan.entry_block)
+    assert plan.contains_global_state and root.node("group").contains_global_state
+    assert not root.node("side").contains_global_state
+    assert all(block.kind in {"workflow","nodeset","loop"} for block in plan.blocks)
+    assert "tasks" not in root.to_dict()
 
-    graph = GraphConfig(
-        nodes=(
-            NodeSpec("group", "fixture.group"),
-            NodeSpec("manager", "fixture.manager", task_targets={"side":NodeSpec("side", "fixture.side")}),
-        ),
-        nodesets={nodeset.type_key: nodeset},
-    )
-
-    unlocked = _compile_global(graph, facts)
-    root = unlocked.block(unlocked.entry_block)
-    assert root.node("manager").flow_kind == "task_manager"
-    assert root.tasks[0].key == "side"
-    assert unlocked.block(root.tasks[0].block_id).kind == "task"
 
 
 @pytest.mark.parametrize("planned_definition", (False, True))
@@ -456,20 +429,11 @@ def test_composite_invocation_locks_use_block_scope() -> None:
     assert root.node("loop").execution_lock.scope == "block"
 
 
-def test_protected_task_plan_records_manager_target_and_executor() -> None:
-    facts = ImplementationFacts((ImplementationFact("fixture.manager",flow_kind="task_manager"),
-        ImplementationFact("fixture.work",flow_kind="process",
-            provides=(DataProvider("value","fixture.value",display_name="Value"),))),strict=True)
-    graph = GraphConfig(nodes=(NodeSpec("manager","fixture.manager",
-        task_targets={"work":NodeSpec("work","fixture.work")}),),execution_lock=ExecutionLockSpec("trainer"))
-    plan = _compile_global(graph, facts)
-    root = plan.block(plan.entry_block)
-    task = root.tasks[0]
-    assert task.manager_node_id == "manager" and task.key == "work"
-    assert task.executor == "thread"
-    assert plan.block(task.block_id).node("work").provides[0].key == "value"
-    # Legacy positive plans cannot bypass the explicit ownership contract.
-    from vibeflow.core.config.graph import parse_graph_config_data as parse_graph_config
+def test_portable_plan_has_no_hidden_task_execution_protocol():
+    from vibeflow.core.config.graph import parse_graph_config_data
     from vibeflow.core.flow import GraphConfigError
-    with pytest.raises(GraphConfigError, match="GRAPH.ASYNC.MIGRATION"):
-        parse_graph_config({"pipeline":{"nodes":[{"id":"work","type_used":"fixture.work","async":"result_key","result_key":"value"}]}})
+    with pytest.raises(GraphConfigError,match="GRAPH.TASK.MIGRATION"):
+        parse_graph_config_data({"pipeline":{"nodes":[{"id":"dispatch","type_used":"fixture.work",
+            "task_targets":{"work":{"type_used":"fixture.work"}}}]}})
+    with pytest.raises(TypeError,match="task_targets"):
+        NodeSpec("dispatch","fixture.work",task_targets={})

@@ -192,14 +192,8 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         item.get("execution_lock"),
         field=f"pipeline.nodes[{index}].execution_lock",
     )
-    targets = item.get("task_targets", {})
-    if not isinstance(targets, Mapping):
-        raise GraphConfigError(f"node '{node_id}'.task_targets must be an object")
-    parsed_targets = {}
-    for key, value in targets.items():
-        if not isinstance(key, str) or not key or not isinstance(value, Mapping):
-            raise GraphConfigError(f"node '{node_id}'.task_targets requires named call objects")
-        parsed_targets[key] = _parse_node({"display_name": key, "description": f"Task target {key}", **value, "id": key}, index=index)
+    if "task_targets" in item:
+        raise GraphConfigError("GRAPH.TASK.MIGRATION: declare ordinary pipeline nodes and edges with an explicit downstream join", "GRAPH.TASK.MIGRATION")
     reserved = {"task_targets", "rulesets", "id", "type_used", "requires", "provides", "config", "node_configs", "allow_config_override", "override_child_config", "status", "flow_kind", "planned_behavior", "async", "result_key", "execution_lock", "display_name", "description", "style", "similar_to", "join_policy", "loop", "io"}
     return NodeSpec(
         id=node_id,
@@ -220,7 +214,6 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         flow_kind=flow_kind,
         planned_behavior=planned_behavior,
         execution_lock=execution_lock,
-        task_targets=parsed_targets,
     )
 
 
@@ -446,7 +439,7 @@ def _parse_status(value: Any, *, field: str) -> str:
 
 def _reject_removed_async_fields(item: Mapping[str, Any]) -> None:
     if "async" in item or "result_key" in item:
-        raise GraphConfigError("GRAPH.ASYNC.MIGRATION: use a task_manager node with task_targets and context.tasks.start; async/result_key/detached calls have been removed", "GRAPH.ASYNC.MIGRATION")
+        raise GraphConfigError("GRAPH.ASYNC.MIGRATION: use ordinary nodes, explicit edges and join_policy=all; async/result_key/detached calls have been removed", "GRAPH.ASYNC.MIGRATION")
 
 
 def _parse_join_policy(value: Any, *, field: str) -> str:

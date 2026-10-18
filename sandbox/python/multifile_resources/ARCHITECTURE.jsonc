@@ -43,7 +43,6 @@
           "description_source": "call"
         },
         "flow_kind": "terminal",
-        "task_targets": {},
         "rulesets": [],
         "selected_rulesets": [],
         "tags": [],
@@ -106,7 +105,6 @@
           "description_source": "call"
         },
         "flow_kind": "process",
-        "task_targets": {},
         "rulesets": [
           "vibeflow.process"
         ],
@@ -183,7 +181,6 @@
           "description_source": "call"
         },
         "flow_kind": "terminal",
-        "task_targets": {},
         "rulesets": [],
         "selected_rulesets": [],
         "tags": [],

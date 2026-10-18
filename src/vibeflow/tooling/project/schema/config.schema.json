@@ -491,8 +491,7 @@
               "data_store",
               "document",
               "preparation",
-              "global_state",
-              "task_manager"
+              "global_state"
             ]
           },
           "planned_behavior": {
@@ -581,12 +580,6 @@
               ]
             },
             "uniqueItems": true
-          },
-          "task_targets": {
-            "type": "object",
-            "additionalProperties": {
-              "$ref": "#/$defs/taskTarget"
-            }
           }
         },
         "anyOf": [
@@ -1030,8 +1023,7 @@
             "data_store",
             "document",
             "preparation",
-            "global_state",
-            "task_manager"
+            "global_state"
           ]
         },
         "planned_behavior": {
@@ -1120,12 +1112,6 @@
             ]
           },
           "uniqueItems": true
-        },
-        "task_targets": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/taskTarget"
-          }
         }
       },
       "anyOf": [

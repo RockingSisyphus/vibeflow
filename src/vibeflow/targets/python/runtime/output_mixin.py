@@ -73,7 +73,8 @@ class RuntimeOutputMixin:
 
     def _finalize_pipeline_outputs(self, state: _RuntimeState) -> None:
         for output in self.graph.outputs:
-            matches = list(state.output_candidates.get(output.type, ()))
+            matches = sorted(state.output_candidates.get(output.type, ()),
+                key=lambda item: self._plan.order.index(item.source_node) if item.source_node in self._plan.order else -1)
             if output.cardinality == CARDINALITY_EXACTLY_ONE:
                 if len(matches) != 1:
                     raise PipelineRuntimeError(f"pipeline output type '{output.type}' expected exactly one value, got {len(matches)}")

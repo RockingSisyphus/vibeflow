@@ -167,8 +167,6 @@ def _capability_declarations(workflow: EmissionWorkflow) -> list[str]:
                     requirement.id,
                     set(),
                 ).update(requirement.operations)
-            for task in node.task_plans.values():
-                visit(task)
             if node.subplan is not None:
                 visit(node.subplan)
 

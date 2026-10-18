@@ -42,16 +42,7 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
     _validate_node_similarity(value, prefix, findings)
     _validate_node_async_fields(value, prefix, findings)
     if "task_targets" in value:
-        targets = value["task_targets"]
-        if not isinstance(targets, Mapping):
-            findings.append(_error("CONFIG.SCHEMA.TASK_TARGETS", "task_targets must be a slot-to-call mapping", prefix))
-        else:
-            for slot, target in targets.items():
-                if not _non_empty_string(slot) or not isinstance(target, Mapping):
-                    findings.append(_error("CONFIG.SCHEMA.TASK_TARGETS", "task slot must name a Node/Nodeset call", prefix))
-                else:
-                    _validate_node({"id": slot, "display_name": slot, "description": "Task target " + slot,
-                                    **target}, f"{prefix}.task_targets.{slot}", findings)
+        findings.append(_error("GRAPH.TASK.MIGRATION", "declare normal nodes and explicit edges", prefix))
     _validate_node_join_policy(value, prefix, findings)
     _validate_node_loop(value, prefix, findings)
     _validate_node_io(value, prefix, findings)
@@ -217,7 +208,7 @@ def _validate_node_similarity_targets(nodes: list[Any], prefix: str, findings: l
 def _validate_node_async_fields(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
     if "async" in value or "result_key" in value:
         findings.append(_error("GRAPH.ASYNC.MIGRATION",
-            "async/result_key/detached calls were removed; declare task_manager/task_targets and use context.tasks", prefix))
+            "async/result_key/detached calls were removed; declare ordinary nodes with explicit fork/join edges", prefix))
 
 def _validate_node_join_policy(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
     if "join_policy" not in value:

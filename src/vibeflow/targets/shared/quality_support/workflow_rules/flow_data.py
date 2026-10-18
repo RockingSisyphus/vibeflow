@@ -104,7 +104,7 @@ def _append_unconsumed_provider_warnings(node, graph, compiled, outgoing, condit
     nodes_by_name = {item.name: item for item in graph.nodes}
     downstream = [nodes_by_name[name] for name in sorted(outgoing.get(node.name, ())) if name in nodes_by_name]
     is_end = compiled.flow_kinds.get(node.name) == FLOW_KIND_TERMINAL and not outgoing.get(node.name)
-    if is_end or node.name == getattr(graph, "task_entry", ""):
+    if is_end:
         return
     downstream_required_types = {
         child.name: sorted({requirement.type for requirement in child.requires})

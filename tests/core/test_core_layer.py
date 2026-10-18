@@ -630,16 +630,18 @@ def test_nested_execution_locks_must_reuse_the_active_core_key() -> None:
     assert not compilation.findings
 
 
-def test_explicit_task_target_lock_reuses_its_manager_scope() -> None:
-    from vibeflow.core.flow import GraphConfig, NodeSpec, ExecutionLockSpec
-    graph = GraphConfig(nodes=(NodeSpec("manager","fixture.manager",execution_lock=ExecutionLockSpec("scope"),
-        task_targets={"work":NodeSpec("work","fixture.work",execution_lock=ExecutionLockSpec("other"))}),))
-    facts = ImplementationFacts((ImplementationFact("fixture.manager",flow_kind="task_manager"),
-                                ImplementationFact("fixture.work",flow_kind="process")),strict=True)
+def test_explicit_nodeset_child_lock_reuses_its_parent_scope():
+    from vibeflow.core.flow import NodesetSpec
+    child = GraphConfig((NodeSpec("work","fixture.work",execution_lock=ExecutionLockSpec("other")),))
+    group = NodesetSpec("fixture.group","Group","Ordinary nested scope",(),(),child)
+    graph = GraphConfig((NodeSpec("group","fixture.group",execution_lock=ExecutionLockSpec("scope")),),
+                        nodesets={group.type_key:group})
+    facts = ImplementationFacts((ImplementationFact("fixture.work",flow_kind="process"),),strict=True)
     with pytest.raises(GraphCompileError) as error:
         compile_core(CoreCompileRequest(graph=graph,implementation_facts=facts,
             target_features=TargetFeatureSet(target="python",features=frozenset({TARGET_FEATURE_EXECUTION_LOCKS}))))
     assert error.value.rule_id == "GRAPH.EXECUTION_LOCK.NESTED_KEY_CONFLICT"
+
 
 
 def test_planned_global_state_is_visible_but_does_not_require_feature_or_lock() -> None:
@@ -768,38 +770,13 @@ def test_execution_lock_config_is_normalized_reserved_and_feature_gated() -> Non
         )
 
 
-@pytest.mark.parametrize('invalid', ['ordinary_control', 'unknown_target', 'retired_target', 'retired_nested'])
-def test_task_target_validation_covers_nested_declarations(invalid):
-    from vibeflow.core.compiler import compile_core
-    from vibeflow.core.models import CoreCompileRequest, ImplementationFact, ImplementationFacts, TargetFeatureSet
-    from vibeflow.core.flow import GraphConfig, NodeSpec, NodesetSpec
-    target=NodeSpec('work','fixture.work')
-    definitions={}
-    if invalid=='ordinary_control':
-        target=NodeSpec('work','fixture.work',task_targets={'nested':NodeSpec('nested','fixture.work')})
-        code='GRAPH.TASK.CONTROL_FORBIDDEN'
-    elif invalid=='unknown_target':
-        target=NodeSpec('work','fixture.unknown')
-        code='NODE.TYPE.UNKNOWN'
-    else:
-        # Retired fields cannot enter the v7 model, including task targets and
-        # nested definitions. JSON users still receive the migration diagnostic.
-        with pytest.raises(TypeError, match='async_mode'):
-            NodeSpec('work','fixture.work',async_mode='detached',status='planned')
-        from vibeflow.core.config import parse_graph_config_data
-        from vibeflow.core.flow import GraphConfigError
-        call = {'id':'work','type_used':'fixture.work','async':'detached'}
-        if invalid == 'retired_target':
-            data = {'pipeline':{'nodes':[{'id':'manager','type_used':'fixture.manager','task_targets':{'work':call}}]}}
-        else:
-            data = {'pipeline':{'nodes':[]},'nodesets':[{'type_key':'fixture.body','display_name':'Body',
-                'description':'Nested definition','requires':[],'provides':[],'pipeline':{'nodes':[call]}}]}
-        with pytest.raises(GraphConfigError,match='GRAPH.ASYNC.MIGRATION'):
-            parse_graph_config_data(data)
-        return
-    graph=GraphConfig((NodeSpec('manage','fixture.manager',task_targets={'work':target}),),nodesets=definitions)
-    facts=ImplementationFacts((ImplementationFact('fixture.manager',flow_kind='task_manager'),
-                               ImplementationFact('fixture.work',flow_kind='process')),strict=True)
-    with pytest.raises(GraphCompileError) as caught:
-        compile_core(CoreCompileRequest(graph,facts,TargetFeatureSet('python')))
-    assert caught.value.rule_id==code
+@pytest.mark.parametrize("nested", [False,True])
+def test_hidden_task_declarations_are_rejected_at_every_graph_depth(nested):
+    from vibeflow.core.config import parse_graph_config_data
+    from vibeflow.core.flow import GraphConfigError
+    body = {"nodes":[{"id":"dispatch","type_used":"fixture.work","task_targets":{}}]}
+    document = {"pipeline":body} if not nested else {"pipeline":{"nodes":[]},"nodesets":[{
+        "type_key":"fixture.body","display_name":"Body","description":"Nested scope",
+        "requires":[],"provides":[],"pipeline":body}]}
+    with pytest.raises(GraphConfigError,match="GRAPH.TASK.MIGRATION"):
+        parse_graph_config_data(document)

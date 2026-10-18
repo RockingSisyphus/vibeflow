@@ -49,7 +49,7 @@ def _node(value):
         params=m.freeze_json_object(value["params"]),
         config_overrides=m.freeze_json_object(value["config_overrides"]),
         execution_lock=_lock(value["execution_lock"]),
-        task_targets=tuple(tuple(item) for item in value["task_targets"]))
+    )
 
 
 def _block(value):
@@ -60,7 +60,6 @@ def _block(value):
         nodes=tuple(_node(v) for v in value["nodes"]),
         routes=tuple(_record(v, m.RoutePlan, condition=_condition(v["condition"])) for v in value["routes"]),
         order=tuple(value["order"]), entries=tuple(value["entries"]), exits=tuple(value["exits"]),
-        tasks=tuple(_record(v, m.TaskPlan) for v in value["tasks"]),
         loop=_loop(value["loop"]), execution_lock=_lock(value["execution_lock"]))
 
 
@@ -86,10 +85,6 @@ def workflow_plan_from_dict(value: Mapping[str, object]) -> m.WorkflowPlan:
                 raise m.PortablePlanError(f"block '{block.id}' route names an unknown node")
             if any(node.child_block and node.child_block not in blocks for node in block.nodes):
                 raise m.PortablePlanError(f"block '{block.id}' names an unknown child block")
-            if any(target not in blocks for node in block.nodes for _, target in node.task_targets):
-                raise m.PortablePlanError(f"block '{block.id}' names an unknown task target")
-            if any(task.block_id not in blocks or task.manager_node_id not in ids for task in block.tasks):
-                raise m.PortablePlanError(f"block '{block.id}' task names an unknown block or manager")
         return plan
     except (KeyError, TypeError, AttributeError) as exc:
         raise m.PortablePlanError(f"invalid workflow plan: {exc}") from exc
@@ -118,20 +113,15 @@ def workflow_subplan(plan: m.WorkflowPlan, entry_block: str) -> m.WorkflowPlan:
         for call in plan.block(key).nodes:
             if call.child_block:
                 collect(call.child_block)
-            for _, target in call.task_targets:
-                collect(target)
     collect(entry_block)
     ids = {block.id:_block_id(block.path[len(prefix):]) for block in plan.blocks if block.id in included}
     blocks = []
     for block in plan.blocks:
         if block.id not in included:
             continue
-        calls = tuple(replace(call, child_block=ids[call.child_block] if call.child_block else '',
-            task_targets=tuple((key,ids[target]) for key,target in call.task_targets)) for call in block.nodes)
-        tasks = tuple(replace(task,id=f'{ids[block.id]}:task:{task.manager_node_id}:{task.key}',
-            block_id=ids[task.block_id]) for task in block.tasks)
+        calls = tuple(replace(call, child_block=ids[call.child_block] if call.child_block else '') for call in block.nodes)
         lock = replace(block.execution_lock,scope='root') if block.id == entry_block and block.execution_lock else block.execution_lock
-        blocks.append(replace(block,id=ids[block.id],path=block.path[len(prefix):],nodes=calls,tasks=tasks,
+        blocks.append(replace(block,id=ids[block.id],path=block.path[len(prefix):],nodes=calls,
             kind='workflow' if block.id == entry_block else block.kind,
             loop=None if block.id == entry_block else block.loop,execution_lock=lock))
     entry = next(block for block in blocks if block.id == ids[entry_block])

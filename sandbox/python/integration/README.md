@@ -17,8 +17,8 @@ PYTHONPATH=src python sandbox/python/integration/run_all.py
 - 确认审核结果不发布中间 `.mmd`、provenance sidecar 或嵌入式 provenance metadata。
 - 对专用可视化 fixture 先执行真实 `validate` 并要求严格 `PASS`，再执行 `export-svg --expand-nodesets`：确认 external node 同时保留颜色 class、`[EXTERNAL]` 标题和 `7px` non-scaling 粗边框；同一父图中的四个 loop 调用全部连接到同一个 `end`，共享的 nodeset body 只生成一个带调用摘要的详情 fragment。
 - 独立 comprehensive_math 通过注入的 `vibeflow.port` 验证 Python `receive → 两层 Nodeset/数学 Node/BaseLib/Loop → send`，同时检查计算结果、发送值、准确 warning 详情以及修正源码后的 warning 消失。
-- 执行模型专项用例验证普通 Python Node 留在 `MainThread`，`async: result_key` Node 确实进入 `ThreadPoolExecutor` 且 `runtime.run()` 会阻塞到 join；portable plan 同时核对 `immediate/inline/current`、`deferred/thread` 和 `detached/thread`。线程池边界覆盖三任务并行、`async_max_workers: 1` 的排队，以及 `0`、负数、布尔值和小数 worker 数被拒绝。
-- `fail_async_result_key_missing.jsonc` 验证 `result_key` 未出现在 `provides` 时配置阶段失败；原有 result_key join、detached 完成和 trace 用例继续验证图内可见的异步分路。
+- 执行模型专项验证单个就绪节点可在调用线程执行；独立 graph_concurrency 沙箱验证 12 个普通分支同时就绪、独立执行并统一 all 汇合，覆盖 plan/block/compiled 与 AOT，无并发数量设置。
+- 旧 async/result_key/detached 字段必须报迁移错误；正向示例只使用普通节点和显式下游边。
 - 在全部 case 结束后集中审计所有发布 SVG：`reports/svg` 必须逐一对应 health 无 error 的合法 case，成功运行目录必须包含 `PASS/CONCERNS` 且 errors 为空的 `health_report.json`，review SVG 必须带有各自的成功校验结果。只有 `expected_fail_*` / `expected_runtime_fail_*` 明确错误路径下的诊断 SVG 可以豁免。
 - 独立 [cli_addition](../cli_addition/README.md) 使用 YAML、pathlib、标准流三个适配配置执行 `2+3+4=9`。精确检查 stdout/stderr、文件字节、退出码、效果范围、执行次数、日志隔离和架构导出无业务副作用。
 - 独立 [object_addition](../object_addition/README.md) 用 Box 和 Counter 做连续加法，检查原对象身份、非 JSON 报告、Nodeset 导出、绑定参数、固定与条件循环，以及 plan/block/compiled 执行。

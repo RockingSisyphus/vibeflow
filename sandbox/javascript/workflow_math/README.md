@@ -9,7 +9,7 @@
 | nested_loop | 从 4 开始，外层两次、内层三次，每次加 1：10；六次 increment、八个内外层迭代事件 |
 | edge_roles | 10 加 1 再乘 2：22；调度边不传送 999，数据边不提前触发消费者；实际顺序正确 |
 | nested_async | 两层 Nodeset 内 `7*2=14`；deferred/detached 计划与完整路径正确；保留超时诊断和失败后复用检查 |
-| task_metadata | 同步 `(10+8)-3=15`、等待能力后 `6*2=12`；区分同步返回与 Promise，核对 TaskPlan 与 event_loop executor；数据释放前不得完成 |
+| task_metadata | 同步 `(10+8)-3=15`、等待能力后 `6*2=12`；区分同步返回与 Promise，核对 ordinary Node 与 event_loop executor；数据释放前不得完成 |
 | loop_max_failure | 从 1 开始加 1，目标无法在两次内达到；应报 VF_MAX_STEPS，错误包含 workflow/节点/块路径，end 不执行 |
 | trace_matrix | 同一 nested_override 构建分别 full/boundary/off 调用，数字不变；full 有节点事件，boundary 保留 Nodeset 边界，off 不输出事件 |
 | conditional_routes | `receive_event → finish_call` 同时声明 `done` 和 `failed` 两条条件边；两个状态均得到 `42+1=43`，收尾节点恰好执行一次。同步/异步各检查原顺序、反顺序、完全重复边及条件重叠；未知状态作为对照，只有重叠条件明确覆盖时才执行 |

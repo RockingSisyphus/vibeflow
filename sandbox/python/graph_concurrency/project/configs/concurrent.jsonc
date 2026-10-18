@@ -1,0 +1,225 @@
+{
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugin.py"
+      }
+    }
+  ],
+  "rulesets": [],
+  "pipeline": {
+    "entry_mode": "sync",
+    "inputs": [
+      {
+        "key": "scenario",
+        "type": "scenario",
+        "required": true,
+        "display_name": "Scenario"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "report",
+        "cardinality": "exactly_one",
+        "as": "report",
+        "display_name": "Report"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "type_used": "native.terminal",
+        "display_name": "start",
+        "description": "Explicit graph call"
+      },
+      {
+        "id": "w0",
+        "type_used": "native.worker0",
+        "display_name": "w0",
+        "description": "Explicit graph call"
+      },
+      {
+        "id": "w1",
+        "type_used": "native.worker1",
+        "display_name": "w1",
+        "description": "Explicit graph call"
+      },
+      {
+        "id": "w2",
+        "type_used": "native.worker2",
+        "display_name": "w2",
+        "description": "Explicit graph call"
+      },
+      {
+        "id": "w3",
+        "type_used": "native.worker3",
+        "display_name": "w3",
+        "description": "Explicit graph call"
+      },
+      {
+        "id": "w4",
+        "type_used": "native.worker4",
+        "display_name": "w4",
+        "description": "Explicit graph call"
+      },
+      {
+        "id": "w5",
+        "type_used": "native.worker5",
+        "display_name": "w5",
+        "description": "Explicit graph call"
+      },
+      {
+        "id": "w6",
+        "type_used": "native.worker6",
+        "display_name": "w6",
+        "description": "Explicit graph call"
+      },
+      {
+        "id": "w7",
+        "type_used": "native.worker7",
+        "display_name": "w7",
+        "description": "Explicit graph call"
+      },
+      {
+        "id": "w8",
+        "type_used": "native.worker8",
+        "display_name": "w8",
+        "description": "Explicit graph call"
+      },
+      {
+        "id": "w9",
+        "type_used": "native.worker9",
+        "display_name": "w9",
+        "description": "Explicit graph call"
+      },
+      {
+        "id": "w10",
+        "type_used": "native.worker10",
+        "display_name": "w10",
+        "description": "Explicit graph call"
+      },
+      {
+        "id": "w11",
+        "type_used": "native.worker11",
+        "display_name": "w11",
+        "description": "Explicit graph call"
+      },
+      {
+        "id": "collect",
+        "type_used": "native.collect",
+        "display_name": "collect",
+        "description": "Explicit graph call",
+        "join_policy": "all"
+      },
+      {
+        "id": "end",
+        "type_used": "native.terminal",
+        "display_name": "end",
+        "description": "Explicit graph call"
+      }
+    ],
+    "edges": [
+      [
+        "start",
+        "w0"
+      ],
+      [
+        "start",
+        "w1"
+      ],
+      [
+        "start",
+        "w2"
+      ],
+      [
+        "start",
+        "w3"
+      ],
+      [
+        "start",
+        "w4"
+      ],
+      [
+        "start",
+        "w5"
+      ],
+      [
+        "start",
+        "w6"
+      ],
+      [
+        "start",
+        "w7"
+      ],
+      [
+        "start",
+        "w8"
+      ],
+      [
+        "start",
+        "w9"
+      ],
+      [
+        "start",
+        "w10"
+      ],
+      [
+        "start",
+        "w11"
+      ],
+      [
+        "w0",
+        "collect"
+      ],
+      [
+        "w1",
+        "collect"
+      ],
+      [
+        "w2",
+        "collect"
+      ],
+      [
+        "w3",
+        "collect"
+      ],
+      [
+        "w4",
+        "collect"
+      ],
+      [
+        "w5",
+        "collect"
+      ],
+      [
+        "w6",
+        "collect"
+      ],
+      [
+        "w7",
+        "collect"
+      ],
+      [
+        "w8",
+        "collect"
+      ],
+      [
+        "w9",
+        "collect"
+      ],
+      [
+        "w10",
+        "collect"
+      ],
+      [
+        "w11",
+        "collect"
+      ],
+      [
+        "collect",
+        "end"
+      ]
+    ]
+  }
+}

@@ -6,12 +6,11 @@ from vibeflow.targets.javascript.quality.rules import node_type_calls, source_no
 
 
 @pytest.mark.parametrize("status", ["planned", "implemented"])
-def test_task_declaration_owners_cover_sources_without_activating_planned_calls(status):
+def test_nodeset_declaration_owners_cover_sources_without_activating_planned_calls(status):
     body = NodesetSpec("example.body", "Body", "Source audit fixture", (), (),
         GraphConfig(nodes=(NodeSpec("worker", "example.worker"),
                           NodeSpec("future", "example.future", status="planned"))))
-    graph = GraphConfig(nodes=(NodeSpec("manage", "example.manager", status=status,
-        flow_kind="task_manager", task_targets={"work":NodeSpec("body", "example.body")}),),
+    graph = GraphConfig(nodes=(NodeSpec("body", "example.body", status=status),),
         nodesets={"example.body":body})
     calls = node_type_calls(graph)
     sources = source_node_calls(graph)
@@ -21,4 +20,4 @@ def test_task_declaration_owners_cover_sources_without_activating_planned_calls(
         assert sources == {"example.worker":[]}
     else:
         assert sources == calls
-        assert sources["example.worker"] == [("manage", "tasks", "work", "body", "worker")]
+        assert sources["example.worker"] == [("body", "worker")]

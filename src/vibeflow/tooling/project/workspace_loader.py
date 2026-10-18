@@ -340,7 +340,6 @@ def _project_runtime_options(
             {"path": str(path)},
         )
     allowed = {
-        "async_max_workers",
         "nodeset_max_depth",
         "status_interval",
         "status_file",
@@ -370,7 +369,7 @@ def _project_runtime_value(name: str, value: object, *, path: Path) -> object:
             return value
         raise WorkspaceConfigError("WORKSPACE.PROJECT_CONFIG.RUNTIME",
                                    "runtime.status_interval must be positive finite seconds", {"path": str(path)})
-    if name in {"async_max_workers", "nodeset_max_depth"}:
+    if name in {"nodeset_max_depth"}:
         if isinstance(value, int) and not isinstance(value, bool) and value > 0:
             return value
         raise WorkspaceConfigError(

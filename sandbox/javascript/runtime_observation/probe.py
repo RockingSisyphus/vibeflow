@@ -25,7 +25,7 @@ export const calculate = defineNode({type_key: "monitor.calculate", rulesets: ["
   info[0].metrics.loss = 999;
   console.log("js-business-stdout");
   console.error("js-business-stderr");
-  const deadline = Date.now() + 250;
+  const deadline = Date.now() + 750;
   while (Date.now() < deadline) { /* Deliberately block the main event loop. */ }
   if (inputs["monitor.number"].value < 0) throw new Error("sandbox JS failed");
   return {result: inputs["monitor.number"].value + 1};

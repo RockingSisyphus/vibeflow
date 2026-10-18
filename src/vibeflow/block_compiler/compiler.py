@@ -23,7 +23,6 @@ from vibeflow.block_compiler.model import (
     PortablePlanError,
     RoutePlan,
     SourceRef,
-    TaskPlan,
     WorkflowPlan,
     freeze_json_object,
 )
@@ -80,7 +79,6 @@ def compile_workflow(
     implementation_facts: ImplementationFacts,
     *,
     call_execution_facts: Mapping[tuple[str, ...], object] | None = None,
-    task_executor: str = "thread",
 ) -> WorkflowPlan:
     """Compile a validated workflow using static Target implementation facts."""
 
@@ -102,7 +100,7 @@ def compile_workflow(
         implementation_facts=implementation_facts,
         call_execution_facts=call_execution_facts,
         target_features=workflow.target_features,
-        compile_nested=True, task_executor=task_executor,
+        compile_nested=True,
     )
 
 
@@ -120,7 +118,6 @@ def compile_graph_plan(
     call_execution_facts: Mapping[tuple[str, ...], object] | None = None,
     target_features: TargetFeatureSet | None = None,
     compile_nested: bool = False,
-    task_executor: str = "thread",
 ) -> WorkflowPlan:
     """Assemble canonical IR from a Core graph compilation."""
 
@@ -133,7 +130,7 @@ def compile_graph_plan(
         implementation_facts=implementation_facts,
         call_execution_facts=call_execution_facts,
         target_features=target_features,
-        compile_nested=compile_nested, task_executor=task_executor,
+        compile_nested=compile_nested,
     )
     root_id = _block_id(())
     state.add_graph_block(
@@ -175,7 +172,6 @@ class _PlannerState:
         call_execution_facts: Mapping[tuple[str, ...], object] | None = None,
         target_features: TargetFeatureSet | None = None,
         compile_nested: bool = False,
-        task_executor: str = "thread",
     ) -> None:
         self.implementation_facts = implementation_facts or ImplementationFacts()
         self.call_execution_facts = dict(call_execution_facts or {})
@@ -188,9 +184,6 @@ class _PlannerState:
         }
         self.target_features = target_features or TargetFeatureSet()
         self.compile_nested = compile_nested
-        if task_executor not in {"thread", "event_loop"}:
-            raise PortablePlanError("task executor must be thread or event_loop")
-        self.task_executor = task_executor
         self.blocks: list[BlockPlan] = []
 
     def add_graph_block(
@@ -227,7 +220,6 @@ class _PlannerState:
             ]
         ] = []
         nodes: list[NodeCallPlan] = []
-        task_children = []
         for spec in graph.nodes:
             is_loop = spec.type_used in LOOP_NODE_TYPES
             is_nodeset = spec.type_used in graph.nodesets and not is_loop
@@ -271,19 +263,6 @@ class _PlannerState:
                 node_lock_key,
                 subject=f"node {'.'.join(child_path)}",
             )
-            targets = []
-            from vibeflow.core.tasks import task_graph
-            for key, target in (() if spec.status == STATUS_PLANNED else spec.task_targets.items()):
-                target_path = (*path, spec.id, "tasks", key)
-                target_graph = task_graph(graph, target)
-                target_compiled = self.compiled_by_path.get(target_path)
-                if target_compiled is None:
-                    target_compiled = CoreGraphCompiler().compile(target_graph,
-                        implementation_facts=self.implementation_facts,
-                        target_features=self.target_features)
-                targets.append((key, _block_id(target_path)))
-                task_children.append((node_index, target_graph, target_compiled, target_path, child_lock_key))
-            node_plan = replace(node_plan, task_targets=tuple(targets))
             nodes.append(node_plan)
             if not has_child or nodeset is None:
                 continue
@@ -327,7 +306,6 @@ class _PlannerState:
                 loop=loop,
                 nodes=tuple(nodes),
                 execution_lock=block_lock,
-                task_executor=self.task_executor,
             )
         )
         for (
@@ -354,12 +332,6 @@ class _PlannerState:
                     nodes[node_index],
                     contains_global_state=True,
                 )
-        for node_index, target_graph, target_compiled, target_path, task_lock_key in task_children:
-            task_global_state = self.add_graph_block(target_graph, target_compiled, path=target_path,
-                kind="task", loop=None, active_nodesets=active_nodesets,
-                inherited_lock_key=task_lock_key)
-            if task_global_state:
-                nodes[node_index] = replace(nodes[node_index], contains_global_state=True)
         contains_global_state = any(
             node.contains_global_state for node in nodes
         )
@@ -372,7 +344,6 @@ class _PlannerState:
             nodes=tuple(nodes),
             execution_lock=block_lock,
             contains_global_state=contains_global_state,
-            task_executor=self.task_executor,
         )
         return contains_global_state
 
@@ -475,13 +446,12 @@ def _block(
     nodes: tuple[NodeCallPlan, ...],
     execution_lock: ExecutionLockPlan | None = None,
     contains_global_state: bool = False,
-    task_executor: str = "thread",
 ) -> BlockPlan:
     routes = _routes(compiled)
     incoming = {route.target for route in routes if route.schedule}
     outgoing = {route.source for route in routes if route.schedule}
     terminal_by_id = {node.id: node.is_terminal for node in nodes}
-    entries = (graph.task_entry,) if graph.task_entry else tuple(node_id for node_id in compiled.order if node_id not in incoming and terminal_by_id.get(node_id, False))
+    entries = tuple(node_id for node_id in compiled.order if node_id not in incoming and terminal_by_id.get(node_id, False))
     exits = tuple(node_id for node_id in compiled.order if node_id not in outgoing and terminal_by_id.get(node_id, False))
     return BlockPlan(
         id=_block_id(path),
@@ -496,10 +466,6 @@ def _block(
         entries=entries,
         exits=exits,
         max_steps=graph.max_steps,
-        tasks=tuple(TaskPlan(id=f"{_block_id(path)}:task:{node.id}:{key}",
-            manager_node_id=node.id, key=key, block_id=target,
-            executor=task_executor)
-            for node in nodes for key, target in node.task_targets),
         loop=loop,
         execution_lock=(
             execution_lock

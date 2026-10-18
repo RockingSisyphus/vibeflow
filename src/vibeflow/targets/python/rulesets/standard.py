@@ -3,7 +3,7 @@ from vibeflow.core.rules import RuleCall, RuleRelation, RulesetDescriptor
 
 
 def standard_rulesets():
-    scopes = {"task_manager": "none", "process": "none", "io": "terminal", "python_io": "python_io", "document": "python_io",
+    scopes = {"process": "none", "io": "terminal", "python_io": "python_io", "document": "python_io",
               "data_store": "python_io", "global_state": "global_state", "base_lib": "none"}
     rulesets = []
     for name, scope in scopes.items():

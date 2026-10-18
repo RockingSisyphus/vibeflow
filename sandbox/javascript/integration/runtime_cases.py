@@ -231,7 +231,8 @@ for (const failure of [missing, preCancelled, liveCancelled, wrongOutput]) {
 }
 assert(missing.nodePath === "", JSON.stringify(missing));
 assert(preCancelled.nodePath === "", JSON.stringify(preCancelled));
-assert(liveCancelled.nodePath === "read", JSON.stringify(liveCancelled));
+// Either concurrently running invocation may observe the shared cancellation first.
+assert(["read", "double"].includes(liveCancelled.nodePath), JSON.stringify(liveCancelled));
 assert(wrongOutput.nodePath === "read", JSON.stringify(wrongOutput));
 assert(missingTrace.length === 0, JSON.stringify(missingTrace));
 assert(preTrace.length === 0, JSON.stringify(preTrace));
