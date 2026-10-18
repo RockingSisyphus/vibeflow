@@ -11,6 +11,14 @@ on:
         description: Full commit SHA already verified for this tag
         required: true
         type: string
+      collaborative_blob:
+        description: Git blob SHA containing the verified collaborative ZIP
+        required: true
+        type: string
+      autonomous_blob:
+        description: Git blob SHA containing the verified autonomous ZIP
+        required: true
+        type: string
       collaborative_sha256:
         description: SHA256 of the verified collaborative ZIP
         required: true
@@ -33,6 +41,8 @@ jobs:
       PYTHONDONTWRITEBYTECODE: "1"
       RELEASE_TAG: ${{ inputs.tag }}
       EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+      COLLABORATIVE_BLOB: ${{ inputs.collaborative_blob }}
+      AUTONOMOUS_BLOB: ${{ inputs.autonomous_blob }}
       COLLABORATIVE_SHA256: ${{ inputs.collaborative_sha256 }}
       AUTONOMOUS_SHA256: ${{ inputs.autonomous_sha256 }}
     steps:
@@ -43,9 +53,6 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "24"
       - name: Check immutable source and verified inputs
         run: |
           python - <<'PY'
@@ -56,11 +63,21 @@ jobs:
           commit = os.environ["EXPECTED_COMMIT"]
           assert re.fullmatch(r"[0-9a-f]{40}", commit)
           assert subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip() == commit
+          for key in ("COLLABORATIVE_BLOB", "AUTONOMOUS_BLOB"):
+              assert re.fullmatch(r"[0-9a-f]{40}", os.environ[key])
           for key in ("COLLABORATIVE_SHA256", "AUTONOMOUS_SHA256"):
               assert re.fullmatch(r"[0-9a-f]{64}", os.environ[key])
           PY
-      - name: Build both profiles
-        run: python distribution/build.py
+      - name: Retrieve the original verified archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          version="${RELEASE_TAG#v}"
+          gh api "repos/${GH_REPO}/git/blobs/${COLLABORATIVE_BLOB}" --jq .content | base64 --decode > "dist/vibeflow-distribution-${version}.zip"
+          gh api "repos/${GH_REPO}/git/blobs/${AUTONOMOUS_BLOB}" --jq .content | base64 --decode > "dist/vibeflow-distribution-autonomous-${version}.zip"
       - name: Require byte-identical verified packages
         run: |
           python - <<'PY'
@@ -89,6 +106,7 @@ jobs:
           verify_dir="${RUNNER_TEMP}/release-verification"
           gh release download "$RELEASE_TAG" --dir "$verify_dir"
           cd "$verify_dir"
+          cmp "${GITHUB_WORKSPACE}/dist/SHA256SUMS-${version}.txt" "SHA256SUMS-${version}.txt"
           sha256sum -c "SHA256SUMS-${version}.txt"
           gh release edit "$RELEASE_TAG" --draft=false --latest
           gh release view "$RELEASE_TAG" --json url,isDraft,assets
