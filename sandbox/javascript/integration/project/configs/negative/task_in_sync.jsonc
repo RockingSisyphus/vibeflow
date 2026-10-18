@@ -14,21 +14,13 @@
         "id": "start",
         "type_used": "sandbox.terminal",
         "display_name": "Start",
-        "description": "Starts the invalid sync TaskPlan fixture."
+        "description": "Starts the invalid sync ordinary Node fixture."
       },
       {
         "id": "invalid",
-        "type_used": "task.launch.sandbox_async_double.waited",
-        "display_name": "Task manager in sync",
-        "description": "Cannot launch workflow tasks from a synchronous JS workflow.",
-        "task_targets": {
-          "work": {
-            "id": "work",
-            "type_used": "sandbox.math",
-            "display_name": "Deferred node in sync workflow",
-            "description": "Must fail because a sync entry cannot contain a deferred TaskPlan."
-          }
-        }
+        "type_used": "sandbox.async_double",
+        "display_name": "invalid",
+        "description": "Executes the declared ordinary workflow node."
       },
       {
         "id": "end",
@@ -49,7 +41,7 @@
     ],
     "outputs": [
       {
-        "type": "sandbox.math.result",
+        "type": "sandbox.async.value",
         "cardinality": "exactly_one",
         "display_name": "Result",
         "as": "result"

@@ -85,14 +85,10 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         self._trace_sink: RuntimeTraceSink | None = None
         self._trace_path_prefix: tuple[str, ...] = ()
         self._capabilities = dict(capabilities or {})
-        from .tasks import TaskRegistry, CancellationSignal
-        self._tasks = TaskRegistry(self)
+        from .lifecycle import CancellationSignal
         self._signal = CancellationSignal()
-        self._current_task = None
-        self._owns_task_scope = True
-        self._owns_tasks = True
+        self._owns_run = True
         self._has_run = False
-        self._task_outputs = {}
         self._reset_execution_lock_state()
 
     def _assert_planned_runtime_allowed(self, graph: GraphConfig) -> None:
@@ -126,12 +122,8 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         runtime.runtime_options = parent.runtime_options
         runtime.delegate_cli = parent.delegate_cli
         runtime._capabilities = parent._capabilities
-        runtime._tasks = parent._tasks
         runtime._signal = parent._signal
-        runtime._current_task = parent._current_task
-        runtime._owns_task_scope = False
-        runtime._owns_tasks = False
-        runtime._task_outputs = {}
+        runtime._owns_run = False
         runtime._reset_execution_lock_state()
         return runtime
 
@@ -141,7 +133,7 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
 
     def run(self, initial: Mapping[str, Any] | None = None) -> RunResult:
         factory = getattr(self, "_runtime_plugin_factory", None)
-        if factory is None or not self._owns_tasks:
+        if factory is None or not self._owns_run:
             return self._run_with_observation(initial)
         from vibeflow.targets.python.sdk.loading import source_paths
         from vibeflow.targets.python.project.plugins import plugin_lifetime
@@ -162,11 +154,11 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
                 return self._run_with_observation(initial)
 
     def _run_with_observation(self, initial: Mapping[str, Any] | None = None) -> RunResult:
-        if not self._owns_tasks:
+        if not self._owns_run:
             return self._run_observed(initial)
         if self._has_run:
-            from .tasks import TaskRegistry, CancellationSignal
-            self._tasks, self._signal = TaskRegistry(self), CancellationSignal()
+            from .lifecycle import CancellationSignal
+            self._signal = CancellationSignal()
         self._has_run = True
         with observe_run(self._run_dir, self.runtime_options) as observer:
             observer.configure(self.runtime_options)
@@ -193,7 +185,7 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
             lease_started = True
             self._validate_public_inputs(initial_values)
             self._record_run_boundary("run_start")
-            if self._owns_tasks:
+            if self._owns_run:
                 self._call_runtime_plugins("before_run", dict(initial_values))
             if self.runtime_options.execution == "compiled":
                 run_compiled_steps(self, state)
@@ -202,20 +194,15 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
             else:
                 self._run_steps(state)
             self._signal.throw_if_aborted()
-            if self._owns_task_scope:
-                self._tasks.drain(self._current_task)
-            self._signal.throw_if_aborted()
             self.trace.stop_reason = self.trace.stop_reason or "completed"
             self._finalize_pipeline_outputs(state)
             self._record_run_boundary("run_end")
             self._write_trace(state.result)
-            if self._owns_tasks:
+            if self._owns_run:
                 self._call_runtime_plugins("after_run", state.result.to_dict(), self.trace.to_dict())
         except DelegateCliExit as exc:
             try:
-                if self._owns_task_scope:
-                    self._signal.request_stop("business exit")
-                    self._tasks.drain(self._current_task)
+                self._signal.request_stop("business exit")
             except BaseException as cleanup:
                 primary_error = cleanup
                 cleanup.business_exit = {"exit_code":exc.exit_code,"source":exc.source}
@@ -232,25 +219,11 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
             self._write_trace(state.result)
         except BaseException as exc:
             primary_error = exc
-            if self._owns_task_scope:
-                self._signal.request_stop("workflow failed")
-                try:
-                    self._tasks.drain(self._current_task)
-                except BaseException as cleanup:
-                    exc.add_note(str(cleanup))
-                    exc.cleanup_errors = [*getattr(exc, "cleanup_errors", ()), cleanup]
+            self._signal.request_stop("workflow failed")
             self._record_runtime_failure(state, exc)
             raise
         finally:
             try:
-                if self._owns_tasks:
-                    try:
-                        self._tasks.close()
-                    except BaseException as cleanup:
-                        if primary_error is None:
-                            raise
-                        primary_error.add_note(str(cleanup))
-                        primary_error.cleanup_errors = [*getattr(primary_error, "cleanup_errors", ()), cleanup]
                 if self.trace.exception:
                     self._record_global_state_change_warning(self.trace.exception)
             finally:
@@ -286,7 +259,7 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         self.trace.exception = str(exc)
         self._record_global_state_change_warning(str(exc))
         self._write_trace(state.result)
-        if self._owns_tasks:
+        if self._owns_run:
             try:
                 self._call_runtime_plugins("run_failed", state.result.to_dict(), self.trace.to_dict(), str(exc))
             except BaseException as cleanup:
@@ -332,32 +305,8 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         return self._run_dir / "runtime_trace.jsonl"
 
     def _run_steps(self, state: _RuntimeState) -> None:
-        ready = list(self._initial_ready_nodes(state))
-        queued = set(ready)
-        for _ in range(self._plan.max_steps):
-            if not ready:
-                self.trace.stop_reason = "no_ready_nodes"
-                return
-            node_name = ready.pop(0)
-            queued.discard(node_name)
-            if not self._requirements_available(node_name, state):
-                continue
-            outputs = self._run_node(node_name, state)
-            self.trace.step_count += 1
-            self._clear_conditional_outgoing(node_name, state)
-            active_edges = self._activated_edges(node_name, outputs, state)
-            for edge in active_edges:
-                self._activate_edge(edge, state)
-            for target in self._scheduled_targets(node_name, active_edges):
-                if target not in queued:
-                    ready.append(target)
-                    queued.add(target)
-            self._deliver_transfer_edges(node_name, outputs, state)
-            if self._is_end_terminal(node_name):
-                self.trace.stop_reason = "completed"
-                return
-        self.trace.stop_reason = "max_steps"
-        raise PipelineRuntimeError(f"pipeline exceeded max_steps={self._plan.max_steps}")
+        from .scheduler import run_graph
+        run_graph(self, state)
 
     def _run_block_steps(self, state: _RuntimeState) -> None:
         block = graph_block(self._plan)
@@ -378,7 +327,7 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
             frame = self._frames[node_name]
             if frame.incoming:
                 continue
-            if not frame.is_terminal and node_name != self.graph.task_entry:
+            if not frame.is_terminal:
                 continue
             if self._requirements_available(node_name, state):
                 ready.append(node_name)
@@ -441,36 +390,8 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
                 values[str(value.get("key", ""))] = value.get("value")
         return values
 
-    def _run_node(self, node_name: str, state: _RuntimeState) -> Mapping[str, object]:
-        self._signal.throw_if_aborted()
-        self.trace.current_node = node_name
-        frame = self._frames[node_name]
-        inputs = self._resolve_inputs(frame, state)
-        state.last_inputs[node_name] = inputs
-        state.inboxes[node_name] = []
-        with self._frame_execution_scope(frame):
-            if frame.is_io:
-                outputs = self._run_io_node(frame, inputs)
-            elif frame.is_planned_stub:
-                outputs = self._run_planned_stub_node(frame, inputs)
-            elif frame.is_loop:
-                if self.runtime_options.execution == "block":
-                    outputs = self._run_loop_block_node(frame, inputs)
-                elif self.runtime_options.execution == "compiled" and loop_block(self._plan, frame.name) is not None:
-                    outputs = self._run_loop_block_node(frame, inputs)
-                else:
-                    outputs = self._run_loop_node(frame, inputs)
-            elif frame.is_nodeset:
-                if self.runtime_options.execution == "compiled" and nodeset_block(self._plan, frame.name) is not None:
-                    outputs = self._run_nodeset_block_node(frame, inputs)
-                else:
-                    outputs = self._run_nodeset_node(frame, inputs)
-            else:
-                outputs = self._run_pure_node(frame, inputs)
-        if self.graph.task_entry == frame.id:
-            self._task_outputs = dict(outputs)
-        self._record_node_output_candidates(node_name, outputs, state)
-        return outputs
+
+
 
 def _block_compile_error_details(plan: ExecutionPlan) -> str:
     findings = [item for item in explain_block_compilation(plan) if not bool(item.get("compiled"))]

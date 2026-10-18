@@ -72,7 +72,7 @@ def prepare_python_workflow(graph, compiled, *, registry, global_config=None, no
         workflow = compile_graph_plan(graph, compiled, implementation_facts=facts,
             compiled_by_path=compilations, params_by_path=parameters,
             target_features=TargetFeatureSet(target='python', features=frozenset({'execution_locks', 'global_state'})),
-            task_executor='thread')
+        )
     except ValueError as exc:
         raise PipelineRuntimeError(str(exc)) from exc
     return PreparedPythonWorkflow(workflow, graphs,
@@ -108,8 +108,6 @@ def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_reg
                 implementation_type = registry.get(call.type_used)
                 implementation = implementation_type()
                 accepts_context = len(signature(implementation.run_pure).parameters) == 3
-                if call.flow_kind == 'task_manager' and not accepts_context:
-                    raise PipelineRuntimeError('VF_TASK_CONTEXT_REQUIRED: task_manager must accept context')
             stub_path, stub_hash = '', ''
             if behavior.kind == 'python_stub':
                 path = resolve_stub_module_path(behavior.stub_module, graph.project_root)
@@ -138,7 +136,6 @@ def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_reg
                 nodeset_type_key=call.nodeset_type_key, exports=tuple(getattr(nodeset,'provides',())),
                 loop_spec=spec.loop, io_spec=spec.io, execution_lock=spec.execution_lock,
                 subplan=bind(call.child_block) if call.child_block else None,
-                task_plans={key:bind(target) for key,target in call.task_targets},
                 accepts_context=accepts_context, planned_behavior=behavior,
                 planned_stub_module=behavior.stub_module, planned_stub_path=stub_path, planned_stub_hash=stub_hash)
         bindings = build_python_binding_plan(frames, order=block.order, path=block.path,
@@ -148,7 +145,7 @@ def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_reg
             contains_global_state=block.contains_global_state,
             contains_execution_locks=bool(block.execution_lock) or any(
                 not frame.is_planned and (frame.execution_lock or (frame.subplan and frame.subplan.contains_execution_locks)
-                or any(child.contains_execution_locks for child in frame.task_plans.values())) for frame in frames.values()))
+                ) for frame in frames.values()))
         blocks = block_loader(plan, block_id) if block_loader is not None else compile_blocks(plan, runtime_options)
         entries = {item.entry:item for item in blocks}
         return replace(plan, blocks=blocks, block_by_entry=entries, compiled_blocks=blocks,

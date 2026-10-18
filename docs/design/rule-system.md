@@ -114,7 +114,7 @@ src/vibeflow/core/rules/
 
 读取器不执行规则；规划不解析语言源码。Python/JavaScript Target 提供语言事实、局部符号视图及实现绑定，消费相同选择和范围；不能各自再实现继承或接管。Tooling 负责配置、Plugin 装配、命令与报告投影，不增加隐式默认注入。
 
-JavaScript 的公开源码服务对未知路径报 `RULE.SOURCE.UNAVAILABLE`，不回退磁盘读取；有限图引用避免完整注册结构形成循环 JSON。Rule ABI 为 v2，Plugin ABI v3 与 Workflow ABI v7 继续承担各自原生协议。
+JavaScript 的公开源码服务对未知路径报 `RULE.SOURCE.UNAVAILABLE`，不回退磁盘读取；有限图引用避免完整注册结构形成循环 JSON。Rule ABI 为 v2，Plugin ABI v3 与 Workflow ABI v8 继续承担各自原生协议。
 
 ## 复用与可解释报告
 
@@ -136,6 +136,6 @@ JavaScript 的公开源码服务对未知路径报 `RULE.SOURCE.UNAVAILABLE`，�
 - 协作仍通过同范围 Records；缓存不会丢失诊断归属。
 - 用户手册只需解释公开用法；内部结构、缓存和维护取舍留在开发者文档。
 
-原生任务管理的源码使用检查与图关系检查沿用上述选择、范围与 Target 所有权；管理身份和运行控制接口不是规则授予的权限。具体归属检查入口、有限模式及运行器边界见[任务管理设计](task-management.md#规则与图形)。
+并发分支沿用普通节点的源码归属和图结构检查；规则不会授予节点启动或回收其他节点的接口。共享图协调器负责调度与清理，见[图并发设计](graph-concurrency.md)。
 
 若实践证据推翻关键假设，复核目标、剩余实现量、验证成本及维护负担。等价修复自主完成；需要改变用户可观察的替代、接管或资料边界时，先说明同一场景下的结果差异，再让用户判断，不以降低实现成本为由静默缩减目标。

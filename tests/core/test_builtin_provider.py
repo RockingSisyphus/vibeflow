@@ -21,8 +21,8 @@ def test_standard_definitions_are_owned_by_the_selected_target(target):
     catalogs = load_builtin_plugins(target).catalogs
     assert len(tuple(catalogs.rules)) == 27
     assert catalogs.rules.require("vibeflow.async_lifecycle").scope == "source"
-    assert len(tuple(catalogs.rulesets)) == 13
-    assert catalogs.rulesets.require("vibeflow.task_manager")
+    assert len(tuple(catalogs.rulesets)) == 12
+    assert "vibeflow.task_manager" not in {item.id for item in catalogs.rulesets}
     for group, directory, entries in (("rules", "rules", catalogs.rules),
                                       ("rulesets", "rulesets", catalogs.rulesets)):
         for entry in entries:

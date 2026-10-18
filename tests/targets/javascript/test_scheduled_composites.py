@@ -29,7 +29,7 @@ def _call(node_id, type_key, **options):
 def _body(input_type, output_type, leaf_type):
     return {"inputs": [{**_provides(input_type), "required": True}],
             "nodes": [_call("start", "fixture.terminal"), _call("calculate", leaf_type),
-                      _call("end", "fixture.terminal")],
+                      _call("end", "fixture.terminal",join_policy="all")],
             "edges": [["start", "calculate"], ["calculate", "end"]],
             "outputs": [{**_requires(output_type), "as": "answer" if leaf_type == "fixture.double" else output_type}]}
 
@@ -44,18 +44,6 @@ def test_native_composite_task_builds_and_returns_numeric_result(tmp_path, kind,
     for name in ("package.json", "package-lock.json"):
         shutil.copy2(toolchain / name, project / name)
     (project / "nodes.mjs").write_text('''
-export async function manager(inputs,params,context) {
- const ref=context.tasks.start('work',Object.fromEntries(Object.entries(inputs).map(([key,item])=>[key,item.value])));
- const result=(await context.tasks.waitAllExited([ref]))[0];
- if(result.status!=='succeeded')throw new Error(result.error.message);
- return {answer: Object.values(result.outputs)[0]};
-}
-export async function backgroundManager(inputs,params,context) {
- const ref=context.tasks.start('work',Object.fromEntries(Object.entries(inputs).map(([key,item])=>[key,item.value])));
- const result=(await context.tasks.waitAllExited([ref]))[0];
- if(result.status!=='succeeded')throw new Error(result.error.message);
- return {};
-}
 export function terminal() { return {}; }
 export function double(inputs) { return {answer: inputs["number.in"].value * 2}; }
 export function mainline(inputs) { return {"mainline.answer": inputs["number.in"].value * 2}; }
@@ -77,9 +65,6 @@ export function increment(inputs) { return {"loop.next": inputs["loop.current"].
             "implementations": [{"language": "javascript", "targets": ["node"], "completion": "immediate",
                 "source": {"kind": "file", "ref": "nodes.mjs", "export": export}}]})
     input_type, output_type = ("number.in", "number.out") if kind=="nodeset" else ("loop.current", "loop.final")
-    resources.append({"kind":"node","type_key":"fixture.manager","display_name":"Manager","description":"Starts a declared composite task","version":"1","flow_kind":"task_manager","rulesets":[],
-        "contract":{"requires":[_requires(input_type)],"input_semantics":{input_type:["Task input"]},"output_semantics":{"answer":["Task output"]} if mode=="join" else {},"provides":[_provides("answer",output_type)] if mode=="join" else [],"params_schema":{"join":{"type":"boolean"}},"params_defaults":{"join":mode=="join"}},
-        "implementations":[{"language":"javascript","targets":["node"],"completion":"suspend","source":{"kind":"file","ref":"nodes.mjs","export":"manager" if mode=="join" else "backgroundManager"}}]})
     selection = write_plugin(project, resources, target="javascript")
     project_config = project / "vibeflow_project.jsonc"
     project_config.write_text(json.dumps({"project_target": "javascript", "quality_enabled": False,
@@ -99,8 +84,8 @@ export function increment(inputs) { return {"loop.next": inputs["loop.current"].
                 "carry": [{"from": "loop.current", "as": "loop.current", "update": "loop.next"}],
                 "outputs": [{"from": "loop.current", "as": "loop.final"}]})
     calls = [_call("start", "fixture.terminal"),
-             _call("composite", "fixture.manager", task_targets={"work":_call("execute","fixture.body" if kind == "nodeset" else "vibeflow.loop.while", **call_options)}),
-             _call("end", "fixture.terminal")]
+             _call("composite", "fixture.body" if kind == "nodeset" else "vibeflow.loop.while", **call_options),
+             _call("end", "fixture.terminal",join_policy="all")]
     edges = [["start", "composite"], ["composite", "end"]]
     public_type = "number.out" if kind == "nodeset" else "loop.final"
     if mode == "background":
@@ -118,8 +103,7 @@ export function increment(inputs) { return {"loop.next": inputs["loop.current"].
     result = build_project_aot(ProjectBuildRequest(workspace=workspace, config=config,
         out_dir=tmp_path / "dist", target="node", profile="single-esm"))
     root = result.prepared.plan.block(result.prepared.plan.entry_block)
-    assert root.node("composite").executor == "event_loop"
-    assert root.tasks[0].executor == "event_loop"
+    assert root.node("composite").child_block
     assert root.node("start").executor == root.node("end").executor == "current"
     runtime_inputs = {input_type: 2}
     if mode == "background" and kind == "loop":
@@ -134,6 +118,4 @@ console.log(JSON.stringify({{outputs, tasks: trace.filter(item => item.kind.star
         cwd=tmp_path, capture_output=True, text=True, check=True)
     observed = json.loads(completed.stdout)
     assert observed["outputs"] == {"result": 5 if kind == "loop" and mode == "join" else 4}
-    expected = ("task_started", "task_exited")
-    assert {item["kind"] for item in observed["tasks"]} == set(expected), observed["tasks"]
-    assert all(item["nodePath"] == "composite" for item in observed["tasks"])
+    assert observed["tasks"] == []

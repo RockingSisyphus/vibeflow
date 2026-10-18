@@ -112,12 +112,12 @@ def test_portable_plan_reading_preserves_tasks_and_rejects_old_abi():
 
 
 @pytest.mark.parametrize('execution', ('plan','block','compiled'))
-@pytest.mark.parametrize('configuration', ('tasks','nested','nested_manager','launch_only'))
+@pytest.mark.parametrize('configuration', ('concurrent',))
 def test_task_sandbox_runs_from_a_moved_bundle(tmp_path, execution, configuration):
     from vibeflow.tooling.project.workspace_loader import load_workspace_config
     repository = Path(__file__).resolve().parents[3]
     source = tmp_path/'source'
-    shutil.copytree(repository/'sandbox/python/task_management',source,ignore=shutil.ignore_patterns('__pycache__','runs'))
+    shutil.copytree(repository/'sandbox/python/graph_concurrency',source,ignore=shutil.ignore_patterns('__pycache__','runs'))
     workspace = load_workspace_config(source/'vibeflow_config.jsonc')
     config = source/'project/configs'/f'{configuration}.jsonc'
     build_python_aot(PythonBuildRequest(workspace,config,tmp_path/'bundle'))
@@ -127,7 +127,7 @@ def test_task_sandbox_runs_from_a_moved_bundle(tmp_path, execution, configuratio
         runtime_options={'execution':execution,'trace':'full'})
     assert result.context.get('runtime.stop_reason') == 'completed'
     trace = (result.run_dir/'runtime_trace.jsonl').read_text()
-    assert 'task_started' in trace and 'task_exited' in trace
+    assert 'worker_started' in trace and 'cleanup_finished' in trace
 
 
 def test_runtime_plugin_is_created_per_run_and_disposed_after_success(tmp_path):
@@ -153,18 +153,18 @@ def create(context):
     assert marker.read_text().splitlines() == ['create','before','dispose'] * 2
 
 
-def test_bundle_failure_keeps_managed_tasks_until_they_exit(tmp_path):
+def test_bundle_failure_keeps_ordinary_workers_until_they_exit(tmp_path):
     from vibeflow.tooling.project.workspace_loader import load_workspace_config
     repository = Path(__file__).resolve().parents[3]
     source = tmp_path/'source'
-    shutil.copytree(repository/'sandbox/python/task_management',source,ignore=shutil.ignore_patterns('__pycache__','runs'))
-    config = source/'project/configs/tasks.jsonc'
+    shutil.copytree(repository/'sandbox/python/graph_concurrency',source,ignore=shutil.ignore_patterns('__pycache__','runs'))
+    config = source/'project/configs/concurrent.jsonc'
     build_python_aot(PythonBuildRequest(load_workspace_config(source/'vibeflow_config.jsonc'),config,tmp_path/'bundle'))
     shutil.rmtree(source)
     with pytest.raises(Exception,match='parent failed'):
         load_bundle(tmp_path/'bundle').run({'scenario':'root_failure'},run_root=tmp_path/'runs')
     trace = next((tmp_path/'runs').glob('*/runtime_trace.jsonl')).read_text()
-    assert 'task_exited' in trace
+    assert 'cleanup_finished' in trace
 
 
 def test_plugin_disposal_preserves_primary_failure_and_releases_all_instances(tmp_path):
@@ -191,9 +191,9 @@ def test_bundle_cancellation_waits_for_real_cleanup_and_releases_lock(tmp_path, 
     import time
     from vibeflow.tooling.project.config_loader import load_raw_config_document
     source = tmp_path/'source'
-    shutil.copytree(Path(__file__).resolve().parents[3]/'sandbox/python/task_management',source,
+    shutil.copytree(Path(__file__).resolve().parents[3]/'sandbox/python/graph_concurrency',source,
         ignore=shutil.ignore_patterns('__pycache__','runs'))
-    config = source/'project/configs/tasks.jsonc'
+    config = source/'project/configs/concurrent.jsonc'
     data = load_raw_config_document(config).data
     data['pipeline']['execution_lock'] = {'key':'aot.cancellation'}
     config.write_text(json.dumps(data))
@@ -218,6 +218,5 @@ def test_bundle_cancellation_waits_for_real_cleanup_and_releases_lock(tmp_path, 
     events = [json.loads(line) for line in trace.read_text().splitlines()]
     kinds = [item['kind'] for item in events]
     assert 'cleanup_finished' in kinds
-    assert 'task_exited' in kinds
     assert kinds.index('cleanup_finished') < kinds.index('lock_released')
     assert bundle.create_runtime(run_dir=tmp_path/'next').run({'scenario':'success'}).get('runtime.stop_reason') == 'completed'

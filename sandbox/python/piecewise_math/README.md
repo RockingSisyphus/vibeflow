@@ -17,7 +17,7 @@
 | join | 两个互斥分支产生不同 key、相同 `selected_w` 类型，之后统一计算 `w+u` | `any_active` 汇合；`exactly_one` 只解析一个活跃 provider；原始 source key 正确；输出 11、6、7 |
 | bypass | 按顺序算 `u`、`w=u+1`、`w+u`，并通过数据旁路把 u 直接送给 finish | 结果 11；finish 仍等待 left；`u→finish` 在独立导出图和运行图中都是数据虚线 |
 
-每个配置均运行 plan/full、compiled/boundary、compiled/full，共 24 组独立观察。compiled 必须真正生成一个完整执行块；保存的源码必须包含 `runtime._run_compiled_frame`，不能包含 `_run_node(`。完整 trace 检查节点、边、类型解析；边界 trace 只检查块事件与摘要。每个配置另执行一次正式 checked run，验证 health 无 error、架构文档和实际渲染 SVG。
+每个配置均运行 plan/full、compiled/boundary、compiled/full，共 24 组独立观察。compiled 必须生成一个完整执行块，通过 `run_graph_block` 使用公共图协调器，不能包含 `_run_node(`。完整 trace 检查节点、边、类型解析；边界 trace 只检查块事件与摘要。每个配置另执行一次正式 checked run，验证 health 无 error、架构文档和实际渲染 SVG。
 
 ```bash
 python sandbox/python/piecewise_math/run_all.py

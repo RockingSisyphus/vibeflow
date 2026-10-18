@@ -32,4 +32,4 @@ Nodeset 定义可以在 `type_key` 同级设置 `"expand": false`，让展开图
 
 业务 Node 更新进度时，Python 从 `vibeflow.targets.python.sdk` 导入 `update_run_info`，在 `run_pure` 内调用；JS/TS 在 `run(inputs, params, context)` 内调用 `context.updateInfo`。传入 JSON 对象数组，每次替换整个 `info`，需要保留的进度与指标一起提交，`[]` 清空。数值使用语言原生 JSON 类型。更新复制到当前运行缓存，默认每 60 秒及状态变化、结束时发布；Node 仍按原契约返回输出，并沿用所选 Ruleset。配置路径、刷新间隔和完整示例见上述运行日志与状态接口。
 
-- 管理并发任务、迁移旧异步调用：[`kernel/docs/user/task-management.md`](kernel/docs/user/task-management.md)
+- 管理并发任务、迁移旧异步调用：[`kernel/docs/user/graph-concurrency.md`](kernel/docs/user/graph-concurrency.md)

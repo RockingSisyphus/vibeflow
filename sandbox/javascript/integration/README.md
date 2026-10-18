@@ -34,7 +34,7 @@ Positive workflows:
   failure when the stop condition cannot converge in time;
 - `project/configs/async_capability.jsonc` combines a Promise node with a
   per-run injected `sandbox.storage` Capability. The execution-model case
-  proves its serial suspend, deferred TaskPlan and Capability all use the JS
+  proves its serial suspend, deferred ordinary Node and Capability all use the JS
   event loop rather than a thread executor;
 - `project/configs/optional_input.jsonc` adds an optional offset, treating an
   omitted `required: false` input as zero;
@@ -68,14 +68,14 @@ undeclared external packages, package-root escapes and indirect Node builtins.
 The source audit rejects dynamic code, module-level or discarded Promise work,
 long-lived node listeners and mutable module state, with stable diagnostic
 codes, owners and source locations. Completion mismatches, a suspending node or
-a deferred TaskPlan inside a synchronous workflow remain covered as separate
+a deferred ordinary Node inside a synchronous workflow remain covered as separate
 execution-model failures.
 
 The runner also verifies that the default synchronous ABI returns a plain,
 non-thenable value immediately, while the explicit `runWorkflowAsync` ABI
 returns a Promise and remains pending across a held suspending Capability. It
 inspects the generated plan for `completion`, `schedule`, `executor` and
-TaskPlan metadata, confirms JS uses `event_loop` rather than pretending to
+ordinary Node metadata, confirms JS uses `event_loop` rather than pretending to
 spawn Python-style threads, and covers import side-effect freedom, repeated and concurrent
 call isolation, input preflight, cancellation, trace modes and trace callback
 errors, Capability isolation, declaration-file consumption under strict

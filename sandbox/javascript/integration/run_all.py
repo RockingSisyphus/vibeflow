@@ -428,7 +428,7 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
         "suspend_sync": "VF_COMPLETION_SUSPEND_NON_PROMISE",
         "unowned_promise": "VF_PROMISE_UNOWNED",
         "suspend_in_sync": "VF_ENTRY_MODE_SUSPEND_IN_SYNC",
-        "task_in_sync": "VF_ENTRY_MODE_TASK_IN_SYNC",
+        "task_in_sync": "VF_ENTRY_MODE_SUSPEND_IN_SYNC",
         "barrel_import": "VF_IMPORT_NODE_TO_NODE",
         "alias_import": "VF_IMPORT_NODE_TO_NODE",
         "symlink_import": "VF_IMPORT_NODE_TO_NODE",
@@ -635,9 +635,9 @@ def _rule_selection_case():
     return json.loads((work / "report.json").read_text())
 
 
-def _task_management_case(puppeteer_root):
-    work = _RUNTIME_ROOT / "task_management"
-    command = [sys.executable, str(_SOURCE_SANDBOX_ROOT.parent / "task_management/run_all.py"),
+def _graph_concurrency_case(puppeteer_root):
+    work = _RUNTIME_ROOT / "graph_concurrency"
+    command = [sys.executable, str(_SOURCE_SANDBOX_ROOT.parent / "graph_concurrency/run_all.py"),
                "--work-dir", str(work), "--toolchain-root", str(PROJECT_ROOT),
                "--puppeteer-root", str(puppeteer_root)]
     completed = subprocess.run(command, capture_output=True, text=True,
@@ -645,14 +645,6 @@ def _task_management_case(puppeteer_root):
     if completed.returncode:
         raise AssertionError(completed.stdout + completed.stderr)
     report = json.loads((work / "report.json").read_text())
-    ownership_work = _RUNTIME_ROOT / "task_ownership"
-    command = [sys.executable, str(_SOURCE_SANDBOX_ROOT.parent / "task_management/run_ownership.py"),
-               "--work-dir", str(ownership_work), "--toolchain-root", str(PROJECT_ROOT)]
-    completed = subprocess.run(command, capture_output=True, text=True,
-        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
-    if completed.returncode:
-        raise AssertionError(completed.stdout + completed.stderr)
-    report["ownership"] = json.loads((ownership_work / "report.json").read_text())
     return report
 
 
@@ -734,7 +726,7 @@ def main() -> int:
         cases: list[tuple[str, Any]] = [
             ("rules:selection-and-boundaries", _rule_selection_case),
             ("math:workflow-nesting-and-trace", lambda: _addition_case("workflow_math")),
-            ("tasks:workflow-owned-management", lambda: _task_management_case(puppeteer_root)),
+            ("graph:parallel-dispatch-and-collection", lambda: _graph_concurrency_case(puppeteer_root)),
             ("math:plugin-addition", lambda: _addition_case("plugin_addition")),
             ("math:async-addition", lambda: _addition_case("async_addition")),
             ("math:comprehensive-plugin-rules", lambda: _comprehensive_math_case(
@@ -756,7 +748,7 @@ def main() -> int:
             ("capability:missing-and-cancel", lambda: capability_error_case(
                 async_capability().entry
             )),
-            ("async:owned-task-cleanup-and-stop", lambda: detached_case(
+            ("async:node-cleanup-and-stop", lambda: detached_case(
                 detached().entry
             )),
             ("error:node-cause-and-path", lambda: runtime_error_case(

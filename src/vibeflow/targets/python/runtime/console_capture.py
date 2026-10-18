@@ -36,8 +36,13 @@ def capture_process_console(observer):
                 readable, _, _ = select.select([read_fd], [], [], .05)
                 if not readable:
                     if finishing.is_set():
-                        break
-                    continue
+                        # The final flush may arrive after the timed poll
+                        # expires but before we observe the shutdown signal.
+                        readable, _, _ = select.select([read_fd], [], [], 0)
+                        if not readable:
+                            break
+                    else:
+                        continue
                 data = os.read(read_fd, 65536)
                 if not data:
                     break

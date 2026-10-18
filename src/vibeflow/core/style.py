@@ -19,7 +19,6 @@ NODE_SHAPES = frozenset({"rect", "rounded", "stadium", "diamond", "lean-r", "lea
 # renderer or touching the filesystem.
 RESERVED_SYSTEM_COLORS = frozenset(
     {
-        "#fce7f3", "#be185d", "#831843",
         "#ececff",
         "#9370db",
         "#333333",

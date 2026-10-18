@@ -1,4 +1,4 @@
-"""Check the public task-controller boundary separately from the Node ABI."""
+"""Check resource ownership and the ordinary graph execution boundary."""
 import ast
 from vibeflow.core.rules import RuleResult
 from .helpers import finding, source_subject
@@ -16,18 +16,13 @@ def async_lifecycle(context, inputs, params):
         return RuleResult()
     method = entry._node
     arguments = (*method.args.posonlyargs, *method.args.args)
-    manager = node.descriptor.flow_kind == "task_manager"
     findings = []
-    if manager and len(arguments) != 4:
-        findings.append(finding(context, "VF_TASK_CONTEXT_REQUIRED",
-            "task_manager must accept run_pure(self, inputs, params, context)",
-            path=entry.path, line=method.lineno))
-    if not manager and len(arguments) == 4:
+    if len(arguments) == 4:
         context_name = arguments[3].arg
         for item in ast.walk(method):
             if isinstance(item, ast.Attribute) and item.attr == "tasks" and isinstance(item.value, ast.Name) and item.value.id == context_name:
                 findings.append(finding(context, "VF_TASK_CONTROL_FORBIDDEN",
-                    "task controller is available only to task_manager Nodes",
+                    "task controllers were removed; use explicit graph edges",
                     path=entry.path, line=item.lineno))
     findings.extend(_OwnedWorkScanner.findings(context,sources,node,symbol))
     return RuleResult(findings=tuple(findings))
@@ -108,10 +103,10 @@ class _OwnedWorkScanner:
                             cleanup='shutdown' if kind.endswith('Executor') else 'join'
                             if not self._owned(call,handle,cleanup):
                                 diagnostics.append(finding(context,'VF_NODE_RESOURCE_UNOWNED',
-                                    'native background work must be joined in finally or owned by an executor context; use declared task_targets for workflow tasks',
+                                    'native background work must be joined in finally or owned by an executor context; declare normal workflow nodes and edges',
                                     path=source.path,line=call.lineno))
                     if '_thread.start_new_thread' in names:
                         diagnostics.append(finding(context,'VF_NODE_RESOURCE_UNOWNED',
-                            'unowned native thread callback is forbidden; use declared task_targets',path=source.path,line=call.lineno))
+                            'unowned native thread callback is forbidden; declare normal workflow nodes and edges',path=source.path,line=call.lineno))
             Scanner().visit(tree)
         return diagnostics

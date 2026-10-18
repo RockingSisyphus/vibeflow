@@ -7,7 +7,6 @@ This module adapts canonical declarations and available implementation facts.
 from __future__ import annotations
 
 from dataclasses import replace
-from vibeflow.core.tasks import call_specs
 from typing import Any, Protocol
 
 from vibeflow.core.compiler import (
@@ -181,7 +180,7 @@ def _adapt_implementation_facts(
         nodeset_types.update(current.nodesets)
         relevant.update(
             node.type_used
-            for node in call_specs(current.nodes)
+            for node in current.nodes
             if node.status != STATUS_PLANNED
             and node.type_used not in LOOP_NODE_TYPES
             and node.type_used != IO_NODE_TYPE

@@ -362,7 +362,6 @@ def prepare_project_build(
         params_by_path=state.params_by_path,
         implementation_facts=implementation_facts,
         call_execution_facts=native_call_execution_facts(graph),
-        task_executor="event_loop",
         target_features=target_features,
     )
     declared_host_extensions = selected_hosts

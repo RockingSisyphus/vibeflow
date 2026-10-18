@@ -2,7 +2,6 @@
   "project_target": "python",
   "quality_enabled": true,
   "runtime": {
-    "async_max_workers": 4,
     "nodeset_max_depth": 4
   },
   "architecture": {

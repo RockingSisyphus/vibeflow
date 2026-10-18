@@ -382,7 +382,7 @@ def build_javascript_binding_plan(
             path = (*block.path, node.id)
             metadata = implementation_facts.get(node.type_used, {})
             completion = _completion(node, metadata)
-            executor = _javascript_executor(completion, node.schedule)
+            executor = _javascript_executor(completion)
             params_schema = _mapping_fact(metadata, "params_schema")
             schema_orders.extend(_contract_schema_orders(
                 path, "params_schema", params_schema
@@ -539,8 +539,8 @@ def _completion(node: object, metadata: Mapping[str, object]) -> str:
     return str(value or "immediate")
 
 
-def _javascript_executor(completion: str, schedule: str) -> str:
-    if completion == "suspend" or schedule != "inline":
+def _javascript_executor(completion: str) -> str:
+    if completion == "suspend":
         return "event_loop"
     return "current"
 

@@ -1119,9 +1119,6 @@ function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy, pro
     return "";
   }
 
-  if (owner.flowKind === "task_manager" && (declaration.parameters?.length || 0) < 3)
-    findings.push(importFinding(sourceFile, declaration, "VF_TASK_CONTEXT_REQUIRED",
-      `task_manager '${owner.id}' must accept context as its third parameter`));
   function nativeTimerName(expression, seen = new Set()) {
     if (!expression || seen.has(expression)) return "";
     seen.add(expression);
@@ -1218,10 +1215,10 @@ function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy, pro
   }
   function visit(node) {
     if (ts.isPropertyAccessExpression(node) && node.name.text === "tasks"
-        && owner.flowKind !== "task_manager" && contextSymbol
+        && contextSymbol
         && checker.getSymbolAtLocation(node.expression) === contextSymbol) {
       findings.push(importFinding(sourceFile, node, "VF_TASK_CONTROL_FORBIDDEN",
-        `node '${owner.id}' must be task_manager to use the controller`));
+        `node '${owner.id}' must use explicit graph edges; task controllers were removed`));
     }
     if (node !== declaration
         && (ts.isFunctionDeclaration(node)

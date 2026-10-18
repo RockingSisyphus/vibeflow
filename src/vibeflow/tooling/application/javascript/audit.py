@@ -1,7 +1,6 @@
 """Target-neutral JavaScript workflow validation and architecture snapshots."""
 
 from __future__ import annotations
-from vibeflow.tooling.presentation.task_targets import task_target_document
 
 from vibeflow.core.rules.selection import selection_data
 
@@ -515,14 +514,6 @@ def _validate_graph_tree(
     compilation = replace(compilation, compiled_graph=compiled)
     for node in graph.nodes:
         call_path = (*path, node.id)
-        from vibeflow.core.tasks import task_graph
-        for slot, target in node.task_targets.items():
-            task_path = (*call_path, "tasks", slot)
-            task_compilation = _validate_graph_tree(task_graph(graph, target), catalogs=catalogs,
-                facts=facts, path=task_path, active_nodesets=active_nodesets,
-                compiled_by_path=compiled_by_path, used_node_types=used_node_types,
-                call_effect_scopes=call_effect_scopes)
-            compiled_by_path[task_path] = task_compilation.compiled_graph
         if node.status == STATUS_PLANNED:
             continue
         if node.type_used == IO_NODE_TYPE:
@@ -922,7 +913,6 @@ def _javascript_node_document(
         "metadata": dict(descriptor.metadata) if descriptor else {},
         "contract_source": contract_source,
         "flow_kind": flow_kind,
-        "task_targets": task_target_document(node, catalogs.nodes.get),
         "effect_scope": "unavailable" if planned else _effect_scope_label(compiled, node_id, flow_kind),
 
         "execution_lock": (

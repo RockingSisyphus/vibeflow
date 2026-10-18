@@ -113,7 +113,7 @@ def run(work, *, toolchain=None):
                 path = work / f"source-{index}-{block_index}.py"
                 path.write_text(block.source)
                 if block.kind == "graph":
-                    assert "runtime._run_compiled_frame" in path.read_text()
+                    assert "return run_graph_block(runtime, state," in path.read_text()
                     assert "_run_node(" not in path.read_text()
         hooks = Hooks()
         plugins = PluginRegistry()

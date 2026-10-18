@@ -108,12 +108,6 @@ class _Renderer:
             self._render_contracts(lines, graph, compiled, indent=indent)
         if self.expand_nodesets:
             self._render_nodesets(lines, graph, indent=indent)
-        from vibeflow.core.tasks import task_graph
-        for node in graph.nodes:
-            for slot, target in node.task_targets.items():
-                child, child_compiled = self.prepared.graph_for(task_graph(graph, target))
-                self._render_section(lines, child, child_compiled,
-                    title=f"task target {node.id}/{slot}", indent=f"{indent}  ")
 
     def _ascii_nodes(self, graph: GraphConfig, compiled: CompiledGraph) -> dict[str, AsciiNode]:
         findings_by_node = _findings_by_node(self.health_report)
@@ -162,7 +156,7 @@ class _Renderer:
     def _contract_details(self, graph: GraphConfig, node: NodeSpec, compiled: CompiledGraph) -> list[str]:
         nodeset = nodeset_for_node(graph, node)
         flow_kind = node_flow_kind(node, compiled) or (nodeset.flow_kind if nodeset else FLOW_KIND_PROCESS)
-        details = (["任务管理"] if flow_kind == "task_manager" else []) + [f"kind={flow_kind}", f"type_used={node.type_used}"]
+        details = [f"kind={flow_kind}", f"type_used={node.type_used}"]
         if node.status == STATUS_PLANNED:
             behavior = effective_planned_behavior(node, nodeset)
             details.append(f"status={planned_behavior_label(behavior).replace(' ', '_')}")
@@ -191,8 +185,6 @@ class _Renderer:
 
     def _node_label(self, node: NodeSpec, flow_kind: str) -> tuple[str, ...]:
         lines = [_badge(flow_kind, node), node.id]
-        if flow_kind == "task_manager":
-            lines.append("任务管理")
         if node.status == STATUS_PLANNED:
             lines.append(planned_behavior_label(node.planned_behavior).upper())
             if node.planned_behavior.stub_module:
@@ -205,8 +197,6 @@ class _Renderer:
         if nodeset is None:
             return self._node_label(node, flow_kind)
         lines = [_badge(flow_kind, node), node.id]
-        if flow_kind == "task_manager":
-            lines.append("任务管理")
         if node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED:
             behavior = effective_planned_behavior(node, nodeset)
             lines.append(planned_behavior_label(behavior).upper())

@@ -1,16 +1,22 @@
+# 当前开发变更
+
+普通图调度统一承载并发，分发与 all 汇合分离，取消与真实清理由运行器持有。删除独立任务图、控制器及数量上限；Workflow ABI v8，旧配置与构建产物须迁移重建。详见[普通图并发](../../distribution/docs/user/graph-concurrency.md)。
+
+沙箱验收同时发现并修复 CLI 标准流的收尾竞争：读取轮询超时与最终 flush 之间到达的数据，在收到结束标志后仍须排空。确定性回归覆盖最后一批 stdout/stderr 的转发与业务日志记录。
+
 # 发行与文档装配
 
 VibeFlow 当前发行版本为 1.0.0，准备 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目和 Workflow ABI。迁移入口与删除接口见 [统一资源迁移](../../distribution/docs/user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖归档发行包。
 
 1.0.0 统一 Block Compiler，并新增 Python 目录 AOT：计划 ABI v7、构建 manifest v3。旧计划需重新构建；既有 0.20.0 发行资产保持原字节和 ABI v6。实施与完整验收见[双语言 AOT 与维护整理记录](aot-unification-implementation.md)，本版变更与发行验证见[1.0.0 发布说明](history/release-1.0.0.md)。
 
-0.20.0 将任务等待改为一次结果交付：接收后任务卡自动回收，结果由父流程保存和转交；旧重复等待和停止已消费引用的代码须迁移。Workflow ABI 仍为 v6，配置形状不变。接口与示例见[原生任务管理](../../distribution/docs/user/task-management.md)，开发、全量验收与构建见[本轮记录](history/task-result-delivery-20261014.md)。
+0.20.0 将任务等待改为一次结果交付：接收后任务卡自动回收，结果由父流程保存和转交；旧重复等待和停止已消费引用的代码须迁移。Workflow ABI 仍为 v6，配置形状不变。该接口现已删除，迁移见[普通图并发](../../distribution/docs/user/graph-concurrency.md)，开发、全量验收与构建见[本轮记录](history/task-result-delivery-20261014.md)。
 
 GitHub 0.20.0 更新日志以此前正式分发版本 v0.18.3 为基线，覆盖本地 0.19.x 与 0.20.0 的 Git 历史，见[中英文发布说明](history/release-0.20.0.md)。
 
 0.19.1 修复跨 root 独立 Nodeset 源码审查遗漏 BaseLib 归属的问题，保持 planned 调用与真正未登记导入的检查行为。修复与验证见[复现及修复记录](history/task-ownership-reproduction-20261014.md)。
 
-0.19.0 引入原生任务管理与 Workflow ABI v6：管理 Node 使用声明目标启动任务，普通 TaskRef 数组可沿数据连边传递，停止请求与实际退出分开，workflow 在所属执行与清理完成后才退出。JS 使用事件循环，Python 使用线程与完成通知。旧 `async/result_key/detached` 入口须显式迁移，没有自动转换层；迁移后重新生成 Architecture、计划与构建产物。接口与内存边界见[原生任务管理](../../distribution/docs/user/task-management.md)，开发和全量验收见[实施记录](history/task-management-implementation-20261014.md)。
+0.19.0 引入原生任务管理与 Workflow ABI v6：管理 Node 使用声明目标启动任务，普通 TaskRef 数组可沿数据连边传递，停止请求与实际退出分开，workflow 在所属执行与清理完成后才退出。JS 使用事件循环，Python 使用线程与完成通知。旧 `async/result_key/detached` 入口须显式迁移，没有自动转换层；迁移后重新生成 Architecture、计划与构建产物。当前迁移见[普通图并发](../../distribution/docs/user/graph-concurrency.md)，开发和全量验收见[实施记录](history/task-management-implementation-20261014.md)。
 
 0.19.0 两种本地发布包及实际 ZIP 解压验证见[构建记录](history/release-0.19.0.md)。
 

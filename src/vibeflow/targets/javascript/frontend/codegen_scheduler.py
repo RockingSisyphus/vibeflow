@@ -13,113 +13,66 @@ from vibeflow.targets.javascript.frontend.codegen_common import (
 class SchedulerCodegenMixin:
     def _emit_scheduler(self, code: WorkflowCode) -> str:
         workflow = code.workflow
-        hook = (
-            "await invokeRuntimeHookAsync"
-            if workflow.entry_mode == "async"
-            else "invokeRuntimeHookSync"
-        )
-        incoming: dict[str, list[Any]] = {
-            node.id: [] for node in workflow.nodes
-        }
+        asynchronous = workflow.entry_mode == "async"
+        hook = "await invokeRuntimeHookAsync" if asynchronous else "invokeRuntimeHookSync"
+        incoming = {node.id: [] for node in workflow.nodes}
         for route in workflow.routes:
             if route.schedule:
                 incoming[route.target].append(route)
-        empty_starts = {
-            node.id
-            for node in workflow.nodes
-            if node.is_terminal
-            and not incoming[node.id]
-            and not node.requires
-            and not node.provides
-        }
-        lines = [
-            (
-                f"{'async ' if workflow.entry_mode == 'async' else ''}"
-                f"function {code.function_name}(initial, root, path) {{"
-            ),
-            "  try {",
-            (
-                f"    {hook}(root, \"beforeBlock\", {{ "
-                "blockPath: formatBlockPath(path), path: [...path] });"
-            ),
-            (
-                f"    const state = createStaticState("
-                f"{code.metadata_name}, initial, root, path);"
-            ),
-        ]
-        for node in workflow.nodes:
-            targets = {key: code.children[(node.id,key)] for key in node.task_plans}
-            if targets:
-                lines.append(f"    setOwn(state.taskExecutors, {js(node.id)}, dictionary());")
-                for key, child in targets.items():
-                    lines.append(f"    setOwn(state.taskExecutors[{js(node.id)}], {js(key)}, (inputs, root, path) => {child.function_name}(inputs, root, path));")
+        empty_starts = {node.id for node in workflow.nodes
+                        if node.is_terminal and not incoming[node.id]
+                        and not node.requires and not node.provides}
+        lines = [f"{'async ' if asynchronous else ''}function {code.function_name}(initial, root, path) {{",
+                 "  const running = new Map();", "  try {",
+                 f'    {hook}(root, "beforeBlock", {{blockPath: formatBlockPath(path), path: [...path]}});',
+                 f"    const state = createStaticState({code.metadata_name}, initial, root, path);"]
         for node in workflow.nodes:
             lines.append(f"    initializeInbox(state, {js(node.id)});")
-        for node in workflow.nodes:
-            node_incoming = incoming[node.id]
-            if node.requires and (
-                not node_incoming
-                or any(route.source in empty_starts for route in node_incoming)
-            ):
-                lines.append(
-                    f"    seedInbox(state, {js(node.id)}, "
-                    f"{js([item.type for item in node.requires])});"
-                )
-        lines.extend(
-            [
-                f"    const ready = {js(list(workflow.entries))};",
-                "    const queued = new Set(ready);",
-                "    let completed = false;",
-                "    while (ready.length) {",
-                f"      throwIfAborted(root.signal, {code.metadata_name});",
-                f"      if (state.stepCount >= {workflow.max_steps}) {{",
-                '        const nextNodeId = ready[0] || "";',
-                "        throw vfError(",
-                '          "VF_MAX_STEPS",',
-                (
-                    f"          {js(f'workflow exceeded max_steps={workflow.max_steps}')},"
-                ),
-                f"          {code.metadata_name},",
-                "          {",
-                '            nodePath: nextNodeId ? nodePath(state, nextNodeId) : "",',
-                "            blockPath: formatBlockPath(path),",
-                "          },",
-                "        );",
-                "      }",
-                "      const nodeId = ready.shift();",
-                "      queued.delete(nodeId);",
-                "      switch (nodeId) {",
-            ]
-        )
+            if node.requires and (not incoming[node.id] or any(r.source in empty_starts for r in incoming[node.id])):
+                lines.append(f"    seedInbox(state, {js(node.id)}, {js([r.type for r in node.requires])});")
+        lines.extend([f"    const ready = {js(list(workflow.entries))};",
+                      "    const queued = new Set(ready);", "    let completed = false;",
+                      f"    const executeReady = {'async ' if asynchronous else ''}(nodeId) => {{",
+                      "      switch (nodeId) {"])
         for node in workflow.nodes:
             lines.extend(self._emit_scheduler_case(code, node, incoming[node.id]))
-        lines.extend(
-            [
-                "        default:",
-                "          break;",
+        lines.extend(["        default: break;", "      }", "    };"])
+        if asynchronous:
+            lines.extend([
+                "    while (ready.length || running.size) {",
+                "      throwIfAborted(root.signal, state.workflow);",
+                "      const batch = ready.splice(0);",
+                "      for (const nodeId of batch) {",
+                "        queued.delete(nodeId);",
+                "        if (running.has(nodeId)) { enqueueStaticTargets([nodeId], ready, queued); continue; }",
+                "        const operation = executeReady(nodeId).then(() => ({nodeId}), error => ({nodeId, error}));",
+                "        running.set(nodeId, operation);",
                 "      }",
+                "      if (!running.size) break;",
+                "      const outcome = await Promise.race(running.values());",
+                "      running.delete(outcome.nodeId);",
+                "      if (outcome.error) throw outcome.error;",
                 "    }",
-                '    const publicOutputs = state.workflow.kind === "task" ? state.taskOutputs : finalizeOutputs(state);',
-                (
-                    f"    {hook}(root, \"afterBlock\", {{ "
-                    "blockPath: formatBlockPath(path), path: [...path] });"
-                ),
-                "    return { publicOutputs, candidates: state.candidates, completed };",
-                "  } catch (cause) {",
-                (
-                    f"    const failure = ensureErrorLocation(cause, "
-                    f"{code.metadata_name}, path);"
-                ),
-                (
-                    f"    {hook}(root, \"blockFailed\", {{ "
-                    "blockPath: formatBlockPath(path), path: [...path], "
-                    "code: failure.code, message: failure.message }, true);"
-                ),
-                "    throw failure;",
-                "  }",
-                "}",
-            ]
-        )
+            ])
+        else:
+            lines.extend(["    while (ready.length) {", "      const nodeId = ready.shift();",
+                          "      queued.delete(nodeId);", "      executeReady(nodeId);", "    }"])
+        lines.extend(["    const publicOutputs = finalizeOutputs(state);",
+                      f'    {hook}(root, "afterBlock", {{blockPath: formatBlockPath(path), path: [...path]}});',
+                      "    return {publicOutputs, candidates: state.candidates, completed};",
+                      "  } catch (cause) {"])
+        if asynchronous:
+            lines.extend([
+                "    root.controller.abort(cause);",
+                "    const remaining = await Promise.all(running.values());",
+                "    for (const outcome of remaining) {",
+                "      if (outcome.error && outcome.error !== cause && (outcome.error.code !== 'VF_ABORTED' || outcome.error.cleanupErrors?.length))",
+                "        (cause.cleanupErrors ||= []).push(outcome.error);",
+                "    }",
+            ])
+        lines.extend([f"    const failure = ensureErrorLocation(cause, {code.metadata_name}, path);",
+                      f'    {hook}(root, "blockFailed", {{blockPath: formatBlockPath(path), path: [...path], code: failure.code, message: failure.message}}, true);',
+                      "    throw failure;", "  }", "}"])
         return "\n".join(lines)
 
     def _emit_scheduler_case(
@@ -148,6 +101,9 @@ class SchedulerCodegenMixin:
         lines.extend(
             [
                 "          try {",
+                f"            if (state.stepCount >= {code.workflow.max_steps}) throw vfError('VF_MAX_STEPS', 'workflow exceeded max_steps', state.workflow);",
+                "            state.stepCount += 1;",
+                f"            consumeStaticActivation({code.node_names[node.id]}, state);",
                 (
                     f"            const inputs = prepareStaticNode("
                     f"{code.node_names[node.id]}, state);"
@@ -158,23 +114,20 @@ class SchedulerCodegenMixin:
                     f"blockPath: formatBlockPath(state.path), type: {js(node.type_used)} }});"
                 ),
                 "            let outputs;",
-                "            let deferred = false;",
             ]
         )
         self._emit_node_invocation(lines, code, node)
         lines.extend(
             [
-                "            state.taskOutputs = outputs;",
-                "            state.stepCount += 1;",
-                (
-                    f"            const targets = {code.activate_names[node.id]}("
-                    "outputs, inputs, state, deferred);"
-                ),
                 (
                     f"            {hook}(state.root, \"afterNode\", {{ "
                     f"nodeId: {js(node.id)}, nodePath: nodePath(state, {js(node.id)}), "
                     f"blockPath: formatBlockPath(state.path), type: {js(node.type_used)}, "
                     "outputKeys: Object.keys(outputs || {}).sort() });"
+                ),
+                (
+                    f"            const targets = {code.activate_names[node.id]}("
+                    "outputs, inputs, state);"
                 ),
             ]
         )
@@ -187,7 +140,6 @@ class SchedulerCodegenMixin:
             lines.extend(
                 [
                     "            completed = true;",
-                    "            ready.length = 0;",
                 ]
             )
         else:

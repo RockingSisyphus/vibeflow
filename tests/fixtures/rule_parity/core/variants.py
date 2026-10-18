@@ -207,8 +207,7 @@ def _graph_variants(emit, codes, support, variant):
                 return
             visited.add(id(current))
             known = {**known, **current.nodesets}
-            from vibeflow.core.tasks import call_specs
-            for spec in (call_specs(current.nodes) if variant=="current" else current.nodes):
+            for spec in current.nodes:
                 if spec.type_used not in known and spec.type_used != "vibeflow.io" and not spec.type_used.startswith("vibeflow.loop."):
                     collected[spec.type_used] = ImplementationFact(spec.type_used, flow_kind=spec.flow_kind, requires=spec.requires, provides=spec.provides)
             for definition in current.nodesets.values():
@@ -241,20 +240,6 @@ def _graph_variants(emit, codes, support, variant):
                 lambda graph=graph,scenario=scenario: retired("detached",nested=True,planned=scenario=="planned_detached") if variant == "current" and "detached" in scenario else compile(graph), codes(*((diagnostic, "error"),) if diagnostic else (),
                     **({"message_contains": "incompatible key" if scenario == "different_key" else "cannot use async='detached'"} if diagnostic else {})),
                 evidence="core/compiler.py:561-655,979-1030; executable/planned distinction")
-
-    if variant=="current":
-        for conditional in (False,True):
-            manager=node("manager","task_manager",provides=(DataProvider("refs","task.refs"),),
-                task_targets={"work":node("execution",provides=(DataProvider("value","worker.value"),))})
-            receiver=node("receiver",requires=(DataRequirement("task.refs","exactly_one"),))
-            managed=GraphConfig((manager,receiver),(EdgeSpec("manager","receiver",when="choice == 1" if conditional else ""),),execution_lock=ExecutionLockSpec("shared"))
-            emit("tasks.refs_route."+str(conditional),"TaskRef data routes do not impose implicit joins","native.task_refs",
-                lambda graph=managed:compile(graph),codes(),classification="new_feature",evidence="core/tasks.py; execution ownership is verified by target runtime tests")
-        emit("tasks.no_consumer","An explicit finite task has its workflow owner without a result consumer","native.task_refs",
-            lambda:compile(GraphConfig((manager,),execution_lock=ExecutionLockSpec("shared"))),codes(),classification="new_feature")
-        ordinary=node("ordinary",task_targets={"work":node("execution")})
-        emit("tasks.control_forbidden","Ordinary Node cannot declare task control","native.task_refs",
-            lambda:compile(GraphConfig((ordinary,))),codes(("GRAPH.TASK.CONTROL_FORBIDDEN","error")),classification="new_feature")
 
     def review(graph, topic):
         compilation = compile(graph)

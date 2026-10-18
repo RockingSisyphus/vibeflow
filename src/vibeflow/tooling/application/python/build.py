@@ -148,8 +148,6 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
                 frame = plan.frames[call.id]
                 if call.child_block:
                     save_blocks(frame.subplan,call.child_block)
-                for key,target in call.task_targets:
-                    save_blocks(frame.task_plans[key],target)
         save_blocks(native_plan,prepared.workflow.entry_block)
         from vibeflow.tooling.application.python.delegate_contract import validate_delegate_cli_graph_contract
         delegate_health = validate_delegate_cli_graph_contract(compilation.workflow.graph, health)
@@ -169,7 +167,7 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
                 target.parent.mkdir(parents=True,exist_ok=True)
                 shutil.copy2(source,target)
             (staging/'python-workflow.json').write_text(json.dumps(data,ensure_ascii=False,sort_keys=True,allow_nan=False)+'\n',encoding='utf-8')
-            imports = 'from vibeflow.targets.python.runtime.block_compiler import CompiledBlockResult\nfrom vibeflow.targets.python.runtime.errors import PipelineRuntimeError\nfrom vibeflow.targets.python.runtime.summaries import summarize_mapping\nfrom vibeflow.targets.python.runtime.helpers import elapsed_ms\nfrom time import perf_counter as now\n'
+            imports = 'from vibeflow.targets.python.runtime.block_compiler import CompiledBlockResult\n'
             (staging/'generated_blocks.py').write_text(imports+'\n\n'.join(source_functions)+'\n',encoding='utf-8')
             (staging/'run.py').write_text("from pathlib import Path\nimport sys\nsys.dont_write_bytecode = True\nROOT = Path(__file__).resolve().parent\nsys.path.insert(0, str(ROOT / '_framework'))\nfrom vibeflow.tooling.application.python.bundle_cli import main\nif __name__ == '__main__':\n    raise SystemExit(main(ROOT))\n",encoding='utf-8')
             manifest = artifact_manifest(staging,workflow=prepared.workflow,project_target='python',entry='run.py',

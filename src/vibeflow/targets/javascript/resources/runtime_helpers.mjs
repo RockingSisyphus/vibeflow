@@ -1,4 +1,4 @@
-export const VIBEFLOW_WORKFLOW_ABI = "vibeflow.workflow.v7";
+export const VIBEFLOW_WORKFLOW_ABI = "vibeflow.workflow.v8";
 export const VIBEFLOW_PLUGIN_ABI = "vibeflow.plugin.v3";
 
 export class VibeFlowWorkflowError extends Error {
@@ -10,7 +10,6 @@ export class VibeFlowWorkflowError extends Error {
     this.workflowId = details.workflowId || "";
     this.nodePath = details.nodePath || "";
     this.blockPath = details.blockPath || "";
-    if (details.taskErrors) this.taskErrors = details.taskErrors;
     if (details.sourceLocation) this.sourceLocation = details.sourceLocation;
   }
 }
@@ -223,7 +222,7 @@ function emitTrace(root, kind, details = {}, boundary = false) {
 function normalizeOptions(workflow, options) {
   const raw = options === undefined ? {} : options;
   assertObject(raw, "VF_INTERNAL", "workflow options must be an object", workflow);
-  if (Object.hasOwn(raw,"detachedTimeoutMs")) throw vfError("VF_ASYNC_MIGRATION", "detachedTimeoutMs was removed; workflow waits for actual task cleanup", workflow);
+  if (Object.hasOwn(raw,"detachedTimeoutMs")) throw vfError("VF_ASYNC_MIGRATION", "detachedTimeoutMs was removed; workflow waits for actual Node cleanup", workflow);
   const traceMode = raw.trace ?? "boundary";
   if (!["off", "boundary", "full"].includes(traceMode)) {
     throw vfError("VF_INTERNAL", `unsupported trace mode '${String(traceMode)}'`, workflow);
@@ -450,10 +449,7 @@ const __vfMultipleInputs = Symbol('native input envelopes');
 function inputValues(workflow, inputs, input) {
   const values=inputs[__vfMultipleInputs]?.get(input.key);
   if(values)return values;
-  if(workflow.task_input_cardinalities?.[input.type]==='all') {
-    if(!Array.isArray(inputs[input.key]))throw vfError('VF_TASK_INPUT_INVALID',`all input '${input.key}' requires an array`,workflow);
-    return inputs[input.key];
-  }
+
   return [inputs[input.key]];
 }
 
@@ -497,7 +493,6 @@ function createStaticState(workflow, initial, root, path) {
     candidates: new Map(),
     activeEdges: new Set(),
     lastInputs: new Map(),
-    taskExecutors: dictionary(),
     nodeRuns: new Map(),
     stepCount: 0,
     initial,
@@ -522,7 +517,8 @@ function seedInbox(state, nodeId, acceptedTypes) {
 function requirementsFromInbox(node, state) {
   const inputs = dictionary();
   for (const requirement of node.requires) {
-    const matches = state.inboxes[node.id].filter((item) => item.type === requirement.type);
+    const matches = state.inboxes[node.id].filter((item) => item.type === requirement.type)
+      .sort((a,b) => state.workflow.node_order.indexOf(a.source_node) - state.workflow.node_order.indexOf(b.source_node));
     if (requirement.cardinality === "exactly_one") {
       if (matches.length !== 1) {
         throw vfError(
@@ -658,10 +654,6 @@ function nodeContext(node, state, execution) {
   }
   return Object.freeze({
     signal: execution?.signal || state.root.signal,
-    get tasks() {
-      if (node.flow_kind !== "task_manager") throw vfError("VF_TASK_CONTROL_FORBIDDEN", "only task_manager nodes have a task controller", state.workflow, {nodePath: nodePath(state, node.id)});
-      return taskController(node, state, execution);
-    },
     capabilities: Object.freeze(allowed),
     updateInfo(info) { state.root.statusUpdate?.(info); },
     trace(kind, details = {}) {
@@ -859,7 +851,8 @@ function resultValues(child) {
 function finalizeOutputs(state) {
   const output = {};
   for (const spec of state.workflow.outputs) {
-    const matches = state.candidates.get(spec.type) || [];
+    const matches = [...(state.candidates.get(spec.type) || [])]
+      .sort((a,b) => state.workflow.node_order.indexOf(a.source_node) - state.workflow.node_order.indexOf(b.source_node));
     if (spec.cardinality === "exactly_one") {
       if (matches.length !== 1) {
         throw vfError(
@@ -1131,17 +1124,22 @@ async function disposeRuntimePluginsAsync(root, preserveFailure = false) {
 }
 
 function createRoot(workflow, normalized) {
+  const controller = new AbortController();
+  const parentSignal = normalized.signal;
+  const propagate = () => controller.abort(parentSignal.reason);
+  parentSignal?.addEventListener("abort", propagate, {once:true});
+  if (parentSignal?.aborted) propagate();
   const root = {
     workflow,
     workflowId: workflow.workflow_id,
-    signal: normalized.signal || new AbortController().signal,
+    signal: controller.signal,
     traceMode: normalized.traceMode,
     onTrace: normalized.onTrace,
     statusStopping: normalized.statusStopping,
     statusUpdate: normalized.statusUpdate,
     kernelLog: normalized.kernelLog,
     capabilities: {},
-    taskRegistry: new TaskRegistry(),
+    controller,
     runtimePlugins: [],
   };
   const onAbort = () => {
@@ -1149,7 +1147,7 @@ function createRoot(workflow, normalized) {
     catch (error) { root.observationFailure ||= error; }
   };
   root.signal.addEventListener("abort", onAbort, {once:true});
-  root.unsubscribeSignal = () => root.signal.removeEventListener("abort", onAbort);
+  root.unsubscribeSignal = () => { root.signal.removeEventListener("abort", onAbort); parentSignal?.removeEventListener("abort", propagate); };
   return root;
 }
 
@@ -1316,29 +1314,7 @@ function createStaticWorkflowAsync(
         ? cause
         : vfError("VF_INTERNAL", "generated workflow failed internally", workflow, { cause });
     }
-    try {
-      await root.taskRegistry.finish(root);
-      if (!failure) throwIfAborted(root.signal, workflow);
-      if (root.observationFailure) throw root.observationFailure;
-    } catch (cleanupCause) {
-      const cleanupFailure = cleanupCause instanceof VibeFlowWorkflowError
-        ? cleanupCause
-        : vfError("VF_INTERNAL", "task cleanup failed internally", workflow, {
-          cause: cleanupCause,
-        });
-      if (!failure) failure = cleanupFailure;
-      else {
-        (failure.cleanupErrors ||= []).push(cleanupFailure);
-        try {
-          emitTrace(root, "async_cleanup_failed", {
-            code: cleanupFailure.code,
-            message: cleanupFailure.message,
-          }, true);
-        } catch {
-          // Preserve the primary failure after cleanup.
-        }
-      }
-    }
+    if (root.observationFailure && !failure) failure = root.observationFailure;
     root.unsubscribeSignal();
     if (failure) {
       if (failure.code !== "VF_TRACE_SINK_FAILED") {
@@ -1377,4 +1353,13 @@ function createStaticWorkflowAsync(
     await disposeRuntimePluginsAsync(root);
     return result.publicOutputs;
   };
+}
+
+function consumeStaticActivation(node, state) {
+  if (node.join_policy === 'all') {
+    for (const route of state.workflow.routes) {
+      if (route.schedule && route.target === node.id)
+        state.activeEdges.delete(`${route.source}\0${route.target}`);
+    }
+  }
 }

@@ -73,8 +73,6 @@ def workflow_plan_from_execution_plan(
             frames_by_path[(*block.path,call.id)] = frame
             if call.child_block:
                 collect(frame.subplan,call.child_block)
-            for key,target in call.task_targets:
-                collect(frame.task_plans[key],target)
     collect(execution_plan, original.entry_block)
     blocks = []
     for block in original.blocks:

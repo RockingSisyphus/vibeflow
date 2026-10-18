@@ -238,6 +238,8 @@ class RuntimeExecutionLockMixin:
         global_state_entered = False
         primary_error: BaseException | None = None
         try:
+            # A ready invocation may have waited for another execution domain.
+            self._signal.throw_if_aborted()
             if held_lock is not None:
                 protection_context_token = (
                     _CURRENT_EXECUTION_PROTECTION_DEPTH.set(
@@ -321,27 +323,7 @@ class RuntimeExecutionLockMixin:
     def _execution_scope_is_protected():
         return _CURRENT_EXECUTION_PROTECTION_DEPTH.get() > 0
 
-    def _retain_task_execution_locks(self):
-        """Keep inherited domains held while a managed invocation is queued or running.
 
-        Coordinator tokens are thread-independent. ContextVar stack tokens stay
-        with their original frame and are never transferred across threads.
-        """
-        retained = []
-        try:
-            for key in dict.fromkeys(key for key, _ in _CURRENT_EXECUTION_LOCK_STACK.get()):
-                acquisition = PROCESS_EXECUTION_LOCK_COORDINATOR.acquire(key,
-                    mode="shared", lease=self._lease, allow_reentrant=True)
-                retained.append(acquisition.token)
-        except BaseException:
-            self._release_task_execution_locks(retained)
-            raise
-        return retained
-
-    @staticmethod
-    def _release_task_execution_locks(retained):
-        for token in reversed(retained):
-            PROCESS_EXECUTION_LOCK_COORDINATOR.release(token)
 
 
 __all__ = ["RuntimeExecutionLockMixin"]

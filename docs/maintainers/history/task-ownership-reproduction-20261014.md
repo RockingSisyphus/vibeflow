@@ -6,7 +6,7 @@
 
 ## 公开入口复现
 
-案例见 [ownership fixture](../../../sandbox/javascript/task_management/ownership/README.md)，入口为 `sandbox/javascript/task_management/run_ownership.py`。两个 workspace root 复用同一 worker 和已登记 BaseLib/source/implementation_files。只运行公开 validate 与 inspect-resources，不执行业务，不关闭规则。
+当时使用的入口为 `sandbox/javascript/task_management/run_ownership.py`，该任务管理 fixture 已随图并发重构删除，不再提供执行入口。当前并发案例见[普通图并发沙箱](../../../sandbox/javascript/graph_concurrency/README.md)。历史对照中，两个 workspace root 复用同一 worker 和已登记 BaseLib/source/implementation_files，只运行公开 validate 与 inspect-resources，不执行业务，不关闭规则。
 
 最终十项对照中九项符合预期：同 root 普通/任务调用通过，跨 root 普通 Nodeset 与 implemented 管理调用通过，直接 Node 目标通过，真正未登记 loose.ts 在两 root 均被拒绝。唯一不匹配为跨 root 的 planned 管理 Node + Nodeset 目标：3 条 VF_IMPORT_OWNER，分别指向已登记 math.ts/types.ts（类型检查位置产生两条 types.ts 诊断）。源码与实际 0.19.0 包结果相同。
 

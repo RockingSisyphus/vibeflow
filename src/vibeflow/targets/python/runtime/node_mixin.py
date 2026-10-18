@@ -12,12 +12,8 @@ from vibeflow.targets.python.runtime.helpers import elapsed_ms
 from vibeflow.targets.python.runtime.summaries import summarize_mapping
 
 class RuntimeNodeMixin:
-    def _run_compiled_frame(self, frame: NodeFrame, state: "_RuntimeState") -> Mapping[str, object]:
+    def _execute_frame(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
         self._signal.throw_if_aborted()
-        self.trace.current_node = frame.name
-        inputs = self._resolve_inputs(frame, state)
-        state.last_inputs[frame.name] = inputs
-        state.inboxes[frame.name] = []
         with self._frame_execution_scope(frame):
             if frame.is_io:
                 outputs = self._run_io_node(frame, inputs)
@@ -35,9 +31,6 @@ class RuntimeNodeMixin:
                     outputs = self._run_nodeset_node(frame, inputs)
             else:
                 outputs = self._run_pure_node(frame, inputs)
-        if self.graph.task_entry == frame.id:
-            self._task_outputs = dict(outputs)
-        self._record_node_output_candidates(frame.name, outputs, state)
         return outputs
 
     def _run_io_node(
@@ -246,7 +239,7 @@ class RuntimeNodeMixin:
         # Runtime globals retain their reference semantics; Node config is JSON.
         if "_global" in frame.params:
             params["_global"] = frame.params["_global"]
-        from .tasks import NodeRunContext
+        from .lifecycle import NodeRunContext
         context = NodeRunContext(self, frame) if frame.accepts_context else None
         primary = None
         try:

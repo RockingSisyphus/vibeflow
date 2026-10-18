@@ -21,7 +21,6 @@ class StyleColors:
 
 
 SYSTEM_STYLE_COLORS: Mapping[str, StyleColors] = {
-    "taskManagerNode": StyleColors(fill="#FCE7F3", stroke="#BE185D", text="#831843"),
     "defaultNode": StyleColors(fill="#ECECFF", stroke="#9370DB", text="#333333"),
     "healthError": StyleColors(fill="#fee2e2", stroke="#dc2626", text="#7f1d1d"),
     "healthWarning": StyleColors(fill="#fef3c7", stroke="#d97706", text="#78350f"),
@@ -41,7 +40,6 @@ SYSTEM_MODIFIER_STYLES: Mapping[str, str] = {
 }
 
 MERMAID_MAIN_CLASS_ORDER = (
-    "taskManagerNode",
     "defaultNode",
     "healthError",
     "healthWarning",

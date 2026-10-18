@@ -7,7 +7,7 @@
 - [workflow-and-config](user/workflow-and-config.md)
 - [python-development](user/python-development.md)
 - [javascript-development](user/javascript-development.md)
-- [原生任务管理](user/task-management.md)：管理节点声明、并发启动、停止等待、取消清理和旧配置迁移。
+- [普通图并发](user/graph-concurrency.md)：显式分发与汇合、真实清理和旧配置迁移。
 - [nodesets-and-loops](user/nodesets-and-loops.md)
 - [plugins-and-integrations](user/plugins-and-integrations.md)
 - [multifile-resources](user/multifile-resources.md)

@@ -34,39 +34,17 @@
       },
       {
         "id": "double",
-        "type_used": "task.launch.sandbox_async_double.waited",
-        "display_name": "任务管理：Deferred double",
-        "description": "Starts an explicitly declared workflow-owned task.",
-        "task_targets": {
-          "work": {
-            "id": "work",
-            "type_used": "sandbox.async_double",
-            "display_name": "Deferred double",
-            "description": "Resolves the nested business result."
-          }
-        }
-      },
-      {
-        "id": "double_join",
-        "type_used": "task.join.sandbox_async_double",
-        "display_name": "任务管理：等待 Deferred double",
-        "description": "Waits for actual task execution and cleanup, then returns its declared outputs."
+        "type_used": "sandbox.async_double",
+        "display_name": "double",
+        "description": "Executes the declared ordinary workflow node."
       },
       {
         "id": "audit",
-        "type_used": "task.launch.sandbox_detached_audit.background",
-        "display_name": "任务管理：Detached nested audit",
-        "description": "Starts an explicitly declared workflow-owned task.",
-        "task_targets": {
-          "work": {
-            "id": "work",
-            "type_used": "sandbox.detached_audit",
-            "display_name": "Detached nested audit",
-            "description": "Exercises invocation-owned detached cleanup.",
-            "config": {
-              "label": "nested-async"
-            }
-          }
+        "type_used": "sandbox.detached_audit",
+        "display_name": "audit",
+        "description": "Executes the declared ordinary workflow node.",
+        "config": {
+          "label": "nested-async"
         }
       },
       {
@@ -86,12 +64,8 @@
         "to": "audit"
       },
       {
-        "from": "double_join",
-        "to": "end"
-      },
-      {
         "from": "double",
-        "to": "double_join"
+        "to": "end"
       },
       {
         "from": "audit",

@@ -91,7 +91,8 @@ def run(work, *, toolchain=None):
                     source_path.parent.mkdir(exist_ok=True)
                     source_path.write_text(block.source)
                     source = source_path.read_text()
-                    assert "runtime._run_compiled_frame" in source and "_run_node(" not in source
+                    assert "return run_graph_block(runtime, state," in source
+                    assert "_run_node(" not in source
                     sources.append(str(source_path.relative_to(work)))
             for case_index, case in enumerate(cases):
                 numbers, u, v, branch, w, result = case
@@ -104,8 +105,14 @@ def run(work, *, toolchain=None):
                 trace = events(run_dir / "runtime_trace.jsonl")
                 summary = trace[-1]
                 order = expected_order(topology, branch)
-                assert list(value(context, "runtime.exec_order")) == order
-                assert summary["exec_order"] == order and summary["current_node"] == order[-1], summary
+                actual_order = summary["exec_order"]
+                assert list(value(context, "runtime.exec_order")) == actual_order
+                assert len(actual_order) == len(order) and set(actual_order) == set(order), summary
+                assert summary["current_node"] == order[-1], summary
+                positions = {name: index for index, name in enumerate(actual_order)}
+                for edge in prepared.compilation.compiled_graph.schedule_edges:
+                    if edge.source in positions and edge.target in positions:
+                        assert positions[edge.source] < positions[edge.target], summary
                 assert summary["node_runs"] == dict.fromkeys(order, 1), summary
                 assert summary["step_count"] == len(order) and summary["stop_reason"] == "completed", summary
                 counts = Counter(event["kind"] for event in trace)

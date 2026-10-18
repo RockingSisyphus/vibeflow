@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from threading import Lock
+from threading import Lock, RLock
 from typing import TextIO
 
 
@@ -58,61 +58,68 @@ class RuntimeTrace:
     event_count: int = 0
     trace_path: str = ""
     events_streamed: bool = True
+    # Independent Node workers also publish events and nested trace summaries.
+    _lock: object = field(default_factory=RLock, init=False, repr=False, compare=False)
 
     def record_node_run(self, node_name: str, run_count: int) -> None:
-        qualified = qualified_name((node_name,))
-        self.node_runs[node_name] = run_count
-        self.exec_order.append(node_name)
-        self.qualified_node_runs[qualified] = run_count
-        self.qualified_exec_order.append(qualified)
+        with self._lock:
+            qualified = qualified_name((node_name,))
+            self.node_runs[node_name] = run_count
+            self.exec_order.append(node_name)
+            self.qualified_node_runs[qualified] = run_count
+            self.qualified_exec_order.append(qualified)
 
     def record_edge(self, source: str, target: str) -> None:
-        key = f"{source}->{target}"
-        self.edge_executions[key] = self.edge_executions.get(key, 0) + 1
-        qualified_key = f"{qualified_name((source,))}->{qualified_name((target,))}"
-        self.qualified_edge_executions[qualified_key] = self.qualified_edge_executions.get(qualified_key, 0) + 1
+        with self._lock:
+            key = f"{source}->{target}"
+            self.edge_executions[key] = self.edge_executions.get(key, 0) + 1
+            qualified_key = f"{qualified_name((source,))}->{qualified_name((target,))}"
+            self.qualified_edge_executions[qualified_key] = self.qualified_edge_executions.get(qualified_key, 0) + 1
 
     def add_event(self, event: dict[str, object], path: tuple[str, ...], sink: RuntimeTraceSink | None = None) -> None:
-        enriched = dict(event)
-        enriched["path"] = list(path)
-        enriched["qualified_node"] = qualified_name(path)
-        enriched["depth"] = max(len(path) - 1, 0)
-        self.event_count += 1
-        if sink is not None:
-            sink.write_event(enriched)
+        with self._lock:
+            enriched = dict(event)
+            enriched["path"] = list(path)
+            enriched["qualified_node"] = qualified_name(path)
+            enriched["depth"] = max(len(path) - 1, 0)
+            self.event_count += 1
+            if sink is not None:
+                sink.write_event(enriched)
 
     def merge_child(self, parent_path: tuple[str, ...], child: "RuntimeTrace") -> None:
-        for name in child.qualified_exec_order:
-            self.qualified_exec_order.append(_join_qualified(parent_path, name))
-        for name, count in child.qualified_node_runs.items():
-            key = _join_qualified(parent_path, name)
-            self.qualified_node_runs[key] = self.qualified_node_runs.get(key, 0) + count
-        for edge, count in child.qualified_edge_executions.items():
-            source, sep, target = edge.partition("->")
-            if not sep:
-                continue
-            key = f"{_join_qualified(parent_path, source)}->{_join_qualified(parent_path, target)}"
-            self.qualified_edge_executions[key] = self.qualified_edge_executions.get(key, 0) + count
-        self.event_count += child.event_count
-        self.nested_step_count += child.step_count + child.nested_step_count
+        with self._lock:
+            for name in child.qualified_exec_order:
+                self.qualified_exec_order.append(_join_qualified(parent_path, name))
+            for name, count in child.qualified_node_runs.items():
+                key = _join_qualified(parent_path, name)
+                self.qualified_node_runs[key] = self.qualified_node_runs.get(key, 0) + count
+            for edge, count in child.qualified_edge_executions.items():
+                source, sep, target = edge.partition("->")
+                if not sep:
+                    continue
+                key = f"{_join_qualified(parent_path, source)}->{_join_qualified(parent_path, target)}"
+                self.qualified_edge_executions[key] = self.qualified_edge_executions.get(key, 0) + count
+            self.event_count += child.event_count
+            self.nested_step_count += child.step_count + child.nested_step_count
 
     def to_dict(self) -> dict[str, object]:
-        return {
-            "exec_order": tuple(self.exec_order),
-            "edge_executions": dict(self.edge_executions),
-            "step_count": self.step_count,
-            "node_runs": dict(self.node_runs),
-            "qualified_exec_order": tuple(self.qualified_exec_order),
-            "qualified_edge_executions": dict(self.qualified_edge_executions),
-            "qualified_node_runs": dict(self.qualified_node_runs),
-            "total_step_count": self.step_count + self.nested_step_count,
-            "stop_reason": self.stop_reason,
-            "current_node": self.current_node,
-            "exception": self.exception,
-            "event_count": self.event_count,
-            "trace_path": self.trace_path,
-            "events_streamed": self.events_streamed,
-        }
+        with self._lock:
+            return {
+                "exec_order": tuple(self.exec_order),
+                "edge_executions": dict(self.edge_executions),
+                "step_count": self.step_count,
+                "node_runs": dict(self.node_runs),
+                "qualified_exec_order": tuple(self.qualified_exec_order),
+                "qualified_edge_executions": dict(self.qualified_edge_executions),
+                "qualified_node_runs": dict(self.qualified_node_runs),
+                "total_step_count": self.step_count + self.nested_step_count,
+                "stop_reason": self.stop_reason,
+                "current_node": self.current_node,
+                "exception": self.exception,
+                "event_count": self.event_count,
+                "trace_path": self.trace_path,
+                "events_streamed": self.events_streamed,
+            }
 
 
 def qualified_name(path: tuple[str, ...]) -> str:

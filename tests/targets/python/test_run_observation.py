@@ -124,3 +124,70 @@ def test_interruption_writes_failed_state(tmp_path):
             raise KeyboardInterrupt
     status = json.loads((tmp_path / "status.json").read_text())
     assert status["state"] == "failed" and status["error"] == "KeyboardInterrupt"
+
+
+def test_console_shutdown_drains_bytes_arriving_after_a_poll_timeout(tmp_path):
+    """Force the empty poll / final flush race in an isolated process."""
+    import subprocess
+    import sys
+
+    script = tmp_path / "console_race.py"
+    script.write_text('''
+from pathlib import Path
+import sys
+from threading import Event, Lock
+from vibeflow.targets.python.runtime import console_capture
+
+empty_poll = Event()
+resume_poll = Event()
+first_poll_lock = Lock()
+first_poll = True
+real_select = console_capture.select.select
+
+def paused_empty_poll(readers, writers, errors, timeout):
+    global first_poll
+    with first_poll_lock:
+        pause = first_poll
+        first_poll = False
+    if pause:
+        result = real_select(readers, writers, errors, 0)
+        assert not result[0], result
+        empty_poll.set()
+        assert resume_poll.wait(5), "shutdown never released the empty poll"
+        return result
+    return real_select(readers, writers, errors, timeout)
+
+class FinishingEvent:
+    def __init__(self):
+        self.event = Event()
+    def is_set(self):
+        return self.event.is_set()
+    def set(self):
+        self.event.set()
+        resume_poll.set()
+
+class Observer:
+    def __init__(self):
+        self.messages = []
+    def write_business(self, text):
+        self.messages.append(text)
+
+console_capture.select.select = paused_empty_poll
+console_capture.Event = FinishingEvent
+observer = Observer()
+with console_capture.capture_process_console(observer):
+    assert empty_poll.wait(5), "reader never reached an empty poll"
+    print("sum=9")
+    sys.stderr.write("writer=pathlib\\n")
+Path(sys.argv[1]).write_text("".join(observer.messages))
+''')
+    business = tmp_path / "business.log"
+    completed = subprocess.run(
+        [sys.executable, str(script), str(business)],
+        capture_output=True, text=True, timeout=15,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout == "sum=9\n", completed.stdout
+    assert completed.stderr == "writer=pathlib\n", completed.stderr
+    lines = business.read_text().splitlines()
+    assert sorted(lines) == ["sum=9", "writer=pathlib"], lines

@@ -280,7 +280,6 @@ class _MermaidRenderer:
                 if is_external:
                     lines.append(f"{indent}class {node_id} externalBoundary;")
                 lines.append(f"{indent}style {node_id} {presentation.mermaid_style()};")
-                self._render_task_targets(lines, graph, node, node_id, prefix=prefix, indent=indent, visited_nodesets=visited_nodesets)
                 continue
             flow_kind = node_flow_kind(node, compiled) or nodeset.flow_kind
             is_loop = node.type_used in LOOP_NODE_TYPES
@@ -338,16 +337,6 @@ class _MermaidRenderer:
                 self._render_edges(lines, nodeset.graph, nested_compiled, prefix=nested_prefix, indent=f"{indent}  ")
             lines.append(f"{indent}end")
 
-    def _render_task_targets(self, lines, graph, node, parent_id, *, prefix, indent, visited_nodesets):
-        from vibeflow.core.tasks import task_graph
-        for slot, target in node.task_targets.items():
-            child = task_graph(graph, target)
-            child, compiled = self.prepared.graph_for(child)
-            child_prefix = f"{prefix}{node.id}__tasks__{slot}__"
-            target_id = _safe_id(f"{child_prefix}{target.id}")
-            self._render_graph_body(lines, child, compiled, prefix=child_prefix,
-                indent=indent, visited_nodesets=visited_nodesets)
-            self._append_edge_line(lines, f'{indent}{parent_id} -.->|"启动: {_escape_edge_label(slot)}"| {target_id}')
 
     def _render_edges(self, lines: list[str], graph: GraphConfig, compiled: CompiledGraph, *, prefix: str, indent: str) -> None:
         for edge in compiled.effective_edges:
@@ -471,8 +460,6 @@ class _MermaidRenderer:
         return preferred_class or "defaultNode"
 
     def _preferred_class_for_node(self, *, flow_kind: str, is_external: bool) -> str:
-        if flow_kind == "task_manager":
-            return "taskManagerNode"
         if is_external:
             return "externalDependency"
         if flow_kind == FLOW_KIND_DOCUMENT:
@@ -514,8 +501,6 @@ class _MermaidRenderer:
         is_external: bool,
     ) -> str:
         sections: list[list[str]] = [[self._node_title(node, is_external=is_external)], [f"id: {node.id}", f"type_used: {node.type_used}"]]
-        if node_flow_kind(node, compiled) == "task_manager":
-            sections.append(["任务管理"])
         descriptor = registry_descriptor(self.registry, node.type_used)
         presentation = resolve_presentation(descriptor, call_style=node.style)
         icon = presentation.values.get("icon", "")
@@ -544,7 +529,7 @@ class _MermaidRenderer:
             )
             if semantic_lines:
                 sections.append([_section_label("meta"), *semantic_lines])
-        return _join_label_sections(sections, full=node_flow_kind(node, compiled) == "task_manager")
+        return _join_label_sections(sections, full=False)
 
     def _nodeset_label(
         self,

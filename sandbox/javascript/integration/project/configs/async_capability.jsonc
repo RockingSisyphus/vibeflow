@@ -24,23 +24,9 @@
       },
       {
         "id": "double",
-        "type_used": "task.launch.sandbox_async_double.waited",
-        "display_name": "任务管理：Double asynchronously",
-        "description": "Starts an explicitly declared workflow-owned task.",
-        "task_targets": {
-          "work": {
-            "id": "work",
-            "type_used": "sandbox.async_double",
-            "display_name": "Double asynchronously",
-            "description": "Doubles x through a Promise-returning node."
-          }
-        }
-      },
-      {
-        "id": "double_join",
-        "type_used": "task.join.sandbox_async_double",
-        "display_name": "任务管理：等待 Double asynchronously",
-        "description": "Waits for actual task execution and cleanup, then returns its declared outputs."
+        "type_used": "sandbox.async_double",
+        "display_name": "double",
+        "description": "Executes the declared ordinary workflow node."
       },
       {
         "id": "read",
@@ -66,16 +52,12 @@
         "to": "read"
       },
       {
-        "from": "double_join",
-        "to": "end"
-      },
-      {
         "from": "read",
         "to": "end"
       },
       {
         "from": "double",
-        "to": "double_join"
+        "to": "end"
       }
     ],
     "outputs": [

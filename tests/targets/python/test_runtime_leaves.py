@@ -98,7 +98,7 @@ def test_python_block_compiler_source_is_deterministic_golden() -> None:
     assert first[0].source == second[0].source
     # Transfer routes are evaluated independently of scheduling routes.
     assert sha256(first[0].source.encode("utf-8")).hexdigest() == (
-        "697e43749a18e2f2803978bdd6123b95ccd3bdff547a787b1e1c388a13497abe"
+        "b19d3a8c6217f931dc264e1329aba6c09c514978372f42f147ea6a48b77dfaa4"
     )
 
 

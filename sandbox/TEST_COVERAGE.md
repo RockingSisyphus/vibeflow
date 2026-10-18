@@ -4,11 +4,11 @@
 
 | 使用情境 | 实际验证入口 |
 | --- | --- |
-| 原生任务引用数组、任务管理 Node、失败作为结果、协作停止与实际退出、名单中转、Node／Chromium 两种 AOT profile | 两 Target 的 task_management/run_all.py，integration 与根目录 `--full`；机制屏障回归见两个 Target 的 test_task_management.py |
-| 跨 root Nodeset 任务目标源码归属，planned/implemented 对照及真实未登记导入 | JavaScript task_management/run_ownership.py 静态回归；integration 的任务管理案例自动执行，历史失败保留 |
+| 普通图并发、独立分发与 all 汇合、无数量上限、协作取消与实际清理、Node／Chromium AOT | 两 Target 的 graph_concurrency/run_all.py；integration 与根目录 `--full`；屏障与嵌套循环回归见 tests/conformance/test_graph_concurrency.py，清理回归见两个 Target 的 test_node_lifecycle.py |
+| Nodeset 声明源码归属、planned/implemented 对照及未登记导入 | tests/targets/javascript/test_source_audit_subjects.py、test_nodeset_rules.py 和 integration 源码规则负例；已删除任务目标专用 fixture |
 | 综合数学应用：自定义源码 Rule、typed records、warning 对照、配置覆盖、分支/汇合、Nodeset/Loop、Port 与复用并发 | 两 Target 的 comprehensive_math/run_all.py；各 integration runner 自动执行；[公式与通过判定](../docs/maintainers/comprehensive-math-sandbox.md) |
 | 简单数学使用场景：CLI、对象、插件修改、异步/Port | 五个 addition 独立入口；各 integration runner 自动执行；[替代与通过判定](../docs/maintainers/history/audits/addition-sandboxes-20261009.md) |
-| 嵌套数学工作流：条件/固定的内外层循环、carry/collect、编译源码、hooks、trace、TaskPlan、调度/数据边和超限诊断 | 两 Target 的 workflow_math/run_all.py；integration 自动执行；[19 项替代与通过判定](../docs/maintainers/history/audits/workflow-math-20261010.md) |
+| 嵌套数学工作流：条件/固定的内外层循环、carry/collect、编译源码、hooks、trace、ordinary Node、调度/数据边和超限诊断 | 两 Target 的 workflow_math/run_all.py；integration 自动执行；[19 项替代与通过判定](../docs/maintainers/history/audits/workflow-math-20261010.md) |
 | 同一起终点的不同条件边：成功/失败均收尾，顺序无关，完全重复与重叠条件不重复执行 | JavaScript workflow_math/conditional_routes.py；八次真实 AOT 构建、二十四次 Node.js 调用；integration 与根目录 `--full` 自动执行；[场景与判定](javascript/workflow_math/README.md) |
 | 分段数学工作流：直线、互斥分支、多终点、按类型汇合、数据旁路、编译源码和 trace | Python piecewise_math/run_all.py；integration 自动执行；[11 项替代与通过判定](../docs/maintainers/history/audits/piecewise-math-20261010.md) |
 | Python 工作流、Nodeset、Loop、异步、规则入口、CLI 与资源释放 | sandbox/python/integration/run_all.py |
