@@ -133,6 +133,7 @@ class PythonBundle:
 
     def _bind_config(self, prepared, registry, overrides, global_config):
         from vibeflow.core.graph_calls import graph_call_subjects
+        from vibeflow.core.config.concurrency import business_config, dispatch_limit
         from vibeflow.core.config.scope import ConfigScope, normalize_config_scope, scoped_node_params
         from vibeflow.block_compiler.compiler import _block_id
         from vibeflow.block_compiler.model import freeze_json_object
@@ -153,15 +154,17 @@ class PythonBundle:
             for call in block.nodes:
                 spec = specs[call.id]
                 if (call.is_loop or call.is_nodeset or spec.io.operation) and call.status != 'planned':
-                    calls.append(call)
+                    config = {**spec.params, **subject.overrides.get(call.id, {})}
+                    calls.append(replace(call, max_concurrency=dispatch_limit(config)))
                     continue
                 if call.status == 'planned':
-                    params = spec.params
+                    params = {**spec.params, **subject.overrides.get(call.id, {})}
                 else:
                     config = registry.get_config_spec(call.type_used)
                     params = scoped_node_params(spec.params,scope,declared_keys=set(config.schema))
                     params = registry.merge_config(call.type_used,{**params,**subject.overrides.get(call.id,{})})
-                calls.append(replace(call,params=freeze_json_object(params)))
+                calls.append(replace(call, params=freeze_json_object(business_config(params)),
+                    max_concurrency=dispatch_limit(params)))
             blocks[key] = replace(block,nodes=tuple(calls))
         return replace(prepared,workflow=replace(prepared.workflow,blocks=tuple(blocks.values())),globals=globals_by_block,overrides=overrides_by_block)
 

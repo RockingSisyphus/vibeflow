@@ -32,7 +32,10 @@
         "id": "start",
         "type_used": "native.terminal",
         "display_name": "start",
-        "description": "Explicit graph call"
+        "description": "Explicit graph call",
+        "config": {
+          "max_concurrency": 12
+        }
       },
       {
         "id": "w0",

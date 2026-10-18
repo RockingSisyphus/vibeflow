@@ -12,6 +12,7 @@ from vibeflow.core.flow import (
     STATUS_PLANNED,
 )
 from vibeflow.core.findings import HealthFinding
+from vibeflow.core.config.concurrency import business_config
 from vibeflow.targets.python.project.registry import NodeRegistry, NodeRegistryError
 from vibeflow.core.config.scope import (
     ConfigScope,
@@ -84,8 +85,8 @@ def _append_node_config_finding(
         rule_id="CONFIG.GLOBAL_CONFIG.OVERRIDES_LOCAL",
         object_id=node.id,
         message=f"global config overrides local node config: {node.id}",
-        base=node.params,
-        override=global_scope.values,
+        base=business_config(node.params),
+        override=business_config(global_scope.values),
         allow=global_scope.allow_config_override,
         details={"owner": owner, "type_used": node.type_used},
     )

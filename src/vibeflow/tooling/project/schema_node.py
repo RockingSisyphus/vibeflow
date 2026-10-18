@@ -120,6 +120,9 @@ def _validate_node_contract_fields(
 def _validate_node_config_fields(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
     if "config" in value and not isinstance(value["config"], Mapping):
         findings.append(_error("CONFIG.SCHEMA.NODE_CONFIG_OBJECT", f"{prefix}.config must be an object", f"{prefix}.config"))
+    config = value.get("config", {})
+    if isinstance(config, Mapping) and "max_concurrency" in config:
+        _validate_positive_int(config["max_concurrency"], f"{prefix}.config.max_concurrency", findings, "CONFIG.SCHEMA.MAX_CONCURRENCY")
     if "node_configs" in value:
         _validate_node_configs(value["node_configs"], f"{prefix}.node_configs", findings)
     for field in ("allow_config_override", "override_child_config"):

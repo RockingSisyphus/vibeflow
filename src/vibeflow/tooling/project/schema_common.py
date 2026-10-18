@@ -66,6 +66,8 @@ def _validate_node_configs(value: Any, prefix: str, findings: list[HealthFinding
             findings.append(_error("CONFIG.SCHEMA.NODE_CONFIGS_KEY", f"{prefix} keys must be non-empty strings", prefix))
         if not isinstance(item, Mapping):
             findings.append(_error("CONFIG.SCHEMA.NODE_CONFIG_OBJECT", f"{prefix}.{key} must be an object", f"{prefix}.{key}"))
+        elif "max_concurrency" in item:
+            _validate_positive_int(item["max_concurrency"], f"{prefix}.{key}.max_concurrency", findings, "CONFIG.SCHEMA.MAX_CONCURRENCY")
 
 def _validate_string_list(
     value: Any,

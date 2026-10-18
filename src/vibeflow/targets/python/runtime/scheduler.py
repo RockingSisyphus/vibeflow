@@ -2,10 +2,11 @@
 
 Only this coordinator changes graph mailboxes and activates edges. Workers own
 their Node invocation through its real return, including finally and SDK cleanup.
-There is no worker-count setting or separate task graph.
+Each dispatch invocation owns its own admission budget; there is no task graph.
 """
 
 from contextvars import copy_context
+from dataclasses import dataclass
 from queue import Queue
 from threading import Thread
 
@@ -14,10 +15,18 @@ from vibeflow.core.flow import JOIN_POLICY_ALL
 from .errors import DelegateCliExit, PipelineRuntimeError
 
 
+@dataclass(eq=False)
+class _Dispatch:
+    limit: int
+    active: int = 0
+
+
 def run_graph(runtime, state):
     ready = list(runtime._initial_ready_nodes(state))
     queued = set(ready)
     running = {}
+    pending_dispatches = {}
+    active_dispatches = {}
     finished = Queue()
     last_node, last_outputs = "", {}
     failure = None
@@ -38,8 +47,17 @@ def run_graph(runtime, state):
                 if name in running:
                     ready.append(name)
                     continue
+                dispatches = pending_dispatches.get(name, ())
+                if any(dispatch.active >= dispatch.limit for dispatch in dispatches):
+                    ready.append(name)
+                    continue
                 queued.discard(name)
                 if runtime._requirements_available(name, state):
+                    pending_dispatches.pop(name, None)
+                    if dispatches:
+                        for dispatch in dispatches:
+                            dispatch.active += 1
+                        active_dispatches[name] = dispatches
                     eligible.append(name)
             concurrent = bool(running) or len(eligible) > 1
             for name in eligible:
@@ -79,6 +97,8 @@ def run_graph(runtime, state):
             thread = running.pop(name)
             if thread is not None:
                 thread.join()
+            for dispatch in active_dispatches.pop(name, ()):
+                dispatch.active -= 1
             if error is not None:
                 runtime.trace.current_node = name
                 raise error
@@ -90,7 +110,16 @@ def run_graph(runtime, state):
             for edge in active:
                 runtime._activate_edge(edge, state)
             runtime._deliver_transfer_edges(name, outputs, state)
-            for target in runtime._scheduled_targets(name, active):
+            targets = runtime._scheduled_targets(name, active)
+            frame = runtime._frames[name]
+            dispatch = (
+                _Dispatch(frame.max_concurrency)
+                if len({edge.target for edge in frame.outgoing}) > 1
+                else None
+            )
+            for target in targets:
+                if dispatch is not None:
+                    pending_dispatches.setdefault(target, set()).add(dispatch)
                 if target not in queued:
                     ready.append(target)
                     queued.add(target)

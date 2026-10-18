@@ -31,6 +31,12 @@ class SchedulerCodegenMixin:
             if node.requires and (not incoming[node.id] or any(r.source in empty_starts for r in incoming[node.id])):
                 lines.append(f"    seedInbox(state, {js(node.id)}, {js([r.type for r in node.requires])});")
         lines.extend([f"    const ready = {js(list(workflow.entries))};",
+                      "    const pendingDispatches = new Map();",
+                      "    const activeDispatches = new Map();",
+                      "    const releaseDispatch = nodeId => {",
+                      "      for (const dispatch of activeDispatches.get(nodeId) || []) dispatch.active -= 1;",
+                      "      activeDispatches.delete(nodeId);",
+                      "    };",
                       "    const queued = new Set(ready);", "    let completed = false;",
                       f"    const executeReady = {'async ' if asynchronous else ''}(nodeId) => {{",
                       "      switch (nodeId) {"])
@@ -45,18 +51,22 @@ class SchedulerCodegenMixin:
                 "      for (const nodeId of batch) {",
                 "        queued.delete(nodeId);",
                 "        if (running.has(nodeId)) { enqueueStaticTargets([nodeId], ready, queued); continue; }",
+                "        const dispatches = pendingDispatches.get(nodeId);",
+                "        if (dispatches && [...dispatches].some(dispatch => dispatch.active >= dispatch.limit)) { enqueueStaticTargets([nodeId], ready, queued); continue; }",
                 "        const operation = executeReady(nodeId).then(() => ({nodeId}), error => ({nodeId, error}));",
                 "        running.set(nodeId, operation);",
                 "      }",
                 "      if (!running.size) break;",
                 "      const outcome = await Promise.race(running.values());",
                 "      running.delete(outcome.nodeId);",
+                "      releaseDispatch(outcome.nodeId);",
                 "      if (outcome.error) throw outcome.error;",
                 "    }",
             ])
         else:
             lines.extend(["    while (ready.length) {", "      const nodeId = ready.shift();",
-                          "      queued.delete(nodeId);", "      executeReady(nodeId);", "    }"])
+                          "      queued.delete(nodeId);", "      executeReady(nodeId);",
+                          "      releaseDispatch(nodeId);", "    }"])
         lines.extend(["    const publicOutputs = finalizeOutputs(state);",
                       f'    {hook}(root, "afterBlock", {{blockPath: formatBlockPath(path), path: [...path]}});',
                       "    return {publicOutputs, candidates: state.candidates, completed};",
@@ -101,6 +111,9 @@ class SchedulerCodegenMixin:
         lines.extend(
             [
                 "          try {",
+                f"            const dispatches = pendingDispatches.get({js(node.id)});",
+                f"            pendingDispatches.delete({js(node.id)});",
+                f"            if (dispatches) {{ for (const dispatch of dispatches) dispatch.active += 1; activeDispatches.set({js(node.id)}, dispatches); }}",
                 f"            if (state.stepCount >= {code.workflow.max_steps}) throw vfError('VF_MAX_STEPS', 'workflow exceeded max_steps', state.workflow);",
                 "            state.stepCount += 1;",
                 f"            consumeStaticActivation({code.node_names[node.id]}, state);",
@@ -143,6 +156,14 @@ class SchedulerCodegenMixin:
                 ]
             )
         else:
+            if len({route.target for route in code.workflow.routes if route.source == node.id and route.schedule}) > 1:
+                lines.extend([
+                    f"            const childDispatch = {{limit: {node.max_concurrency}, active: 0}};",
+                    "            for (const target of targets) {",
+                    "              if (!pendingDispatches.has(target)) pendingDispatches.set(target, new Set());",
+                    "              pendingDispatches.get(target).add(childDispatch);",
+                    "            }",
+                ])
             lines.append(
                 "            enqueueStaticTargets(targets, ready, queued);"
             )

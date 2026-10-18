@@ -2,7 +2,7 @@
 
 Core 提供语言无关的图结构与依赖；Block Compiler 生成 Workflow ABI v8 的普通工作流、Nodeset 与 Loop Block。Target 负责真实执行，Tooling 负责配置、质量检查与展示。
 
-所有执行节点通过正常边激活下游。就绪队列提交独立分支；节点完成真实清理后交付输出；`join_policy: all` 消费本轮所有前驱的完成信号再执行。并发数量没有固定上限。串行关系由依赖链表达。
+所有执行节点通过正常边激活下游。就绪队列提交独立分支；节点完成真实清理后交付输出；`join_policy: all` 消费本轮所有前驱的完成信号再执行。分发节点通过 `config.max_concurrency` 设置自身直接调用的容量，默认 8，任一调用实际退出后补位。串行关系由依赖链表达。
 
 Python 的 plan、block、compiled 三种入口共用同一图调度器；JavaScript AOT 发射事件循环调度。锁保护与取消生命周期覆盖已启动节点至实际退出，错误保留清理信息。详细配置与迁移见[普通图并发与汇合](graph-concurrency.md)。
 

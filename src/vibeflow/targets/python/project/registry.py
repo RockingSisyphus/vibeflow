@@ -6,7 +6,8 @@ from dataclasses import dataclass
 import sys
 from typing import Any, Callable, Mapping
 
-from vibeflow.core.config.node import NodeConfigError, NodeConfigSpec, merge_node_config, normalize_node_config_spec
+from vibeflow.core.config.node import NodeConfigError, NodeConfigSpec, normalize_node_config_spec
+from vibeflow.core.config.concurrency import merge_call_config
 from vibeflow.core.descriptors.models import NodeDescriptor
 
 
@@ -144,7 +145,7 @@ class NodeRegistry:
 
     def merge_config(self, key: str, overrides: Mapping[str, Any] | None) -> dict[str, Any]:
         try:
-            return merge_node_config(self.get_config_spec(key), overrides)
+            return merge_call_config(self.get_config_spec(key), overrides)
         except NodeConfigError as exc:
             raise NodeRegistryError(str(exc)) from exc
 
@@ -183,7 +184,7 @@ class NodeRegistryQueries:
     def merge_config(self,key,overrides):
         from vibeflow.core.rules.models import readonly
         try:
-            return readonly(merge_node_config(self.get_config_spec(key),overrides))
+            return readonly(merge_call_config(self.get_config_spec(key),overrides))
         except NodeConfigError as exc:
             raise NodeRegistryError(str(exc)) from exc
 

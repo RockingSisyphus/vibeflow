@@ -74,8 +74,9 @@ def node_invocation_scope(
     *,
     allow_config_override: bool,
 ) -> ConfigScope:
+    from .concurrency import business_config
     return ConfigScope(
-        values={str(key): value for key, value in values.items()},
+        values={str(key): value for key, value in business_config(values).items()},
         allow_config_override=bool(allow_config_override),
     )
 
@@ -130,12 +131,18 @@ def nested_node_config_overrides(
 def normalize_node_config_overrides(
     value: Mapping[str, Mapping[str, object]],
 ) -> dict[str, dict[str, object]]:
+    from .concurrency import dispatch_limit
+    from .node import NodeConfigError
     out: dict[str, dict[str, object]] = {}
     for key, item in value.items():
         if not isinstance(item, Mapping):
             raise ConfigBindingError(
                 f"node config override for '{key}' must be an object"
             )
+        try:
+            dispatch_limit(item)
+        except NodeConfigError as error:
+            raise ConfigBindingError(f"node config override for '{key}': {error}") from error
         out[str(key)] = dict(item)
     return out
 

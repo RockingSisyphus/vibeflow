@@ -28,6 +28,7 @@ class EmissionNode(Protocol):
     params: Mapping[str, Any]
     flow_kind: str
     join_policy: str
+    max_concurrency: int
     is_terminal: bool
     is_nodeset: bool
     is_loop: bool
