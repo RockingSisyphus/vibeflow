@@ -227,7 +227,7 @@ from pathlib import Path
 from vibeflow.tooling.application.python.project.declarations import declared_python_registry
 from vibeflow.tooling.project.workspace_loader import load_project_workspace
 from vibeflow.targets.python.project.resource_rules import review_python_resource
-from vibeflow.targets.python.quality.source_analysis import PurityPolicy
+from vibeflow.targets.python.rules.node.policy import PurityPolicy
 root=Path(sys.argv[1]); options=json.loads(sys.argv[2])
 registry=declared_python_registry(load_project_workspace(root/"workflow.jsonc"),config_path=root/"workflow.jsonc")
 registry.configure_rule_defaults(purity_policy=PurityPolicy(**options))
@@ -307,13 +307,13 @@ from vibeflow.tooling.project.workspace_loader import load_project_workspace
 registry=declared_python_registry(load_project_workspace(root/'node.py'),config_path=root/'workflow.jsonc')
 report=validate_graph_health(graph,registry=registry,purity_policy=policy,source_context=collect_workflow_source_context(registry,graph))
 '''
+    policy_module = "vibeflow.targets.python.quality.source_analysis" if variant == "baseline" else "vibeflow.targets.python.rules.node.policy"
     return '''import json,sys
 from pathlib import Path
 from vibeflow.core import GraphConfig,NodeSpec,EdgeSpec,DataProvider
 from vibeflow.core.flow import NodeMetadata
 from vibeflow.targets.python.project import NodeRegistry
-from vibeflow.targets.python.quality.source_analysis import PurityPolicy
-from vibeflow.targets.python.quality.workflow import validate_graph_health
+''' + "from " + policy_module + " import PurityPolicy\n" + '''from vibeflow.targets.python.quality.workflow import validate_graph_health
 root=Path(sys.argv[1]); policy=PurityPolicy(**json.loads(sys.argv[2]))
 def call(name):
     return NodeSpec(id=name,type_used='parity.'+(name if name!='demo' else 'node'),metadata=NodeMetadata(name,'Parity graph call'),provides=(DataProvider('demo.out','demo.out',display_name='Result'),) if name=='demo' else ())

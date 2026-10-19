@@ -145,7 +145,7 @@ Architecture 另记录项目声明、入口/支撑文件、实际导入、库依
 
 四类资源使用相同 `presentation` 字段：`fill/stroke/text/shape/icon`。颜色必须是六位十六进制值并遵守系统保留色；14 种形状与 Node 相同。使用处只覆盖 `fill/stroke/text`，形状和图标由资源声明选择。顺序为原生默认、资源声明、状态、使用处颜色；真实 `flow_kind`、external、planned 和诊断标记单独保留。
 
-公开形状为 `rect/rounded/stadium/diamond/lean-r/lean-l/fr-rect/cyl/doc/hex/cloud/circle/dbl-circ/trap-b`；序列化后 `diamond` 归一化为 `diam`。资源目录使用资源的有效展示，Workflow 中每次 Node 调用分别保存调用样式与真实执行身份。
+公开形状为 `rect/rounded/stadium/diamond/lean-r/lean-l/fr-rect/cyl/doc/hex/cloud/circle/dbl-circ/trap-b`；Architecture 和 HTML 使用公共名称 `diamond`，仅 Mermaid 输出转换为其方言 `diam`。资源目录使用资源的有效展示，Workflow 中每次 Node 调用分别保存调用样式与真实执行身份。
 
 Node 使用调用点 `style`；Host 使用 `host_extensions[].style`；插件使用 `plugins[].style`；BaseLib 使用 `base_lib.modules[].style`。插件颜色覆盖只影响插件包和它的生命周期，不改写包内 Node、Host 或库的声明。
 

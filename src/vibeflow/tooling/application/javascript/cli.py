@@ -251,7 +251,7 @@ def handle_inspect_config(args: argparse.Namespace) -> int:
 
 
 def handle_export_architecture(args: argparse.Namespace) -> int:
-    from vibeflow.tooling.application.javascript.audit import render_architecture
+    from vibeflow.tooling.application.javascript.presentation.architecture import render_architecture
 
     result, error = _audit(args)
     if error is not None:
@@ -286,7 +286,7 @@ def handle_export_architecture(args: argparse.Namespace) -> int:
 
 
 def handle_export_mermaid(args: argparse.Namespace) -> int:
-    from vibeflow.tooling.application.javascript.audit import render_mermaid
+    from vibeflow.tooling.application.javascript.presentation.diagrams import render_mermaid
 
     return _handle_text_export(
         args,
@@ -299,7 +299,7 @@ def handle_export_mermaid(args: argparse.Namespace) -> int:
 
 
 def handle_export_ascii(args: argparse.Namespace) -> int:
-    from vibeflow.tooling.application.javascript.audit import render_ascii
+    from vibeflow.tooling.application.javascript.presentation.diagrams import render_ascii
 
     return _handle_text_export(
         args,
@@ -311,8 +311,8 @@ def handle_export_ascii(args: argparse.Namespace) -> int:
 
 
 def handle_export_svg(args: argparse.Namespace) -> int:
-    from vibeflow.tooling.application.javascript.review import write_review_svg
-    from vibeflow.tooling.presentation.review_types import REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH
+    from vibeflow.tooling.application.javascript.presentation.diagrams import write_review_svg
+    from vibeflow.tooling.presentation.mermaid.types import REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH
 
     result, error = _audit(args)
     if error is not None:
@@ -367,9 +367,7 @@ def handle_export_svg(args: argparse.Namespace) -> int:
 
 
 def handle_review(args: argparse.Namespace) -> int:
-    from vibeflow.tooling.application.javascript.audit import (
-        render_architecture,
-    )
+    from vibeflow.tooling.application.javascript.presentation.architecture import render_architecture
     config_path = Path(args.config).resolve()
     output = Path(args.output).resolve() if args.output else Path(getattr(args, "preview_root", None) or Path(args.workspace).resolve().parent) / "vibeflow-preview.html"
     payload: dict[str, object] = {
@@ -465,7 +463,7 @@ def handle_review(args: argparse.Namespace) -> int:
 
 
 def _publish_review_preview(result, args, payload):
-    from vibeflow.tooling.application.javascript.preview import javascript_preview
+    from vibeflow.tooling.application.javascript.presentation.preview import javascript_preview
     from vibeflow.tooling.presentation.preview.exporter import attach_svg
     record = None
     try:
@@ -474,7 +472,7 @@ def _publish_review_preview(result, args, payload):
     except Exception as exc:
         return _finish_review_failure(payload,"preview","REVIEW.PREVIEW.WRITE",exc,status="FAIL")
     if args.output or getattr(args,"with_svg",False):
-        from vibeflow.tooling.application.javascript.review import write_review_svg, expected_review_coverage
+        from vibeflow.tooling.application.javascript.presentation.diagrams import write_review_svg, expected_review_coverage
         output=Path(args.output).resolve() if args.output else record.directory/"requested-review.svg"
         temporary=None
         stage,code="svg","REVIEW.SVG.RENDER"
@@ -1014,8 +1012,6 @@ def _validate_review_svg_file(
             "generated review SVG coverage mismatch: "
             f"missing={missing}, unexpected={unexpected}, duplicates={duplicates}",
         )
-
-
 
 
 def _finish_review_failure(

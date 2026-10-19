@@ -12,7 +12,7 @@ from tests.fixtures.support.declarations import write_node_plugin
 from tests.fixtures.support.plugins import resource as resource_ref, append_resource
 
 from vibeflow.tooling.project.config_loader import load_raw_config_document
-from vibeflow.tooling.application.python.presentation.architecture_document import ARCHITECTURE_DOCUMENT_HEADER
+from vibeflow.tooling.project.document_kinds import ARCHITECTURE_DOCUMENT_HEADER
 from vibeflow.tooling.application.python.workspace_service import (
     run_workspace_checked,
     validate_workspace_config_path,

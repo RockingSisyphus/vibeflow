@@ -90,7 +90,7 @@ def run(work, *, toolchain=None):
             assert_artifacts(checked.run_dir)
             facts=preview_architecture(checked.run_dir)
             visible=json.dumps(facts,ensure_ascii=False)
-            for text in row.get("expected_svg_text_contains",[]):
+            for text in row.get("expected_architecture_text_contains",[]):
                 assert text in visible, text
             env = build_workspace_environment(loaded, config_path=config)
             prepared = _prepare_workspace_graph(config, workspace=loaded, env=env)

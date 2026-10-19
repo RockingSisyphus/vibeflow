@@ -8,7 +8,8 @@ def evidence(actual,architecture,mermaid,browser,kind,fields,*,override=False):
     resource=display_resource(architecture,kind)
     values=resource.get("effective_presentation",{}).get("values",{})
     sources=resource.get("effective_presentation",{}).get("sources",{})
-    shape="diam" if fields.get("shape")=="diamond" else fields.get("shape",values.get("shape"))
+    shape=fields.get("shape",values.get("shape"))
+    mermaid_shape="diam" if shape=="diamond" else shape
     candidates=display_nodes(browser,kind)
     shapes=[item for node in candidates for item in node["shapes"]]
     geometry=fields.get("shape",values.get("shape"))
@@ -21,7 +22,7 @@ def evidence(actual,architecture,mermaid,browser,kind,fields,*,override=False):
         shape_matches=any(item["tag"]=="polygon" and len((item["points"] or "").split())==count for item in shapes)
     else:shape_matches=any(item["tag"]=="path" and item["d"] for item in shapes)
     actual["metrics"].update(architecture_shape=values.get("shape"),architecture_fill=values.get("fill"),
-        presentation_origin=sources.get("fill"),mermaid_shape=("shape: "+str(shape)) in mermaid,
+        presentation_origin=sources.get("fill"),mermaid_shape=("shape: "+str(mermaid_shape)) in mermaid,
         browser_resource_count=len(candidates),browser_fill=any(item["fill"]==rgb(fields["fill"]) for item in shapes),
         browser_stroke=any(item["stroke"]==rgb(fields["stroke"]) for item in shapes),
         browser_text=any(label["fill"]==rgb(fields["text"]) or label["color"]==rgb(fields["text"]) for node in candidates for label in node["labels"]),

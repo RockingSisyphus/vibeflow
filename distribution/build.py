@@ -960,8 +960,9 @@ import sys
 from vibeflow.tooling.application.javascript.audit import (
     JavascriptAuditRequest,
     audit_javascript_project,
-    render_architecture,
 )
+
+from vibeflow.tooling.application.javascript.presentation.architecture import render_architecture
 
 result = audit_javascript_project(
     JavascriptAuditRequest(

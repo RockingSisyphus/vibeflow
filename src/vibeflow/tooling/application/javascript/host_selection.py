@@ -28,6 +28,3 @@ def declared_hosts(config, *, catalog):
             description=resource.description or descriptor.description, version=resource.version or descriptor.version,
             **contract))
     return tuple(resolved)
-
-
-from vibeflow.targets.javascript.build.host_selection import active_host_ids

@@ -34,7 +34,7 @@
       "retry_loop.iter_2.increment",
       "retry_loop.iter_2.done"
     ],
-    "expected_svg_text_contains": [
+    "expected_architecture_text_contains": [
       "Retry Loop",
       "vibeflow.loop.while",
       "stop_when"

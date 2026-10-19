@@ -1,19 +1,13 @@
 from __future__ import annotations
+from vibeflow.tooling.presentation.mermaid.style import mermaid_shape
 
 import textwrap
 from typing import Any, Mapping
 
-from vibeflow.tooling.application.python.presentation.helpers import nodeset_for_node
-from vibeflow.tooling.application.python.presentation.review_model import (
-    display_source_path,
-    edge_roles,
-    edge_transfers,
-    mapping_items,
-    rendered_resources_payload,
-    resources_payload,
-)
+from vibeflow.tooling.application.python.presentation.review_model import nodeset_for_node
+from vibeflow.tooling.application.python.presentation.review_model import display_source_path, edge_roles, edge_transfers, mapping_items, rendered_resources_payload
 from vibeflow.core.flow import GraphConfig, NodeSpec, NodesetSpec
-from vibeflow.tooling.application.mermaid_shapes import (
+from vibeflow.tooling.presentation.mermaid.style import (
     mermaid_shape_for_flow_kind,
 )
 
@@ -72,11 +66,9 @@ def _section_label(name: str) -> str:
 
 def _node_shape(node_id: str, label: str, flow_kind: object, *, shape: str = "") -> str:
     escaped = _escape_label(label)
-    actual_shape = shape or mermaid_shape_for_flow_kind(flow_kind)
+    actual_shape = mermaid_shape(shape) if shape else mermaid_shape_for_flow_kind(flow_kind)
     return f'{node_id}@{{ shape: {actual_shape}, label: "{escaped}" }}'
 
-def _resources_payload(resources: object | None) -> Mapping[str, object]:
-    return resources_payload(resources)
 
 def _rendered_resources_payload(resources: object | None, graph: GraphConfig | None = None, registry=None) -> dict[str, object]:
     return rendered_resources_payload(resources, graph, registry)
@@ -275,7 +267,7 @@ def _comment_text(value: str) -> str:
     return value.replace("\r", " ").replace("\n", " ").strip()
 
 def _safe_id(value: str) -> str:
-    from vibeflow.tooling.presentation.mermaid_identity import mermaid_identity
+    from vibeflow.tooling.presentation.mermaid.identity import mermaid_identity
     if value.startswith("n_"):
         return "vf_encoded_" + value.encode("utf-8").hex()
     cleaned = mermaid_identity(value)

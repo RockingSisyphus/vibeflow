@@ -207,14 +207,14 @@ def _require_exact_keys(value: Mapping[str, Any], expected: frozenset[str], labe
 def _validate_protocol(name: str, protocol: Mapping[str, Any]) -> None:
     if protocol["change_inventory"] not in {"required", "optional"}:
         raise DistributionProfileError(f"profiles.{name}.agent_protocol.change_inventory is invalid")
-    if protocol["required_review_artifact"] not in {"expanded_svg", "on_demand"}:
+    if protocol["required_review_artifact"] not in {"html_preview", "on_demand"}:
         raise DistributionProfileError(
             f"profiles.{name}.agent_protocol.required_review_artifact is invalid"
         )
     if not isinstance(protocol["planned_review"], bool) or not isinstance(protocol["human_approval_gate"], bool):
         raise DistributionProfileError(f"profiles.{name}.agent_protocol boolean fields must be booleans")
     if name == "collaborative":
-        expected = ("required", True, True, "expanded_svg")
+        expected = ("required", True, True, "html_preview")
     else:
         expected = ("optional", False, False, "on_demand")
     actual = (

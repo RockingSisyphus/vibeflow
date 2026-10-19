@@ -1,6 +1,6 @@
 # 嵌套与循环数学
 
-一个独立 SDK 数学项目，共享小整数节点和纯加法 BaseLib；通过正式 checked run 导出架构和 SVG，每种配置只准备、渲染一次，后续模式使用独立 Runtime。
+一个独立 SDK 数学项目，共享小整数节点和纯加法 BaseLib；通过正式 checked run 导出 Architecture 和 HTML 预览快照，每种配置只准备一次，后续模式使用独立 Runtime。
 
 | 场景 | 手写期望 | 额外通过条件 |
 | --- | --- | --- |
@@ -15,8 +15,7 @@
 共 17 组观察，另有五次 checked run。`expectations.json` 保存手写数字、路径和事件数量；没有调用被测计算来生成期望值。旧双层循环的业务累加从 outer+inner+1 简化为每次加 1，停止条件、carry/collect、迭代次数和路径保持原检查。
 
 ```bash
-python sandbox/python/workflow_math/run_all.py --work-dir /tmp/workflow-math-python \
-  --renderer-root /path/to/installed/mermaid-renderer
+python sandbox/python/workflow_math/run_all.py --work-dir /path/outside/repository/workflow-math-python
 ```
 
 入口自动纳入 Python integration，替代 13 个旧任务。逐项对应见 [整合归档](../../../docs/maintainers/history/audits/workflow-math-20261010.md)。

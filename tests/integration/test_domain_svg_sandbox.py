@@ -67,7 +67,7 @@ def _label(element):
 def _assert_shape(element, shape):
     geometry = [child for child in element if child.tag.rsplit("}", 1)[-1] in {"polygon", "circle", "rect", "path"}]
     assert geometry, ET.tostring(element, encoding="unicode")
-    if shape in {"hex", "diam"}:
+    if shape in {"hex", "diamond"}:
         polygons = [item for item in geometry if item.tag.endswith("polygon")]
         assert polygons
         assert len(polygons[0].get("points", "").split()) == (6 if shape == "hex" else 4)
@@ -79,9 +79,9 @@ def _assert_shape(element, shape):
 
 @pytest.mark.parametrize("level,fill,shape,icon", [
     ("default", "#cceeff", "hex", "MODEL_ICON"),
-    ("node", "#fff2aa", "diam", "NODE_ICON"),
+    ("node", "#fff2aa", "diamond", "NODE_ICON"),
     ("call", "#ffe6ee", "circle", "CALL_ICON"),
-    ("status", "#fef08a", "diam", "NODE_ICON"),
+    ("status", "#fef08a", "diamond", "NODE_ICON"),
     ("planned", "#ffe6ee", "circle", "CALL_ICON"),
 ])
 def test_formal_domain_svg_preserves_effective_styles_and_native_identity(svg_project, capsys, tmp_path, level, fill, shape, icon):

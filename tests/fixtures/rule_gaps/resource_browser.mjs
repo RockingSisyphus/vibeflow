@@ -1,6 +1,6 @@
 /** Browser evidence over the final composed SVG, including actual geometry. */
 import {createRequire} from "node:module";
-import {serveAssets} from "../../../src/vibeflow/tooling/presentation/http_assets.mjs";
+import {serveAssets} from "../../../src/vibeflow/tooling/presentation/mermaid/http_assets.mjs";
 const [renderer,svg,output] = process.argv.slice(2);
 const require=createRequire(renderer+"/package.json");
 const puppeteer=require("puppeteer");

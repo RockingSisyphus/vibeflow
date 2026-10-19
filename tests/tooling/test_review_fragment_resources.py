@@ -8,7 +8,7 @@ from vibeflow.core.descriptors import NodeContractDescriptor, NodeDescriptor
 from vibeflow.targets.python.project import GraphCompiler, NodeRegistry
 from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_document
 from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid, review_fragments, review_svg
-from vibeflow.tooling.presentation.review_types import SvgFragment
+from vibeflow.tooling.presentation.mermaid.types import SvgFragment
 from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
 from vibeflow.tooling.project.graph_config import parse_graph_config
 
@@ -64,7 +64,6 @@ def test_review_workflow_and_nested_frames_exclude_resource_columns(prepared_rev
         rendered.append((title, mermaid_text))
         return SvgFragment(title, '<svg viewBox="0 0 120 60"><rect width="120" height="60"/></svg>', 120, 60)
 
-    monkeypatch.setattr(review_svg, "_render_fragment", fragment)
     monkeypatch.setattr(review_fragments, "_render_fragment", fragment)
     output = tmp_path / "review.svg"
     review_svg.render_review_columns_svg(graph, prepared.compiled, output,

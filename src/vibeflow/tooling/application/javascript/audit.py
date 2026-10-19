@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-from vibeflow.core.rules.selection import selection_data
-
 from vibeflow.targets.javascript.build.driver_session import check_scope
 
 from dataclasses import dataclass
-from html import escape as escape_xml
-import json
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -28,8 +24,6 @@ from vibeflow.core.flow import (
     STATUS_PLANNED,
     GraphConfig,
 )
-from vibeflow.core.constants import FLOW_KIND_GLOBAL_STATE
-from vibeflow.core.inspection import build_architecture_report
 from vibeflow.targets.shared.quality_support import QualityPolicy
 from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy
 from vibeflow.tooling.application.javascript.rule_defaults import workflow_rule_defaults
@@ -63,15 +57,11 @@ from vibeflow.tooling.project.config_loader import (
 from vibeflow.tooling.project.descriptor_loader import (
     load_workflow_catalogs,
 )
-from vibeflow.tooling.project.document_kinds import ARCHITECTURE_DOCUMENT_HEADER
 from vibeflow.tooling.project.graph_config import parse_graph_config
 from vibeflow.tooling.project.plugin_review import load_plugin_review_resources
 from vibeflow.tooling.project.workspace_loader import load_workspace_config
 from vibeflow.tooling.project.workspace_model import WorkspaceConfig, WorkspaceRoot
-from vibeflow.tooling.application.javascript.architecture_facts import build_architecture_facts, _effect_scope_label
-from vibeflow.tooling.application.mermaid_shapes import (
-    mermaid_shape_for_flow_kind,
-)
+from vibeflow.tooling.application.javascript.presentation.architecture import build_architecture_facts, _effect_scope_label
 
 
 @dataclass(frozen=True)
@@ -318,18 +308,9 @@ def audit_javascript_project(
         host_records=host_records,
         root_id=root.id,
         source_path=config_path.relative_to(root.path).as_posix(),
-        findings=rule_report.findings,
+        project_root=root.path, selections=document.data, roots={item.id:item.path for item in workspace.roots},
+        rule_report=rule_report,
     )
-    from vibeflow.core.rules.planning import selection_report
-    architecture["rule_selections"] = selection_report(graph, catalogs)
-    architecture["rule_checks"] = rule_report.to_dict()
-    from vibeflow.tooling.presentation.resource_architecture import resource_architecture
-    architecture["implementation_graph"] = resource_architecture(catalogs, project_root=root.path,
-        source_facts=tuple(item for scope in rule_report.source_scopes.values() for item in scope["sources"]),
-        selections=document.data, selected_nodes=used_node_types, findings=rule_report.findings,
-        roots={item.id:item.path for item in workspace.roots})
-    from vibeflow.tooling.presentation.portable_paths import portable_paths
-    architecture = portable_paths(architecture, roots={item.id:item.path for item in workspace.roots}, primary_root=root.path)
     return JavascriptAuditResult(
         workspace=workspace,
         root=root,
@@ -350,11 +331,6 @@ def audit_javascript_project(
         toolchain=toolchain,
         rule_report=rule_report, rule_facts=rule_report.facts,
     )
-
-
-def render_architecture(result: JavascriptAuditResult) -> str:
-    from vibeflow.tooling.presentation.architecture_facts import render_architecture_payload
-    return render_architecture_payload(result.architecture)
 
 
 def inspect_payload(result: JavascriptAuditResult) -> dict[str, object]:
@@ -408,50 +384,6 @@ def inspect_payload(result: JavascriptAuditResult) -> dict[str, object]:
     }
 
 
-def render_mermaid(
-    result: JavascriptAuditResult,
-    *,
-    expand_nodesets: bool = False,
-    show_contract: bool = True,
-    show_semantics: bool = True,
-    mermaid_layout: str = "default",
-) -> str:
-    from vibeflow.tooling.application.javascript.review import render_mermaid as render
-
-    return render(
-        result,
-        expand_nodesets=expand_nodesets,
-        show_contract=show_contract,
-        show_semantics=show_semantics,
-        mermaid_layout=mermaid_layout,
-    )
-
-
-def render_ascii(
-    result: JavascriptAuditResult,
-    *,
-    expand_nodesets: bool = False,
-    show_contract: bool = True,
-    show_semantics: bool = True,
-) -> str:
-    from vibeflow.tooling.application.javascript.review import render_ascii as render
-
-    return render(
-        result,
-        expand_nodesets=expand_nodesets,
-        show_contract=show_contract,
-        show_semantics=show_semantics,
-    )
-
-
-def render_review_svg(result: JavascriptAuditResult) -> str:
-    from vibeflow.tooling.application.javascript.review import render_review_svg as render
-
-    return render(result)
-
-
-
-
 def _effective_lock_text(graph: GraphConfig, node: object) -> str:
     node_lock = getattr(node, "execution_lock", None)
     if node_lock is not None:
@@ -465,8 +397,6 @@ def _effective_lock_text(graph: GraphConfig, node: object) -> str:
     if graph.execution_lock is not None:
         return f"{graph.execution_lock.key} (root, inherited)"
     return ""
-
-
 
 
 def _validate_graph_tree(
@@ -658,7 +588,8 @@ def _plugin_records(
 
 
 def _host_extension_records(config, *, root, catalogs):
-    from vibeflow.tooling.application.javascript.host_selection import declared_hosts, active_host_ids
+    from vibeflow.tooling.application.javascript.host_selection import declared_hosts
+    from vibeflow.targets.javascript.build.host_selection import active_host_ids
     resources = declared_hosts(config, catalog=catalogs.host_extensions)
     active = active_host_ids(tuple(item.id for item in resources if item.status == "implemented"),
         catalog=catalogs.host_extensions, planned=frozenset(item.id for item in resources if item.status == "planned"))
@@ -675,15 +606,9 @@ def _host_extension_records(config, *, root, catalogs):
     return tuple(item.to_dict() for item in resources), active
 
 
-
-
 __all__ = [
     "JavascriptAuditRequest",
     "JavascriptAuditResult",
     "audit_javascript_project",
     "inspect_payload",
-    "render_ascii",
-    "render_architecture",
-    "render_mermaid",
-    "render_review_svg",
 ]

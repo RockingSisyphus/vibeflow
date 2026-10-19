@@ -21,8 +21,6 @@ def _root_name(node: ast.AST) -> str:
     return ""
 
 
-def _matches_prefix(name: str, patterns: set[str]) -> bool:
-    return any(name.startswith(f"{pattern}.") for pattern in patterns)
 
 
 

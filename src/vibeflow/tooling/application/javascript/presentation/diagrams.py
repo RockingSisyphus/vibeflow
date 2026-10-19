@@ -1,16 +1,14 @@
 from __future__ import annotations
+from vibeflow.tooling.presentation.mermaid.style import mermaid_style, mermaid_shape
 
 from dataclasses import dataclass
-from html import escape as escape_xml
 from pathlib import Path
-import re
 import tempfile
 from typing import Mapping
 
-from vibeflow.core.constants import FLOW_KIND_DOCUMENT, FLOW_KIND_GLOBAL_STATE
+from vibeflow.core.constants import FLOW_KIND_DOCUMENT
 from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, NodeSpec, NodesetSpec, STATUS_PLANNED
 from vibeflow.core.planned import effective_planned_behavior, planned_behavior_label
-from vibeflow.tooling.application.mermaid_shapes import mermaid_shape_for_flow_kind
 from vibeflow.tooling.presentation.mermaid import (
     DEFAULT_MERMAID_MAX_EDGES,
     DEFAULT_MERMAID_MAX_TEXT_SIZE,
@@ -18,14 +16,14 @@ from vibeflow.tooling.presentation.mermaid import (
     EXPANDED_MERMAID_MAX_TEXT_SIZE,
     render_mermaid_svg,
 )
-from vibeflow.tooling.presentation.style import MERMAID_MAIN_CLASS_ORDER, mermaid_class_def_lines
+from vibeflow.tooling.presentation.mermaid.style import MERMAID_MAIN_CLASS_ORDER, mermaid_class_def_lines
 from vibeflow.tooling.presentation.node_presentation import EffectivePresentation, resolve_presentation
-from vibeflow.tooling.presentation.review_layout import (
+from vibeflow.tooling.presentation.mermaid.layout import (
     _compose_svg,
     _validate_review_fragment_max_width,
     _viewbox_size,
 )
-from vibeflow.tooling.presentation.review_types import (
+from vibeflow.tooling.presentation.mermaid.types import (
     REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH,
     SvgFragment,
 )
@@ -486,7 +484,7 @@ def _graph_mermaid(
             if is_external:
                 label.append("external: true")
         escaped = _escape_label("\\n".join(label))
-        shape = presentation.shape
+        shape = mermaid_shape(presentation.shape)
         node_id = _safe_id(node.id)
         lines.append(f'  {node_id}@{{ shape: {shape}, label: "{escaped}" }}')
         lines.append(
@@ -495,18 +493,10 @@ def _graph_mermaid(
         )
         if is_external:
             lines.append(f"  class {node_id} externalBoundary;")
-        custom_style = presentation.mermaid_style()
+        custom_style = mermaid_style(presentation)
         if custom_style:
             lines.append(f"  style {node_id} {custom_style};")
-    edge_pairs = {
-        name: {item.pair for item in values}
-        for name, values in (
-            ("mainline", compiled.mainline_edges),
-            ("data_bypass", compiled.data_bypass_edges),
-        )
-    }
     for index, edge in enumerate(compiled.effective_edges):
-        pair = edge.pair
         edge_labels: list[str] = []
         if edge.when:
             edge_labels.append(edge.when)
@@ -520,10 +510,10 @@ def _graph_mermaid(
             else ""
         )
         lines.append(f"  {_safe_id(edge.source)} -->{label} {_safe_id(edge.target)}")
-        if pair in edge_pairs["mainline"]:
-            lines.append(f"  linkStyle {index} stroke-width:4px;")
-        elif pair in edge_pairs["data_bypass"]:
+        if edge in compiled.data_bypass_edges:
             lines.append(f"  linkStyle {index} stroke-dasharray:6 4,stroke-width:2px;")
+        elif edge in compiled.mainline_edges:
+            lines.append(f"  linkStyle {index} stroke-width:4px;")
     return "\n".join(lines) + "\n"
 
 
@@ -582,8 +572,6 @@ def _node_class(
     if flow_kind == FLOW_KIND_DOCUMENT:
         return "documentNode"
     return "defaultNode"
-
-
 
 
 def _invocation_groups(graph: GraphConfig) -> tuple[_InvocationGroup, ...]:
@@ -746,25 +734,23 @@ def _resource_mermaid(kind: str, records: tuple[Mapping[str, object], ...]) -> s
         native_class = {"base_lib": "baseLibResource", "plugin": "pluginResource", "host_extension": "hostExtensionResource"}.get(resource_kind, "")
         presentation = resolve_presentation(record, resource_kind=resource_kind, native_class=native_class,
             status_class="plannedResource" if status == "planned" else record.get("_health_status", ""), call_style=record.get("style"))
-        shape = presentation.shape
+        shape = mermaid_shape(presentation.shape)
         icon = str(presentation.values.get("icon", ""))
         label = f"{icon + ' ' if icon else ''}{display_name}\\nid: {identifier}\\nstatus: {status}"
         lines.append(f'  {resource_id}@{{ shape: {shape}, label: "{_escape_label(label)}" }}')
         lines.append(f"  {root} -.-> {resource_id}")
-        lines.append(f"  style {resource_id} {presentation.mermaid_style()}")
+        lines.append(f"  style {resource_id} {mermaid_style(presentation)}")
     return "\n".join(lines) + "\n"
 
 
 def _safe_id(value: str) -> str:
-    from vibeflow.tooling.presentation.mermaid_identity import mermaid_identity
+    from vibeflow.tooling.presentation.mermaid.identity import mermaid_identity
     normalized = mermaid_identity(value)
     return f"vf_{normalized or 'item'}"
 
 
 def _escape_label(value: str) -> str:
     return value.replace('"', "'").replace("<", "&lt;").replace(">", "&gt;")
-
-
 
 
 def _effect_scope(compiled: object, node_id: str, flow_kind: str) -> str:

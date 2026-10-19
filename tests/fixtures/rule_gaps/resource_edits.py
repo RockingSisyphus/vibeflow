@@ -82,7 +82,7 @@ def run_cases(work,toolchain,*,kinds=KINDS,include_extra=True):
                                          "value":None if variant=="implementation" and kind=="plugin" else expected_value}
                 actual["metrics"]["modified_run"]=modified_run
             if modified_diagram:
-                fill,shape=("#bbddaa","rect") if variant=="colour" else ("#ddbbff","diam")
+                fill,shape=("#bbddaa","rect") if variant=="colour" else ("#ddbbff","diamond")
                 metrics.update(modified_diagram={"review_exit":0,"browser_exit":0,"fill":fill,"shape":shape,"matches_svg":True},diagram_restored=True)
                 actual["metrics"].update(modified_diagram=modified_diagram,diagram_restored=before_diagram==restored_diagram)
             descriptor=next((item for item in declarations(inspected) if item.get("id",item.get("type_key"))==IDS[kind]),{})

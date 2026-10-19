@@ -1,41 +1,20 @@
 from __future__ import annotations
-from ..compiled_document import compiled_graph_payload
+from vibeflow.tooling.presentation.mermaid.style import mermaid_style, mermaid_shape
 from vibeflow.tooling.presentation.node_presentation import registry_descriptor, resolve_presentation
 
-import textwrap
 from typing import TYPE_CHECKING
-from typing import Any, Mapping
+from typing import Mapping
 
 from vibeflow.core.compiler import CompiledGraph
-from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
-from vibeflow.tooling.application.python.presentation.helpers import effective_graph_for_render, compile_for_render, node_flow_kind, node_is_external, nodeset_for_node
+from vibeflow.tooling.application.python.presentation.helpers import effective_graph_for_render, compile_for_render, node_is_external
+from vibeflow.tooling.application.python.presentation.review_model import node_flow_kind, nodeset_for_node
 from vibeflow.tooling.application.python.presentation.review_model import node_review_effect_scope
 
-from vibeflow.tooling.application.python.presentation.mermaid.labels import (
-    _comment_text,
-    _edge_contract_text,
-    _edge_style,
-    _escape_edge_label,
-    _escape_label,
-    _expanded_nodeset_title,
-    _health_findings,
-    _join_label_lines,
-    _join_label_sections,
-    _loop_stop_text,
-    _mapping_items,
-    _node_metadata_lines,
-    _node_shape,
-    _nodeset_node_ids,
-    _resource_label,
-    _rendered_resources_payload,
-    _safe_id,
-    _section_label,
-    _source_lines,
-)
+from vibeflow.tooling.application.python.presentation.mermaid.labels import _comment_text, _edge_contract_text, _edge_style, _escape_edge_label, _escape_label, _expanded_nodeset_title, _health_findings, _join_label_sections, _loop_stop_text, _mapping_items, _node_metadata_lines, _node_shape, _nodeset_node_ids, _resource_label, _rendered_resources_payload, _safe_id, _section_label, _source_lines
 from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, NodeSpec, NodesetSpec, STATUS_PLANNED
-from vibeflow.core.constants import EFFECT_SCOPE_GLOBAL_STATE, EFFECT_SCOPE_NONE, FLOW_KIND_DATA_STORE, FLOW_KIND_DECISION, FLOW_KIND_DOCUMENT, FLOW_KIND_GLOBAL_STATE, FLOW_KIND_IO, FLOW_KIND_PREDEFINED, FLOW_KIND_PREPARATION, FLOW_KIND_PROCESS, FLOW_KIND_TERMINAL
+from vibeflow.core.constants import EFFECT_SCOPE_GLOBAL_STATE, EFFECT_SCOPE_NONE, FLOW_KIND_DOCUMENT, FLOW_KIND_GLOBAL_STATE, FLOW_KIND_PROCESS
 from vibeflow.core.planned import effective_planned_behavior, planned_behavior_label
-from vibeflow.tooling.presentation.style import MERMAID_MAIN_CLASS_ORDER, mermaid_class_def_lines
+from vibeflow.tooling.presentation.mermaid.style import MERMAID_MAIN_CLASS_ORDER, mermaid_class_def_lines
 
 if TYPE_CHECKING:
     from vibeflow.targets.python.project.registry import NodeRegistry
@@ -86,10 +65,6 @@ def export_mermaid(
     )
     renderer.prepared = prepared
     return renderer.render(graph, actual_compiled)
-
-
-
-
 
 
 class _MermaidRenderer:
@@ -193,7 +168,7 @@ class _MermaidRenderer:
                     lines.append(f"{indent}class {node_id} {_MERMAID_CLOUD_NODE_CLASS};")
                 if is_external:
                     lines.append(f"{indent}class {node_id} externalBoundary;")
-                lines.append(f"{indent}style {node_id} {presentation.mermaid_style()};")
+                lines.append(f"{indent}style {node_id} {mermaid_style(presentation)};")
                 continue
             flow_kind = node_flow_kind(node, compiled) or nodeset.flow_kind
             is_loop = node.type_used in LOOP_NODE_TYPES
@@ -222,7 +197,7 @@ class _MermaidRenderer:
                 lines.append(f"{indent}class {node_id} {class_name};")
             if presentation.shape == "cloud":
                 lines.append(f"{indent}class {node_id} {_MERMAID_CLOUD_NODE_CLASS};")
-            lines.append(f"{indent}style {node_id} {presentation.mermaid_style()};")
+            lines.append(f"{indent}style {node_id} {mermaid_style(presentation)};")
             if not should_expand or not nodeset.expand:
                 continue
             group_id = _safe_id(f"{prefix}{node.id}__expanded")
@@ -336,10 +311,10 @@ class _MermaidRenderer:
             status = str(resource.get("status", "implemented"))
             presentation = resolve_presentation(resource, native_class=child_class, resource_kind=label_kind,
                 status_class="plannedResource" if status == STATUS_PLANNED else "", call_style=resource.get("style"))
-            lines.append(f'{indent}{resource_id}@{{ shape: {presentation.shape}, label: "{_escape_label(label)}" }}')
+            lines.append(f'{indent}{resource_id}@{{ shape: {mermaid_shape(presentation.shape)}, label: "{_escape_label(label)}" }}')
             self._append_edge_line(lines, f"{indent}{root_id} -.-> {resource_id}")
             lines.append(f"{indent}class {resource_id} {'plannedResource' if status == STATUS_PLANNED else child_class};")
-            lines.append(f"{indent}style {resource_id} {presentation.mermaid_style()}")
+            lines.append(f"{indent}style {resource_id} {mermaid_style(presentation)}")
 
     def _render_findings(self, lines: list[str], graph: GraphConfig, compiled: CompiledGraph, *, indent: str) -> None:
         for finding in _health_findings(self.health_report):

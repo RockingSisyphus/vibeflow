@@ -15,6 +15,26 @@ from vibeflow.tooling.project.preview_options import validate_preview_options
 from vibeflow.tooling.project.architecture_types import WorkspaceConfigError
 
 
+def test_installer_discovers_entry_asset_references_and_preserves_configuration(tmp_path,monkeypatch):
+    from vibeflow.tooling.presentation import viewer
+    assets=tmp_path/"tool";assets.mkdir()
+    (assets/"index.html").write_text('<link href="new-style.css"><script src="new-module.js"></script>'
+        '<script src="preview.config.js"></script><a href="#flow">Flow</a><a href="https://example.org">Help</a>')
+    (assets/"new-style.css").write_text("body{}")
+    (assets/"new-module.js").write_text("window.newModule=true;")
+    root=tmp_path/"workspace";root.mkdir()
+    config=root/"vibeflow-preview.config.js";config.write_text('window.VibeFlowViewerConfig={dataRoot:"custom/"};')
+    monkeypatch.setattr(viewer,"viewer_assets",lambda:assets)
+    install_page(root)
+    html=(root/"vibeflow-preview.html").read_text()
+    assert 'href="vibeflow-preview/assets/new-style.css"' in html
+    assert 'src="vibeflow-preview/assets/new-module.js"' in html
+    assert 'src="vibeflow-preview.config.js"' in html
+    assert 'href="#flow"' in html and 'href="https://example.org"' in html
+    assert (root/"vibeflow-preview/assets/new-module.js").read_text()=="window.newModule=true;"
+    assert config.read_text()=='window.VibeFlowViewerConfig={dataRoot:"custom/"};'
+
+
 def test_concurrent_catalog_updates_and_reindex(tmp_path):
     install_page(tmp_path)
     def publish(index):
@@ -111,7 +131,7 @@ def test_adapter_discovers_standalone_project_root(tmp_path):
 
 def test_node_aliases_preserve_identity():
     from vibeflow.tooling.application.python.presentation.mermaid.labels import _safe_id as python_id
-    from vibeflow.tooling.application.javascript.review import _safe_id as javascript_id
+    from vibeflow.tooling.application.javascript.presentation.diagrams import _safe_id as javascript_id
     names = ["a-b", "a_b", "a/b", "a.b", "中文", "中_", "end", "n_end", "1", "n_1", "vf_encoded_612d62"]
     for mapper in (python_id, javascript_id):
         assert len({mapper(value) for value in names}) == len(names)
@@ -192,7 +212,7 @@ def _presentations(root):
     from vibeflow.targets.python.project import NodeRegistry
     from vibeflow.tooling.project.graph_config import parse_graph_config
     from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
-    from vibeflow.tooling.application.javascript.architecture_facts import build_architecture_facts
+    from vibeflow.tooling.application.javascript.presentation.architecture import build_architecture_facts
 
     registry = NodeRegistry()
     descriptor = NodeDescriptor("fixture.work", "Work", "Preview node", "1", "process", contract=NodeContractDescriptor(), rulesets=())
@@ -228,7 +248,7 @@ def _presentations(root):
     remote_model=SimpleNamespace(id="remote",path=root/"remote",project_config={"preview":{"workflow_links":[
         {"from_workflow":"other.jsonc","to_root":"fixture","to_workflow":"main.jsonc","kind":"reference"}]}})
     workspace=SimpleNamespace(root=root,roots=(root_model,remote_model),root_for_path=lambda p:root_model)
-    javascript=SimpleNamespace(graph=graph,compiled=prepared.compiled,compiled_nodesets=compiled_nodesets,
+    javascript=SimpleNamespace(warnings=(),graph=graph,compiled=prepared.compiled,compiled_nodesets=compiled_nodesets,
         catalogs=catalogs,architecture=architecture,workspace=workspace,config_path=config)
     return prepared,javascript,workspace,config
 
@@ -238,7 +258,7 @@ def test_real_offline_shapes_nested_browser_and_history(tmp_path):
     if not is_mermaid_svg_renderer_available():
         pytest.skip("locked Mermaid renderer required; supplied by the full gate")
     from vibeflow.tooling.application.python.presentation.preview import python_preview
-    from vibeflow.tooling.application.javascript.preview import javascript_preview
+    from vibeflow.tooling.application.javascript.presentation.preview import javascript_preview
 
     prepared,javascript,workspace,config = _presentations(tmp_path)
     first = python_preview(prepared,config=config,workspace=workspace,status="passed")
@@ -297,7 +317,7 @@ def test_node_details_edge_roles_and_contracts_in_real_browser(tmp_path):
     from vibeflow.targets.python.project import NodeRegistry
     from vibeflow.tooling.project.graph_config import parse_graph_config
     from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
-    from vibeflow.tooling.application.javascript.architecture_facts import build_architecture_facts
+    from vibeflow.tooling.application.javascript.presentation.architecture import build_architecture_facts
     from vibeflow.tooling.presentation.preview.exporter import publish_preview
     from vibeflow.tooling.presentation.mermaid import _find_mmdc
     registry=NodeRegistry();catalogs=DescriptorCatalogs.empty()
@@ -381,6 +401,11 @@ def test_default_javascript_commands_and_explicit_svg_failure(tmp_path, monkeypa
     assert main(["build",*common,"--target","node","--profile","single-esm","--out-dir",str(tmp_path/"bundle")])==0;capsys.readouterr()
     records=[json.loads(f.read_text()) for f in (project/"vibeflow-preview/snapshots").glob("*/record.json")]
     assert {(r["category"],r["status"]) for r in records}=={("review","passed"),("build","succeeded")}
+    for record in records:
+        script=(project/"vibeflow-preview/snapshots"/record["id"]/"snapshot.js").read_text()
+        architecture=json.loads(script[len("VibeFlowPreview.snapshot("):-3])["architecture"]
+        assert {"rule_selections","rule_checks","implementation_graph"} <= architecture.keys()
+        assert architecture["implementation_graph"] and architecture["workflow"]["nodes"]
     assert main(["review",*common,"--with-svg"])==1;capsys.readouterr()
     records=[json.loads(f.read_text()) for f in (project/"vibeflow-preview/snapshots").glob("*/record.json")]
     failed=next(r for r in records if r["status"]=="failed")

@@ -11,7 +11,6 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
-from xml.etree import ElementTree
 from time import perf_counter
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -61,21 +60,11 @@ def cli(arguments, *, stdin=None):
 def main(run, label, *, javascript=False):
     parser = argparse.ArgumentParser(description=label)
     parser.add_argument("--work-dir", type=Path)
-    parser.add_argument("--renderer-root", type=Path)
     parser.add_argument("--toolchain-root", type=Path)
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="vibeflow-addition-") as temporary:
         work = args.work_dir.resolve() if args.work_dir else Path(temporary)
         work.mkdir(parents=True, exist_ok=True)
-        renderer = args.renderer_root or os.environ.get("VIBEFLOW_MERMAID_RENDERER_ROOT")
-        if not javascript and not renderer:
-            renderer = work / "renderer"
-            renderer.mkdir()
-            for name in ("package.json", "package-lock.json"):
-                shutil.copy2(ROOT / "tools/mermaid-renderer" / name, renderer / name)
-            subprocess.run(["npm", "ci"], cwd=renderer, check=True)
-        if renderer:
-            os.environ["VIBEFLOW_MERMAID_RENDERER_ROOT"] = str(Path(renderer).resolve())
         started = perf_counter()
         report = run(work, toolchain=args.toolchain_root)
         report["seconds"] = round(perf_counter() - started, 3)

@@ -15,7 +15,7 @@ import pytest
 from vibeflow.targets.javascript.build.plugin_session import JavascriptPluginSession
 from vibeflow.tooling.application.javascript.audit import JavascriptAuditRequest, audit_javascript_project
 from vibeflow.tooling.application.javascript.build import ProjectBuildRequest, build_project_aot
-from vibeflow.tooling.application.javascript.review import render_mermaid
+from vibeflow.tooling.application.javascript.presentation.diagrams import render_mermaid
 from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
 
 ROOT = Path(__file__).resolve().parents[3]

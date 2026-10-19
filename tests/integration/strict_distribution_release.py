@@ -51,7 +51,7 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
             "change_inventory": "required",
             "human_approval_gate": True,
             "planned_review": True,
-            "required_review_artifact": "expanded_svg",
+            "required_review_artifact": "html_preview",
         },
         "development_profile": "collaborative",
         "kernel": {

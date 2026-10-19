@@ -154,19 +154,10 @@ def run(work):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--work-dir", type=Path, help="retain the temporary project and reports here")
-    parser.add_argument("--renderer-root", type=Path, help="reuse an installed Mermaid/Puppeteer toolchain")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="vibeflow-python-math-") as temporary:
         work = args.work_dir.resolve() if args.work_dir else Path(temporary)
         work.mkdir(parents=True, exist_ok=True)
-        renderer = args.renderer_root or (Path(os.environ["VIBEFLOW_MERMAID_RENDERER_ROOT"]) if os.environ.get("VIBEFLOW_MERMAID_RENDERER_ROOT") else None)
-        if renderer is None:
-            renderer = work / "renderer"
-            renderer.mkdir()
-            for name in ("package.json", "package-lock.json"):
-                shutil.copy2(REPOSITORY / "tools/mermaid-renderer" / name, renderer / name)
-            subprocess.run(["npm", "ci"], cwd=renderer, check=True)
-        os.environ["VIBEFLOW_MERMAID_RENDERER_ROOT"] = str(renderer.resolve())
         run(work)
 
 

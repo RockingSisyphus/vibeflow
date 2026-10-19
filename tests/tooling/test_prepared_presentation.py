@@ -47,7 +47,7 @@ def _fixture(tmp_path):
 
 def test_all_renderers_share_each_graph_compilation_and_never_bind(tmp_path, monkeypatch):
     from vibeflow.tooling.application.python.presentation.mermaid import review_fragments, review_svg
-    from vibeflow.tooling.presentation.review_types import SvgFragment
+    from vibeflow.tooling.presentation.mermaid.types import SvgFragment
 
     graph, registry, bindings = _fixture(tmp_path)
     counts = Counter()
@@ -61,7 +61,6 @@ def test_all_renderers_share_each_graph_compilation_and_never_bind(tmp_path, mon
         return SvgFragment(title, '<svg viewBox="0 0 100 40"><rect width="100" height="40"/></svg>', 100, 40)
 
     monkeypatch.setattr(GraphCompiler, "compile_with_findings", compile)
-    monkeypatch.setattr(review_svg, "_render_fragment", fragment)
     monkeypatch.setattr(review_fragments, "_render_fragment", fragment)
     prepared = prepare_python_presentation(graph, registry=registry)
     assert counts["compiles"] == 2

@@ -19,10 +19,6 @@ class EffectivePresentation:
     def shape(self) -> str:
         return self.values["shape"]
 
-    def mermaid_style(self) -> str:
-        names = {"fill": "fill", "stroke": "stroke", "text": "color"}
-        return ",".join(f"{names[key]}:{self.values[key]}" for key in names if key in self.values)
-
     def to_dict(self) -> dict[str, object]:
         return {"values": dict(self.values), "sources": dict(self.sources)}
 
@@ -65,9 +61,6 @@ def resolve_presentation(
         status = SYSTEM_STYLE_COLORS[status_class]
         apply({"fill": status.fill, "stroke": status.stroke, "text": status.text}, "status")
     apply(call_style, "call")
-    # The Mermaid vocabulary uses 'diam', while public descriptors say diamond.
-    if values["shape"] == "diamond":
-        values["shape"] = "diam"
     return EffectivePresentation(MappingProxyType(values), MappingProxyType(sources))
 
 

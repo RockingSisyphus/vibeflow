@@ -5,8 +5,8 @@ import pytest
 from tests.tooling.test_presentation_cascade import Empty
 from vibeflow.core.descriptors import DescriptorCatalogs,NodeDescriptor,NodeContractDescriptor
 from vibeflow.targets.python.project import GraphCompiler,NodeRegistry
-from vibeflow.tooling.application.javascript.architecture_facts import _javascript_graph_document
-from vibeflow.tooling.application.javascript.review import render_mermaid
+from vibeflow.tooling.application.javascript.presentation.architecture import _javascript_graph_document
+from vibeflow.tooling.application.javascript.presentation.diagrams import render_mermaid
 from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid
 from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_document
 from vibeflow.tooling.project.graph_config import parse_graph_config
@@ -110,6 +110,13 @@ def test_same_endpoints_keep_each_conditional_edges_own_roles():
         actual={item['when']:item['roles'] for item in body['edges'] if item['from']=='start' and item['to']=='dispatch'}
         assert actual=={"route == 'run'":['mainline','schedule'],"route == 'data'":['data_bypass','transfer'],
                         "route == 'both'":['mainline','schedule','transfer']}
+
+    texts=[export_mermaid(graph,compiled=compiled,registry=registry),
+        render_mermaid(SimpleNamespace(graph=graph,compiled=compiled,catalogs=catalogs,architecture={"workflow":js}))]
+    for text in texts:
+        assert "linkStyle 0 stroke-width:4px" in text
+        assert "linkStyle 1 stroke-dasharray:6 4,stroke-width:2px" in text
+        assert "linkStyle 2 stroke-width:4px" in text
 
 
 @pytest.mark.parametrize('target',[0,1],ids=['python','javascript'])

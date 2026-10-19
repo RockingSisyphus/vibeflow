@@ -169,8 +169,8 @@ run_pure 的返回值无法被静态识别为字典键集合时，报 NODE.PURIT
 | JS 事实装配 | [frontend/facts.py](../../src/vibeflow/targets/javascript/frontend/facts.py:94) 及同文件另一构造位置 |
 | Core 架构资料 | [inspection/architecture.py 标签函数](../../src/vibeflow/core/inspection/architecture.py:127) 及记录生成 |
 | Python 文档与 SVG | [architecture_document.py](../../src/vibeflow/tooling/application/python/presentation/architecture_document.py:329)、[mermaid/__init__.py](../../src/vibeflow/tooling/application/python/presentation/mermaid/__init__.py:709) 中字段、文本与各布局消费者 |
-| JS audit 与 review | [audit.py](../../src/vibeflow/tooling/application/javascript/audit.py:458)、[review.py](../../src/vibeflow/tooling/application/javascript/review.py:775) 中记录、标签与文本消费者 |
-| 共享展示与导出 | [展示标签解析](../../src/vibeflow/tooling/presentation/mermaid.py:216)、[source_analysis 导出](../../src/vibeflow/targets/python/quality/source_analysis/__init__.py:4)、[旧诊断映射](../../src/vibeflow/targets/python/quality/source_analysis/types.py:191) |
+| JS audit 与 review | [audit.py](../../src/vibeflow/tooling/application/javascript/audit.py:458)、[diagrams.py](../../src/vibeflow/tooling/application/javascript/presentation/diagrams.py) 中记录、标签与文本消费者 |
+| 共享展示与导出 | [展示标签解析](../../src/vibeflow/tooling/presentation/mermaid/__init__.py:216)、[source_analysis 导出](../../src/vibeflow/targets/python/quality/source_analysis/__init__.py:4)、[旧诊断映射](../../src/vibeflow/targets/python/quality/source_analysis/types.py:191) |
 
 涉及公开计划／报告格式时，明确版本和迁移说明。若确需有限过渡，可以输出“未分析”占位，但必须指定移除版本，不能保留旧分析器暗中运行。不扩展为动态调用安全检查，不移除共享源码依赖解析。
 

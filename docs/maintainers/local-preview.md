@@ -4,8 +4,8 @@
 
 ## 数据与职责
 
-- Python `PreparedPythonPresentation.architecture()` 缓存同次准备的事实；其 Target-owned 构建入口为 `build_architecture_facts`。JavaScript 的同名公共入口由审查和构建共用，不通过私有审查函数或拼接审查结果对象导出。
-- Python 资源选择在检查边界保存为不可变事实；后续配置被修改或移除，不改变本次导出。原有 compiled_graph.json 序列化收拢到不依赖 Mermaid 的 compiled_document，旧公开导入仍委托同一实现。
+- Python `PreparedPythonPresentation.architecture()` 缓存同次准备的事实；其 Target-owned 构建入口为 `build_architecture_facts`。JavaScript 的同名公共入口位于 application/javascript/presentation/architecture，由审查和构建共用；规则报告、实现关系和来源归一化在此组装，不通过私有审查函数或拼接审查结果对象导出。
+- Python 资源选择在检查边界保存为不可变事实；后续配置被修改或移除，不改变本次导出。原有 compiled_graph.json 序列化收拢到不依赖 Mermaid 的 compiled_document，消费者直接从 compiled_document 导入。
 - 准备阶段同时记录是否具有配置来源；纯内存构图保持原有正文边界，已经准备好的真实项目则不因配置后来被移除而丢失资源实现事实。
 - 共享 `architecture_facts` 序列化 Architecture 文档；`resource_architecture` 和 `node_presentation` 保留资源来源与有效样式规则。有效连边来自编译结果，网页不推导执行顺序。
 - `preview/exporter` 只写 version 2 数据：workflow 身份、Architecture 正文、关联、视图和附件引用。没有重复 body facts、SVG 字符串、图元、96 方向边界或 Mermaid DOM ID。
@@ -15,7 +15,7 @@
 
 ## 独立网页与发行
 
-唯一源码位于 tools/workflow-viewer：model 处理加载、调用与类型事实关联及连边角色投影，inspector 展示完整职责、契约、参数和来源，shapes 管理内容测量及原生形状，layout 管理 ELK 层级布局，views 绘制流程/资源/关联，viewer 管理浏览状态和交互。节点形状来自自身几何，长契约显示在信息栏。展开调用保留标题卡和分组边界，外部连边连接调用边界。
+唯一源码位于 tools/workflow-viewer：model 处理加载、调用与类型事实关联及连边角色投影，inspector 展示完整职责、契约、参数和来源，shapes 管理内容测量及原生形状，layout 管理 ELK 层级布局，views 绘制流程/资源/关联，viewer 管理浏览状态和交互。节点形状与连接点复用自身轮廓几何，长契约显示在信息栏。展开调用保留标题卡和分组边界，外部连边连接调用边界。
 
 工具通过配置脚本的 dataRoot 读取经典注册脚本，URL 相对配置位置解析。默认根入口、配置及资源随项目生成；已有配置不覆盖。独立复制工具后修改配置即可浏览数据，不依赖 Python、源码仓库或服务器。原 SVG 是不透明图片附件，只承担平移缩放对照。
 
