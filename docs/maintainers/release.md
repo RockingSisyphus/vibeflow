@@ -1,3 +1,7 @@
+# VibeFlow 1.1.0
+
+独立离线 HTML 浏览器使用 v2 架构快照自主绘制，支持分类历史、五类视图、调用展开和 workflow 关联；SVG 为显式生成的对照附件。默认事实导出不启动 Mermaid，AOT 执行不生成报告。共享事实、存储、安装与两端编排分离，网页唯一源码位于 `tools/workflow-viewer`。Workflow ABI v8 与 AOT manifest v3 保持不变，旧预览须重新生成。变更和验收范围见 [1.1.0 发布说明](history/release-1.1.0.md)。
+
 # VibeFlow 1.0.2
 
 恢复普通 process 分发与多前驱 all 回收节点的双圆默认图形。识别只读取正常调度边，在共享展示级联中实现，保留 Node 和调用级形状覆盖；没有恢复旧任务管理类型。Python、JavaScript 的 Architecture、Mermaid 及真实 SVG 回归验证这两种图形。此修复进入 1.0.2；1.0.1 历史资产保持原样。ABI、运行和并发容量规则不变，从 1.0.1 升级只需重新生成 Architecture 和 SVG。详见 [1.0.2 发布说明](history/release-1.0.2.md)。
@@ -12,7 +16,7 @@
 
 # 发行与文档装配
 
-VibeFlow 当前发行版本为 1.0.2，提供 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目、Workflow ABI v8 和 AOT manifest v3。并发升级见[普通图并发迁移](../../distribution/docs/user/graph-concurrency.md#从旧任务接口迁移)，更早资源接口迁移见 [统一资源迁移](../../distribution/docs/user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖历史发行包。
+VibeFlow 当前发行版本为 1.1.0，提供 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目、Workflow ABI v8 和 AOT manifest v3。并发升级见[普通图并发迁移](../../distribution/docs/user/graph-concurrency.md#从旧任务接口迁移)，更早资源接口迁移见 [统一资源迁移](../../distribution/docs/user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖历史发行包。
 
 此前 1.0.0 统一 Block Compiler，并新增 Python 目录 AOT：计划 ABI v7、构建 manifest v3。旧计划需重新构建；历史发行资产保持原字节。实施与完整验收见[双语言 AOT 与维护整理记录](aot-unification-implementation.md)，历史变更与发行验证见[1.0.0 发布说明](history/release-1.0.0.md)。
 

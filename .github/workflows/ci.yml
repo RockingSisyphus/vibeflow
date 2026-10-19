@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -12,6 +15,10 @@ jobs:
       fail-fast: false
       matrix:
         node-version: ["22", "24"]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      TMPDIR: ${{ runner.temp }}
+      PUPPETEER_CACHE_DIR: ${{ runner.temp }}/puppeteer-cache
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
@@ -37,4 +44,16 @@ jobs:
           subprocess.check_call([sys.executable, "-m", "pip", "install", "build", *dependencies])
           PY
       - name: Run full project verification (isolated pytest)
-        run: python tools/verify_project.py --full
+        shell: bash
+        run: |
+          set -o pipefail
+          python tools/verify_project.py --full --workers 4 --scratch "${RUNNER_TEMP}/verification" 2>&1 | tee "${RUNNER_TEMP}/verification.log"
+      - name: Preserve verification results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: verification-node-${{ matrix.node-version }}
+          path: |
+            ${{ runner.temp }}/verification.log
+            ${{ runner.temp }}/verification/*.json
+          if-no-files-found: ignore
