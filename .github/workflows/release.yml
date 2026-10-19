@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag, for example v1.0.1
+        description: Existing release tag, for example v1.1.0
         required: true
         type: string
       expected_commit:
