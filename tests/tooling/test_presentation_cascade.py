@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 from vibeflow.core.descriptors import DescriptorCatalogs, NodeContractDescriptor, NodeDescriptor
 from vibeflow.targets.python.project import GraphCompiler, NodeRegistry
-from vibeflow.tooling.application.javascript.architecture_facts import _javascript_graph_document
-from vibeflow.tooling.application.javascript.review import render_mermaid
+from vibeflow.tooling.application.javascript.presentation.architecture import _javascript_graph_document
+from vibeflow.tooling.application.javascript.presentation.diagrams import render_mermaid
 from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_document
 from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid
 from vibeflow.tooling.project.graph_config import parse_graph_config

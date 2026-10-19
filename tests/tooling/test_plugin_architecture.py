@@ -11,10 +11,8 @@ from vibeflow.core.descriptors import PluginCatalog
 from vibeflow.tooling.application.python.presentation.architecture_document import (
     build_architecture_document,
 )
-from vibeflow.tooling.application.python.presentation.mermaid import (
-    compiled_graph_payload,
-    export_mermaid,
-)
+from vibeflow.tooling.application.python.presentation.compiled_document import compiled_graph_payload
+from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid
 from vibeflow.tooling.application.python.workspace_service import (
     load_workspace_config,
     load_workspace_graph_for_export,

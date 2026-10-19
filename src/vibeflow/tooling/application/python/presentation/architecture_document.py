@@ -3,7 +3,6 @@ from __future__ import annotations
 from vibeflow.core.rules.selection import selection_data
 
 import inspect
-import json
 from pathlib import Path
 from typing import Mapping
 
@@ -27,9 +26,6 @@ from vibeflow.tooling.application.python.presentation.review_model import (
     rendered_resources_payload,
     resources_payload,
     source_reference,
-)
-from vibeflow.tooling.project.document_kinds import (
-    ARCHITECTURE_DOCUMENT_HEADER,
 )
 
 
@@ -325,8 +321,6 @@ def _effective_execution_lock(
             "inherited": True,
         }
     return None
-
-
 
 
 def _graph_contains_global_state(

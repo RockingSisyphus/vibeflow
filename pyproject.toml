@@ -22,7 +22,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 vibeflow = [
-    "tooling/presentation/*.mjs",
+    "tooling/presentation/mermaid/*.mjs",
     "targets/javascript/resources/*.mjs",
     "targets/javascript/nodetypes/*.mjs",
     "targets/javascript/nodetypes/*.d.ts",

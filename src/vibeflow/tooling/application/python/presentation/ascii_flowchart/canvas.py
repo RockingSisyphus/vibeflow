@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 
-
 class Canvas:
     def __init__(self, width: int, height: int) -> None:
         self.width = max(width, 1)

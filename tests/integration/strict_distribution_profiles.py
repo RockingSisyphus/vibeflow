@@ -56,7 +56,7 @@ def _profile_payload() -> dict[str, object]:
                     "change_inventory": "required",
                     "planned_review": True,
                     "human_approval_gate": True,
-                    "required_review_artifact": "expanded_svg",
+                    "required_review_artifact": "html_preview",
                 },
                 "agent_automation": {
                     "refresh_architecture": True,

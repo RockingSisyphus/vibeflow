@@ -253,8 +253,6 @@ _FIELD_PREFIXES = frozenset(
         "class:",
         "config:",
         "external:",
-        "async:",
-        "result_key:",
         "effect_scope:",
         "execution_lock:",
     }

@@ -60,7 +60,7 @@ Node 的 gain=2、shift=1、amount=1 默认值被 config 的 `inner.affine` 和 
 | Nodeset 与循环 | 两层 Nodeset；同时携带值和计数，body 第三次返回 done | qualified 路径包含 prepare.inner.affine；step/loop_iteration 各三次，history 逐项一致 |
 | 原生 IO | 测试注入 receive/send，不连接外部网络 | 恰一次 receive(math.in) 和 send(math.out, result)，参数和值精确匹配 |
 | 复用与并发隔离 | 连续使用同一入口；正负两组同时运行 | 不串结果、offset、history 或 trace；JS 一组 full、一组 boundary，boundary 不出现 node_start 且保留 Nodeset 边界 |
-| Python 执行与架构产物 | checked run；再以 plan/block/compiled 执行 | 三后端正负结果一致；架构 JSONC、Mermaid 及真实渲染的 collapsed/expanded SVG 存在 |
+| Python 执行与架构产物 | checked run；再以 plan/block/compiled 执行 | 三后端正负结果一致；Architecture JSONC、结构化快照和 HTML 入口存在；不安装或启动 Mermaid |
 | JS AOT 与真实浏览器 | Node/browser single-esm；浏览器实际导入执行 | 两宿主执行同一组断言、public envelope 只有声明的输出；浏览器 DOM 显示正确值 |
 | JS 异步等待 | 暂不释放真实注入 Port 的 Promise | workflow 保持 pending；释放后得到 480；Node 与浏览器都检查 |
 
@@ -81,8 +81,8 @@ python sandbox/python/comprehensive_math/run_all.py
 python sandbox/javascript/comprehensive_math/run_all.py
 ```
 
-默认复制到临时目录并自动清理。两者接受 `--work-dir /仓库外/新目录` 保留项目、health、trace/build 和 `report.json`；目录须为新目录。Python 可用 `--renderer-root`，JS 可用 `--toolchain-root`（其下有锁定版本 node_modules）和 `--puppeteer-root` 复用依赖。JS `--skip-browser` 明确记录 REDUCED，不算完整浏览器验收。
+默认复制到临时目录并自动清理。两者接受 `--work-dir /仓库外/新目录` 保留项目、health、trace/build 和 `report.json`；目录须为新目录。JS 可用 `--toolchain-root`（其下有锁定版本 node_modules）和 `--puppeteer-root` 复用依赖。JS `--skip-browser` 明确记录 REDUCED，不算完整浏览器验收。
 
-Python 首次检查、渲染后复用组装图测试输入矩阵；JS 在同一检查会话内复用解析资料，每个 Target 构建一次，再复用生成物执行矩阵。源码修正后再检查/构建，检验资料确实随源码失效。这样减少重复解析、启动进程和 SVG 渲染，同时保留上述独立观察。
+Python 首次检查与数据导出后复用组装图测试输入矩阵；JS 在同一检查会话内复用解析资料，每个 Target 构建一次，再复用生成物执行矩阵。源码修正后再检查/构建，检验资料确实随源码失效。这样减少重复解析、启动进程和重复检查，同时保留上述独立观察。
 
 原案例的逐项替代与实际验证成绩见 [整合归档](history/audits/comprehensive-sandbox-20261009.md)。

@@ -41,6 +41,31 @@ const puppeteer=createRequire(renderer)('puppeteer');
     await page.goto(pathToFileURL(entry).href+'#'+new URLSearchParams({snapshot:pythonId,view:'flow'}));
     const wait=async count=>page.waitForFunction(n=>document.querySelectorAll('[data-call-path]').length===n,{},count);
     await wait(4);
+    const geometry=await page.evaluate(()=>{
+      const svg=VFShapes.node('svg',{width:1200,height:1000});document.body.append(svg);
+      const shapes=['rect','rounded','stadium','circle','dbl-circ','diamond','lean-r','lean-l','trap-b','hex','fr-rect','cyl','doc','cloud'];
+      const failures=[];
+      for(const shape of shapes){
+        const facts={id:shape,display_name:'Readable card',presentation:{values:{shape}}};
+        const card=VFShapes.measure(facts),graphic=VFShapes.draw(card,facts);svg.append(graphic);
+        const item={x:2000,y:3000,width:card.width,height:card.height,card};
+        const shell=graphic.querySelector('.card-outline'),cx=card.width/2,cy=card.height/2;
+        for(let i=0;i<40;i++){
+          const angle=i*Math.PI/20,ux=Math.cos(angle),uy=Math.sin(angle);
+          const p=VFShapes.connection(item,{x:item.x+cx+ux*2000,y:item.y+cy+uy*2000});
+          const x=p.x-item.x,y=p.y-item.y;
+          // Independent browser SVG fill geometry, rather than the canvas path used by routing.
+          if(!shell.isPointInFill(new DOMPoint(x-ux*.3,y-uy*.3))||shell.isPointInFill(new DOMPoint(x+ux*.3,y+uy*.3)))failures.push({shape,i,x,y});
+        }
+        graphic.remove();
+      }
+      const resource={kind:'node',type_key:'fixture.external',display_name:'External resource',external:true};
+      const resourceCard=VFShapes.measure(resource,{'fixture.external':{external:true,contract:{requires:[{key:'input'}],provides:[]}}});
+      const rows=resourceCard.rows.map(r=>r.text);
+      svg.remove();return {failures,rows};
+    });
+    assert.deepEqual(geometry.failures,[]);assert(geometry.rows.includes('外部依赖'));
+    assert(geometry.rows.includes('fixture.external'));assert(geometry.rows.includes('1 输入 · 0 输出'));
     const icons=await page.evaluate(async()=>{
       const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
       svg.style.cssText='position:fixed;left:-10000px;top:0;width:1200px;height:500px';document.body.append(svg);

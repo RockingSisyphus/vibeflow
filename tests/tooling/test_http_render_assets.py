@@ -21,7 +21,7 @@ def test_browser_asset_server_limits_access_and_closes(tmp_path):
         (assets / "escape.svg").symlink_to(secret)
     except OSError:
         pytest.skip("symlink creation is unavailable")
-    module = Path(__file__).resolve().parents[2] / "src/vibeflow/tooling/presentation/http_assets.mjs"
+    module = Path(__file__).resolve().parents[2] / "src/vibeflow/tooling/presentation/mermaid/http_assets.mjs"
     script = """
 import assert from 'node:assert/strict';
 import {serveAssets} from MODULE;

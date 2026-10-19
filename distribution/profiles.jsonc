@@ -39,7 +39,7 @@
         "change_inventory": "required",
         "planned_review": true,
         "human_approval_gate": true,
-        "required_review_artifact": "expanded_svg"
+        "required_review_artifact": "html_preview"
       },
       "agent_automation": {
         "refresh_architecture": true,

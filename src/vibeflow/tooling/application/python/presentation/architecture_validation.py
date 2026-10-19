@@ -7,7 +7,7 @@ from typing import Mapping
 
 from vibeflow.core.findings import HealthFinding, HealthReport
 from vibeflow.tooling.project.config_loader import ConfigLoadError, load_raw_config_document
-from vibeflow.tooling.application.python.presentation.architecture_document import ARCHITECTURE_DOCUMENT_HEADER
+from vibeflow.tooling.project.document_kinds import ARCHITECTURE_DOCUMENT_HEADER
 
 
 _SOURCE_ERROR_RULES = frozenset(

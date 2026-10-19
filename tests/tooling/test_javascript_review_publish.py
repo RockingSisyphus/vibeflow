@@ -8,13 +8,15 @@ from types import SimpleNamespace
 import pytest
 
 from vibeflow.tooling.application.javascript import cli
+from vibeflow.tooling.application.javascript.presentation import architecture as architecture_facts
 from vibeflow.tooling.project.document_kinds import (
     ARCHITECTURE_DOCUMENT_HEADER,
 )
 
 
 def _review_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    from vibeflow.tooling.application.javascript import audit, review, preview
+    from vibeflow.tooling.application.javascript.presentation import preview
+    from vibeflow.tooling.application.javascript.presentation import diagrams as review
     from vibeflow.tooling.project import workspace_loader
 
     root_path = tmp_path / "project"
@@ -57,7 +59,7 @@ def _review_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         warnings=(),
         rule_report=None,
     )
-    monkeypatch.setattr(audit, "render_architecture", lambda _result: rendered_architecture)
+    monkeypatch.setattr(architecture_facts, "render_architecture", lambda _result: rendered_architecture)
     monkeypatch.setattr(review, "expected_review_coverage", lambda _result: frozenset({("workflow", "", "demo")}))
     args = SimpleNamespace(
         workspace=str(workspace.path),
@@ -86,7 +88,7 @@ def test_review_publish_failure_keeps_new_architecture_and_old_svg(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    from vibeflow.tooling.application.javascript import review
+    from vibeflow.tooling.application.javascript.presentation import diagrams as review
 
     args, result, architecture, svg, rendered = _review_fixture(tmp_path, monkeypatch)
     architecture.write_text("old architecture\n", encoding="utf-8")
@@ -169,7 +171,7 @@ def test_review_renderer_failure_keeps_new_architecture_and_old_svg(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    from vibeflow.tooling.application.javascript import review
+    from vibeflow.tooling.application.javascript.presentation import diagrams as review
 
     args, result, architecture, svg, rendered = _review_fixture(tmp_path, monkeypatch)
     svg.write_text("old svg\n", encoding="utf-8")
@@ -195,7 +197,7 @@ def test_review_coverage_failure_keeps_new_architecture_and_old_svg(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    from vibeflow.tooling.application.javascript import review
+    from vibeflow.tooling.application.javascript.presentation import diagrams as review
 
     args, result, architecture, svg, rendered = _review_fixture(tmp_path, monkeypatch)
     svg.write_text("old svg\n", encoding="utf-8")
@@ -224,7 +226,7 @@ def test_review_publishes_single_json_and_coverage_checked_svg(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    from vibeflow.tooling.application.javascript import review
+    from vibeflow.tooling.application.javascript.presentation import diagrams as review
 
     args, result, architecture, svg, rendered = _review_fixture(tmp_path, monkeypatch)
     monkeypatch.setattr(cli, "_audit", lambda _args: (result, None))

@@ -28,7 +28,8 @@ def main():
     frames, panels, columns = [], [], []
     original_fragment = fragments._render_fragment
     original_panel = fragments._compose_detail_panel_svg
-    original_compose = review_svg._compose_svg
+    from vibeflow.tooling.presentation.mermaid import layout as review_layout
+    original_compose = review_layout._compose_svg
 
     def capture_fragment(title, mermaid, *positional, **options):
         index = len(frames)
@@ -52,9 +53,9 @@ def main():
         columns.extend([[item.title for item in group] for group in value])
         return original_compose(value, **options)
 
-    fragments._render_fragment = review_svg._render_fragment = capture_fragment
+    fragments._render_fragment = capture_fragment
     fragments._compose_detail_panel_svg = capture_panel
-    review_svg._compose_svg = capture_columns
+    review_layout._compose_svg = capture_columns
     started = time.perf_counter()
     error = None
     with args.report.with_suffix(".stdout.txt").open("w") as stdout:

@@ -36,7 +36,8 @@ from vibeflow.core import (
     compile_core,
 )
 from vibeflow.tooling.project.config_loader import load_workspace_config_document
-from vibeflow.tooling.application.javascript.host_selection import declared_hosts, active_host_ids
+from vibeflow.tooling.application.javascript.host_selection import declared_hosts
+from vibeflow.targets.javascript.build.host_selection import active_host_ids
 from vibeflow.core.descriptors import DescriptorCatalogs
 from vibeflow.targets.javascript.frontend.facts import (
     JavascriptImplementationFactsError,
@@ -535,7 +536,7 @@ def _compile_core_compilation(
 def build_project_aot(request: ProjectBuildRequest) -> ProjectBuildResult:
     prepared = prepare_project_build(request)
     from vibeflow.tooling.presentation.preview.diagnostics import incidental_preview, preview_operation
-    from vibeflow.tooling.application.javascript.build_preview import publish_build_preview
+    from vibeflow.tooling.application.javascript.presentation.preview import publish_build_preview
     record = incidental_preview(publish_build_preview, prepared=prepared, preview_root=request.preview_root)
     with preview_operation(record):
         result = build_aot(

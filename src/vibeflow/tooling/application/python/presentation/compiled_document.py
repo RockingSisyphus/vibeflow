@@ -5,7 +5,7 @@ from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
 from vibeflow.core.flow import GraphConfig, NodeSpec, STATUS_PLANNED
 from vibeflow.targets.python.runtime.helpers import has_planned, planned_items
-from .helpers import node_flow_kind, nodeset_for_node
+from .review_model import node_flow_kind, nodeset_for_node
 from .review_model import node_review_effect_scope, resources_payload
 
 

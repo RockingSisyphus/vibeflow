@@ -19,13 +19,10 @@ from vibeflow.tooling.application.javascript.build import (
     build_project_aot,
     prepare_project_build,
 )
-from vibeflow.tooling.application.javascript.audit import (
-    JavascriptAuditRequest,
-    audit_javascript_project,
-    render_architecture,
-    render_mermaid,
-)
-from vibeflow.tooling.application.javascript.review import write_review_svg
+from vibeflow.tooling.application.javascript.audit import JavascriptAuditRequest, audit_javascript_project
+from vibeflow.tooling.application.javascript.presentation.diagrams import render_mermaid
+from vibeflow.tooling.application.javascript.presentation.architecture import render_architecture
+from vibeflow.tooling.application.javascript.presentation.diagrams import write_review_svg
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.flow import (
     GraphConfig,

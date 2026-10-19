@@ -54,12 +54,6 @@ def _function_definition_expressions(node):
     yield from getattr(node, "type_params", ())
 
 
-def _function_bindings(
-    node: ast.FunctionDef | ast.AsyncFunctionDef,
-) -> tuple[set[str], set[str]]:
-    collector = _function_scope_bindings(node)
-    names = collector.names - collector.global_names - collector.nonlocal_names
-    return names, collector.import_names
 
 
 def _function_scope_bindings(

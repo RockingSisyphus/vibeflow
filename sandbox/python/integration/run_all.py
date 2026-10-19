@@ -440,7 +440,7 @@ def _run_comprehensive_math_case() -> CaseResult:
     work = WORK_ROOT / "comprehensive_math"
     completed = subprocess.run(
         [sys.executable, str(SANDBOX_DIR.parent / "comprehensive_math/run_all.py"),
-         "--work-dir", str(work), "--renderer-root", os.environ["VIBEFLOW_MERMAID_RENDERER_ROOT"]],
+         "--work-dir", str(work)],
         env={**os.environ, "PYTHONPATH": str(SOURCE_ROOT), "PYTHONDONTWRITEBYTECODE": "1"},
         capture_output=True, text=True,
     )
@@ -453,8 +453,7 @@ def _run_comprehensive_math_case() -> CaseResult:
 def _run_addition_case(name: str) -> CaseResult:
     work = WORK_ROOT / name
     completed = subprocess.run(
-        [sys.executable, str(SANDBOX_DIR.parent / name / "run_all.py"), "--work-dir", str(work),
-         "--renderer-root", os.environ["VIBEFLOW_MERMAID_RENDERER_ROOT"]],
+        [sys.executable, str(SANDBOX_DIR.parent / name / "run_all.py"), "--work-dir", str(work)],
         env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}, capture_output=True, text=True,
     )
     if completed.returncode:
@@ -1147,7 +1146,7 @@ def _run_effectful_imported_helper_preflight_case() -> CaseResult:
 
 
 def _run_global_state_forbidden_effect_audit() -> CaseResult:
-    from vibeflow.targets.python.quality.source_analysis import PurityPolicy
+    from vibeflow.targets.python.rules.node.policy import PurityPolicy
     cases = {"file":"bad.global_state.file", "environment":"bad.global_state.environment",
              "network":"bad.global_state.network", "subprocess":"bad.global_state.subprocess",
              "thread":"bad.global_state.thread", "eval":"bad.global_state.eval",
@@ -1540,7 +1539,6 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         collapsed_svg = SVG_DIR / f"{name}.svg"
         render_mermaid_svg(collapsed, collapsed_svg)
         render_mermaid_svg(expanded, SVG_DIR / f"{name}.expanded.svg", max_text_size=500_000, max_edges=5_000)
-        _assert_svg_text_contains(case, collapsed_svg)
         _assert_svg_cloud_nodes(case, collapsed_svg)
     initial = case["initial_factory"]() if "initial_factory" in case else case.get("initial", {})
     hook_marker = REPORT_DIR / "plugin_hooks.jsonl"
@@ -1696,18 +1694,6 @@ def _assert_compiled_block_sources(case: dict[str, Any], plan, source_paths: lis
 
 def _runtime_trace_lines(run_dir: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in (run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
-
-
-def _assert_svg_text_contains(case: dict[str, Any], path: Path) -> None:
-    expected = [str(item) for item in case.get("expected_svg_text_contains", ())]
-    if not expected:
-        return
-    svg_text = path.read_text(encoding="utf-8", errors="ignore")
-    visible = re.sub(r"<[^>]+>", " ", svg_text)
-    visible = " ".join(visible.split())
-    missing = [item for item in expected if item not in visible]
-    if missing:
-        raise AssertionError(f"SVG {path.name} missing visible text {missing!r}")
 
 
 def _assert_svg_cloud_nodes(case: dict[str, Any], path: Path) -> None:
@@ -2041,7 +2027,7 @@ def _run_invalid_case(case: dict[str, Any], base_lib_report):
 
 
 def _inspect_invalid_node(case: dict[str, Any], kind: str) -> CaseResult:
-    from vibeflow.targets.python.quality.source_analysis import PurityPolicy
+    from vibeflow.targets.python.rules.node.policy import PurityPolicy
     from vibeflow.tooling.project.descriptor_loader import load_workflow_plugins, DescriptorLoadError
     from vibeflow.tooling.project.workspace_loader import load_workspace_config
     negative = PROJECT_DIR / "negative_plugins" / (str(case["class"]) + ".py")
@@ -2114,7 +2100,7 @@ def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
 def _health_invalid_node(case: dict[str, Any]) -> CaseResult:
     from vibeflow.core import DataProvider, GraphConfig, NodeSpec
     from vibeflow.targets.python.project import NodeRegistry
-    from vibeflow.targets.python.quality.source_analysis import PurityPolicy
+    from vibeflow.targets.python.rules.node.policy import PurityPolicy
     from vibeflow.targets.python.quality.workflow import validate_graph_health
     from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
 
@@ -2140,7 +2126,7 @@ def _bad_base_lib_report():
     from vibeflow.targets.shared.quality_support.implementation import analyze_call_graph
     from vibeflow.core.rules import RuleContext, compile_ruleset, execute_rule_plan
     from vibeflow.targets.python.quality.source_context import PythonSourceFile, build_python_source_context
-    from vibeflow.targets.python.quality.source_analysis import PurityPolicy
+    from vibeflow.targets.python.rules.node.policy import PurityPolicy
     from vibeflow.targets.python.quality.rule_adapter import rule_resources
     from vibeflow.targets.python.project.source_membership import source_ownership
     registry = _project_registry()

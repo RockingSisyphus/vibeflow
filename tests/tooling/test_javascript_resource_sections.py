@@ -1,4 +1,5 @@
 from __future__ import annotations
+from vibeflow.tooling.presentation.mermaid.style import mermaid_style, mermaid_shape
 
 from types import SimpleNamespace
 
@@ -6,8 +7,8 @@ import pytest
 
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.flow import GraphConfig, NodeSpec, NodesetSpec, LoopSpec
-from vibeflow.tooling.application.javascript import review
-from vibeflow.tooling.presentation.review_types import SvgFragment
+from vibeflow.tooling.application.javascript.presentation import diagrams as review
+from vibeflow.tooling.presentation.mermaid.types import SvgFragment
 
 
 def _compiled(graph):
@@ -143,7 +144,7 @@ def test_javascript_selected_resource_health_and_call_style_remain_visible():
 
 
 def test_javascript_call_health_uses_rule_associations_not_shared_source_files():
-    from vibeflow.tooling.application.javascript.presentation_status import node_health_classes
+    from vibeflow.tooling.application.javascript.presentation.status import node_health_classes
     graph = GraphConfig(nodes=(NodeSpec("first", "demo.work"), NodeSpec("second", "demo.work"),
                                NodeSpec("neighbor", "demo.other")))
     source = {"object_type": "node", "object_id": "demo.work", "severity": "warning",
@@ -157,7 +158,7 @@ def test_javascript_call_health_uses_rule_associations_not_shared_source_files()
 
 
 def test_javascript_call_health_distinguishes_repeated_node_ids_in_nested_graphs():
-    from vibeflow.tooling.application.javascript.presentation_status import node_health_classes
+    from vibeflow.tooling.application.javascript.presentation.status import node_health_classes
     child = GraphConfig(nodes=(NodeSpec("same", "demo.work"),))
     definition = NodesetSpec("demo.child", "Child", "A child", (), (), child)
     graph = GraphConfig(nodes=(NodeSpec("same", "demo.work"), NodeSpec("parent", "demo.child")),
@@ -179,8 +180,8 @@ def test_javascript_call_health_distinguishes_repeated_node_ids_in_nested_graphs
 ])
 def test_javascript_actual_call_architecture_and_mermaid_share_health_style(status, override, expected, origin):
     from vibeflow.core.flow import NodeStyle
-    from vibeflow.tooling.application.javascript.architecture_facts import _javascript_node_document
-    from vibeflow.tooling.application.javascript.presentation_status import node_health_classes
+    from vibeflow.tooling.application.javascript.presentation.architecture import _javascript_node_document
+    from vibeflow.tooling.application.javascript.presentation.status import node_health_classes
     result = _result()
     call = NodeSpec("call", "demo.work", status=status, style=NodeStyle(fill=override))
     graph = GraphConfig(nodes=(call,))
@@ -204,7 +205,7 @@ def test_javascript_resource_directory_defaults_use_the_shared_resource_presenta
         presentation = resolve_presentation({"id": "selected"}, resource_kind=resource_kind, native_class=native)
         text = review._resource_mermaid(kind, ({"id": "selected"},))
         assert f"shape: {presentation.shape}" in text
-        assert presentation.mermaid_style() in text
+        assert mermaid_style(presentation) in text
         assert text.count(" -.-> ") == 1
 
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from vibeflow.tooling.presentation.mermaid.style import mermaid_style, mermaid_shape
 
 import re
 import xml.sax.saxutils
@@ -9,10 +10,10 @@ from typing import Mapping
 from vibeflow.core.flow import GraphConfig, NodeSpec, NodesetSpec, STATUS_PLANNED
 from vibeflow.tooling.application.python.presentation.helpers import compile_for_render
 from vibeflow.tooling.application.python.presentation.mermaid import MERMAID_LAYOUT_DEFAULT, _escape_label, _resource_label, _safe_id, export_mermaid
-from vibeflow.tooling.presentation.mermaid import DEFAULT_MERMAID_MAX_EDGES, DEFAULT_MERMAID_MAX_TEXT_SIZE, render_mermaid_svg
-from vibeflow.tooling.presentation.review_layout import _column_height, _column_svg, _display_size, _validate_review_fragment_max_width, _viewbox_size
+from vibeflow.tooling.presentation.mermaid import render_mermaid_svg
+from vibeflow.tooling.presentation.mermaid.layout import _column_height, _column_svg, _display_size, _validate_review_fragment_max_width, _viewbox_size
 from vibeflow.tooling.application.python.presentation.review_model import invocation_for_node
-from vibeflow.tooling.presentation.review_types import (
+from vibeflow.tooling.presentation.mermaid.types import (
     DETAIL_PANEL_COLUMN_GAP as _DETAIL_PANEL_COLUMN_GAP,
     DETAIL_PANEL_ROW_GAP as _DETAIL_PANEL_ROW_GAP,
     DETAIL_PANEL_STYLE as _DETAIL_PANEL_STYLE,
@@ -21,7 +22,7 @@ from vibeflow.tooling.presentation.review_types import (
     REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH,
     SvgFragment,
 )
-from vibeflow.tooling.presentation.style import MERMAID_RESOURCE_CLASS_ORDER, mermaid_class_def_lines
+from vibeflow.tooling.presentation.mermaid.style import MERMAID_RESOURCE_CLASS_ORDER, mermaid_class_def_lines
 
 
 _MAX_GROUP_TITLE_CALL_IDS = 3
@@ -407,8 +408,8 @@ def _resource_mermaid(root_label: str, resources: tuple[Mapping[str, object], ..
         status = str(resource.get("status", "implemented"))
         presentation = resolve_presentation(resource, native_class=child_class, resource_kind=kind,
             status_class="plannedResource" if status == STATUS_PLANNED else "", call_style=resource.get("style"))
-        lines.append(f'  {resource_id}@{{ shape: {presentation.shape}, label: "{_escape_label(label)}" }}')
+        lines.append(f'  {resource_id}@{{ shape: {mermaid_shape(presentation.shape)}, label: "{_escape_label(label)}" }}')
         lines.append(f"  {root_id} -.-> {resource_id}")
         lines.append(f"  class {resource_id} {'plannedResource' if status == STATUS_PLANNED else child_class};")
-        lines.append(f"  style {resource_id} {presentation.mermaid_style()}")
+        lines.append(f"  style {resource_id} {mermaid_style(presentation)}")
     return "\n".join(lines) + "\n"

@@ -10,7 +10,8 @@ import shutil
 
 import pytest
 
-from vibeflow.tooling.application.javascript.audit import JavascriptAuditRequest, audit_javascript_project, render_architecture
+from vibeflow.tooling.application.javascript.audit import JavascriptAuditRequest, audit_javascript_project
+from vibeflow.tooling.application.javascript.presentation.architecture import render_architecture
 from vibeflow.tooling.application.javascript.build import ProjectBuildRequest, build_project_aot
 from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
 

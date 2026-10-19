@@ -66,6 +66,10 @@ Architecture 从真实 Config、Nodeset、插件资源及编译事实确定性�
 
 Node、BaseLib、Plugin 与 Host 共用展示解析，按 native → resource → status → use 合并并记录逐字段来源。资源选择覆盖颜色，声明指定形状与图标；执行身份、效果约束和状态标记独立保存。
 
+两端在 Tooling 的 Target 展示适配器中将已检查、编译的结果组装为完整架构事实；共享 presentation 序列化 Architecture、保存 v2 快照及历史索引。review、build 与 Python 源码运行默认导出数据并安装浏览工具，不启动 Mermaid。AOT 执行不检查源码或生成报告。
+
+HTML 唯一源码位于 tools/workflow-viewer，通过配置的 dataRoot 按需加载本地注册脚本，自主绘制可变形状卡片及连线；流程、BaseLib、Plugin、Host Extension 和 workflow 关联分别投影已有事实。网页不解析业务配置，也不读取原 SVG 的内部结构。形状和颜色保留公共样式词汇；Mermaid 方言及格式化仅在可选渲染器内转换。详见[本地预览维护说明](../maintainers/local-preview.md)。
+
 用户项目 SVG 从实际 Workflow 调用与配置资源选择生成。Plugin、BaseLib、Host 使用目录父节点连接本次使用的资源；Node 位于业务调用处。公开图形层不接收 Catalog 定义图、源码文件依赖图或规则实现图作为业务架构。
 
 Architecture JSONC 的 implementation_graph 保存当前项目的资源、源码角色、归属、真实导入、库依赖、插件贡献和有效规则。这些资料用于源码审核、来源查询与架构新鲜度校验，不直接投影为 SVG。Core/Target 内部开发信息与用户项目展示边界独立；统一 SDK 注册不会改变图形读者或展示层级。

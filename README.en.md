@@ -16,7 +16,7 @@ terminal start → input I/O → process / nodeset → output I/O → terminal e
 - Python and JS/TS plugin SDKs for code-defined Nodes, Rules, Rulesets, and other resources explicitly selected by each workflow;
 - composable Rules and Rulesets, plus Nodes, Nodesets, Loops, Capabilities, and explicit effect boundaries;
 - explicit multi-file implementations, source ownership, per-file reviews, and default presentation for Nodes, BaseLibs, Plugins, and Hosts;
-- deterministic Architecture JSONC, Mermaid, ASCII, and expanded SVG views with resource dependencies;
+- deterministic Architecture JSONC and offline HTML previews with history, expandable calls and resource views; optional Mermaid, ASCII and SVG exports;
 - config, contract, reachability, control-flow, quality, build, and execution-evidence checks;
 - collaborative and autonomous development protocols over the same Core and machine rules.
 
@@ -50,6 +50,7 @@ node javascript_project/scripts/workflow_execution_probe.mjs
 
 - [Project overview](distribution/docs/overview.md)
 - [User development guides](docs/README.md#使用者开发)
+- [Offline previews and history](distribution/docs/user/local-preview.md)
 - [Multi-file resources and presentation](distribution/docs/user/multifile-resources.md)
 - [System design](docs/README.md#系统设计)
 - [Kernel maintenance](docs/README.md#内核维护)

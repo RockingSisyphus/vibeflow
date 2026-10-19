@@ -18,7 +18,7 @@ from vibeflow.core.constants import (
 _SHAPE_BY_FLOW_KIND = {
     FLOW_KIND_TERMINAL: "stadium",
     FLOW_KIND_PROCESS: "rect",
-    FLOW_KIND_DECISION: "diam",
+    FLOW_KIND_DECISION: "diamond",
     FLOW_KIND_IO: "lean-r",
     FLOW_KIND_PREDEFINED: "fr-rect",
     FLOW_KIND_DATA_STORE: "cyl",

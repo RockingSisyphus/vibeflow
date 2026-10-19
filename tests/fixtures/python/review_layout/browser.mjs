@@ -1,6 +1,6 @@
 /** Computed geometry and colours from the final, composed SVG. */
 import {createRequire} from "node:module";
-import {serveAssets} from "../../../../src/vibeflow/tooling/presentation/http_assets.mjs";
+import {serveAssets} from "../../../../src/vibeflow/tooling/presentation/mermaid/http_assets.mjs";
 const [renderer, svg, screenshot] = process.argv.slice(2);
 const require = createRequire(renderer + "/package.json");
 const assets = await serveAssets({files: {"graph.svg": svg}});

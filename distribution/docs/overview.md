@@ -26,14 +26,14 @@ Node 类型信息是端口契约和语义的来源；Config 中的 `display_name
 - 可组合的源码、架构和领域 Ruleset；
 - Node、BaseLib、Plugin 与 Host 的多文件实现、源码归属和逐文件质量检查；
 - Python 运行时与目录 AOT、JavaScript/TypeScript AOT 构建；
-- 保存规则及样式来源的 Architecture JSONC，以及展示工作流和资源依赖的展开 SVG；
+- 保存规则及样式来源的 Architecture JSONC，以及带历史、可展开调用与资源视图的离线 HTML 预览；SVG 按需生成对照；
 - 可追踪的运行产物与工作流执行探针。
 
 VibeFlow 检查工程结构、源码健康度与所选领域约束。项目测试与真实环境验证负责业务结果、需求符合性和外部接口行为。
 
 ## 两个开发 profile
 
-- **collaborative**：使用变更清单、planned 架构审核、正式 SVG 和人工批准门。
+- **collaborative**：使用变更清单、planned 架构审核、HTML 审查快照和人工批准门。
 - **autonomous**：AI 直接维护真实 source，自动更新架构并完成适用门禁。
 
 两个 profile 使用同一 Core、quality policy、项目模板和 Workflow ABI `vibeflow.workflow.v8`。profile 只改变开发协议、提示词和随包文档选择。

@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 from typing import Mapping
 
 from vibeflow.tooling.presentation.mermaid import MermaidRenderError
-from vibeflow.tooling.presentation.review_types import (
+from vibeflow.tooling.presentation.mermaid.types import (
     FRAGMENT_FRAME_PADDING as _FRAGMENT_FRAME_PADDING,
     REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH,
     REVIEW_COLUMNS_STYLE as _REVIEW_COLUMNS_STYLE,

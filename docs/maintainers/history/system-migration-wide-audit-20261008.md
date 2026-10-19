@@ -100,7 +100,7 @@ Plugin 支撑文件中的 `def write(value): return value`，由 lifecycle hook 
 
 ### M08 旧浏览器首选函数由三个测试保留
 
-[共享 mermaid renderer](../../../src/vibeflow/tooling/presentation/mermaid.py#L398) 的 `_find_chromium` 只返回系统候选首项。正式渲染已在 `e553628` 改为 Puppeteer bundled browser 与全部合适候选，当前走 `_puppeteer_launch_options` 和 `_system_browser_candidates`。
+[共享 mermaid renderer](../../../src/vibeflow/tooling/presentation/mermaid/__init__.py#L398) 的 `_find_chromium` 只返回系统候选首项。正式渲染已在 `e553628` 改为 Puppeteer bundled browser 与全部合适候选，当前走 `_puppeteer_launch_options` 和 `_system_browser_candidates`。
 
 只有[strict_mermaid_cli.py](../../../tests/tooling/strict_mermaid_cli.py#L9) 的三个直接测试还调用旧函数。可迁移这三个测试后删除函数；不能把活跃 renderer、候选 fallback 或可用性 API 一起删除。
 

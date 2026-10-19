@@ -129,10 +129,6 @@ def source_node_calls(graph: Any) -> dict[str, list[tuple[str, ...]]]:
     return result
 
 
-def _workflow_blocks(graph: Any, *, include_declarations: bool = False):
-    for item in graph_rule_subjects(graph):
-        if include_declarations or not item.declaration_only:
-            yield item.graph, None if item.declaration_only else item.call_path
 
 
 class _RuleSession:

@@ -6,10 +6,6 @@ from typing import TYPE_CHECKING, Mapping
 
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.flow import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, LoopSpec, NodeSpec, NodesetSpec, STATUS_PLANNED
-from vibeflow.core.constants import (
-    EFFECT_SCOPE_GLOBAL_STATE,
-    FLOW_KIND_GLOBAL_STATE,
-)
 
 if TYPE_CHECKING:
     from vibeflow.targets.python.project.registry import NodeRegistry

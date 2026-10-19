@@ -24,9 +24,9 @@
 
 完成修改后更新 Architecture，并执行任务适用的 validate、quality、build 和工作流执行探针。按本次修改对应的源码与输入，分别报告静态检查、构建、执行和业务验收结果。
 
-正式审核图使用 `review` 生成，展示当前用户项目的主流程、所选资源目录和 Nodeset 详情。资源目录父节点分别为 `plugins`、`base_lib`、`host_extensions`，连接当前配置实际使用的资源；空目录省略。Node 显示在实际流程调用位置。主流程与嵌套父流程纵向显示，叶子 Nodeset 横向显示，子详情在父流程右侧上下排列。项目源码归属与规则证据保存在 `ARCHITECTURE.jsonc`，有效规则可通过 `review-rules --json` 查询。
+正式审核材料使用 `review` 生成：HTML 入口加载当次结构化快照，提供流程、BaseLib、Plugin、Host Extension 和 workflow 关联视图。资源来自当前 workflow 的实际选择；Node 显示在真实调用位置。Nodeset 与 Loop 默认折叠，在具体调用上右键展开或收起，手动状态不修改源配置。项目源码归属与规则证据保存在 `ARCHITECTURE.jsonc`，有效规则可通过 `review-rules --json` 查询。
 
-Nodeset 定义可以在 `type_key` 同级设置 `"expand": false`，让展开图保留调用框并停止展示其全部内部；省略时为 `true`。同定义的重复调用和 Loop body 沿用该设置，内部源码仍接受审查并按原生流程执行。
+需要静态 SVG 对照时使用 `review --with-svg` 或 `review --output FILE.svg`。SVG 的主流程与嵌套父流程纵向显示、叶子 Nodeset 横向显示；Nodeset 定义的 `"expand": false` 控制 SVG 详情展开，省略时为 `true`。该配置不改变 HTML 的手动展开，也不影响源码审查及原生执行。
 
 运行排查时读取本次运行的 `vibeflow.log`（内核）和 `business.log`（业务 stdout/stderr）。自动化监控以 `status.json` 的 `state` 判断运行状态；`state/error/updated_at` 由内核维护。
 

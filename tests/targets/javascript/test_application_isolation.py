@@ -109,7 +109,7 @@ def test_javascript_review_import_does_not_load_python_application_or_target() -
     _run_import_guard(
         "import sys; "
         "import vibeflow.tooling.application.javascript.audit; "
-        "import vibeflow.tooling.application.javascript.review; "
+        "import vibeflow.tooling.application.javascript.presentation.diagrams; "
         "bad=sorted(name for name in sys.modules "
         "if name == 'vibeflow.targets.python' "
         "or name.startswith('vibeflow.targets.python.') "

@@ -34,10 +34,16 @@ def build_architecture_facts(
     root_id: str,
     source_path: str,
     findings: tuple = (),
+    project_root=None,
+    selections=None,
+    roots=None,
+    rule_report=None,
 ) -> dict[str, object]:
-    from vibeflow.tooling.application.javascript.presentation_status import node_health_classes
+    from .status import node_health_classes
+    if rule_report is not None:
+        findings = rule_report.findings
     health_classes = node_health_classes(graph, findings)
-    return {
+    payload = {
         "project_target": "javascript",
         "workflow": _javascript_graph_document(
             graph,
@@ -103,6 +109,20 @@ def build_architecture_facts(
             "plugins": list(plugin_records),
         },
     }
+
+    from vibeflow.core.rules.planning import selection_report
+    payload["rule_selections"] = selection_report(graph, catalogs)
+    if rule_report is not None:
+        payload["rule_checks"] = rule_report.to_dict()
+    if project_root is not None:
+        from vibeflow.tooling.presentation.resource_architecture import resource_architecture
+        from vibeflow.tooling.presentation.portable_paths import portable_paths
+        sources = tuple(item for scope in rule_report.source_scopes.values() for item in scope["sources"]) if rule_report else ()
+        payload["implementation_graph"] = resource_architecture(catalogs, project_root=project_root,
+            selections=selections, selected_nodes=used_node_types, source_facts=sources,
+            findings=findings, roots=roots)
+        payload = portable_paths(payload, roots=roots or {}, primary_root=project_root)
+    return payload
 
 
 def _active_capability_ids(
@@ -323,3 +343,31 @@ def _reachable_javascript_nodesets(graph: GraphConfig) -> frozenset[str]:
     visit(graph)
     return frozenset(reachable)
 
+
+def build_prepared_architecture(prepared):
+    """Adapt checked build inputs without compiling or interpreting source again."""
+    inputs = prepared.presentation_inputs
+    compiled_nodesets = dict(inputs["declarations"])
+
+    def remember(graph, path=()):
+        for node in graph.nodes:
+            target = node.loop.body if node.type_used in LOOP_NODE_TYPES else node.type_used
+            definition = graph.nodesets.get(target)
+            call = path + (node.id,)
+            if definition is not None and call in inputs["compiled_by_path"]:
+                compiled_nodesets.setdefault(target, inputs["compiled_by_path"][call])
+                remember(definition.graph, call)
+
+    remember(prepared.graph)
+    return build_architecture_facts(prepared.graph, compiled=prepared.compiled,
+        compiled_nodesets=compiled_nodesets, catalogs=prepared.catalogs,
+        used_node_types=frozenset(prepared.used_node_types), active_base_lib_ids=frozenset(prepared.used_base_libs),
+        plugin_records=prepared.declared_plugins, host_records=prepared.declared_host_extensions,
+        root_id=prepared.root.id, source_path=prepared.config_path.relative_to(prepared.root.path).as_posix(),
+        project_root=prepared.root.path, selections=inputs["selections"],
+        roots={root.id:root.path for root in prepared.workspace.roots}, rule_report=prepared.rule_report)
+
+
+def render_architecture(result):
+    from vibeflow.tooling.presentation.architecture_facts import render_architecture_payload
+    return render_architecture_payload(result.architecture)

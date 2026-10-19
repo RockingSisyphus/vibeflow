@@ -1,10 +1,7 @@
 from tests.fixtures.support.strict_support import *
 
-from vibeflow.tooling.application.python.presentation.architecture_document import (
-    ARCHITECTURE_DOCUMENT_HEADER,
-    build_architecture_document,
-    render_architecture_document,
-)
+from vibeflow.tooling.project.document_kinds import ARCHITECTURE_DOCUMENT_HEADER
+from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_document, render_architecture_document
 from vibeflow.tooling.application.python.presentation.review_model import graph_root_ids
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.flow import ExecutionLockSpec, GraphConfig, NodeSpec

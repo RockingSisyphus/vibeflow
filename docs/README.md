@@ -48,7 +48,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 
 ## 当前维护说明
 
-- [技术债审查（2026-10-19）](maintainers/technical-debt-audit-20261019.md)：预览功能提交后的遗留依赖、目录与文档核对，包含复现和未判为债务的边界。
+- [展示子系统清理（2026-10-19）](maintainers/presentation-cleanup-20261019.md)：删除旧转接与死代码、收拢展示目录、统一协议和样式事实，记录回归及保留边界。
 - [综合数学沙箱说明](maintainers/comprehensive-math-sandbox.md)
 - [VibeFlow 职责边界与整改规格](maintainers/product-boundary-refactor-spec-20261009.md)：完整职责定义、11 项源码定位、当前与目标逻辑、删改停止点和实施后验收。
 - [双语言 AOT 与维护整理实施记录](maintainers/aot-unification-implementation.md)

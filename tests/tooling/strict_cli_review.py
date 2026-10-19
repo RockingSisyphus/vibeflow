@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from tests.fixtures.support.strict_support import _seed_add_pipeline, cli_main
-from vibeflow.tooling.application.python.presentation.architecture_document import ARCHITECTURE_DOCUMENT_HEADER
+from vibeflow.tooling.project.document_kinds import ARCHITECTURE_DOCUMENT_HEADER
 
 
 _CANONICAL_SVG = (
