@@ -93,12 +93,25 @@ def resource_architecture(catalogs, *, project_root, source_facts=(), selections
             "status":status,"markers":markers,"diagnostics":related,"effective_rules":_rule_plans(descriptor,catalogs),
             "effective_presentation":presentation.to_dict(),"sources":source_rows}
         for row in source_rows:edges.append({"from":key,"to":row["id"],"relation":row["role"]})
+    # Planned selections need no implementation descriptor, but remain real
+    # declarations with their own presentation and review metadata.
+    for (kind, identity), record in uses.items():
+        key = kind + ":" + identity
+        if kind == "plugin_declaration" or key in resources or record.get("status") != "planned":
+            continue
+        native = {"base_lib":"baseLibResource", "plugin":"pluginResource",
+                  "host_extension":"hostExtensionResource"}[kind]
+        presentation = resolve_presentation(record, native_class=native, status_class="plannedResource",
+            call_style=record.get("style", {}), resource_kind=kind)
+        resources[key] = {**record, "kind":kind, "id":identity, "plugin_id":"", "status":"planned",
+            "markers":["planned"], "effective_rules":{}, "sources":[],
+            "effective_presentation":presentation.to_dict()}
     for record in catalogs.plugin_records:
         if record.get("loaded") or not record.get("id"):continue
         key="plugin_declaration:"+record["id"]
         presentation=resolve_presentation(record,native_class="pluginResource",status_class="plannedResource",
                                           call_style=record.get("style",{}),resource_kind="plugin_declaration")
-        resources[key]={"kind":"plugin_declaration","id":record["id"],"plugin_id":record["id"],
+        resources[key]={**record,"kind":"plugin_declaration","id":record["id"],"plugin_id":record["id"],
             "status":"planned","markers":["planned"],"rulesets":[],"effective_rules":{},"sources":[],
             "origin":{"plugin_id":record["id"],"path":str(known_roots.get(record.get("root"),root)/record.get("source",{}).get("ref",""))},
             "effective_presentation":presentation.to_dict()}

@@ -1,7 +1,7 @@
 """Collect project implementations and package resources for Python AOT."""
 from pathlib import Path
 
-_EXCLUDED = {'.git', '.venv', 'node_modules', 'runs', 'build', 'dist', '__pycache__'}
+_EXCLUDED = {'.git', '.venv', 'node_modules', 'runs', 'build', 'dist', '__pycache__', 'vibeflow-preview', 'vibeflow-preview.config.js'}
 
 
 def python_bundle_files(workspace, registry, config, *, out_dir, include):

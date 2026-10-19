@@ -169,6 +169,7 @@ WORKSPACE_COMMANDS = {
     "quality-check",
     "review",
     "review-rules",
+    "preview",
     "run",
     "validate",
 }

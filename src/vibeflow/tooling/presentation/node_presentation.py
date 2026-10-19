@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Mapping
 
-from vibeflow.tooling.application.mermaid_shapes import mermaid_shape_for_flow_kind
+from vibeflow.tooling.presentation.shape_semantics import shape_for_flow_kind
 from vibeflow.tooling.presentation.style import SYSTEM_STYLE_COLORS
 
 
@@ -44,7 +44,7 @@ def resolve_presentation(
                                     else "documentNode" if identity == "document" else "defaultNode")
     native = SYSTEM_STYLE_COLORS.get(native_class, SYSTEM_STYLE_COLORS["defaultNode"])
     values = {"fill": native.fill, "stroke": native.stroke, "text": native.text,
-              "shape": "trap-b" if native_class == "loopNode" else mermaid_shape_for_flow_kind(identity)}
+              "shape": "trap-b" if native_class == "loopNode" else shape_for_flow_kind(identity)}
     if identity == "process" and native_class not in {"loopNode", "nodesetNode"} and _parallel_call(node, compiled):
         values["shape"] = "dbl-circ"
     sources = dict.fromkeys(values, "native")

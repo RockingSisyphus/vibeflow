@@ -38,6 +38,7 @@ def add_delegate_cli_parser(subparsers, add_runtime_options: Callable[[object], 
         type=parse_run_id_argument,
         help="optional deterministic run id for tests or controlled runs",
     )
+    parser.add_argument("--preview-root", help="override offline preview directory")
     add_runtime_options(parser)
 
 
@@ -111,6 +112,7 @@ def handle_delegate_cli(args) -> int:
                     runtime_options=options,
                     delegate_cli=True,
                     _prepared_run_dir=owned_run_dir,
+                    preview_root=getattr(args, "preview_root", None),
                 )
     except RunDirectoryExistsError:
         _minimal_stderr("run directory already exists")

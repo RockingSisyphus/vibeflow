@@ -27,7 +27,7 @@ DEFAULT_EXCLUDED_DIRS = frozenset({
     ".git", ".hg", ".pytest_cache", ".venv", "build", "dist",
     "node_modules", "vendor", "coverage", ".next", ".turbo",
     "generated", "__generated__", ".svelte-kit", ".output", ".cache",
-    "references",
+    "references", "vibeflow-preview", "./vibeflow-preview.config.js",
 })
 
 

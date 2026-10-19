@@ -179,7 +179,7 @@ def test_javascript_call_health_distinguishes_repeated_node_ids_in_nested_graphs
 ])
 def test_javascript_actual_call_architecture_and_mermaid_share_health_style(status, override, expected, origin):
     from vibeflow.core.flow import NodeStyle
-    from vibeflow.tooling.application.javascript.audit import _javascript_node_document
+    from vibeflow.tooling.application.javascript.architecture_facts import _javascript_node_document
     from vibeflow.tooling.application.javascript.presentation_status import node_health_classes
     result = _result()
     call = NodeSpec("call", "demo.work", status=status, style=NodeStyle(fill=override))

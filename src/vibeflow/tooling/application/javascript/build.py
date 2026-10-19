@@ -93,6 +93,7 @@ class ProjectBuildRequest:
     html_template: str | Path | None = None
     app_entry: str | Path | None = None
     node_command: str = "node"
+    preview_root: str | Path | None = None
 
 
 @dataclass(frozen=True)
@@ -122,6 +123,7 @@ class PreparedProjectBuild:
     plugin_annotations: tuple[Mapping[str, Any], ...] = ()
     plugin_audit_sources: tuple[str, ...] = ()
     warnings: tuple[Mapping[str, object], ...] = ()
+    presentation_inputs: object | None = None
 
 
 @dataclass(frozen=True)
@@ -486,6 +488,8 @@ def prepare_project_build(
         ),
         warnings=tuple(warnings),
         javascript_bindings=javascript_bindings,
+        presentation_inputs={"compiled_by_path": dict(state.compiled_by_path),
+                        "declarations": compiled_declarations, "selections": document.data},
     )
 
 
@@ -530,33 +534,37 @@ def _compile_core_compilation(
 @check_scope
 def build_project_aot(request: ProjectBuildRequest) -> ProjectBuildResult:
     prepared = prepare_project_build(request)
-    result = build_aot(
-        BuildRequest(
-            plan=prepared.plan,
-            project_root=prepared.root.path,
-            package_root=prepared.package_root,
-            out_dir=request.out_dir,
-            target=request.target,
-            profile=request.profile,
-            external_packages=prepared.external_packages,
-            entry_name=request.entry_name,
-            sourcemap=request.sourcemap,
-            replace=request.replace,
-            html_template=request.html_template,
-            app_entry=request.app_entry,
-            node_command=request.node_command,
-            javascript_bindings=prepared.javascript_bindings,
-            plugin_manifest={
-                "declared": list(prepared.declared_plugins),
-                "planned": list(prepared.planned_plugins),
-                "active": list(prepared.plugin_bindings),
-                "annotations": [
-                    dict(item) for item in prepared.plugin_annotations
-                ],
-            },
-            audit_sources=prepared.plugin_audit_sources,
+    from vibeflow.tooling.presentation.preview.diagnostics import incidental_preview, preview_operation
+    from vibeflow.tooling.application.javascript.build_preview import publish_build_preview
+    record = incidental_preview(publish_build_preview, prepared=prepared, preview_root=request.preview_root)
+    with preview_operation(record):
+        result = build_aot(
+            BuildRequest(
+                plan=prepared.plan,
+                project_root=prepared.root.path,
+                package_root=prepared.package_root,
+                out_dir=request.out_dir,
+                target=request.target,
+                profile=request.profile,
+                external_packages=prepared.external_packages,
+                entry_name=request.entry_name,
+                sourcemap=request.sourcemap,
+                replace=request.replace,
+                html_template=request.html_template,
+                app_entry=request.app_entry,
+                node_command=request.node_command,
+                javascript_bindings=prepared.javascript_bindings,
+                plugin_manifest={
+                    "declared": list(prepared.declared_plugins),
+                    "planned": list(prepared.planned_plugins),
+                    "active": list(prepared.plugin_bindings),
+                    "annotations": [
+                        dict(item) for item in prepared.plugin_annotations
+                    ],
+                },
+                audit_sources=prepared.plugin_audit_sources,
+            )
         )
-    )
     return ProjectBuildResult(prepared=prepared, build=result)
 
 

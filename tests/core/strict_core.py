@@ -1,3 +1,4 @@
+from tests.fixtures.support.preview import preview_directory, preview_architecture, preview_snapshot
 from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 from tests.fixtures.support.strict_support import *
@@ -581,8 +582,6 @@ def test_checked_run_writes_reproducible_artifacts_without_raw_inputs(tmp_path) 
         "effective_policy.json",
             "compiled_graph.json",
             "health_report.json",
-            "graph.txt",
-            "graph.mmd",
             "runtime_trace.jsonl",
             "output_summary.json",
         }
@@ -593,20 +592,12 @@ def test_checked_run_writes_reproducible_artifacts_without_raw_inputs(tmp_path) 
     compiled = json.loads((result.run_dir / "compiled_graph.json").read_text(encoding="utf-8"))
     assert compiled["data_edges"] == []
     assert compiled["mainline_edges"] == [["start", "seed"], ["seed", "add"], ["add", "end"]]
-    graph_mmd = (result.run_dir / "graph.mmd").read_text(encoding="utf-8")
-    graph_txt = (result.run_dir / "graph.txt").read_text(encoding="utf-8")
-    for edge in compiled["effective_edges"]:
-        mermaid_to = "n_end" if edge["to"] == "end" else edge["to"]
-        assert any(line.strip().startswith(f'{edge["from"]} -->') and line.strip().endswith(f" {mermaid_to}") for line in graph_mmd.splitlines())
-        assert f'{edge["from"]} ----> {edge["to"]}' in graph_txt
-    assert "---------- data ----------" in graph_mmd
-    assert "data: Value Out" in graph_mmd
-    assert "TOPOLOGY FLOWCHART" in graph_txt
-    assert "provides=value.out" in graph_txt
-    if is_mermaid_svg_renderer_available():
-        graph_svg = (result.run_dir / "graph.svg").read_text(encoding="utf-8")
-        assert "<svg" in graph_svg
-        assert "graph.svg.error.txt" not in {path.name for path in result.run_dir.iterdir()}
+    architecture=preview_architecture(result.run_dir)
+    assert {(e["from"],e["to"],e["when"]) for e in architecture["workflow"]["edges"]} == {
+        (e["from"],e["to"],e["when"]) for e in compiled["effective_edges"]}
+    seed=next(n for n in architecture["workflow"]["nodes"] if n["id"]=="seed")
+    assert seed["provides"][0]["type"]=="value.in"
+    assert not list(preview_directory(result.run_dir).glob("*.svg"))
     trace_lines = [json.loads(line) for line in (result.run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
     assert [event["node"] for event in trace_lines if event["kind"] == "node"] == ["start", "seed", "add", "end"]
     assert trace_lines[-1]["kind"] == "runtime_summary"

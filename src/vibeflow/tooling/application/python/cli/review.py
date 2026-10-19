@@ -16,18 +16,22 @@ _REVIEW_FRAGMENT_CLASS = "review-inline-fragment"
 def add_review_parser(subparsers: argparse._SubParsersAction) -> None:
     review = subparsers.add_parser(
         "review",
-        help="refresh registered architecture, validate it, and publish a canonical expanded review SVG",
+        help="refresh registered architecture, validate it, and publish offline preview data",
     )
     review.add_argument("--workspace", required=True, help="workspace vibeflow_config.jsonc path")
     review.add_argument("--config", required=True, help="registered executable workflow config path")
-    review.add_argument("--output", required=True, help="canonical expanded review SVG output path")
+    review.add_argument("--output", help="optional canonical expanded review SVG output path")
+    review.add_argument("--with-svg", action="store_true", help="also render the optional review SVG")
+    review.add_argument("--preview-root", help="override offline preview directory")
 
 
 def handle_review(args: argparse.Namespace) -> int:
     runner = _ReviewRunner(
         workspace_path=Path(args.workspace).resolve(),
         config_path=Path(args.config).resolve(),
-        output_path=Path(args.output).resolve(),
+        output_path=Path(args.output).resolve() if args.output else None,
+        preview_root=getattr(args, "preview_root", None),
+        with_svg=getattr(args, "with_svg", False),
     )
     return_code = runner.run()
     _print_result(runner.result)
@@ -35,10 +39,14 @@ def handle_review(args: argparse.Namespace) -> int:
 
 
 class _ReviewRunner:
-    def __init__(self, *, workspace_path: Path, config_path: Path, output_path: Path) -> None:
+    def __init__(self, *, workspace_path: Path, config_path: Path, output_path: Path | None, preview_root=None, with_svg=False) -> None:
         self.workspace_path = workspace_path
         self.config_path = config_path
         self.output_path = output_path
+        self.legacy_output = output_path is not None
+        self.with_svg = with_svg or self.legacy_output
+        self.preview_record = None
+        self.preview_root = preview_root
         self.result = _review_result(config_path=config_path, output_path=output_path)
         self.workspace = None
         self.root = None
@@ -74,6 +82,9 @@ class _ReviewRunner:
 
         try:
             self.workspace = load_workspace_config(self.workspace_path)
+            if self.output_path is None:
+                self.output_path = Path(self.preview_root or self.workspace.root).resolve() / "vibeflow-preview.html"
+                self.result.update(output=str(self.output_path), svg=None)
         except WorkspaceConfigError as exc:
             finding = HealthFinding(
                 rule_id=exc.rule_id,
@@ -249,16 +260,51 @@ class _ReviewRunner:
         return True
 
     def _render_and_publish(self) -> bool:
-        if not self._create_temporary_output():
+        if not self._publish_preview():
             return False
-        try:
-            stages = (self._render_temporary_output, self._check_temporary_output, self._publish_output)
-            for stage in stages:
-                if not stage():
-                    return False
+        if not self.with_svg:
             return True
+        if not self.legacy_output:
+            self.output_path = self.preview_record.directory / "requested-review.svg"
+        success = False
+        try:
+            if self._create_temporary_output():
+                success = all(stage() for stage in
+                    (self._render_temporary_output,self._check_temporary_output,self._publish_output))
+            if success:
+                from vibeflow.tooling.presentation.preview.exporter import attach_svg
+                attach_svg(self.preview_record,self.output_path)
+                self.preview_record.update("passed")
+                self.result["svg"] = str(self.output_path) if self.legacy_output else str(self.preview_record.directory/"review.svg")
+            else:
+                message=self.result.get("error",{}).get("message","Requested SVG generation failed")
+                self.preview_record.metadata["svg_error"]=message
+                self.preview_record.update("failed",error=message)
+            return success
+        except Exception as exc:
+            self.preview_record.metadata["svg_error"]=str(exc)
+            self.preview_record.update("failed",error=str(exc))
+            self._fail_finding("svg","FAIL",_review_finding("REVIEW.SVG.ATTACH",str(exc),
+                object_type="svg",object_id=str(self.output_path),failure_layer="render"))
+            return False
         finally:
             self._cleanup_temporary_output()
+            if not self.legacy_output:
+                self.output_path.unlink(missing_ok=True)
+
+    def _publish_preview(self) -> bool:
+        from vibeflow.tooling.application.python.presentation.preview import python_preview
+        try:
+            record = python_preview(self.presentation, config=self.config_path, workspace=self.workspace,
+                                    preview_root=self.preview_root, category="review", status="reviewing" if self.with_svg else "passed", check_status=self.validation_status)
+            self.preview_record = record
+            self.result["preview"] = str(record.root / "vibeflow-preview.html")
+            self.result["preview_id"] = record.metadata["id"]
+            return True
+        except Exception as exc:
+            self._fail_finding("preview", "FAIL", _review_finding("REVIEW.PREVIEW.WRITE", str(exc),
+                object_type="preview", object_id=str(self.output_path), failure_layer="render"))
+            return False
 
     def _create_temporary_output(self) -> bool:
         try:
@@ -427,12 +473,12 @@ def _xml_local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
 
-def _review_result(*, config_path: Path, output_path: Path) -> dict[str, object]:
+def _review_result(*, config_path: Path, output_path: Path | None) -> dict[str, object]:
     return {
         "status": "ERROR", "failed_stage": None,
         "config": str(config_path),
         "architecture": None, "validation": None,
-        "svg": str(output_path), "published": False,
+        "svg": str(output_path) if output_path is not None else None, "published": False,
     }
 
 

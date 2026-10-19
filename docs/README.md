@@ -21,6 +21,8 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 
 以下记录保留各阶段基线、决定与验证资料。当前使用接口以使用者手册为准，当前内核机制见系统设计。
 
+- [本地预览实现与验收](maintainers/local-preview.md)
+
 - [运行观测与类型注解修复记录](design/history/runtime-observation-results.md)
 - [RuleContext 共享对象图修复](design/history/readonly-facts-results.md)
 

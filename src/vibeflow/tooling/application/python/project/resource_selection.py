@@ -2,6 +2,7 @@
 from dataclasses import dataclass, field, replace
 from typing import Mapping
 
+from vibeflow.core.descriptors.json_values import freeze_mapping
 from vibeflow.targets.python.project.resource_bindings import PythonResourceBinding
 from vibeflow.core.findings import HealthFinding
 from vibeflow.tooling.project.host_extensions import (
@@ -15,6 +16,10 @@ class PythonResources:
     base_libs: tuple[PythonResourceBinding, ...] = ()
     plugins: tuple[PythonResourceBinding, ...] = ()
     host_extensions: tuple[HostExtensionResource, ...] = ()
+    selection_facts: Mapping[str, object] = field(default_factory=dict, repr=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "selection_facts", freeze_mapping(self.selection_facts, field_name="resource selections"))
 
     @property
     def has_planned(self):
@@ -80,4 +85,5 @@ def select_python_resources(config, *, registry=None, base_path=None):
         findings.append(HealthFinding(rule_id="PLUGIN.CONFIG.ROOT", severity="error", object_type="config",
             object_id="plugins", message="plugin resources require an owning SDK catalog"))
     hosts = host_extension_resources(config, findings=findings)
-    return PythonResources(dict(global_config), tuple(libraries), tuple(plugins), tuple(hosts)), tuple(findings)
+    selections = {key:config[key] for key in ("base_lib", "host_extensions") if key in config}
+    return PythonResources(dict(global_config), tuple(libraries), tuple(plugins), tuple(hosts), selections), tuple(findings)

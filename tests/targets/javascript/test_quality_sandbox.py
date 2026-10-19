@@ -482,6 +482,20 @@ def test_multiple_workflows_reuse_one_javascript_quality_facts_pass(
     assert calls == [str(project)]
 
 
+def test_generated_local_preview_is_not_application_source(tmp_path, capsys):
+    workspace, project, _ = _project_case(tmp_path)
+    from vibeflow.tooling.presentation.viewer import install_page
+    install_page(project)
+    # This is a display-data script, even if damaged; quality checks must keep
+    # inspecting the project's actual source after a preview has been generated.
+    (project/"vibeflow-preview/index.js").write_text("not application JavaScript !!!")
+    code = main(["quality-check", "--workspace", str(workspace), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0, payload
+    assert payload["source_quality"]["files"]
+    assert not any("vibeflow-preview" in row["path"] for row in payload["source_quality"]["files"])
+
+
 @pytest.mark.parametrize("value", [0, True, 1.5, "5"])
 def test_project_depth_field_rejects_invalid_value(tmp_path: Path, value) -> None:
     workspace, project, _ = _project_case(tmp_path)

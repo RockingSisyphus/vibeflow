@@ -93,6 +93,7 @@ def run_checked(
     capabilities: Mapping[str, object] | None = None,
     delegate_cli: bool = False,
     _prepared_run_dir: Path | None = None,
+    preview_root: str | Path | None = None,
 ) -> CheckedRunResult:
     path = Path(config_path)
     from vibeflow.tooling.project.workspace_loader import find_project_config, load_project_workspace
@@ -105,7 +106,7 @@ def run_checked(
         return run_workspace_checked(path, workspace=workspace,
             initial=initial, run_root=run_root, run_id=run_id,
             runtime_options=runtime_options, capabilities=capabilities,
-            delegate_cli=delegate_cli, _policy_result=policy, _prepared_run_dir=_prepared_run_dir)
+            delegate_cli=delegate_cli, _policy_result=policy, _prepared_run_dir=_prepared_run_dir, preview_root=preview_root)
     actual_run_id = _new_run_id() if run_id is None else validate_run_id(run_id)
     effective_runtime_options = normalize_runtime_options(runtime_options)
     run_dir = _prepared_run_dir if _prepared_run_dir is not None else _prepare_run_dir(run_root, actual_run_id)
@@ -328,43 +329,15 @@ def _validate_run_health(
 
 
 def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, health: HealthReport, *, registry: NodeRegistry | None = None, resources: PythonResources | None = None, prepared=None) -> None:
-    from vibeflow.tooling.application.python.presentation.architecture_document import render_architecture_document
-    from vibeflow.tooling.application.python.presentation.ascii_flowchart import export_ascii_flowchart
-    from vibeflow.tooling.application.python.presentation.mermaid import compiled_graph_payload, export_mermaid
-    from vibeflow.tooling.presentation.mermaid import EXPANDED_MERMAID_MAX_EDGES, EXPANDED_MERMAID_MAX_TEXT_SIZE, MermaidRenderError, render_mermaid_svg
-    from vibeflow.tooling.application.python.presentation.mermaid.review_svg import render_review_columns_svg
-
     from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
-    prepared = prepared or prepare_python_presentation(graph, compiled=compiled, registry=registry, resources=resources)
-    graph, compiled = prepared.graph, prepared.compiled
+    from vibeflow.tooling.application.python.presentation.compiled_document import compiled_graph_payload
+    from vibeflow.tooling.application.python.preview_run import start_run_preview
+    from vibeflow.tooling.presentation.preview.diagnostics import incidental_preview
 
+    prepared = prepared or prepare_python_presentation(graph, compiled=compiled, registry=registry, resources=resources)
     _write_json(run_dir / "health_report.json", health.to_dict())
-    _write_json(run_dir / "compiled_graph.json", compiled_graph_payload(graph, compiled, resources=resources))
-    (run_dir / "architecture.jsonc").write_text(
-        render_architecture_document(graph, compiled=compiled, registry=registry, resources=resources, prepared=prepared),
-        encoding="utf-8",
-    )
-    (run_dir / "graph.txt").write_text(export_ascii_flowchart(graph, compiled=compiled, registry=registry, health_report=health, prepared=prepared), encoding="utf-8")
-    mermaid_text = export_mermaid(graph, compiled=compiled, registry=registry, health_report=health, resources=resources, prepared=prepared)
-    (run_dir / "graph.mmd").write_text(mermaid_text, encoding="utf-8")
-    try:
-        render_mermaid_svg(mermaid_text, run_dir / "graph.svg")
-    except MermaidRenderError as exc:
-        (run_dir / "graph.svg.error.txt").write_text(str(exc), encoding="utf-8")
-    try:
-        render_review_columns_svg(
-            graph,
-            compiled,
-            run_dir / "graph.expanded.svg",
-            registry=registry,
-            resources=resources,
-            expand_nodesets=True,
-            max_text_size=EXPANDED_MERMAID_MAX_TEXT_SIZE,
-            max_edges=EXPANDED_MERMAID_MAX_EDGES,
-            prepared=prepared,
-        )
-    except MermaidRenderError as exc:
-        (run_dir / "graph.expanded.svg.error.txt").write_text(str(exc), encoding="utf-8")
+    _write_json(run_dir / "compiled_graph.json", compiled_graph_payload(prepared.graph, prepared.compiled, resources=resources))
+    incidental_preview(start_run_preview, prepared=prepared, run_dir=run_dir, health=health, error_path=run_dir / "preview.error.txt")
 
 
 def _refuse_on_health_failure(health: HealthReport, run_dir: Path, run_id: str) -> None:

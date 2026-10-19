@@ -14,7 +14,7 @@ from vibeflow.tooling.project.document_kinds import (
 
 
 def _review_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    from vibeflow.tooling.application.javascript import audit, review
+    from vibeflow.tooling.application.javascript import audit, review, preview
     from vibeflow.tooling.project import workspace_loader
 
     root_path = tmp_path / "project"
@@ -65,6 +65,9 @@ def _review_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         output=str(svg),
         node_command="node",
     )
+    from vibeflow.tooling.presentation.preview.exporter import publish_preview
+    monkeypatch.setattr(preview,"javascript_preview",lambda *a,**kw:publish_preview(root=tmp_path,
+        workflow={"id":"fixture:main"},category="review",status="passed",architecture={}))
     return args, result, architecture, svg, rendered_architecture
 
 

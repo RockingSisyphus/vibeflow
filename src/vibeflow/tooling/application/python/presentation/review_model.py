@@ -129,14 +129,13 @@ def node_review_metadata(graph: GraphConfig, node: NodeSpec, registry: NodeRegis
 
 
 def edge_roles(compiled: CompiledGraph, edge: object) -> tuple[str, ...]:
-    pair = (str(getattr(edge, "source", "")), str(getattr(edge, "target", "")))
-    role_pairs = {
-        "mainline": _edge_pairs(compiled.mainline_edges),
-        "data_bypass": _edge_pairs(compiled.data_bypass_edges),
-        "schedule": _edge_pairs(compiled.schedule_edges),
-        "transfer": _edge_pairs(compiled.transfer_edges),
+    role_edges = {
+        "mainline": compiled.mainline_edges,
+        "data_bypass": compiled.data_bypass_edges,
+        "schedule": compiled.schedule_edges,
+        "transfer": compiled.transfer_edges,
     }
-    return tuple(role for role in EDGE_ROLE_ORDER if pair in role_pairs[role])
+    return tuple(role for role in EDGE_ROLE_ORDER if edge in role_edges[role])
 
 
 def edge_transfers(graph: GraphConfig, edge: object) -> tuple[dict[str, object], ...]:
@@ -282,10 +281,6 @@ def source_reference(root_id: object = "", root_path: object = "", source_path: 
     if relative:
         payload["path"] = relative
     return payload
-
-
-def _edge_pairs(edges: object) -> frozenset[tuple[str, str]]:
-    return frozenset((str(item.source), str(item.target)) for item in edges)
 
 
 def mapping_items(value: object) -> tuple[Mapping[str, object], ...]:

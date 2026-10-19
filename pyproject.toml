@@ -34,3 +34,6 @@ vibeflow = [
 testpaths = ["tests"]
 pythonpath = ["src"]
 python_files = ["test_*.py", "strict_*.py", "vibeflow_strict.py"]
+
+[tool.setuptools.cmdclass]
+build_py = "vibeflow_build.ViewerBuild"

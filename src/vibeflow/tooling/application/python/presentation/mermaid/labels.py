@@ -275,7 +275,10 @@ def _comment_text(value: str) -> str:
     return value.replace("\r", " ").replace("\n", " ").strip()
 
 def _safe_id(value: str) -> str:
-    cleaned = "".join(char if char.isalnum() or char == "_" else "_" for char in value)
+    from vibeflow.tooling.presentation.mermaid_identity import mermaid_identity
+    if value.startswith("n_"):
+        return "vf_encoded_" + value.encode("utf-8").hex()
+    cleaned = mermaid_identity(value)
     if not cleaned:
         return "node"
     if cleaned[0].isdigit() or cleaned.lower() in {"end", "class", "classdef", "flowchart", "graph", "subgraph"}:

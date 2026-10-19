@@ -45,6 +45,13 @@ def test_moved_bundle_runs_without_source_or_compilers(tmp_path, monkeypatch, ex
     monkeypatch.setattr(prepared,'prepare_python_presentation',forbidden)
     monkeypatch.setattr(preparation,'prepare_python_workflow',forbidden)
     monkeypatch.setattr(block_compiler,'compile_blocks',forbidden)
+    from vibeflow.tooling.application.python.presentation import architecture_document
+    from vibeflow.tooling.presentation import viewer, mermaid
+    from vibeflow.tooling.presentation.preview import exporter
+    monkeypatch.setattr(architecture_document,'build_architecture_facts',forbidden)
+    monkeypatch.setattr(exporter,'publish_preview',forbidden)
+    monkeypatch.setattr(viewer,'install_page',forbidden)
+    monkeypatch.setattr(mermaid,'render_mermaid_svg',forbidden)
     bundle = load_bundle(path)
     runtime = bundle.create_runtime(run_dir=tmp_path/'run', runtime_options={'execution':execution,'trace':trace})
     first = runtime.run({})
@@ -52,6 +59,10 @@ def test_moved_bundle_runs_without_source_or_compilers(tmp_path, monkeypatch, ex
     assert first.get('result')['value'] == second.get('result')['value'] == 7
     assert second.get('runtime.stop_reason') == 'completed'
     assert first is not second
+    result=bundle.run(run_root=tmp_path/'runs',runtime_options={'execution':execution,'trace':trace})
+    assert result.context.get('result')['value'] == 7
+    assert not list(tmp_path.rglob('preview.json'))
+    assert not list(tmp_path.rglob('vibeflow-preview'))
 
 
 def test_standalone_cli_uses_shipped_framework(tmp_path):

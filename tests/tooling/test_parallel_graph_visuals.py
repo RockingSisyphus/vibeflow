@@ -5,7 +5,7 @@ import pytest
 from tests.tooling.test_presentation_cascade import Empty
 from vibeflow.core.descriptors import DescriptorCatalogs,NodeDescriptor,NodeContractDescriptor
 from vibeflow.targets.python.project import GraphCompiler,NodeRegistry
-from vibeflow.tooling.application.javascript.audit import _javascript_graph_document
+from vibeflow.tooling.application.javascript.architecture_facts import _javascript_graph_document
 from vibeflow.tooling.application.javascript.review import render_mermaid
 from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid
 from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_document
@@ -95,6 +95,21 @@ def test_transfer_only_edge_and_safe_any_merge_do_not_get_parallel_defaults():
         for node in graph.nodes))
     facts,_=_presentations(graph,registry,catalogs)
     assert facts['dispatch']['values']['shape']==facts['collect']['values']['shape']=='rect'
+
+
+def test_same_endpoints_keep_each_conditional_edges_own_roles():
+    graph,registry,catalogs=_parallel_fixture()
+    edge=graph.edges[0]
+    graph=replace(graph,edges=(replace(edge,when="route == 'run'",schedule=True,transfer=False),
+        replace(edge,when="route == 'data'",schedule=False,transfer=True),
+        replace(edge,when="route == 'both'",schedule=True,transfer=True),*graph.edges[1:]))
+    compiled=GraphCompiler().compile(graph,registry=registry)
+    py=build_architecture_document(graph,compiled=compiled,registry=registry)['workflow']
+    js=_javascript_graph_document(graph,compiled,source={},graph_lock_scope='root',catalogs=catalogs)
+    for body in (py,js):
+        actual={item['when']:item['roles'] for item in body['edges'] if item['from']=='start' and item['to']=='dispatch'}
+        assert actual=={"route == 'run'":['mainline','schedule'],"route == 'data'":['data_bypass','transfer'],
+                        "route == 'both'":['mainline','schedule','transfer']}
 
 
 @pytest.mark.parametrize('target',[0,1],ids=['python','javascript'])

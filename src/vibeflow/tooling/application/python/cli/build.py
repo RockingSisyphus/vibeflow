@@ -8,6 +8,7 @@ def add_build_parser(subparsers):
     parser.add_argument('--workspace',required=True)
     parser.add_argument('--config',required=True)
     parser.add_argument('--out-dir',required=True)
+    parser.add_argument('--preview-root')
     parser.add_argument('--profile',choices=('python-package',),default='python-package')
     parser.add_argument('--include',action='append',default=[])
     parser.add_argument('--replace',action='store_true')
@@ -17,7 +18,7 @@ def handle_build(args):
     from vibeflow.tooling.application.python.build import PythonBuildRequest, build_python_aot
     try:
         result = build_python_aot(PythonBuildRequest(workspace=args.workspace,config=args.config,
-            out_dir=args.out_dir,include=tuple(args.include),replace=args.replace))
+            out_dir=args.out_dir,include=tuple(args.include),replace=args.replace,preview_root=getattr(args, "preview_root", None)))
         payload = {'status':result.health.status,'out_dir':str(result.out_dir),'entry':str(result.entry),
             'manifest':str(result.manifest),'files':list(result.files),
             'warnings':[item.to_dict() for item in result.health.warnings]}

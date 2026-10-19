@@ -33,6 +33,17 @@ def test_directory_notes_stay_out_of_release_resources(tmp_path: Path) -> None:
         assert archive.read("vibeflow/nodes/runtime.py") == b"VALUE = 1\n"
 
 
+def test_kernel_archive_packages_only_explicit_viewer_source(tmp_path):
+    source=tmp_path/"kernel";source.mkdir();(source/"__init__.py").write_text("")
+    viewer=tmp_path/"viewer";viewer.mkdir();(viewer/"viewer.js").write_text("window.example=true;\n")
+    (viewer/"README.md").write_text("<!-- vibeflow-directory-purpose -->\n# Viewer sources\n")
+    archive_path=tmp_path/"kernel.zip"
+    distribution_builder._write_kernel_archive(source,archive_path,viewer_source=viewer)
+    with zipfile.ZipFile(archive_path) as archive:
+        assert set(archive.namelist()) == {"vibeflow/__init__.py","vibeflow/tooling/viewer_assets/viewer.js"}
+        assert archive.read("vibeflow/tooling/viewer_assets/viewer.js") == b"window.example=true;\n"
+
+
 def _profile_payload() -> dict[str, object]:
     return {
         "schema": "vibeflow.distribution-profiles.v1",

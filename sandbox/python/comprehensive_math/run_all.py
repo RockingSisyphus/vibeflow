@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+
 import argparse
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
@@ -19,6 +20,7 @@ FIXTURE = Path(__file__).resolve().parent
 REPOSITORY = FIXTURE.parents[2]
 sys.path[:0] = [str(REPOSITORY), str(REPOSITORY / "src")]
 
+from tests.fixtures.support.preview import preview_directory, preview_architecture, preview_snapshot
 from tests.fixtures.support.comprehensive_math import SCENARIOS, assert_warning_feedback, assert_execution_order
 from vibeflow.core.findings import HealthReport
 from vibeflow.targets.python.runtime import PipelineRuntime, RuntimeOptions
@@ -79,10 +81,10 @@ def run(work):
         runtime_options=RuntimeOptions(trace="full"), capabilities=_capabilities(checked_case, received, sent))
     warning_counts = assert_warning_feedback(checked.health.to_dict())
     observations = [_assert_result(checked_case, checked.context, checked.run_dir / "runtime_trace.jsonl", received, sent)]
-    for name in ("architecture.jsonc", "graph.mmd", "graph.svg", "graph.expanded.svg"):
-        assert (checked.run_dir / name).is_file(), name
-    mermaid = (checked.run_dir / "graph.mmd").read_text()
-    assert all(name in mermaid for name in ("prepare", "loop", "choice", "join", "receive", "send")), mermaid
+    for name in ("architecture.jsonc", "snapshot.js"):
+        assert (preview_directory(checked.run_dir) / name).is_file(), name
+    names={n["id"] for n in preview_architecture(checked.run_dir)["workflow"]["nodes"]}
+    assert {"prepare","loop","choice","join","receive","send"}<=names
 
     environment = build_workspace_environment(workspace, config_path=config)
     prepared = _prepare_workspace_graph(config, workspace=workspace, env=environment)

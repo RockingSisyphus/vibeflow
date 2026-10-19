@@ -1,3 +1,4 @@
+from tests.fixtures.support.preview import preview_directory, preview_architecture, preview_snapshot
 from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 from tests.fixtures.support.strict_support import *
@@ -212,7 +213,7 @@ def test_checked_run_artifact_integrity_cross_links_health_graph_trace(tmp_path)
     result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="integrity")
     compiled = json.loads((result.run_dir / "compiled_graph.json").read_text(encoding="utf-8"))
     health = json.loads((result.run_dir / "health_report.json").read_text(encoding="utf-8"))
-    graph_mmd = (result.run_dir / "graph.mmd").read_text(encoding="utf-8")
+    facts=preview_architecture(result.run_dir)
     trace = [json.loads(line) for line in (result.run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
 
     assert result.context.get("value.out")["value"] == 8
@@ -222,7 +223,7 @@ def test_checked_run_artifact_integrity_cross_links_health_graph_trace(tmp_path)
         {"from": "seed", "to": "add", "when": ""},
         {"from": "add", "to": "end", "when": ""},
     ]
-    assert "data: Value In" in graph_mmd
+    assert any(n["requires"] for n in facts["workflow"]["nodes"])
     assert [event["node"] for event in trace if event.get("kind") == "node"] == ["start", "seed", "add", "end"]
 
 def test_code_quality_tool_reports_file_function_dependency_and_side_effect_findings(tmp_path) -> None:

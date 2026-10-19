@@ -10,7 +10,9 @@ VibeFlow 的公开命令分别报告结构、质量、构建、审核产物或�
 | 检查 Architecture 新鲜度 | 在上述命令后添加 `--check` |
 | 静态结构检查 | `python run.py validate --config <config>` |
 | 项目质量检查 | `python run.py quality --path <root>` |
-| 正式审核图 | `python run.py review --config <config> --output reports/workflow.svg` |
+| 本地审核预览 | `python run.py review --config <config>` |
+| 显式审核 SVG | `python run.py review --config <config> --output reports/workflow.svg` |
+| 重建预览索引 | `python run.py preview --reindex` |
 | 查看有效规则图 | `python run.py review-rules --config <config> --json` |
 | 查询当前资源与来源 | `python run.py inspect-resources --config <config> --json` |
 | Python 执行 | `python run.py run --config <config> --input <input.json>` |
@@ -20,7 +22,7 @@ VibeFlow 的公开命令分别报告结构、质量、构建、审核产物或�
 
 `review` 生成并校验审核产物。collaborative profile 中，产物成功仍需后续人工批准；autonomous profile 按任务直接完成适用门禁。
 
-对实际 Config 的完整工作流执行 `review`，得到一张展开 SVG，并更新已登记的 `ARCHITECTURE.jsonc`。SVG 展示工作流与资源区，JSONC 保存声明、入口与支撑文件、真实依赖、有效规则和展示来源。审核失败时保留已有正式产物。多文件图形内容见[图形与 Architecture](multifile-resources.md#图形与-architecture)。
+对实际 Config 的完整工作流执行 `review`，得到根目录的离线 HTML 预览和历史快照，并更新已登记的 `ARCHITECTURE.jsonc`。默认不调用 Mermaid；使用 `--with-svg` 添加对照附件，显式指定 `--output` 时另交付原有展开 SVG。JSONC 保存声明、入口与支撑文件、真实依赖、有效规则和展示来源。多文件图形内容见[图形与 Architecture](multifile-resources.md#图形与-architecture)，页面交互和目录见[本地预览与历史](local-preview.md)。
 
 展开图的资源目录按 `plugins`、`base_lib`、`host_extensions` 排列：目录父节点连接当前配置使用的资源。Node 显示在流程的实际调用位置；Nodeset 按定义的 `expand` 设置展开。`export-svg --expand-nodesets` 和 `export-mermaid --mermaid-layout review-columns` 沿用这一展示方式。有效规则与参数来源通过 `review-rules --json` 查询。
 
@@ -78,6 +80,6 @@ Python 源码及 bundle 的 `run` 都在 run 目录写入 `workflow_execution_re
 
 ## 运行产物
 
-Python run 目录包含健康报告、Architecture、图形、trace 和脱敏输入输出摘要。真实业务结果从成功运行返回值或业务入口读取；摘要文件用于审计形状，不是业务返回值。
+Python run 目录包含健康报告、编译图事实、trace 和脱敏输入输出摘要；`preview.json` 指向集中存放 Architecture 数据及可选 SVG 附件的预览快照。真实业务结果从成功运行返回值或业务入口读取；摘要文件用于审计形状，不是业务返回值。预览失败的具体原因写入 `preview.error.txt`，不阻止业务执行。
 
 `delegate-cli` 把 workflow 作为普通业务 CLI 使用。业务 stdout/stderr 不添加 VibeFlow 范围说明，框架诊断写入当次 run 的 `vibeflow.log`。

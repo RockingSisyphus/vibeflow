@@ -14,6 +14,7 @@
 - [Rule、Ruleset 与 Node](user/rules-and-nodes.md)：两种默认、三处配置选择，以及 Python/TypeScript 插件定义与接入。
 - [rule-system-migration](user/rule-system-migration.md)
 - [runtime-observation](user/runtime-observation.md)
+- [本地预览与历史](user/local-preview.md)：离线页面、结构化展开、分类时间线和跨 workflow 关联。
 - [commands-and-results](user/commands-and-results.md)
 - [product-check-boundaries](user/product-check-boundaries.md)
 - [collaborative](user/profiles/collaborative.md)

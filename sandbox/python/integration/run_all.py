@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 import argparse
 import importlib.util
 import json
@@ -34,6 +35,8 @@ def _find_repository_root(start: Path) -> Path:
 SANDBOX_DIR = Path(__file__).resolve().parent
 REPO_ROOT = _find_repository_root(SANDBOX_DIR)
 SOURCE_ROOT = REPO_ROOT / "src"
+sys.path.insert(0, str(REPO_ROOT))
+from tests.fixtures.support.preview import preview_directory, preview_architecture, preview_snapshot
 FIXTURE_PROJECT_DIR = SANDBOX_DIR / "project"
 FIXTURE_WORKSPACE_PATH = SANDBOX_DIR / "vibeflow_config.jsonc"
 WORK_ROOT = SANDBOX_DIR
@@ -105,11 +108,7 @@ VALID_RUN_CASES = [
             "effect_scope: global_state",
             "execution_lock: sandbox.global-state.serial",
         ),
-        "expected_run_mermaid_contains": (
-            "state@{ shape: cloud",
-            "effect_scope: global_state",
-            "execution_lock: sandbox.global-state.serial",
-        ),
+        "expected_run_fact_values": ("cloud","global_state","sandbox.global-state.serial"),
         "expected_trace_kind_counts": {
             "lock_wait": 2,
             "lock_acquired": 2,
@@ -184,11 +183,11 @@ VALID_RUN_CASES = [
             "future_value_plugin",
             "planned runtime value hook",
         ],
-        "expected_run_mermaid_contains": [
+        "expected_run_fact_values": [
             "Sandbox Arithmetic",
             "Sandbox Value Shift",
         ],
-        "expected_run_mermaid_not_contains": [
+        "forbidden_run_fact_values": [
             "base_lib.future_arithmetic",
             "future_value_plugin",
             "planned runtime value hook",
@@ -217,8 +216,8 @@ VALID_RUN_CASES = [
             "planned python_stub",
             "stubs/runtime_control_stub.py",
         ],
-        "expected_run_mermaid_contains": [
-            "planned python_stub",
+        "expected_run_fact_values": [
+            "python_stub",
             "stubs/runtime_control_stub.py",
         ],
     },
@@ -618,30 +617,9 @@ def _audit_published_diagrams(results: list[CaseResult]) -> CaseResult:
                 f"successful diagram run has invalid health: {run_name} "
                 f"status={health.get('status')!r} errors={health.get('errors')!r}"
             )
-        svg_path = run_dir / "graph.svg"
-        if is_mermaid_svg_renderer_available():
-            if not svg_path.is_file():
-                raise AssertionError(f"successful diagram run is missing graph.svg: {run_name}")
-            success_run_svgs.add(svg_path)
-
-    expected_error_run_names = {
-        f"expected_fail_{Path(str(case['config'])).stem}"
-        for case in INVALID_CASES
-        if case["kind"] == "run"
-    }
-    expected_error_run_names.update(
-        f"expected_runtime_fail_{Path(str(case['config'])).stem}"
-        for case in INVALID_CASES
-        if case["kind"] == "runtime_run"
-    )
-    actual_run_svgs = set(RUN_ROOT.glob("*/graph.svg"))
-    allowed_error_run_svgs = {RUN_ROOT / run_name / "graph.svg" for run_name in expected_error_run_names}
-    unexpected_run_svgs = actual_run_svgs - success_run_svgs - allowed_error_run_svgs
-    if unexpected_run_svgs:
-        raise AssertionError(
-            "run SVGs are not owned by a health-gated success or an explicit error-path case: "
-            f"{sorted(str(path.relative_to(WORK_ROOT)) for path in unexpected_run_svgs)}"
-        )
+        snapshot=preview_snapshot(run_dir)
+        if snapshot["artifacts"] or not snapshot["architecture"]["workflow"]["nodes"]:
+            raise AssertionError(f"default run did not produce data-only architecture: {run_name}")
 
     expected_report_svgs: set[Path] = {
         REVIEW_DIR / "pass_nodeset_nested.expanded.svg",
@@ -677,7 +655,6 @@ def _audit_published_diagrams(results: list[CaseResult]) -> CaseResult:
         if _xml_local_name(root.tag) != "svg":
             raise AssertionError(f"published success diagram root is not svg: {svg_path}")
 
-    excluded_error_svgs = actual_run_svgs & allowed_error_run_svgs
     return CaseResult(
         "audit:published_diagrams_health_gated",
         "PASS",
@@ -685,7 +662,7 @@ def _audit_published_diagrams(results: list[CaseResult]) -> CaseResult:
             "report_svgs": len(actual_report_svgs),
             "successful_run_svgs": len(success_run_svgs),
             "health_gated_success_runs": len(success_run_names),
-            "explicit_error_path_svgs_excluded": len(excluded_error_svgs),
+            "data_only_success_runs": len(success_run_names),
         },
     )
 
@@ -1979,17 +1956,15 @@ def _assert_health_warnings(case: dict[str, Any], health) -> None:
 
 
 def _assert_run_mermaid(case: dict[str, Any], run_dir: Path) -> None:
-    expected = tuple(str(value) for value in case.get("expected_run_mermaid_contains", ()))
-    if not expected:
-        return
-    text = (run_dir / "graph.mmd").read_text(encoding="utf-8")
-    missing = [value for value in expected if value not in text]
-    if missing:
-        raise AssertionError(f"run Mermaid missing expected content: {missing}")
-    forbidden = tuple(str(value) for value in case.get("expected_run_mermaid_not_contains", ()))
-    present = [value for value in forbidden if value in text]
-    if present:
-        raise AssertionError(f"run Mermaid contained forbidden content: {present}")
+    expected=case.get("expected_run_fact_values",())
+    if not expected:return
+    architecture=preview_architecture(run_dir)
+    facts={"workflow":architecture["workflow"],"nodesets":architecture["nodesets"],
+           "resources":architecture.get("implementation_graph",{}).get("resources",{})}
+    text=json.dumps(facts,ensure_ascii=False)
+    missing=[v for v in expected if v not in text]
+    present=[v for v in case.get("forbidden_run_fact_values",()) if v in text]
+    if missing or present:raise AssertionError(f"architecture facts: missing={missing}, forbidden={present}")
 
 
 def _assert_ascii_contains(name: str, collapsed: str, expanded: str) -> None:
@@ -2009,8 +1984,7 @@ def _assert_artifacts(run_dir: Path) -> None:
     required = (
         "health_report.json",
         "compiled_graph.json",
-        "graph.txt",
-        "graph.mmd",
+        "preview.json",
         "runtime_trace.jsonl",
         "effective_policy.json",
         "input_summary.json",
@@ -2019,10 +1993,8 @@ def _assert_artifacts(run_dir: Path) -> None:
     missing = [name for name in required if not (run_dir / name).exists()]
     if missing:
         raise AssertionError(f"missing run artifacts: {missing}")
-    if is_mermaid_svg_renderer_available():
-        svg = run_dir / "graph.svg"
-        if not svg.exists() or "<svg" not in svg.read_text(encoding="utf-8"):
-            raise AssertionError("missing rendered SVG artifact")
+    if preview_snapshot(run_dir)["artifacts"]:
+        raise AssertionError("default run unexpectedly generated a graphic attachment")
 
 
 def _run_invalid_cases() -> list[CaseResult]:
