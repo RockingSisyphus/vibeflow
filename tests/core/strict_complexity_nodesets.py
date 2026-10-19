@@ -1,3 +1,4 @@
+from tests.fixtures.support.preview import preview_directory, preview_architecture, preview_snapshot
 from tests.fixtures.support.strict_support import *
 from tests.fixtures.support.rule_inspection import _valid_node_source, _inspect_node_source, write_registry_project, node_document
 
@@ -276,6 +277,7 @@ def test_minimal_example_project_runs_only_through_declared_extension_points(tmp
         registry=registry,
         run_root=tmp_path / "runs",
         run_id="minimal_example",
+        preview_root=tmp_path / "preview",
     )
 
     assert result.context.get("value.out")["value"] == 5
@@ -283,15 +285,14 @@ def test_minimal_example_project_runs_only_through_declared_extension_points(tmp
     assert result.health.info["rule_executions"]
     assert result.health.info["effective_resources"]["base_lib"]["modules"][0]["id"] == "base_lib.math_tools"
     assert (result.run_dir / "compiled_graph.json").exists()
-    assert (result.run_dir / "graph.txt").exists()
-    assert (result.run_dir / "graph.mmd").exists()
-    assert "type_key: example.add_one" in (result.run_dir / "graph.mmd").read_text(encoding="utf-8")
+    assert "example.add_one" in preview_architecture(result.run_dir)["nodesets"]
 
     imported_result = run_checked(
         project / "config_with_imports.jsonc",
         registry=registry,
         run_root=tmp_path / "runs",
         run_id="minimal_example_imports",
+        preview_root=tmp_path / "preview",
     )
     assert imported_result.context.get("value.out")["value"] == 5
     assert imported_result.health.info["nodeset_imports"][0]["type_keys"] == ["example.add_one"]

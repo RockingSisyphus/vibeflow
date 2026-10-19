@@ -16,7 +16,7 @@ terminal start → input I/O → process / nodeset → output I/O → terminal e
 - Python 和 JS/TS 插件 SDK，以代码声明 Node、Rule、Ruleset 等资源，由 workflow 显式选择；
 - 可组合的 Rule/Ruleset，以及 Node、Nodeset、Loop、Capability 与显式副作用边界；
 - Node、BaseLib、Plugin 与 Host 的多文件实现、源码归属、逐文件审查和默认图形样式；
-- 确定性 Architecture JSONC、Mermaid、ASCII 和包含资源依赖的展开 SVG；
+- 确定性 Architecture JSONC、Mermaid、ASCII、展开 SVG，以及[离线预览与历史时间线](distribution/docs/user/local-preview.md)；
 - 配置、契约、可达性、控制流、质量、构建与执行证据检查；
 - collaborative 与 autonomous 两种开发协议，共享同一 Core 和机器规则。
 

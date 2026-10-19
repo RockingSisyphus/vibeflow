@@ -1,3 +1,4 @@
+from tests.fixtures.support.preview import preview_directory, preview_architecture, preview_snapshot
 from tests.fixtures.support.graph_calls import normal_call
 from tests.fixtures.support.declarations import native_registry
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
@@ -247,8 +248,7 @@ def test_checked_run_refuses_planned_architecture(tmp_path) -> None:
     result = exc_info.value.result
     assert result.health.status == "FAIL"
     assert any(error.rule_id == "GRAPH.PLANNED.NODE_IN_RUN" for error in result.health.errors)
-    assert "planned" in (result.run_dir / "graph.mmd").read_text(encoding="utf-8")
-    assert "PLANNED" in (result.run_dir / "graph.txt").read_text(encoding="utf-8")
+    assert any(n["status"]=="planned" for n in preview_architecture(result.run_dir)["workflow"]["nodes"])
 
 
 def test_nodeset_call_can_override_inner_node_config_independently() -> None:
@@ -2028,7 +2028,7 @@ def test_cli_run_succeeds_with_declarations_and_writes_artifacts(tmp_path, capsy
     assert code == 0, payload
     assert payload["status"] in {"PASS", "CONCERNS"}
     run_dir = Path(payload["run_dir"])
-    for name in ("compiled_graph.json", "health_report.json", "graph.txt", "graph.mmd", "runtime_trace.jsonl", "output_summary.json"):
+    for name in ("compiled_graph.json", "health_report.json", "runtime_trace.jsonl", "output_summary.json", "preview.json"):
         assert (run_dir / name).exists()
     trace_kinds = [json.loads(line)["kind"] for line in (run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
     assert trace_kinds == ["run_start", "block_enter", "type_resolve", "block_exit", "run_end", "runtime_summary"]
@@ -2042,8 +2042,7 @@ def test_cli_run_succeeds_with_declarations_and_writes_artifacts(tmp_path, capsy
         "run_end",
         "runtime_summary",
     ]
-    if is_mermaid_svg_renderer_available():
-        assert (run_dir / "graph.svg").exists()
+    assert preview_snapshot(run_dir)["artifacts"]=={}
 
 
 def test_distribution_kernel_manifest_allows_root_guides_to_be_customized(tmp_path) -> None:

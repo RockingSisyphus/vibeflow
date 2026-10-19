@@ -500,59 +500,44 @@ def test_review_columns_resource_fragments_render_root_left_to_children_right() 
     assert "type: compiler" in mermaid
 
 
-def test_run_checked_writes_quick_and_expanded_svg_artifacts(tmp_path, monkeypatch) -> None:
-    import vibeflow.tooling.presentation.mermaid as mermaid_render_module
-    import vibeflow.tooling.application.python.presentation.mermaid.review_svg as review_svg_module
-
-    quick_calls: list[Path] = []
-    expanded_calls: list[dict[str, object]] = []
-
-    def fake_quick_svg(mermaid_text, output, **kwargs):
-        quick_calls.append(Path(output))
-        Path(output).write_text("<svg>quick</svg>", encoding="utf-8")
-
-    def fake_expanded_svg(graph, compiled, output, **kwargs):
-        expanded_calls.append({"output": Path(output), **kwargs})
-        Path(output).write_text("<svg>expanded</svg>", encoding="utf-8")
-
-    monkeypatch.setattr(mermaid_render_module, "render_mermaid_svg", fake_quick_svg)
-    monkeypatch.setattr(review_svg_module, "render_review_columns_svg", fake_expanded_svg)
-
+def test_run_checked_centralizes_preview_artifacts(tmp_path, monkeypatch) -> None:
+    from vibeflow.tooling.application.python.presentation import preview
+    from vibeflow.tooling.presentation.preview.catalog import new_record
+    from tests.fixtures.support.preview import preview_directory
+    calls = []
+    def publish(prepared, **kwargs):
+        calls.append(kwargs)
+        record = new_record(tmp_path, {"id":"project:workflow.json"}, "run", "running")
+        (record.directory / "snapshot.js").write_text("VibeFlowPreview.snapshot({version:2});")
+        record.update("running")
+        return record
+    monkeypatch.setattr(preview, "python_preview", publish)
+    # The source-run lifecycle imports the owning adapter once.
+    import vibeflow.tooling.application.python.preview_run as lifecycle
+    monkeypatch.setattr(lifecycle, "python_preview", publish)
     config_path = tmp_path / "workflow.json"
     config_path.write_text(json.dumps({"pipeline": _seed_add_pipeline()}), encoding="utf-8")
     publish_native_fixture(config_path, _registry())
     result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="svg_artifacts")
-
-    assert quick_calls == [result.run_dir / "graph.svg"]
-    assert (result.run_dir / "graph.svg").read_text(encoding="utf-8") == "<svg>quick</svg>"
-    assert (result.run_dir / "graph.expanded.svg").read_text(encoding="utf-8") == "<svg>expanded</svg>"
-    assert expanded_calls[0]["output"] == result.run_dir / "graph.expanded.svg"
-    assert expanded_calls[0]["expand_nodesets"] is True
-    assert expanded_calls[0]["resources"] is not None
+    assert len(calls) == 1
+    assert not (result.run_dir / "graph.svg").exists()
+    directory = preview_directory(result.run_dir)
+    assert "version:2" in (directory / "snapshot.js").read_text()
+    assert json.loads((directory / "record.json").read_text())["status"] == "succeeded"
 
 
-def test_run_checked_records_expanded_svg_error_without_failing_run(tmp_path, monkeypatch) -> None:
-    import vibeflow.tooling.presentation.mermaid as mermaid_render_module
-    import vibeflow.tooling.application.python.presentation.mermaid.review_svg as review_svg_module
-    from vibeflow.tooling.presentation.mermaid import MermaidRenderError
-
-    def fake_quick_svg(mermaid_text, output, **kwargs):
-        Path(output).write_text("<svg>quick</svg>", encoding="utf-8")
-
-    def fail_expanded_svg(*args, **kwargs):
-        raise MermaidRenderError("expanded failed")
-
-    monkeypatch.setattr(mermaid_render_module, "render_mermaid_svg", fake_quick_svg)
-    monkeypatch.setattr(review_svg_module, "render_review_columns_svg", fail_expanded_svg)
-
+def test_run_checked_records_preview_error_without_failing_run(tmp_path, monkeypatch) -> None:
+    import vibeflow.tooling.application.python.preview_run as lifecycle
+    def fail_preview(*args, **kwargs):
+        raise RuntimeError("preview rendering failed")
+    monkeypatch.setattr(lifecycle, "python_preview", fail_preview)
     config_path = tmp_path / "workflow.json"
     config_path.write_text(json.dumps({"pipeline": _seed_add_pipeline()}), encoding="utf-8")
     publish_native_fixture(config_path, _registry())
     result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="svg_error")
-
-    assert (result.run_dir / "graph.svg").exists()
-    assert not (result.run_dir / "graph.expanded.svg").exists()
-    assert (result.run_dir / "graph.expanded.svg.error.txt").read_text(encoding="utf-8") == "expanded failed"
+    assert result.health.status in {"PASS", "CONCERNS"}
+    assert not (result.run_dir / "graph.svg").exists()
+    assert "preview rendering failed" in (result.run_dir / "preview.error.txt").read_text()
 
 
 def test_nodeset_detail_leaf_mermaid_uses_lr_with_layout_spine() -> None:

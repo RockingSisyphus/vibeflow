@@ -7,6 +7,7 @@ sys.dont_write_bytecode = True
 
 FIXTURE = Path(__file__).resolve().parent
 sys.path[:0] = [str(FIXTURE.parents[2]), str(FIXTURE.parents[2] / "src")]
+from tests.fixtures.support.preview import preview_directory, preview_architecture, preview_snapshot
 from tests.fixtures.support.addition_sandboxes import assert_artifacts, events, main, value, workspace
 from vibeflow.core.findings import HealthReport
 from vibeflow.targets.python.runtime import PipelineRuntime, RuntimeOptions
@@ -78,7 +79,8 @@ def run(work, *, toolchain=None):
             exported = export_mermaid(prepared.graph, registry=environment.registry,
                 compiled=prepared.compilation.compiled_graph, resources=prepared.resources, health_report=checked.health)
             (work / "bypass-export.mmd").write_text(exported)
-            assert marker in exported and marker in (checked.run_dir / "graph.mmd").read_text()
+            assert marker in exported
+            assert any("data_bypass" in edge["roles"] for edge in preview_architecture(checked.run_dir)["workflow"]["edges"])
         for execution, trace_level, hooks in MODES:
             options = RuntimeOptions(execution=execution, trace=trace_level, node_hooks=hooks)
             plan = build_execution_plan(prepared.graph, prepared.compilation.compiled_graph,

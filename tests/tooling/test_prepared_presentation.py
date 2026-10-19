@@ -96,6 +96,30 @@ def test_standalone_registry_refreshes_stale_compiled_but_prepared_facts_stay_fi
     assert bindings == []
 
 
+def test_architecture_uses_checked_resource_selections_after_config_changes(tmp_path, monkeypatch):
+    import pytest
+    from tests.fixtures.python.review_layout.fixtures import write_project
+    from vibeflow.tooling.application.python.workspace_service import load_workspace_graph_for_export
+    from vibeflow.tooling.project.workspace_loader import load_workspace_config
+    from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_facts
+    from vibeflow.tooling.project import config_loader
+    project=tmp_path/"project";write_project(project)
+    config=project/"workflow.jsonc"
+    raw=json.loads(config.read_text());raw["base_lib"]["modules"]=[{"id":"layout.helper","style":{"fill":"#abcdef"}}]
+    config.write_text(json.dumps(raw))
+    loaded=load_workspace_graph_for_export(config,workspace=load_workspace_config(project/"vibeflow_config.jsonc"),
+        validate_health=True,_include_presentation=True)
+    assert loaded[4] is None
+    prepared=loaded[-1];facts=build_architecture_facts(prepared)
+    assert facts["implementation_graph"]["resources"]["base_lib:layout.helper"]["effective_presentation"]["values"]["fill"] == "#abcdef"
+    with pytest.raises(TypeError):prepared.resources.selection_facts["base_lib"]["modules"][0]["style"]["fill"]="#000000"
+    monkeypatch.setattr(config_loader,"load_raw_config_document",lambda *a,**k:pytest.fail("facts reread source configuration"))
+    config.write_text('{"base_lib":{"modules":[]}}')
+    assert build_architecture_facts(prepared) == facts
+    config.unlink()
+    assert build_architecture_facts(prepared) == facts
+
+
 def test_without_registry_explicit_compiled_remains_authoritative(tmp_path):
     graph, registry, _ = _fixture(tmp_path)
     compiled = GraphCompiler().compile(graph, registry=registry)

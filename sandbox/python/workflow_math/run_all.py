@@ -7,6 +7,7 @@ import sys
 sys.dont_write_bytecode = True
 FIXTURE = Path(__file__).resolve().parent
 sys.path[:0] = [str(FIXTURE.parents[2]), str(FIXTURE.parents[2] / "src")]
+from tests.fixtures.support.preview import preview_directory, preview_architecture
 from tests.fixtures.support.addition_sandboxes import main, workspace, value, events, assert_artifacts
 from vibeflow.core.findings import HealthReport
 from vibeflow.targets.python.project.plugins import PluginRegistry
@@ -87,11 +88,10 @@ def run(work, *, toolchain=None):
             for key, expected in row["expected_outputs"].items():
                 assert value(checked.context,key) == expected
             assert_artifacts(checked.run_dir)
-            for artifact in ("graph.svg", "graph.expanded.svg"):
-                visible = " ".join(re.sub(r"<[^>]+>", " ",
-                    (checked.run_dir / artifact).read_text()).split())
-                for text in row.get("expected_svg_text_contains", []):
-                    assert text in visible, (artifact, text)
+            facts=preview_architecture(checked.run_dir)
+            visible=json.dumps(facts,ensure_ascii=False)
+            for text in row.get("expected_svg_text_contains",[]):
+                assert text in visible, text
             env = build_workspace_environment(loaded, config_path=config)
             prepared = _prepare_workspace_graph(config, workspace=loaded, env=env)
             assert not isinstance(prepared, HealthReport), prepared

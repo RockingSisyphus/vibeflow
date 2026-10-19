@@ -396,7 +396,8 @@ def _populate_distribution(output: Path, *, profile: DistributionProfile | None 
     _copy_license(output)
     _copy_third_party_notices(output)
     _copy_javascript_sdk(output)
-    _write_kernel_archive(ROOT / "src" / "vibeflow", output / KERNEL_ZIP_RELATIVE)
+    _write_kernel_archive(ROOT / "src" / "vibeflow", output / KERNEL_ZIP_RELATIVE,
+                          viewer_source=ROOT / "tools" / "workflow-viewer")
     _ensure_standard_project_dirs(output)
     _write_workspace_config(output)
     _write_python_architecture(output)
@@ -615,6 +616,8 @@ def _verify_staged_distribution(output: Path) -> None:
                 str(output.parent / "probe-runs"),
                 "--run-id",
                 "distribution-probe",
+                "--preview-root",
+                str(output.parent / "probe-previews"),
             ],
         ),
     )
@@ -775,7 +778,7 @@ def _copy_license(output: Path) -> None:
     destination.write_bytes(source.read_bytes())
 
 
-def _write_kernel_archive(source: Path, target: Path) -> None:
+def _write_kernel_archive(source: Path, target: Path, *, viewer_source: Path | None = None) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for path in sorted(source.rglob("*"), key=lambda item: item.relative_to(source).as_posix()):
@@ -784,6 +787,15 @@ def _write_kernel_archive(source: Path, target: Path) -> None:
                 continue
             archive_relative = Path("vibeflow") / relative_to_package
             info = zipfile.ZipInfo(archive_relative.as_posix())
+            info.date_time = (1980, 1, 1, 0, 0, 0)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            archive.writestr(info, path.read_bytes())
+        viewer_files = sorted(viewer_source.iterdir()) if viewer_source is not None else ()
+        for path in viewer_files:
+            if not path.is_file() or _is_directory_note(path):
+                continue
+            info = zipfile.ZipInfo("vibeflow/tooling/viewer_assets/" + path.name)
             info.date_time = (1980, 1, 1, 0, 0, 0)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
@@ -1102,6 +1114,9 @@ def _ignored(relative: Path) -> bool:
         "runs",
         "reports",
         "node_modules",
+        "vibeflow-preview",
+        "vibeflow-preview.html",
+        "vibeflow-preview.config.js",
     }
     return any(part in ignored_names or part.endswith(".pyc") for part in relative.parts)
 

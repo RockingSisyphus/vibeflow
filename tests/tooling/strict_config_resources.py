@@ -1,3 +1,4 @@
+from tests.fixtures.support.preview import preview_directory, preview_architecture, preview_snapshot
 from tests.fixtures.support.plugins import publish_native_fixture, append_resource, write_lifecycle_fixture
 from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
@@ -234,15 +235,12 @@ class RuntimePlugin:
         {"from": "global", "to": "end", "when": ""},
     ]
     assert graph_payload["production_ready"] is False
-    mermaid = (result.run_dir / "graph.mmd").read_text(encoding="utf-8")
-    assert "resource_base_lib" in mermaid
-    assert "Math Tools Resource" in mermaid
-    assert "Configured Runtime Resource" in mermaid
-    assert "desc: Configured runtime hook resource." in mermaid
-    assert "Future Tools" in mermaid
-    assert "base_lib.future_tools" in mermaid
-    assert "future_runtime_plugin" in mermaid
-    assert mermaid.count("plannedResource") >= 2
+    resources=preview_architecture(result.run_dir)["implementation_graph"]["resources"]
+    text=json.dumps(resources)
+    assert "Math Tools Resource" in text and "Configured Runtime Resource" in text
+    assert "Configured runtime hook resource." in text
+    assert "Future Tools" in text and "base_lib.future_tools" in text and "future_runtime_plugin" in text
+    assert sum(r.get("status")=="planned" for r in resources.values())>=2
     assert not any(finding.rule_id == "GRAPH.FLOW.ORPHAN_NODE" for finding in (*result.health.errors, *result.health.warnings))
     assert not any(finding.rule_id.startswith("BASE_LIB.") for finding in (*result.health.errors, *result.health.warnings))
     assert not any(finding.rule_id.startswith("CONFIG.SMELL.MISSING_") for finding in result.health.warnings)

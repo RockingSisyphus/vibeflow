@@ -422,9 +422,11 @@ def _wheel_smoke(scratch: Path) -> None:
         package_root,
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
     )
-    for name in ("pyproject.toml", "LICENSE"):
+    for name in ("pyproject.toml", "LICENSE", "MANIFEST.in"):
         shutil.copy2(ROOT / name, source_root / name)
 
+    shutil.copy2(ROOT / "src/vibeflow_build.py", source_root / "src/vibeflow_build.py")
+    shutil.copytree(ROOT / "tools/workflow-viewer", source_root / "tools/workflow-viewer")
     wheel_root = scratch / "wheel-dist"
     _run(
         (PYTHON, "-m", "build", "--wheel", "--outdir", wheel_root),

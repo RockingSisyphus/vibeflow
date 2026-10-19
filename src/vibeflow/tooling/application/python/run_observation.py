@@ -35,6 +35,12 @@ def _effective_observation_options(config_path, overrides, workspace):
 def observed_checked_run(function):
     @wraps(function)
     def observed(*args, **kwargs):
+        from vibeflow.tooling.application.python.preview_run import source_run_preview
+        config = args[0] if args else kwargs["config_path"]
+        with source_run_preview(config, workspace=kwargs.get("workspace"), preview_root=kwargs.get("preview_root")):
+            return invoke(*args, **kwargs)
+
+    def invoke(*args, **kwargs):
         if current_observation() is not None:
             return function(*args, **kwargs)
         from vibeflow.tooling.application.python.runner import _new_run_id, _prepare_run_dir
@@ -46,6 +52,8 @@ def observed_checked_run(function):
         config_path = args[0] if args else kwargs["config_path"]
         options = _resolve_observation_options(config_path, kwargs.get("runtime_options"), kwargs.get("workspace"))
         with observe_run(run_dir, options) as observer:
+            from vibeflow.tooling.application.python.preview_run import bind_run_observer
+            bind_run_observer(observer)
             with core_diagnostic_sink(observer.write_kernel):
                 return function(*args, **kwargs)
     return observed
@@ -90,10 +98,13 @@ def observed_cli_run(function):
         args.run_id, args.run_root = run_id, str(run_root)
         args._prepared_run_dir = run_dir
         options = _resolve_observation_options(Path(args.config), _runtime_options_from_args(args))
-        with observe_run(run_dir, options) as observer:
-            with core_diagnostic_sink(observer.write_kernel), capture_process_console(observer):
-                code = function(args)
-                if code != 0 and observer._state != "failed":
-                    observer.transition("failed", f"program exited with code {code}")
-                return code
+        from vibeflow.tooling.application.python.preview_run import source_run_preview, bind_run_observer
+        with source_run_preview(args.config, preview_root=getattr(args, "preview_root", None)):
+            with observe_run(run_dir, options) as observer:
+                bind_run_observer(observer)
+                with core_diagnostic_sink(observer.write_kernel), capture_process_console(observer):
+                    code = function(args)
+                    if code != 0 and observer.result["status"] != "failed":
+                        observer.transition("failed", f"program exited with code {code}")
+                    return code
     return observed

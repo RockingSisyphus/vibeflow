@@ -247,6 +247,7 @@ def _load_project_config(
         "runtime",
         "architecture",
         "javascript",
+        "preview",
     }
     if unknown:
         raise WorkspaceConfigError(
@@ -269,6 +270,8 @@ def _load_project_config(
     _project_runtime_options(data, path)
     project_javascript_options(data, path)
     project_architecture_documents(data, root_path=root_path, path=path)
+    from vibeflow.tooling.project.preview_options import validate_preview_options
+    validate_preview_options(data.get("preview", {}), path=path)
     return data
 
 

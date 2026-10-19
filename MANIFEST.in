@@ -1,0 +1,2 @@
+include src/vibeflow_build.py
+recursive-include tools/workflow-viewer *

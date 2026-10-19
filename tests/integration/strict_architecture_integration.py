@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from tests.fixtures.support.preview import preview_directory
+
+
 import json
 import shutil
 from pathlib import Path
@@ -430,7 +433,7 @@ def test_workspace_run_writes_canonical_architecture_artifact(tmp_path) -> None:
         run_root=tmp_path / "runs",
         run_id="architecture-artifact",
     )
-    artifact_path = result.run_dir / "architecture.jsonc"
+    artifact_path = preview_directory(result.run_dir) / "architecture.jsonc"
     artifact = artifact_path.read_text(encoding="utf-8")
 
     assert artifact_path.is_file()

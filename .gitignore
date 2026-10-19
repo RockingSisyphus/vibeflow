@@ -19,6 +19,8 @@ topology_kernel_distribution/
 vibeflow_distribution/
 *.egg-info/
 /runs/
+vibeflow-preview/
+vibeflow-preview.html
 /reports/
 graphify-out/
 *.log
@@ -50,3 +52,5 @@ coverage.xml
 /experiments/**/*.tar.zst
 /experiments/**/*.zst
 /experiments/**/*.whl
+
+vibeflow-preview.config.js

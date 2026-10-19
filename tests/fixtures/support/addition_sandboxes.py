@@ -1,6 +1,8 @@
 """Small I/O helpers for the independent arithmetic sandbox runners."""
 from __future__ import annotations
 
+from tests.fixtures.support.preview import preview_directory, preview_architecture, preview_snapshot
+
 import argparse
 from collections.abc import Mapping
 import json
@@ -43,9 +45,10 @@ def events(path):
 def assert_artifacts(run_dir):
     health = json.loads((run_dir / "health_report.json").read_text())
     assert health["status"] in {"PASS", "CONCERNS"} and not health["errors"], health
-    for name in ("architecture.jsonc", "graph.mmd", "graph.svg"):
-        assert (run_dir / name).is_file(), name
-    assert ElementTree.parse(run_dir / "graph.svg").getroot().tag.split("}")[-1] == "svg"
+    for name in ("architecture.jsonc", "snapshot.js"):
+        assert (preview_directory(run_dir) / name).is_file(), name
+    assert preview_architecture(run_dir)["workflow"]["nodes"]
+    assert not list(preview_directory(run_dir).glob("*.svg"))
 
 
 def cli(arguments, *, stdin=None):

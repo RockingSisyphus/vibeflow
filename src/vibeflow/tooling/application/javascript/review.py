@@ -756,7 +756,8 @@ def _resource_mermaid(kind: str, records: tuple[Mapping[str, object], ...]) -> s
 
 
 def _safe_id(value: str) -> str:
-    normalized = re.sub(r"[^A-Za-z0-9_]", "_", value)
+    from vibeflow.tooling.presentation.mermaid_identity import mermaid_identity
+    normalized = mermaid_identity(value)
     return f"vf_{normalized or 'item'}"
 
 

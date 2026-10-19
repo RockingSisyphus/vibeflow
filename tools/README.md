@@ -3,7 +3,7 @@
 
 ## 目录用途与边界
 
-仅用于：仓库开发、验证、清理、渲染和辅助脚本；产品 CLI 归 src/vibeflow/tooling，构建发行包的入口归 distribution。
+用于仓库开发、验证、清理、渲染、辅助脚本，以及随发行物交付的独立 workflow-viewer；产品 CLI 归 src/vibeflow/tooling，构建发行包的入口归 distribution。
 
 - 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
 - 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。

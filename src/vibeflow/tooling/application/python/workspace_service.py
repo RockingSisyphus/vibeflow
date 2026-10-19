@@ -113,6 +113,7 @@ def run_workspace_checked(
     capabilities: Mapping[str, object] | None = None,
     _prepared_run_dir: Path | None = None,
     _policy_result=None,
+    preview_root: str | Path | None = None,
 ) -> CheckedRunResult:
     from vibeflow.tooling.application.python.runner import (
         _execute_runtime,

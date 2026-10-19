@@ -37,6 +37,7 @@ class PreparedPythonPresentation:
     resources: object | None = field(default=None, repr=False)
     source_context: object | None = field(default=None, repr=False)
     implementation_sources: tuple = field(default=(), repr=False)
+    source_config_available: bool = field(default=False, repr=False)
     _keys: dict[int, object] = field(default_factory=dict, repr=False, compare=False)
     _graphs: dict[object, tuple[GraphConfig, CompiledGraph]] = field(default_factory=dict, repr=False, compare=False)
     _architecture: list[Any] = field(default_factory=list, repr=False, compare=False)
@@ -73,9 +74,9 @@ class PreparedPythonPresentation:
 
     def architecture(self) -> dict[str, object]:
         if not self._architecture:
-            from vibeflow.tooling.application.python.presentation.architecture_document import _build_architecture_document
+            from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_facts
 
-            self._architecture.append(readonly(_build_architecture_document(self)))
+            self._architecture.append(readonly(build_architecture_facts(self)))
         # The public document API returns ordinary containers. Mutating one
         # document cannot alter the facts used by another renderer.
         return plain(self._architecture[0])
@@ -114,9 +115,12 @@ def prepare_python_presentation(
 
         source_context = collect_workflow_source_context(registry, graph)
     snapshot = _registry_snapshot(registry, source_context) if registry is not None else None
-    implementation_sources = _implementation_source_records(registry, graph, source_context)
+    source_config_available = bool(graph.source_path and Path(graph.source_path).is_file())
+    implementation_sources = _implementation_source_records(registry, graph, source_context,
+                                                            source_config_available=source_config_available)
     prepared = PreparedPythonPresentation(readonly(graph), readonly(compiled), facts, snapshot,
-                                          readonly(resources), source_context, readonly(implementation_sources))
+                                          readonly(resources), source_context, readonly(implementation_sources),
+                                          source_config_available=source_config_available)
     prepared._keys[id(input_graph)] = None
     prepared._inputs.append(input_graph)
     prepared._remember_definitions(input_graph)
@@ -133,9 +137,9 @@ def prepare_python_presentation(
     return prepared
 
 
-def _implementation_source_records(registry, graph, sources):
+def _implementation_source_records(registry, graph, sources, *, source_config_available):
     """Complete presentation source facts while the command session is active."""
-    if not hasattr(registry, "loaded_plugins") or not graph.source_path or not Path(graph.source_path).is_file():
+    if not hasattr(registry, "loaded_plugins") or not source_config_available:
         return ()
     from vibeflow.core.descriptors.source_bundle import source_resources
     from vibeflow.targets.python.project.check_session import current_python_check

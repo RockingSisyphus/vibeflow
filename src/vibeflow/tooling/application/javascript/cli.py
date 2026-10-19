@@ -100,7 +100,9 @@ def add_audit_parsers(subparsers: argparse._SubParsersAction) -> None:
         help="refresh registered Architecture and atomically publish review SVG",
     )
     _add_audit_input(review)
-    review.add_argument("--output", required=True)
+    review.add_argument("--output")
+    review.add_argument("--with-svg", action="store_true")
+    review.add_argument("--preview-root", help="override offline preview directory")
 
     quality = subparsers.add_parser(
         "quality-check",
@@ -142,6 +144,7 @@ def add_build_parser(subparsers: argparse._SubParsersAction) -> None:
         required=True,
         choices=("esm-module", "single-esm", "web-app"),
     )
+    build.add_argument("--preview-root", help="override offline preview directory")
     build.add_argument("--out-dir", required=True, help="dedicated output directory")
     build.add_argument("--entry-name", default="", help="JavaScript entry file name")
     build.add_argument(
@@ -190,6 +193,7 @@ def handle_build(args: argparse.Namespace) -> int:
                 ),
                 app_entry=Path(args.app_entry) if args.app_entry else None,
                 node_command=args.node_command,
+                preview_root=getattr(args, "preview_root", None),
             )
         )
     except Exception as exc:
@@ -366,20 +370,15 @@ def handle_review(args: argparse.Namespace) -> int:
     from vibeflow.tooling.application.javascript.audit import (
         render_architecture,
     )
-    from vibeflow.tooling.application.javascript.review import (
-        expected_review_coverage,
-        write_review_svg,
-    )
-
     config_path = Path(args.config).resolve()
-    output = Path(args.output).resolve()
+    output = Path(args.output).resolve() if args.output else Path(getattr(args, "preview_root", None) or Path(args.workspace).resolve().parent) / "vibeflow-preview.html"
     payload: dict[str, object] = {
         "status": "ERROR",
         "failed_stage": None,
         "config": str(config_path),
         "architecture": None,
         "validation": None,
-        "svg": str(output),
+        "svg": str(output) if args.output else None,
         "output": str(output),
         "project_target": "javascript",
         "published": False,
@@ -462,70 +461,47 @@ def handle_review(args: argparse.Namespace) -> int:
 
     validation = _audit_success_payload(result)
     payload["validation"] = validation
-    output.parent.mkdir(parents=True, exist_ok=True)
-    temporary: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            prefix=f".{output.name}.",
-            suffix=".tmp",
-            dir=output.parent,
-            delete=False,
-        ) as handle:
-            temporary = Path(handle.name)
-        write_review_svg(
-            result,
-            temporary,
-            expand_nodesets=True,
-            show_contract=True,
-            show_semantics=True,
-            theme="default",
-            background="transparent",
-            mermaid_layout="review-columns",
-            )
-    except Exception as exc:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
-        return _finish_review_failure(
-            payload,
-            "svg",
-            "REVIEW.SVG.RENDER",
-            exc,
-            status="FAIL",
-        )
-    try:
-        assert temporary is not None
-        _validate_review_svg_file(
-            temporary,
-            expected_coverage=expected_review_coverage(result),
-        )
-    except Exception as exc:
-        temporary.unlink(missing_ok=True)
-        return _finish_review_failure(
-            payload,
-            "svg_check",
-            str(getattr(exc, "code", "REVIEW.SVG.COVERAGE")),
-            exc,
-            status="FAIL",
-        )
-    try:
-        os.replace(temporary, output)
-    except OSError as exc:
-        temporary.unlink(missing_ok=True)
-        return _finish_review_failure(
-            payload,
-            "publish",
-            "REVIEW.SVG.PUBLISH",
-            exc,
-        )
+    return _publish_review_preview(result, args, payload)
 
-    payload.update(
-        status="CONCERNS" if result.warnings else "PASS",
-        failed_stage=None,
-        published=True,
-        **({"warnings": list(result.warnings)} if result.warnings else {}),
-    )
-    payload = add_result_scope(payload, "vibeflow_review_artifact")
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+def _publish_review_preview(result, args, payload):
+    from vibeflow.tooling.application.javascript.preview import javascript_preview
+    from vibeflow.tooling.presentation.preview.exporter import attach_svg
+    record = None
+    try:
+        record = javascript_preview(result, preview_root=getattr(args,"preview_root",None),category="review",status="reviewing" if args.output or getattr(args,"with_svg",False) else "passed")
+        payload.update(preview=str(record.root/"vibeflow-preview.html"),preview_id=record.metadata["id"])
+    except Exception as exc:
+        return _finish_review_failure(payload,"preview","REVIEW.PREVIEW.WRITE",exc,status="FAIL")
+    if args.output or getattr(args,"with_svg",False):
+        from vibeflow.tooling.application.javascript.review import write_review_svg, expected_review_coverage
+        output=Path(args.output).resolve() if args.output else record.directory/"requested-review.svg"
+        temporary=None
+        stage,code="svg","REVIEW.SVG.RENDER"
+        try:
+            output.parent.mkdir(parents=True,exist_ok=True)
+            with tempfile.NamedTemporaryFile(prefix="."+output.name+".",suffix=".tmp",dir=output.parent,delete=False) as handle:
+                temporary=Path(handle.name)
+            write_review_svg(result,temporary,expand_nodesets=True,show_contract=True,show_semantics=True,
+                theme="default",background="transparent",mermaid_layout="review-columns")
+            stage,code="svg_check","REVIEW.SVG.COVERAGE"
+            _validate_review_svg_file(temporary,expected_coverage=expected_review_coverage(result))
+            stage,code="publish","REVIEW.SVG.PUBLISH"
+            os.replace(temporary,output)
+            attach_svg(record,output)
+            record.update("passed")
+            payload["svg"]=str(output if args.output else record.directory/"review.svg")
+        except Exception as exc:
+            record.metadata["svg_error"]=str(exc)
+            record.update("failed",error=str(exc))
+            return _finish_review_failure(payload,stage,getattr(exc,"code",code),exc,status="FAIL")
+        finally:
+            if temporary is not None:temporary.unlink(missing_ok=True)
+            if not args.output:output.unlink(missing_ok=True)
+    payload.update(status="CONCERNS" if result.warnings else "PASS",failed_stage=None,published=True,
+        **({"warnings":list(result.warnings)} if result.warnings else {}))
+    payload=add_result_scope(payload,"vibeflow_review_artifact")
+    print(json.dumps(payload,ensure_ascii=False,indent=2))
     return 0
 
 

@@ -28,6 +28,7 @@ class PythonBuildRequest:
     include: tuple[str, ...] = ()
     replace: bool = False
     runtime_options: object | None = None
+    preview_root: str | Path | None = None
 
 
 def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
@@ -159,7 +160,16 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
         files = python_bundle_files(workspace, environment.registry, config,
             out_dir=Path(request.out_dir).resolve(), include=request.include)
         files = tuple(sorted({*files,*(Path(graph.source_path) for graph in prepared.graphs.values() if graph.source_path)}))
-        with staged_build(request.out_dir,replace=request.replace) as staging:
+        from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
+        from vibeflow.tooling.presentation.preview.diagnostics import incidental_preview, preview_operation
+        from vibeflow.tooling.application.python.presentation.preview import python_preview
+        def publish_build_preview():
+            presentation = prepare_python_presentation(compilation.workflow.graph, registry=environment.registry,
+                resources=checked.resources, compilation=compilation)
+            return python_preview(presentation, config=config, workspace=workspace,
+                preview_root=request.preview_root, category="build", status="building", check_status=health.status)
+        preview_record = incidental_preview(publish_build_preview)
+        with preview_operation(preview_record), staged_build(request.out_dir,replace=request.replace) as staging:
             copy_python_framework(staging/'_framework/vibeflow')
             copy_implementation_packages(dependency_resources,staging)
             for source in files:

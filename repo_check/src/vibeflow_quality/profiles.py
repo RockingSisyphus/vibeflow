@@ -147,6 +147,7 @@ _DOCUMENT_COMMAND_PATTERNS = (
                 "quality-check",
                 "review",
                 "review-rules",
+                "preview",
                 "run",
                 "svg",
                 "validate",
@@ -171,6 +172,7 @@ _DOCUMENT_COMMAND_PATTERNS = (
                 "quality-check",
                 "review",
                 "review-rules",
+                "preview",
                 "run",
                 "validate",
             }
@@ -193,6 +195,7 @@ _DOCUMENT_COMMAND_PATTERNS = (
                 "quality-check",
                 "review",
                 "review-rules",
+                "preview",
                 "run",
                 "validate",
             }
@@ -363,6 +366,8 @@ def _generated_paths(root: Path) -> Iterator[Path]:
             continue
         kept: list[str] = []
         for name in directories:
+            if name == "vibeflow-preview":
+                continue  # Local history is retained, not a disposable source artifact.
             candidate = current_path / name
             at_root = current_path == root
             in_sandbox = bool(relative_parts and relative_parts[0] == "sandbox")
@@ -469,6 +474,7 @@ def _iter_documentation_files(root: Path) -> Iterator[Path]:
         for path in sorted(candidate.rglob("*.md")):
             if any(
                 part in _GENERATED_ANYWHERE_NAMES
+                or part == "vibeflow-preview"
                 or part in _SANDBOX_GENERATED_NAMES
                 for part in path.relative_to(root).parts
             ):

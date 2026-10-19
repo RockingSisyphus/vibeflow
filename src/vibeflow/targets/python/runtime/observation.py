@@ -92,6 +92,13 @@ class RunObservation:
         self.capture_fds = False
         self.terminal_stdout = None
 
+    @property
+    def result(self):
+        """A read-only status snapshot for operation observers."""
+        from types import MappingProxyType
+        with self._lock:
+            return MappingProxyType({"status": self._state, "error": self._error})
+
     def open(self):
         self.run_dir.mkdir(parents=True, exist_ok=True)
         self.status_file.parent.mkdir(parents=True, exist_ok=True)

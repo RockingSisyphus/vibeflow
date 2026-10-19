@@ -47,7 +47,7 @@ def build_architecture_document(
     return prepared.architecture()
 
 
-def _build_architecture_document(prepared) -> dict[str, object]:
+def build_architecture_facts(prepared) -> dict[str, object]:
     graph, actual_compiled = prepared.graph, prepared.compiled
     registry, resources = prepared.registry, prepared.resources
     roots = _root_paths(graph)
@@ -58,13 +58,12 @@ def _build_architecture_document(prepared) -> dict[str, object]:
         "node_types": _node_types_document(graph, registry=registry, roots=roots),
         "resources": _resources_document(graph, resources, roots=roots),
     }
-    if hasattr(registry, "loaded_plugins") and graph.source_path and Path(graph.source_path).is_file():
+    if getattr(registry, "loaded_plugins", None) is not None and prepared.source_config_available:
         from vibeflow.tooling.presentation.resource_architecture import resource_architecture
-        from vibeflow.tooling.project.config_loader import load_raw_config_document
         sources = prepared.source_context
         catalogs = registry.loaded_plugins.catalogs
         payload["implementation_graph"] = resource_architecture(catalogs,project_root=graph.root_path,
-            source_facts=prepared.implementation_sources,selections=load_raw_config_document(Path(graph.source_path)).data,
+            source_facts=prepared.implementation_sources,selections=getattr(resources, "selection_facts", resources if isinstance(resources, Mapping) else {}),
             selected_nodes={item.type_key for item in sources.nodes},
             findings=getattr(registry,"review_findings",()),
             roots={str(root_id):str(path) for path,root_id in registry.source_root_ids.items()})
@@ -90,8 +89,7 @@ def render_architecture_document(
     return render_architecture_payload(payload)
 
 
-def render_architecture_payload(payload: Mapping[str, object]) -> str:
-    return ARCHITECTURE_DOCUMENT_HEADER + json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
+from vibeflow.tooling.presentation.architecture_facts import render_architecture_payload
 
 
 def _workflow_document(
