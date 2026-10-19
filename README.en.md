@@ -61,5 +61,5 @@ Run the complete source-repository gate with:
 python tools/verify_project.py --full
 ```
 
-Current distribution package version: `1.1.0`. Workflow ABI: `vibeflow.workflow.v8`. AOT manifest: `vibeflow.aot-build.v3`.
-This release adds an independent offline HTML workflow viewer, structured snapshots and operation history. Default presentation export no longer starts Mermaid; SVG is an optional comparison attachment. Upgrading from 1.0.1 / 1.0.2 requires no new business configuration migration; regenerate old preview data for snapshot v2. Earlier versions still require the [graph concurrency migration](distribution/docs/user/graph-concurrency.md). See the [1.1.0 release notes](docs/maintainers/history/release-1.1.0.md).
+Current distribution package version: `1.1.1`. Workflow ABI: `vibeflow.workflow.v8`. AOT manifest: `vibeflow.aot-build.v3`.
+This patch fixes planned Nodeset/Loop status and behavior details, corrects expansion hints for definitions without a body, and requires HTML review delivery to identify the actual snapshot. SVG remains optional. From 1.1.0, run review again to fill missing planned behavior facts; no business configuration or snapshot format migration is required. Earlier versions still require the applicable [graph concurrency migration](distribution/docs/user/graph-concurrency.md). See the [1.1.1 release notes](docs/maintainers/history/release-1.1.1.md).

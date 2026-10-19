@@ -24,7 +24,7 @@
 
 完成修改后更新 Architecture，并执行任务适用的 validate、quality、build 和工作流执行探针。按本次修改对应的源码与输入，分别报告静态检查、构建、执行和业务验收结果。
 
-正式审核材料使用 `review` 生成：HTML 入口加载当次结构化快照，提供流程、BaseLib、Plugin、Host Extension 和 workflow 关联视图。资源来自当前 workflow 的实际选择；Node 显示在真实调用位置。Nodeset 与 Loop 默认折叠，在具体调用上右键展开或收起，手动状态不修改源配置。项目源码归属与规则证据保存在 `ARCHITECTURE.jsonc`，有效规则可通过 `review-rules --json` 查询。
+正式审核材料使用 `review` 生成：交付 JSON 结果中的 `preview` 完整路径、`preview_id` 和定位到当次快照的 HTML 链接（`#snapshot=<preview_id>&view=flow`），说明对应的 Config 与需查看的变化。请用户通过 HTML 查看该快照的 workflow，不能只报告生成成功或提供一张 SVG。HTML 入口加载当次结构化快照，提供流程、BaseLib、Plugin、Host Extension 和 workflow 关联视图。资源来自当前 workflow 的实际选择；Node 显示在真实调用位置。Nodeset 与 Loop 默认折叠，在具体调用上右键展开或收起，手动状态不修改源配置。项目源码归属与规则证据保存在 `ARCHITECTURE.jsonc`，有效规则可通过 `review-rules --json` 查询。
 
 需要静态 SVG 对照时使用 `review --with-svg` 或 `review --output FILE.svg`。SVG 的主流程与嵌套父流程纵向显示、叶子 Nodeset 横向显示；Nodeset 定义的 `"expand": false` 控制 SVG 详情展开，省略时为 `true`。该配置不改变 HTML 的手动展开，也不影响源码审查及原生执行。
 

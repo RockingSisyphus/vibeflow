@@ -107,7 +107,7 @@
       $("identity").textContent=data.workflow.name+" · "+statusText(record);
       if(!data.views.some(v=>v.id===view))view=data.views[0]?.id;
       const remembered=states.has(stateKey());
-      tabs();showInfo(data.workflow.name,{workflow:data.workflow,operation:record});await draw();
+      tabs();showInfo(data.workflow.name,{workflow:data.workflow,operation:record});if(!await draw())return;
       if(call&&(!remembered||state?.selected!==call))await locate(call);
       else if(state?.selectedEdge){const edge=[...edgeFacts.values()].find(e=>e.key===state.selectedEdge);if(edge)showInfo(edge.label,edge.facts,"",edge);}
       else if(state?.selected&&visible.has(state.selected)){const item=visible.get(state.selected);showInfo(item.facts.id||state.selected,item.facts,state.selected);}
@@ -148,10 +148,11 @@
       }
       transform();if(!state.fitted){fit();state.fitted=true;}
       selection();$("dimensions").textContent=visible.size?visible.size+" 个可见对象":"";
+      return true;
     }catch(error){if(token===generation)empty("此视图无法加载："+error.message);}
   }
   function invocationKey(facts) {return "nodeset:"+facts.invokes.target;}
-  function expandable(facts) {return Boolean(facts.invokes&&!data.bodies[invocationKey(facts)]?.error&&data.bodies[invocationKey(facts)]?.facts.nodes?.length);}
+  function expandable(facts) {return VFModel.nodeInfo(facts,data.architecture).expandable&&!data.bodies[invocationKey(facts)]?.error;}
   function factsNodes(body) {return Array.isArray(body.facts.nodes)?body.facts.nodes:Object.values(body.facts.nodes||{});}
   function layoutBody(...args){return VFLayout.body({data,state,elk},...args);}
   function historyButton(label,root,path,call="") {
@@ -197,7 +198,7 @@
     const item=visible.get(path);if(!item||!expandable(item.facts))return;
     const anchor={path,x:state.x+(item.x+item.width/2)*state.k,y:state.y+(item.y+item.height/2)*state.k};
     state.expanded.has(path)?state.expanded.delete(path):state.expanded.add(path);
-    await draw(anchor);select(path);
+    if(await draw(anchor))select(path);
   }
   function fit() {
     if(!state||!$("scene").children.length)return;
@@ -229,7 +230,7 @@
     if(mode!=="structured"){mode="structured";modes.set(current,mode);$("mode").value=mode;state=getState();}
     const path=findPath(query);if(!path){notice("没有找到节点："+query);return;}
     const parts=path.split("/");for(let i=1;i<parts.length;i++)state.expanded.add(parts.slice(0,i).join("/"));
-    await draw();const item=visible.get(path);if(!item)return;
+    if(!await draw())return;const item=visible.get(path);if(!item)return;
     const rect=$("viewport").getBoundingClientRect();state.x=rect.width/2-(item.x+item.width/2)*state.k;state.y=rect.height/2-(item.y+item.height/2)*state.k;
     transform();select(path);notice();
   }

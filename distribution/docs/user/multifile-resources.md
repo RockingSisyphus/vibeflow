@@ -126,15 +126,18 @@ try {
 
 ## 图形与 Architecture
 
-登记 Architecture 文档后，`review --output ARCHITECTURE.svg` 生成当前 Workflow 的展开图，并更新 `ARCHITECTURE.jsonc`。
+登记 Architecture 文档后，`review` 生成当前 Workflow 的 HTML 预览和结构化快照，并更新 `ARCHITECTURE.jsonc`。交付命令返回的 `preview` 完整路径与 `preview_id`，通过 `#snapshot=<preview_id>&view=flow` 定位当次 workflow；流程及资源视图在页面内切换，Nodeset / Loop 按具体调用右键展开。
+
+以下布局说明仅适用于按需生成的静态 SVG 对照，不控制 HTML 的初始折叠和手动展开。
 
 SVG 从左到右展示主流程、当前配置使用的资源目录和 Nodeset 展开详情。资源目录按 `plugins`、`base_lib`、`host_extensions` 分组，目录父节点连接每项实际选择的资源；没有选择的组省略。Node 显示在它所属的主流程或 Nodeset 调用位置。
 
 主流程纵向显示；包含子 Nodeset 的父流程也纵向显示，子详情放在右侧并上下排列；叶子 Nodeset 横向显示。Nodeset 定义的 `expand` 属性控制是否展示内部，见[Nodeset 与 Loop](nodesets-and-loops.md)。
 
 ```bash
-vibeflow review --workspace vibeflow_config.jsonc --config workflow.jsonc \
-  --output ARCHITECTURE.svg
+vibeflow review --workspace vibeflow_config.jsonc --config workflow.jsonc
+# 可选 SVG 对照
+vibeflow review --workspace vibeflow_config.jsonc --config workflow.jsonc --with-svg
 vibeflow export-mermaid --workspace vibeflow_config.jsonc --config workflow.jsonc \
   --mermaid-layout review-columns --output ARCHITECTURE.mmd
 ```

@@ -16,7 +16,11 @@ window.VFModel = (()=>{
     const definition=facts.invokes?architecture.nodesets?.[facts.invokes.target]||null:null;
     const resource=architecture.implementation_graph?.resources?.["node:"+(facts.type_used||facts.type_key)]||null;
     const typeInfo=type?.info||type||{},contract=facts.contract||type?.contract||resource?.contract||{};
+    const status=[facts.status,facts.invokes?.target_status,definition?.status].includes("planned")?"planned":facts.status||"implemented";
+    const nodes=definition?.body?.nodes;
     return {call:facts,type,typeInfo,definition,resource,
+      status,plannedBehavior:facts.planned_behavior??definition?.planned_behavior,
+      expandable:Boolean(nodes&&(Array.isArray(nodes)?nodes.length:Object.keys(nodes).length)),
       description:facts.role?.description||facts.description||facts.info?.description||typeInfo.description||definition?.description||"",
       contract,config:type?.config||{schema:contract.params_schema||{},defaults:contract.params_defaults||{}}};
   }

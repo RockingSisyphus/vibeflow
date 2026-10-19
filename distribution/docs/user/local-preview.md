@@ -12,6 +12,8 @@ python run.py review --config project/configs/main.jsonc --output review.svg
 python run.py preview --reindex
 ```
 
+`review` 的 JSON 结果包含 `preview`（HTML 完整路径）和 `preview_id`。交付审核时提供入口及当次快照定位链接，例如 `vibeflow-preview.html#snapshot=<preview_id>&view=flow`，说明对应 Config 和变更位置，请用户查看该快照；仅报告生成成功或提供 SVG 不等于交付 HTML 审核材料。
+
 源码检出可以使用 `python -m vibeflow`。`review --output` 是可选的；显式指定时
 仍生成原来的审查 SVG，并同时登记历史。`validate`、`quality-check` 和显式导出
 不会登记历史。运行日志、trace、状态文件和业务输出仍在原来的 run 目录；
@@ -32,6 +34,8 @@ AOT 产物执行不采集架构事实、不生成预览、不触发图检查或�
 Nodeset 与 Loop 默认折叠，右键选择原地展开或收起，不改变配置的 `expand`。
 展开容器的外部连线连接调用边界。左键拖拽任何节点或容器内部均平移画布，
 滚轮缩放；比例输入接受任意有限正数，不设固定上限。定位隐藏节点会展开其祖先。
+
+planned Node 和目标定义为 planned 的 Nodeset / Loop 均显示计划状态；侧栏分别保留调用声明与目标定义状态，计划行为采用本次事实中已解析的有效值。Nodeset 有内部定义时可右键展开；没有内部定义时明确标注“暂无内部定义”并禁用展开。规划、已实现与实际运行结果分别报告，不从图形推断运行成功。
 
 卡片显示简短职责说明；单击节点可查看调用职责、类型说明、完整输入输出契约与语义、默认参数、调用参数、参数约束及来源。未提供的信息不会凭空补写，展开“全部事实”可核对对应调用、类型和 Nodeset 定义。
 

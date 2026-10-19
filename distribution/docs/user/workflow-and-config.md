@@ -2,9 +2,9 @@
 
 Config 描述工作流中的调用实例、公共输入输出、资源选择和显式连接。Node 类型或 Nodeset 定义提供已实现调用的端口契约。
 
-## Config 与正式审核图
+## Config 与正式 HTML 审核
 
-Config 提供实际构建和执行的工作流结构。修改已有环节时，沿已登记 Architecture 的 source 在原工作流的实际位置表达 planned Node 或 Nodeset，再对保留上下游关系的完整工作流生成正式审核图。
+Config 提供实际构建和执行的工作流结构。修改已有环节时，沿已登记 Architecture 的 source 在原工作流的实际位置表达 planned Node 或 Nodeset，再对保留上下游关系的完整工作流运行 `review`，交付当次 HTML 快照定位链接，供用户查看 workflow 及其依赖。
 
 协同模式对新增独立工作流、共享资源变更，以及 planned 与已执行状态的具体要求见其 profile 文档。
 

@@ -8,6 +8,7 @@ from vibeflow.core.descriptors import DescriptorCatalogs
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
 from vibeflow.core.inspection import build_architecture_report
 from vibeflow.core.rules.selection import selection_data
+from vibeflow.core.planned import effective_planned_behavior
 from vibeflow.tooling.presentation.node_presentation import resolve_presentation
 
 def _effect_scope_label(
@@ -60,6 +61,7 @@ def build_architecture_facts(
                 "display_name": value.display_name,
                 "description": value.description,
                 "status": value.status,
+                "planned_behavior": value.planned_behavior.to_dict() if value.status == STATUS_PLANNED else None,
                 "expand": value.expand,
                 "flow_kind": value.flow_kind,
                 "effect_scope": "unavailable" if value.status == STATUS_PLANNED else "unconstrained",
@@ -270,11 +272,7 @@ def _javascript_node_document(
         "effective_execution_lock": effective_lock,
         "contains_global_state": flow_kind == FLOW_KIND_GLOBAL_STATE,
         "status": status,
-        "planned_behavior": (
-            getattr(node, "planned_behavior").to_dict()
-            if str(getattr(node, "status", "")) == STATUS_PLANNED
-            else None
-        ),
+        "planned_behavior": effective_planned_behavior(node, nodeset).to_dict() if planned else None,
         "requires": requirements_to_dicts(getattr(node, "requires")),
         "provides": providers_to_dicts(getattr(node, "provides")),
         "join_policy": str(getattr(node, "join_policy", "")),

@@ -117,8 +117,10 @@ Python root 的 `runtime.nodeset_max_depth` 与 JavaScript root 的 `javascript.
 
 ```bash
 python run.py validate --config <root>/configs/main.jsonc
-python run.py review --config <root>/configs/main.jsonc --output reports/workflow.svg
+python run.py review --config <root>/configs/main.jsonc
 ```
+
+打开命令返回的 HTML 入口，并使用当次 `preview_id` 定位快照。planned Nodeset 有内部定义时可右键展开；尚无内部定义时只显示声明、契约和计划行为，不生成虚构子图。静态 SVG 对照按需使用 `review --with-svg`。
 
 ## Nodeset 的规则接管
 

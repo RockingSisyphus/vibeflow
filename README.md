@@ -60,7 +60,7 @@ node javascript_project/scripts/workflow_execution_probe.mjs
 python tools/verify_project.py --full
 ```
 
-当前发行包版本为 `1.1.0`，Workflow ABI 为 `vibeflow.workflow.v8`，AOT manifest 为 `vibeflow.aot-build.v3`。本版新增独立离线 HTML 工作流浏览器、结构化快照与分类历史，默认展示导出不再启动 Mermaid，SVG 改为可选对照。从 1.0.1 / 1.0.2 升级无需新增业务配置迁移；旧预览数据不兼容 v2，请重新生成。更早版本仍须完成[普通图并发迁移](distribution/docs/user/graph-concurrency.md)。完整变更见[1.1.0 发布说明](docs/maintainers/history/release-1.1.0.md)。
+当前发行包版本为 `1.1.1`，Workflow ABI 为 `vibeflow.workflow.v8`，AOT manifest 为 `vibeflow.aot-build.v3`。本版修复 planned Nodeset / Loop 的状态与计划行为展示、无内部定义的展开提示，并明确通过当次 HTML 快照交付审核，SVG 仅作可选对照。从 1.1.0 升级后重新运行 review 可补齐历史快照缺失的计划行为；无业务配置或快照格式迁移。更早版本仍须完成适用的[普通图并发迁移](distribution/docs/user/graph-concurrency.md)。完整变更见[1.1.1 发布说明](docs/maintainers/history/release-1.1.1.md)。
 
 质量检查只覆盖当前实际选择的 Rule；不证明业务正确、代码安全、算法确定性或全部无副作用。有限 Python 输入写入规则独立于效果政策，详见[产品检查边界](distribution/docs/user/product-check-boundaries.md)。
 
