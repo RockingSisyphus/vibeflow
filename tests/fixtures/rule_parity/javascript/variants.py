@@ -266,7 +266,7 @@ def run_variants(work_root: Path, variant: str, toolchain: Path, *, fixture: Any
     for index, item in enumerate(variants(fixture)):
         case = item.case
         if variant=='current' and case.id.startswith('js.variant.task.') and case.id.endswith('.sync'):
-            case=replace(case,entrypoint='build',current_code='VF_ENTRY_MODE_TASK_IN_SYNC',classification='approved_change',notes='Finite task management requires an async JavaScript workflow.')
+            case=replace(case,entrypoint='build-run',current_code='',metrics={'business_result':4},classification='approved_change',notes='The migrated graph is sequential with immediate inline nodes; build and execute it through the synchronous entrypoint.')
         if variant=='current' and case.id=='js.variant.task.result-missing-contract':
             case=replace(case,current_code='GRAPH.ASYNC.MIGRATION',classification='approved_change',notes='Retired result_key is rejected before its former output contract.')
         root = Path(work_root) / f'{index:02d}-{case.id}'
@@ -309,7 +309,8 @@ def run_variants(work_root: Path, variant: str, toolchain: Path, *, fixture: Any
                         app_entry=root / 'web/app.ts' if item.profile == 'web-app' else None))
                 metrics = {'built': True}
                 if case.entrypoint == 'build-run':
-                    script = f'import {{pathToFileURL}} from "node:url"; const workflow = await import(pathToFileURL({json.dumps(str(result.entry))})); try {{process.stdout.write(JSON.stringify(await workflow.runWorkflowAsync({{value: 3}})));}} catch (error) {{process.stdout.write(JSON.stringify({{code: error.code, message: error.message}})); process.exitCode=1;}}'
+                    execution = 'workflow.runWorkflow({value: 3})' if item.pipeline_patch.get('entry_mode') == 'sync' else 'await workflow.runWorkflowAsync({value: 3})'
+                    script = f'import {{pathToFileURL}} from "node:url"; const workflow = await import(pathToFileURL({json.dumps(str(result.entry))})); try {{process.stdout.write(JSON.stringify({execution}));}} catch (error) {{process.stdout.write(JSON.stringify({{code: error.code, message: error.message}})); process.exitCode=1;}}'
                     executed = subprocess.run(['node', '--input-type=module', '--eval', script], cwd=root, capture_output=True, text=True, check=False)
                     payload = json.loads(executed.stdout) if executed.stdout else {'message': executed.stderr}
                     if executed.returncode:
