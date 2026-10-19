@@ -11,7 +11,7 @@ VibeFlow 的公开命令分别报告结构、质量、构建、审核产物或�
 | 静态结构检查 | `python run.py validate --config <config>` |
 | 项目质量检查 | `python run.py quality --path <root>` |
 | 本地审核预览 | `python run.py review --config <config>` |
-| 显式审核 SVG | `python run.py review --config <config> --output reports/workflow.svg` |
+| 可选 SVG 对照 | `python run.py review --config <config> --output reports/workflow.svg` |
 | 重建预览索引 | `python run.py preview --reindex` |
 | 查看有效规则图 | `python run.py review-rules --config <config> --json` |
 | 查询当前资源与来源 | `python run.py inspect-resources --config <config> --json` |
@@ -22,9 +22,9 @@ VibeFlow 的公开命令分别报告结构、质量、构建、审核产物或�
 
 `review` 生成并校验审核产物。collaborative profile 中，产物成功仍需后续人工批准；autonomous profile 按任务直接完成适用门禁。
 
-对实际 Config 的完整工作流执行 `review`，得到根目录的离线 HTML 预览和历史快照，并更新已登记的 `ARCHITECTURE.jsonc`。默认不调用 Mermaid；使用 `--with-svg` 添加对照附件，显式指定 `--output` 时另交付原有展开 SVG。JSONC 保存声明、入口与支撑文件、真实依赖、有效规则和展示来源。多文件图形内容见[图形与 Architecture](multifile-resources.md#图形与-architecture)，页面交互和目录见[本地预览与历史](local-preview.md)。
+对实际 Config 的完整工作流执行 `review`，得到根目录的离线 HTML 预览和历史快照，并更新已登记的 `ARCHITECTURE.jsonc`。审核时交付 `preview` 完整路径、`preview_id` 与 `#snapshot=<preview_id>&view=flow` 定位链接，让用户查看当次 workflow。默认不调用 Mermaid；使用 `--with-svg` 添加对照附件，显式指定 `--output` 时另交付原有展开 SVG。JSONC 保存声明、入口与支撑文件、真实依赖、有效规则和展示来源。多文件图形内容见[图形与 Architecture](multifile-resources.md#图形与-architecture)，页面交互和目录见[本地预览与历史](local-preview.md)。
 
-展开图的资源目录按 `plugins`、`base_lib`、`host_extensions` 排列：目录父节点连接当前配置使用的资源。Node 显示在流程的实际调用位置；Nodeset 按定义的 `expand` 设置展开。`export-svg --expand-nodesets` 和 `export-mermaid --mermaid-layout review-columns` 沿用这一展示方式。有效规则与参数来源通过 `review-rules --json` 查询。
+可选 SVG 展开图的资源目录按 `plugins`、`base_lib`、`host_extensions` 排列：目录父节点连接当前配置使用的资源。Node 显示在流程的实际调用位置；Nodeset 按定义的 `expand` 设置展开。`export-svg --expand-nodesets` 和 `export-mermaid --mermaid-layout review-columns` 沿用这一展示方式。有效规则与参数来源通过 `review-rules --json` 查询。
 
 ## 运行日志与监控
 

@@ -32,7 +32,10 @@ window.VFInspector=(()=>{
   function raw(parent,value){const d=element("details");d.append(element("summary","全部事实（含关联定义）"),element("pre",JSON.stringify(value,null,2)));parent.append(d);}
   function nodeDetails(parent,facts,architecture){
     const info=VFModel.nodeInfo(facts,architecture),type=info.type,definition=info.definition,t=info.typeInfo;
-    table(parent,[["类型",facts.type_used||facts.kind],["状态",facts.status],["流程类型",facts.flow_kind||t.flow_kind],
+    table(parent,[["类型",facts.type_used||facts.kind],["状态",info.status],
+      ["调用声明状态",facts.status!==info.status?facts.status:undefined],
+      ["目标定义状态",definition?.status??facts.invokes?.target_status],
+      ["内部结构",facts.invokes?(info.expandable?"可原地展开":"暂无内部定义"):undefined],["流程类型",facts.flow_kind||t.flow_kind],
       ["调用职责",facts.role?.description],["类型说明",t.description||facts.info?.description||facts.description],
       ["Nodeset 说明",definition?.description],["版本",t.version||facts.version],["作者",t.author||facts.author],
       ["标签",facts.tags?.length?facts.tags:t.tags?.length?t.tags:undefined],
@@ -60,7 +63,7 @@ window.VFInspector=(()=>{
     if(nonempty(facts.metadata)||nonempty(type?.metadata)){const part=section(parent,"补充元数据");table(part,[["调用",facts.metadata],["类型",type?.metadata]]);}
     const rules=facts.selected_rulesets??facts.rulesets??type?.rulesets;
     if(rules?.length){const part=section(parent,"规则声明");notes(part,rules);}
-    if(facts.planned_behavior){const part=section(parent,"计划节点行为");table(part,Object.entries(facts.planned_behavior));}
+    if(info.plannedBehavior){const part=section(parent,"计划节点行为");table(part,Object.entries(info.plannedBehavior));}
     const p=facts.presentation?.values?facts.presentation:facts.effective_presentation;
     if(p){const part=section(parent,"展示样式");table(part,[["最终样式",p.values],["样式来源",p.sources]]);}
     raw(parent,{call:facts,...(type?{node_type:type}:{}),...(definition?{nodeset:definition}:{}),...(info.resource?{resource:info.resource}:{})});

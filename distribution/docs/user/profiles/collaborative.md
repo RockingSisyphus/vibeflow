@@ -5,13 +5,13 @@ collaborative profile 适合需要人类在实现前审阅架构变化的任务�
 1. 阅读已登记 Architecture 并定位真实 source。
 2. 列出复用、修改、删除、新增四类变更清单。
 3. 修改现有流程时，在其真实 Config 的实际位置标记或新增 planned Node、Nodeset，保留原流程上下游。
-4. 对受影响的完整工作流运行 `review`，生成正式 HTML 预览与结构化快照。
+4. 对受影响的完整工作流运行 `review`，生成正式 HTML 预览与结构化快照；交付 `preview` 完整路径、`preview_id` 和定位链接（`#snapshot=<preview_id>&view=flow`），说明对应 Config 及变更位置，请人类查看该快照的 workflow。
 5. 等待人类在后续消息中明确批准。
 6. 实现获批内容，更新 Architecture，并运行适用的 validate、quality、build 和工作流执行探针。
 
 机器检查结论与人工批准分别报告。此 profile 使用与 autonomous 相同的 Core、原生契约和所选 Ruleset。
 
-## 正式审核图与真实流程
+## 正式 HTML 审核与真实流程
 
 正式材料围绕实际构建和执行的 Config 组织，提供以下内容：
 
