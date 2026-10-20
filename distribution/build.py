@@ -404,6 +404,7 @@ def _populate_distribution(output: Path, *, profile: DistributionProfile | None 
     _write_javascript_architecture(output)
     _write_distribution_metadata(output, profile=profile)
     _write_kernel_manifest(output)
+    _write_preview_entry(output)
     _normalize_output_modes(output)
 
 
@@ -414,7 +415,10 @@ def _write_profile_assets(output: Path, profile: DistributionProfile) -> None:
     (output / "README.md").write_text(
         f"# VibeFlow {VERSION} {profile_title}开发包\n\n"
         "本发行包包含相同内核下的最小 Python Runtime 与 JavaScript AOT 项目。"
-        "先阅读 `AGENTS.md` 和 `kernel/docs/README.md`。\n",
+        "先阅读 `AGENTS.md` 和 `kernel/docs/README.md`。\n\n"
+        "双击 `vibeflow-preview.html` 可离线打开浏览工具；初始历史为空。"
+        "执行 `python run.py review --config <workflow>` 后，在页面刷新历史或打开返回的快照定位链接。"
+        "`vibeflow-preview.config.js` 配置数据位置，页面资源和历史在 `vibeflow-preview/`。\n",
         encoding="utf-8",
     )
     docs_root = output / "kernel" / "docs"
@@ -1034,6 +1038,26 @@ raise SystemExit(main(sys.argv[1:]))
     if completed.returncode != 0:
         raise BuildDistributionError(
             "failed to generate Python Architecture document: "
+            + (completed.stderr.strip() or completed.stdout.strip())
+        )
+
+
+def _write_preview_entry(output: Path) -> None:
+    """Install the unpacked entry from the bundled tool without generating history."""
+    environment = os.environ.copy()
+    environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    environment.pop("PYTHONPATH", None)
+    completed = subprocess.run(
+        [sys.executable, "run.py", "preview"],
+        cwd=output,
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode:
+        raise BuildDistributionError(
+            "failed to install distribution HTML preview: "
             + (completed.stderr.strip() or completed.stdout.strip())
         )
 

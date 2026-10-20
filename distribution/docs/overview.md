@@ -38,6 +38,6 @@ VibeFlow 检查工程结构、源码健康度与所选领域约束。项目测�
 
 两个 profile 使用同一 Core、quality policy、项目模板和 Workflow ABI `vibeflow.workflow.v8`。profile 只改变开发协议、提示词和随包文档选择。
 
-1.1.1 提供[独立离线预览与历史](user/local-preview.md)，默认审查、构建和 Python 源码运行导出结构化快照，正确标记 planned Node / Nodeset / Loop 并展示有效计划行为；SVG 按需生成，AOT 执行不生成报告。从 1.0.1 / 1.0.2 升级无需新增业务配置迁移，旧预览数据须重新生成到 v2。自 1.0.1 起使用普通图承载并发，旧任务管理接口已删除；更早版本升级先按[并发迁移步骤](user/graph-concurrency.md#从旧任务接口迁移)更新配置，再重建计划和 AOT 产物。
+1.1.2 预装[独立离线预览与历史](user/local-preview.md)，分发包解压后即可打开根目录 HTML；默认审查、构建和 Python 源码运行导出结构化快照，正确标记 planned Node / Nodeset / Loop 并展示有效计划行为；SVG 按需生成，AOT 执行不生成报告。从 1.0.1 / 1.0.2 升级无需新增业务配置迁移，旧预览数据须重新生成到 v2。自 1.0.1 起使用普通图承载并发，旧任务管理接口已删除；更早版本升级先按[并发迁移步骤](user/graph-concurrency.md#从旧任务接口迁移)更新配置，再重建计划和 AOT 产物。
 
 从发行包开始开发时，先阅读[快速开始](user/quickstart.md)，再按任务进入对应接口文档。

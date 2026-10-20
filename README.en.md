@@ -61,5 +61,5 @@ Run the complete source-repository gate with:
 python tools/verify_project.py --full
 ```
 
-Current distribution package version: `1.1.1`. Workflow ABI: `vibeflow.workflow.v8`. AOT manifest: `vibeflow.aot-build.v3`.
-This patch fixes planned Nodeset/Loop status and behavior details, corrects expansion hints for definitions without a body, and requires HTML review delivery to identify the actual snapshot. SVG remains optional. From 1.1.0, run review again to fill missing planned behavior facts; no business configuration or snapshot format migration is required. Earlier versions still require the applicable [graph concurrency migration](distribution/docs/user/graph-concurrency.md). See the [1.1.1 release notes](docs/maintainers/history/release-1.1.1.md).
+Current distribution package version: `1.1.2`. Workflow ABI: `vibeflow.workflow.v8`. AOT manifest: `vibeflow.aot-build.v3`.
+Both distribution profiles now include a root HTML entry, configuration, offline assets and an empty history index. Open the page immediately after extraction, then run review to generate workflow snapshots. SVG remains optional. No business configuration or snapshot format migration is required. See the [1.1.2 release notes](docs/maintainers/history/release-1.1.2.md).

@@ -60,7 +60,7 @@ node javascript_project/scripts/workflow_execution_probe.mjs
 python tools/verify_project.py --full
 ```
 
-当前发行包版本为 `1.1.1`，Workflow ABI 为 `vibeflow.workflow.v8`，AOT manifest 为 `vibeflow.aot-build.v3`。本版修复 planned Nodeset / Loop 的状态与计划行为展示、无内部定义的展开提示，并明确通过当次 HTML 快照交付审核，SVG 仅作可选对照。从 1.1.0 升级后重新运行 review 可补齐历史快照缺失的计划行为；无业务配置或快照格式迁移。更早版本仍须完成适用的[普通图并发迁移](distribution/docs/user/graph-concurrency.md)。完整变更见[1.1.1 发布说明](docs/maintainers/history/release-1.1.1.md)。
+当前发行包版本为 `1.1.2`，Workflow ABI 为 `vibeflow.workflow.v8`，AOT manifest 为 `vibeflow.aot-build.v3`。两个分发包均预装根目录 HTML 入口、配置、离线资源和空历史索引，解压即可打开，无需先运行命令；运行 review 后查看对应快照。SVG 仍为可选对照，无业务配置或快照格式迁移。完整变更见[1.1.2 发布说明](docs/maintainers/history/release-1.1.2.md)。
 
 质量检查只覆盖当前实际选择的 Rule；不证明业务正确、代码安全、算法确定性或全部无副作用。有限 Python 输入写入规则独立于效果政策，详见[产品检查边界](distribution/docs/user/product-check-boundaries.md)。
 

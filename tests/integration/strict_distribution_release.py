@@ -22,6 +22,27 @@ def _files(root: Path) -> dict[str, bytes]:
     }
 
 
+@pytest.mark.parametrize("profile", ["collaborative", "autonomous"])
+def test_unpacked_release_opens_offline_before_any_command(tmp_path: Path, profile: str) -> None:
+    from vibeflow.tooling.presentation.mermaid import is_mermaid_svg_renderer_available, _find_mmdc
+    if not is_mermaid_svg_renderer_available():
+        pytest.skip("locked browser toolchain supplied by the full gate")
+    artifacts = distribution_builder.build_release(tmp_path / "package", profile=profile, run_self_check=False)
+    extracted = tmp_path / "离线 包"
+    with zipfile.ZipFile(artifacts.archive) as archive:
+        archive.extractall(extracted)
+    root = extracted / "vibeflow-distribution"
+    assert (root / "vibeflow-preview/index.js").read_bytes() == b""
+    assert not (root / "vibeflow-preview/snapshots").exists()
+    script = Path(__file__).resolve().parents[1] / "fixtures/preview/browser.cjs"
+    completed = subprocess.run(["node", str(script), str(_find_mmdc().resolve()),
+        str(root / "vibeflow-preview.html"), "--empty"], capture_output=True, text=True, timeout=60)
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    report = json.loads(completed.stdout)
+    assert report["records"] == 0 and not report["failed_resources"]
+    assert not report["page_errors"] and not report["network_requests"]
+
+
 def test_release_publishes_deterministic_directory_and_single_root_archive(
     tmp_path: Path,
 ) -> None:
@@ -142,6 +163,11 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
         ):
             assert marker in archived_config_guide
         assert "kernel/docs/user/commands-and-results.md" in archived_agents
+        assert archive.read("vibeflow-distribution/vibeflow-preview/index.js") == b""
+        assert "vibeflow-distribution/vibeflow-preview.html" in names
+        assert "vibeflow-distribution/vibeflow-preview.config.js" in names
+        assert "vibeflow-distribution/vibeflow-preview/assets/elk.bundled.js" in names
+        assert not any("vibeflow-preview/snapshots/" in name for name in names)
 
     extracted = tmp_path / "extracted"
     with zipfile.ZipFile(first.archive) as archive:

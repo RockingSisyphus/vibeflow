@@ -13,6 +13,16 @@ const puppeteer=createRequire(renderer)('puppeteer');
     const page=await browser.newPage();await page.setViewport({width:1500,height:1000});
     page.on('pageerror',e=>errors.push(e.message));
     await page.setRequestInterception(true);page.on('request',r=>{if(/^https?:/.test(r.url())){network.push(r.url());r.abort();}else r.continue();});
+    if(pythonId==='--empty') {
+      const failed=[];page.on('requestfailed',r=>failed.push(r.url()));
+      await page.goto(pathToFileURL(entry).href);
+      await page.waitForFunction(()=>document.getElementById('count').textContent==='0 / 0');
+      assert.equal(await page.$eval('#notice',e=>e.textContent),'');
+      assert.match(await page.$eval('#empty',e=>e.textContent),/尚无预览记录/);
+      assert.equal(await page.$$eval('.record, [data-call-path]',es=>es.length),0);
+      assert.deepEqual(errors,[]);assert.deepEqual(network,[]);assert.deepEqual(failed,[]);
+      console.log(JSON.stringify({records:0,page_errors:errors,network_requests:network,failed_resources:failed}));return;
+    }
     if(pythonId==='--resources') {
       await page.goto(pathToFileURL(entry).href);
       await page.waitForSelector('[data-call-path]');
