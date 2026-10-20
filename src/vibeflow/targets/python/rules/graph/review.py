@@ -2,7 +2,7 @@
 from dataclasses import replace
 
 from vibeflow.core.rules import RuleRecord, RuleResult
-from vibeflow.targets.python.rules.graph.workflow import graph_contexts, review_graph
+from vibeflow.targets.shared.rule_support.workflow import graph_contexts, review_graph
 
 
 def workflow_review(context, inputs, params):

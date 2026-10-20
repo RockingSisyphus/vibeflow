@@ -7,7 +7,8 @@ from vibeflow.targets.shared.rule_support.implementation import check_node_imple
 from vibeflow.core.rules import RuleRecord, RuleResult
 from vibeflow.targets.python.rules.node.definitions import implementation_handlers
 from vibeflow.targets.python.quality.analysis_metrics import PythonSourceAnalysis
-from vibeflow.targets.python.rules.node.helpers import finding, source_policy, source_subject, source_info, violation_finding
+from vibeflow.targets.python.rules.node.helpers import finding, source_subject, source_info, violation_finding
+from vibeflow.targets.python.quality.policy_parameters import source_policy
 
 
 def _located(context, item, path, line=1):

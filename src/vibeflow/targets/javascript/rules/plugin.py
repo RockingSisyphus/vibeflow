@@ -1,5 +1,5 @@
 """Assemble the JavaScript standard Rule Plugin."""
-from vibeflow.targets.javascript.rules.capabilities import handlers as capability_handlers
+from vibeflow.targets.shared.rule_support.capability_policy import handlers as capability_handlers
 from vibeflow.targets.javascript.rules.node.handlers import javascript_source_bindings
 
 

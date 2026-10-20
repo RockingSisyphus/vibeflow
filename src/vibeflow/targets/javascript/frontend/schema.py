@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Mapping, Sequence
-from typing import Any
 
 
 JAVASCRIPT_SAFE_INTEGER_MAX = (1 << 53) - 1

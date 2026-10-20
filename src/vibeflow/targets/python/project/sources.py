@@ -3,7 +3,7 @@ import inspect
 import sys
 from pathlib import Path
 
-from vibeflow.core.flow import GraphConfig, STATUS_PLANNED, LOOP_NODE_TYPES
+from vibeflow.core.flow import STATUS_PLANNED, LOOP_NODE_TYPES
 from vibeflow.targets.python.project.registry import NodeRegistry, NodeRegistryError
 from vibeflow.targets.python.project.source_closure import collect_python_source_facts
 from vibeflow.targets.python.quality.source_context import PythonSourceFile, PythonSourceNode, PythonSourceCall, build_python_source_context

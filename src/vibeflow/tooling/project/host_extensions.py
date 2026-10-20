@@ -7,7 +7,6 @@ from typing import Any, Mapping
 
 from vibeflow.tooling.project.resource_helpers import _finding
 from vibeflow.core.descriptors.json_values import freeze_json
-from vibeflow.core.descriptors.models import _string_tuple
 from vibeflow.core.flow import STATUS_IMPLEMENTED, STATUS_PLANNED
 from vibeflow.core.findings import HealthFinding
 

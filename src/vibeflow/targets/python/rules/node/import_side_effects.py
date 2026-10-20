@@ -3,7 +3,8 @@
 import ast
 
 from vibeflow.core.rules import RuleResult
-from vibeflow.targets.python.rules.node.helpers import finding, rule_effect_scope, source_policy
+from vibeflow.targets.python.rules.node.helpers import finding, rule_effect_scope
+from vibeflow.targets.python.quality.policy_parameters import source_policy
 from vibeflow.targets.python.quality.source_analysis.ast_facts import import_modules
 from vibeflow.targets.python.rules.node.effect_policy import policy_import_violation_code
 

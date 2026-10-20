@@ -6,7 +6,6 @@ import json
 from collections.abc import Mapping, Sequence
 
 from .models import (
-    FileQuality,
     ProjectQualityFacts,
     QualityFinding,
     QualityPolicy,

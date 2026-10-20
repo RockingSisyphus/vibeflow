@@ -19,7 +19,7 @@ from types import (
     MethodType,
     ModuleType,
 )
-from typing import Any, Mapping
+from typing import Mapping
 
 from vibeflow.block_compiler.model import SourceRef
 

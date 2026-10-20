@@ -415,10 +415,10 @@ def test_native_input_record_types_are_not_merged_by_their_json_projection(varia
 
 
 def test_record_cache_eligibility_visits_shared_json_containers_once():
-    from vibeflow.core.rules.execution import _cacheable_record_value
+    from vibeflow.core.rules.fingerprint import cacheable_record_value
     shared = 1
     for _ in range(64):
         shared = (shared,shared)
     memo = {}
-    assert _cacheable_record_value(shared,memo)
+    assert cacheable_record_value(shared,memo)
     assert len(memo) == 64 and all(memo.values())

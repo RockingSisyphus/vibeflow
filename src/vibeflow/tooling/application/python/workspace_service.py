@@ -33,7 +33,8 @@ from vibeflow.tooling.project.config_schema import (
     collect_config_schema_findings,
 )
 from vibeflow.tooling.project.descriptor_loader import DescriptorLoadError
-from vibeflow.tooling.application.python.project.resource_selection import PythonResources, select_python_resources, resolve_host_extension_resources
+from vibeflow.tooling.application.python.project.resource_selection import PythonResources, select_python_resources
+from vibeflow.tooling.project.host_extensions import resolve_host_extension_resources
 from vibeflow.tooling.application.python.presentation.architecture_validation import (
     _validate_registered_architecture_document,
 )

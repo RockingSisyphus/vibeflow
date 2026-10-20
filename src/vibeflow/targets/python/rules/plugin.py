@@ -1,5 +1,5 @@
 """Native Python bindings contributed by the standard plugin."""
-from vibeflow.targets.python.rules.capabilities import handlers as capability_handlers
+from vibeflow.targets.shared.rule_support.capability_policy import handlers as capability_handlers
 
 def python_rule_bindings():
     from vibeflow.targets.python.rules.node.effects import no_side_effects

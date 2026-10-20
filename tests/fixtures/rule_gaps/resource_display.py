@@ -1,5 +1,5 @@
-"""All public shapes and resource colors in Architecture, Mermaid and browser SVG."""
-from resource_support import project,documents,observe,KINDS,IDS,mutate_presentation,rgb,config,cli,display_resource,display_nodes
+"""Public shapes/styles in facts, offline HTML, Mermaid and optional SVG."""
+from resource_support import project,documents,observe,KINDS,IDS,mutate_presentation,rgb,config,cli,display_resource,display_nodes,preview_nodes,preview_style_matches
 
 SHAPES=("rect","rounded","stadium","diamond","lean-r","lean-l","fr-rect","cyl","doc","hex","cloud","circle","dbl-circ","trap-b")
 
@@ -21,6 +21,16 @@ def evidence(actual,architecture,mermaid,browser,kind,fields,*,override=False):
         count=10 if geometry=="fr-rect" else 6 if geometry=="hex" else 4
         shape_matches=any(item["tag"]=="polygon" and len((item["points"] or "").split())==count for item in shapes)
     else:shape_matches=any(item["tag"]=="path" and item["d"] for item in shapes)
+    cards=preview_nodes(browser,architecture,kind)
+    def native_geometry(card):
+        outline=card["outline"]
+        if outline["width"]<=0 or outline["height"]<=0:return False
+        if geometry in {"rect","rounded","stadium","fr-rect"}:
+            return outline["tag"]=="rect" and (float(outline["rx"] or 0)>0)==(geometry in {"rounded","stadium"}) and (geometry!="fr-rect" or card["paths"]==2)
+        if geometry in {"circle","dbl-circ"}:return card["ellipses"]==(2 if geometry=="dbl-circ" else 1)
+        if geometry in {"diamond","lean-r","lean-l","hex","trap-b"}:
+            return outline["tag"]=="polygon" and len(outline["points"].split())==(6 if geometry=="hex" else 4)
+        return outline["tag"]=="path" and bool(outline["d"])
     actual["metrics"].update(architecture_shape=values.get("shape"),architecture_fill=values.get("fill"),
         presentation_origin=sources.get("fill"),mermaid_shape=("shape: "+str(mermaid_shape)) in mermaid,
         browser_resource_count=len(candidates),browser_fill=any(item["fill"]==rgb(fields["fill"]) for item in shapes),
@@ -28,12 +38,17 @@ def evidence(actual,architecture,mermaid,browser,kind,fields,*,override=False):
         browser_text=any(label["fill"]==rgb(fields["text"]) or label["color"]==rgb(fields["text"]) for node in candidates for label in node["labels"]),
         browser_shape=bool(shape_matches),architecture_stroke=values.get("stroke"),architecture_text=values.get("text"),
         browser_geometry=bool(shapes) and all(item["width"]>0 and item["height"]>0 for item in shapes),
-        icon_visible=all(fields.get("icon", "") in node["text"] for node in candidates))
+        icon_visible=all(fields.get("icon", "") in node["text"] for node in candidates),
+        preview_resource_count=len(cards),preview_style=preview_style_matches(browser,architecture,kind),
+        preview_geometry=bool(cards) and all(native_geometry(card) for card in cards),
+        preview_icon=bool(cards) and all(fields.get("icon", "") in card["text"] for card in cards),
+        preview_errors=browser.get("preview",{}).get("errors"),preview_network=browser.get("preview",{}).get("network"))
     origin = "plugin_declaration" if kind == "plugin" else kind
     return {"architecture_shape":shape,"architecture_fill":fields["fill"],"presentation_origin":"call" if override else origin,
         "mermaid_shape":True,"browser_resource_count":1,"browser_fill":True,"browser_stroke":True,"browser_text":True,
         "browser_shape":True,"architecture_stroke":fields["stroke"],"architecture_text":fields["text"],
-        "browser_geometry":True,"icon_visible":True,"browser_exit_code":0,"mermaid_exit_code":0}
+        "browser_geometry":True,"icon_visible":True,"browser_exit_code":0,"mermaid_exit_code":0,
+        "preview_resource_count":1,"preview_style":True,"preview_geometry":True,"preview_icon":True,"preview_errors":[],"preview_network":[]}
 
 
 def run_cases(work,toolchain,*,kinds=KINDS,include_extra=True):

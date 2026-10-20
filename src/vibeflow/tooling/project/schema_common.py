@@ -122,12 +122,6 @@ def _validate_requirement_list(value: Any, object_id: str, findings: list[Health
             findings.append(_error(rule_id, f"{object_id} contains duplicate requirement type: {data_type}", item_id))
         seen.add(data_type)
 
-def _provider_keys(value: Any) -> set[str]:
-    if not isinstance(value, list):
-        return set()
-    return {str(item.get("key", "")).strip() for item in value if isinstance(item, Mapping) and _non_empty_string(item.get("key"))}
-
-
 def _validate_positive_int(
     value: Any,
     object_id: str,

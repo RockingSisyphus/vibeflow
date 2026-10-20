@@ -1,5 +1,4 @@
 """Inspect canonical Node declarations without importing their implementations."""
-from pathlib import Path
 from vibeflow.core.findings import HealthFinding, HealthReport
 from vibeflow.tooling.project.workspace_loader import load_project_workspace
 from vibeflow.tooling.application.python.project.declarations import declared_python_registry, collect_node_source_context

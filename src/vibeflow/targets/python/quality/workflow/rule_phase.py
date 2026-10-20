@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from vibeflow.core.findings import HealthFinding
-from vibeflow.core.rules import RuleContext, RuleGraphError, compile_ruleset, execute_rule_plan
+from vibeflow.core.rules import RuleGraphError, compile_ruleset, execute_rule_plan
 from vibeflow.targets.python.quality.policy_parameters import complete_source_policy_plan, native_rule_bindings, native_rule_origins, bound_python_workflow_defaults
 from vibeflow.core.descriptors.contributions import contribution_facts
 from vibeflow.targets.python.quality.project_context import project_rule_facts

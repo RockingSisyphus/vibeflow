@@ -106,7 +106,8 @@ def documents(project, *, name="diagram", screenshot=False):
     if svg.exists():
         renderer=os.environ.get("VIBEFLOW_MERMAID_RENDERER_ROOT","")
         args=["node",str(ROOT / "tests/fixtures/rule_gaps/resource_browser.mjs"),renderer,str(svg)]
-        if screenshot:args.append(str(project / "evidence" / (name + ".png")))
+        args.extend([str(project / "evidence" / (name + ".png")) if screenshot else "",
+                     str(actual["payload"].get("preview", "")), actual["payload"].get("preview_id", "")])
         process=subprocess.run(args,capture_output=True,text=True,check=False,timeout=120)
         if process.returncode==0:browser=json.loads(process.stdout)
         write(project / "evidence" / (name + "-browser.json"),{"exit_code":process.returncode,"stdout":process.stdout,"stderr":process.stderr})
@@ -130,6 +131,24 @@ def display_nodes(browser, kind):
     marker = "type_used: " + IDS[kind] if kind == "node" else "id: " + ("demo" if kind == "plugin" else IDS[kind])
     return [node for node in browser.get("nodes", ())
             if re.search(re.escape(marker) + r"(?=\s|$|rulesets:|status:|----------)", node["text"])]
+
+
+def preview_nodes(browser, architecture, kind):
+    """Use public call/resource identities, independently of labels or SVG IDs."""
+    from urllib.parse import quote
+    view = "flow" if kind == "node" else kind
+    record = display_resource(architecture, kind)
+    identity = quote(record.get("id", ""), safe="~()*!.'-") if kind == "node" else (
+        "plugin_declaration:demo" if kind == "plugin" else kind + ":" + IDS[kind])
+    return [node for node in browser.get("preview", {}).get("views", {}).get(view, ()) if node["id"] == identity]
+
+
+def preview_style_matches(browser, architecture, kind):
+    nodes = preview_nodes(browser, architecture, kind)
+    values = display_resource(architecture, kind).get("effective_presentation", {}).get("values", {})
+    return len(nodes) == 1 and all(node["shape"] == values["shape"] and
+        node["outline"]["fill"] == rgb(values["fill"]) and node["outline"]["stroke"] == rgb(values["stroke"]) and
+        bool(node["labels"]) and all(label["fill"] == rgb(values["text"]) for label in node["labels"]) for node in nodes)
 
 
 def rgb(value):

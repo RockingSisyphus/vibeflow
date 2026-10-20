@@ -4,7 +4,8 @@ import ast
 
 from vibeflow.targets.shared.rule_support.effect_records import EFFECT_POLICY_TYPE
 from vibeflow.core.rules import RuleRecord, RuleResult
-from vibeflow.targets.python.rules.node.helpers import finding, rule_effect_scope, source_info, source_policy, source_subject, violation_finding
+from vibeflow.targets.python.rules.node.helpers import finding, rule_effect_scope, source_info, source_subject, violation_finding
+from vibeflow.targets.python.quality.policy_parameters import source_policy
 from vibeflow.targets.python.rules.node.effect_visitors import ModulePurityVisitor
 
 

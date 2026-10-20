@@ -16,7 +16,7 @@ Workflow ABI 从 v6 升为 `vibeflow.workflow.v7`，AOT manifest 从 v2 升为 `
 
 ### 验证与资产
 
-功能实现冻结后的完整验收 18/18 通过：pytest 4538、Python 沙箱 104/104、JS 真实 Browser 集成 50/50、规则对照 1223/1223、补充规则 680/680、迁移回归 207/207，并覆盖 wheel 和双 profile 隔离部署。历史失败和后续复验分别保留，见[实施记录](../aot-unification-implementation.md)。本次 1.0.0 的版本、文档及正式 ZIP 部署另行复验，不把前一批次改称新全量。
+功能实现冻结后的完整验收 18/18 通过：pytest 4538、Python 沙箱 104/104、JS 真实 Browser 集成 50/50、规则对照 1223/1223、补充规则 680/680、迁移回归 207/207，并覆盖 wheel 和双 profile 隔离部署。历史失败和后续复验分别保留，见[实施记录](aot-unification-implementation.md)。本次 1.0.0 的版本、文档及正式 ZIP 部署另行复验，不把前一批次改称新全量。
 
 发布资产为 collaborative、autonomous 两种 ZIP 及 `SHA256SUMS-1.0.0.txt`。小型 CPU 探针的启动中位数约 385 → 236 ms，重复执行约 0.63 ms，未观察到重复执行收益；不是 GPU 吞吐结论。
 

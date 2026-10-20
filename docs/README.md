@@ -50,10 +50,8 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 ## 当前维护说明
 
 - [测试提效与技术债迭代](maintainers/test-and-debt-iterations.md)：逐轮诊断、覆盖删增、实际耗时及自主修复记录。
-- [展示子系统清理（2026-10-19）](maintainers/presentation-cleanup-20261019.md)：删除旧转接与死代码、收拢展示目录、统一协议和样式事实，记录回归及保留边界。
 - [综合数学沙箱说明](maintainers/comprehensive-math-sandbox.md)
 - [VibeFlow 职责边界与整改规格](maintainers/product-boundary-refactor-spec-20261009.md)：完整职责定义、11 项源码定位、当前与目标逻辑、删改停止点和实施后验收。
-- [双语言 AOT 与维护整理实施记录](maintainers/aot-unification-implementation.md)
 - [AOT 暖调用准备开销复现与方案](maintainers/aot-preparation-analysis.md)：Python 重复元数据装配与 JS 空钩子工作，含测量范围和职责建议。
 - [1.1.5 构建说明](maintainers/history/release-1.1.5.md)：Python AOT 固定资料按 Bundle 准备，运行实例保持独立。
 - [1.1.4 发布说明](maintainers/history/release-1.1.4.md)：展开 Nodeset / Loop 改用分组标题与说明。
@@ -75,6 +73,9 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - [目录清理与删除原则](maintainers/directory-cleanup-20261010.md)
 
 ## 历史审核与实施记录
+
+- [展示子系统清理（2026-10-19）](maintainers/history/presentation-cleanup-20261019.md)：删除旧转接与死代码、收拢展示目录、统一协议和样式事实，记录回归及保留边界。
+- [双语言 AOT 与维护整理实施记录](maintainers/history/aot-unification-implementation.md)
 
 - [跨 root 任务目标源码归属复现与根因](maintainers/history/task-ownership-reproduction-20261014.md)：静态回归、正式修复与原项目复验。
 - [任务结果一次交付与回收](maintainers/history/task-result-delivery-20261014.md)：0.20.0 消费语义、长期 workflow 任务卡回收与独立全量验证。

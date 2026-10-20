@@ -3,7 +3,7 @@ from dataclasses import dataclass, replace
 import inspect
 from types import MappingProxyType
 
-from vibeflow.core.descriptors.contributions import ContributionBuilder, ResourceOrigin
+from vibeflow.core.descriptors.contributions import ContributionBuilder
 from vibeflow.core.descriptors.models import RuleImplementationDescriptor, SourceLocator
 
 

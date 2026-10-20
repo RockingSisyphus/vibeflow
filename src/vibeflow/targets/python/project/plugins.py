@@ -6,7 +6,7 @@ modules; those operations remain in the outer loading layer.
 """
 
 from __future__ import annotations
-from vibeflow.core.rules.selection import selection_refs, selection_data
+from vibeflow.core.rules.selection import selection_data
 
 
 from contextlib import contextmanager

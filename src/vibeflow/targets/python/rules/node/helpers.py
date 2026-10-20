@@ -2,7 +2,6 @@
 
 from vibeflow.core.findings import HealthFinding
 from vibeflow.targets.python.quality.source_analysis.types import _SourceInfo
-from vibeflow.targets.python.quality.policy_parameters import source_policy
 
 
 def rule_effect_scope(params):

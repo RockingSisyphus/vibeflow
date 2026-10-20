@@ -10,7 +10,7 @@ from typing import Any, Callable, Mapping, MutableMapping
 from vibeflow.core.findings import Finding, HealthFinding
 from vibeflow.core.rules.graph import RuleInvocation, RulePlan
 from vibeflow.core.rules.models import RuleContext, RuleRecord, RuleResult, plain, readonly
-from vibeflow.core.rules.fingerprint import cacheable_record_value as _cacheable_record_value, record_inputs_fingerprint, value_fingerprint
+from vibeflow.core.rules.fingerprint import record_inputs_fingerprint, value_fingerprint
 
 
 RuleHandler = Callable[[RuleContext, Mapping[str, RuleRecord], Mapping[str, Any]], RuleResult]

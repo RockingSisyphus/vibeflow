@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping
+from typing import Any, Mapping
 
 from vibeflow.core.findings import HealthFinding
 from vibeflow.targets.shared.quality_support.policy_data import COMMON_POLICY_DATA, merge_policy_data

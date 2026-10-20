@@ -1,7 +1,7 @@
 """Explicit, same-scope analysis and checks for the standard Workflow Ruleset."""
 from dataclasses import replace
 
-from vibeflow.core.findings import Finding, HealthFinding
+from vibeflow.core.findings import HealthFinding
 from vibeflow.core.rules import RuleRecord, RuleResult
 from vibeflow.targets.shared.rule_support.graph import _flow, _join, _nodesets, _duplicates, _planned
 

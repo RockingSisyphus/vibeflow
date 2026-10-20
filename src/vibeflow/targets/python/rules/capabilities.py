@@ -1,7 +1,6 @@
 """Explicit call grants and graph restrictions for this Target."""
 from vibeflow.core.rules import RuleDescriptor
 from vibeflow.core.workflows.policies import POLICY_TYPE
-from vibeflow.targets.shared.rule_support.capability_policy import handlers
 
 
 def policy_rule_resources():

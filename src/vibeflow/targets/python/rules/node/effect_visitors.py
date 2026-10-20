@@ -3,7 +3,6 @@ from __future__ import annotations
 import ast
 
 from vibeflow.targets.python.quality.source_analysis.ast_facts import (
-    import_aliases,
     import_aliases_from_node,
     imported_module_roots,
     import_modules,
@@ -11,7 +10,6 @@ from vibeflow.targets.python.quality.source_analysis.ast_facts import (
     qualified_reference_name,
 )
 from vibeflow.core.constants import EFFECT_SCOPE_GLOBAL_STATE, EFFECT_SCOPE_NONE
-from vibeflow.core.descriptors import NodeContractDescriptor
 from vibeflow.targets.python.rules.node.effect_policy import (
     ambient_assignment_is_forbidden,
     call_violation,
@@ -28,13 +26,10 @@ from vibeflow.targets.python.rules.node.effect_policy import (
 from vibeflow.targets.python.quality.source_analysis.ast_facts import call_name as _call_name
 from vibeflow.targets.python.rules.node.effect_policy import module_assignment_is_allowed as _module_assignment_is_allowed
 from vibeflow.targets.python.quality.source_analysis.helpers import (
-    _module_matches,
     _root_name,
     _violation,
 )
 from vibeflow.targets.python.quality.source_analysis.ast_facts import _reachable_module_helpers
-from vibeflow.targets.python.quality.source_analysis.types import PurityViolation, _SourceInfo
-from vibeflow.targets.python.rules.node.policy import PurityPolicy
 
 
 from vibeflow.targets.python.quality.source_analysis.bindings import _bound_names, _comprehension_evaluation_steps, _comprehension_outer_bindings, _function_definition_expressions, _function_scope_bindings, _FunctionBindingCollector

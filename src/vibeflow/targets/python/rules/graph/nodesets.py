@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Mapping
 
 from vibeflow.core.flow import (
-    GraphConfig,
     LOOP_NODE_TYPES,
     STATUS_PLANNED,
 )
