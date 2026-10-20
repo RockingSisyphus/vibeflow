@@ -58,16 +58,16 @@ def test_rule_jobs_share_one_bounded_pool(tmp_path, monkeypatch, workers):
     lock = Lock()
     calls = []
 
-    def observe(group, work, toolchain, renderer, family, *, workers):
+    def observe(group, work, toolchain, renderer, family, part, *, workers):
         nonlocal active, peak
         with lock:
             active += 1
             peak = max(peak, active)
-            calls.append((group, family, workers))
+            calls.append((group, family, part, workers))
         time.sleep(0.03)
         with lock:
             active -= 1
-        case_id = group + ("." + family if family else "")
+        case_id = ".".join(filter(None, (group, family, part)))
         return [{"id": case_id, "title": case_id, "family": "unit",
                  "classification": "new_feature", "expected": {"should_accept": True},
                  "actual": {"status": "PASS", "codes": []}}]
@@ -80,11 +80,11 @@ def test_rule_jobs_share_one_bounded_pool(tmp_path, monkeypatch, workers):
     result = json.loads(report.read_text())
     assert status == 0
     assert peak == min(workers, len(calls))
-    assert len(calls) == 11
-    assert len({(group, family) for group, family, _ in calls}) == 11
-    assert all(count == workers for _, _, count in calls)
+    assert len(calls) == 19
+    assert len({(group, family, part) for group, family, part, _ in calls}) == 19
+    assert all(count == workers for _, _, _, count in calls)
     assert result["workers"] == workers
-    assert result["summary"]["matched"] == 11
+    assert result["summary"]["matched"] == 19
 
 
 def test_parallel_observation_error_remains_nonzero(tmp_path, monkeypatch):
