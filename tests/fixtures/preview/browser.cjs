@@ -103,6 +103,19 @@ const puppeteer=createRequire(renderer)('puppeteer');
     async function locate(query,path=query){await page.$eval('#search',(e,p)=>e.value=p,query);await page.click('#search-form button');await page.waitForFunction(p=>document.querySelector(`[data-call-path="${p}"]`),{},path);}
     await locate('first/inner/shape_cloud');
     await page.waitForFunction(()=>document.querySelectorAll('[data-call-path^="first/inner/shape_"]').length===14);
+    // Expanded calls are groups, never a disconnected invocation card above their body.
+    const groups=await page.evaluate(()=>['first','first/inner'].map(path=>{
+      const g=document.querySelector(`[data-call-path="${path}"]`),header=g.querySelector(':scope > .group-header');
+      const box=header.getBBox(),inner=g.querySelector(':scope > svg');
+      return {card:!!g.querySelector(':scope > .node-card'),title:header.querySelector('.card-title').textContent,
+        description:[...header.querySelectorAll('.card-description')].map(e=>e.textContent).join(''),
+        clear:box.y+box.height<inner.transform.baseVal.consolidate().matrix.f,
+        boundary:!!g.querySelector(':scope > .call-boundary')};
+    }));
+    assert.deepEqual(groups.map(g=>g.card),[false,false]);
+    assert.deepEqual(groups.map(g=>g.title),['first','inner']);
+    assert.deepEqual(groups.map(g=>g.description),['真实预览测试 first','真实预览测试 inner']);
+    assert(groups.every(g=>g.clear&&g.boundary));
     const shapes=await page.$$eval('[data-call-path^="first/inner/shape_"]',es=>es.map(e=>{
       const card=e.querySelector('.node-card'),graphic=card.querySelector('.card-outline');
       return {path:e.dataset.callPath,fill:getComputedStyle(graphic).fill,shape:card.dataset.shape,bbox:card.getBBox().width};
@@ -138,11 +151,21 @@ const puppeteer=createRequire(renderer)('puppeteer');
     assert.match(await page.$eval('#scene',e=>e.getAttribute('transform')),/scale\(10\)/);
     await page.click('#plus');assert.match(await page.$eval('#scene',e=>e.getAttribute('transform')),/scale\(12.5\)/);
     await page.click('#actual');await locate('first');
+    // Locating a tall expanded group centers the whole group; fit before dragging its header.
+    await page.click('#fit');
+    const header=await page.$('[data-call-path="first"] > .group-header');const headerBounds=await header.boundingBox();
+    const beforeHeaderDrag=await page.$eval('#scene',e=>e.getAttribute('transform'));
+    const hx=headerBounds.x+headerBounds.width/2,hy=headerBounds.y+headerBounds.height/2;
+    await page.mouse.move(hx,hy);await page.mouse.down();
+    await page.mouse.move(hx+50,hy+30,{steps:6});await page.mouse.up();
+    assert.notEqual(await page.$eval('#scene',e=>e.getAttribute('transform')),beforeHeaderDrag);
     // Right-click title/container preserves its screen anchor through layout.
     const center=async()=>page.$eval('[data-call-path="first"]',e=>{const b=e.getBoundingClientRect();return [b.x+b.width/2,b.y+b.height/2];});
     const anchor=await center();
-    await page.$eval('[data-call-path="first"]',e=>e.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:700,clientY:300})));
+    await page.$eval('[data-call-path="first"] > .group-header .card-title',e=>e.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:700,clientY:300})));
     await page.click('#toggle');await wait(4);
+    assert(await page.$('[data-call-path="first"] > .node-card'));
+    assert(!await page.$('[data-call-path="first"] > .group-header'));
     const after=await center();assert(Math.abs(after[0]-anchor[0])<1&&Math.abs(after[1]-anchor[1])<1);
     await locate('second/inner/shape_diamond');
     assert.equal(await page.$$eval('[data-call-path^="first/"]',es=>es.length),0);
@@ -220,6 +243,8 @@ const puppeteer=createRequire(renderer)('puppeteer');
     await page.goto(pathToFileURL(entry).href+'#'+new URLSearchParams({snapshot:javascriptId,view:'flow'}));await page.reload();await wait(4);
     await locate('loop/inner/shape_dbl_circ');
     await page.waitForFunction(()=>document.querySelectorAll('[data-call-path^="loop/inner/shape_"]').length===14);
+    assert(await page.$('[data-call-path="loop"] > .group-header'));
+    assert(!await page.$('[data-call-path="loop"] > .node-card'));
     await page.select('#mode','original');
     await page.waitForFunction(()=>document.getElementById('empty').textContent.includes('review --with-svg'));
     // An explicitly rendered attachment may finish after facts have been cached.

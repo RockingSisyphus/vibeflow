@@ -12,13 +12,21 @@ window.VFShapes=(()=>{
     for(const character of String(text||"")){if(character==="\n"||width(line+character,size)>max){lines.push(line);line="";}if(character!=="\n")line+=character;}
     if(line)lines.push(line);return lines.length?lines:[""];
   }
+  const title=facts=>facts.role?.display_name||facts.display_name||facts.info?.display_name||facts.resource_id||facts.id;
+  function groupHeader(facts,architecture,w){
+    const max=Math.min(w-40,640),description=VFModel.nodeInfo(facts,architecture).description;
+    const rows=wrap(title(facts),max,16).map(text=>({text,kind:"title"}));
+    if(description)rows.push(...wrap(description,max,12).map(text=>({text,kind:"description"})));
+    let y=30;
+    for(const row of rows){row.y=y;y+=row.kind==="title"?23:18;}
+    return {rows,height:y+10};
+  }
   function measure(facts,types={},nodesets={}) {
     const info=VFModel.nodeInfo(facts,{node_types:types,nodesets}),external=Boolean(info.typeInfo.external||facts.external||facts.info?.external);
     const values=facts.presentation?.values||facts.effective_presentation?.values||{};
     // Earlier v2 histories used the Mermaid spelling. New facts use the public name.
     const requested=values.shape||"rect",canonical=requested==="diam"?"diamond":requested,shape=supported.has(canonical)?canonical:"rect";
-    const title=facts.role?.display_name||facts.display_name||facts.info?.display_name||facts.resource_id||facts.id;
-    const titleLines=wrap(title,260,16),typeLines=wrap(facts.type_used||facts.type_key||facts.kind||"",260,12);
+    const titleLines=wrap(title(facts),260,16),typeLines=wrap(facts.type_used||facts.type_key||facts.kind||"",260,12);
     const contract=(facts.requires??info.contract.requires??[]).length+" 输入 · "+(facts.provides??info.contract.provides??[]).length+" 输出";
     const status=info.status;
     const rows=[...titleLines.map(t=>({text:t,kind:"title"})),...typeLines.map(t=>({text:t,kind:"type"})),
@@ -82,5 +90,5 @@ window.VFShapes=(()=>{
     for(let i=0;i<32;i++){const d=(inside+outside)/2;if(context.isPointInPath(path,c.x+d*ux,c.y+d*uy))inside=d;else outside=d;}
     return {x:item.x+c.x+inside*ux,y:item.y+c.y+inside*uy};
   }
-  return {node,measure,draw,connection,width,wrap};
+  return {node,measure,draw,connection,width,wrap,groupHeader};
 })();
