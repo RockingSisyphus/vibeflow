@@ -15,7 +15,7 @@ from vibeflow.core.contracts import (
 from vibeflow.core.flow import (
     EdgeSpec, ExecutionLockSpec, GraphConfig, GraphConfigError, JOIN_POLICIES, JOIN_POLICY_SAFE_ANY, JOIN_POLICY_ALL, JOIN_POLICY_ANY_ACTIVE,
     ENTRY_MODES, ENTRY_MODE_SYNC,
-    IO_NODE_TYPE, IO_OPERATIONS, IoSpec, LOOP_NODE_TYPES, LOOP_WHILE_TYPE, LoopCarrySpec, LoopCollectSpec, LoopOutputSpec, LoopSpec, LoopStopWhenSpec,
+    LOOP_NODE_TYPES, LOOP_WHILE_TYPE, LoopCarrySpec, LoopCollectSpec, LoopOutputSpec, LoopSpec, LoopStopWhenSpec,
     NodeMetadata, NodeSimilarity, NodeSpec, NodeStyle, NodesetSpec, SIMILAR_TO_RELATIONSHIPS, STATUSES, STATUS_IMPLEMENTED, STATUS_PLANNED,
 )
 from vibeflow.core.config.edge import parse_edge as _parse_edge
@@ -61,7 +61,12 @@ def parse_graph_config_data(
         root_path=actual_root_path,
         source_path=actual_source_path,
     )
-    return replace(graph, rulesets=_parse_rulesets(config.get("rulesets"), explicit="rulesets" in config))
+    from vibeflow.core.workflows.targets import parse_targets
+    try:
+        targets = parse_targets(config.get("workflow_targets", {}))
+    except ValueError as error:
+        raise GraphConfigError(str(error), "CONFIG.WORKFLOW_TARGET.INVALID") from error
+    return replace(graph, rulesets=_parse_rulesets(config.get("rulesets"), explicit="rulesets" in config), workflow_targets=targets)
 
 
 def _parse_graph_body(
@@ -108,6 +113,12 @@ def _parse_graph_body(
     for edge in edges:
         if edge.source not in names or edge.target not in names:
             raise GraphConfigError(f"edge references unknown node: {edge.source}->{edge.target}")
+    from vibeflow.core.workflows.entries import parse_entries
+    try:
+        entries = parse_entries(raw.get("entries", {}), node_ids=names,
+            default=raw.get("default_entry", ""), field=field + ".entries")
+    except ValueError as error:
+        raise GraphConfigError(str(error), "CONFIG.ENTRY.INVALID") from error
     return GraphConfig(
         nodes=nodes,
         edges=edges,
@@ -116,6 +127,7 @@ def _parse_graph_body(
         outputs=outputs,
         max_steps=max_steps,
         entry_mode=entry_mode,
+        entries=entries, default_entry=raw.get("default_entry", ""),
         project_root=project_root,
         root_id=root_id,
         root_path=root_path,
@@ -158,7 +170,9 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         raise GraphConfigError(f"pipeline.nodes[{index}].flow_kind must be one of {sorted(FLOW_KINDS)}")
     if status == STATUS_IMPLEMENTED and flow_kind:
         raise GraphConfigError(f"pipeline.nodes[{index}].flow_kind is only allowed for planned nodes")
-    explicit_contract = status == STATUS_PLANNED or type_used in LOOP_NODE_TYPES or type_used == IO_NODE_TYPE
+    if "io" in item or type_used == "vibeflow.io":
+        raise GraphConfigError("replace native io with ordinary SDK nodes, explicit contracts and vibeflow.port Capability; add terminal boundaries", "GRAPH.IO.MIGRATION")
+    explicit_contract = status == STATUS_PLANNED or type_used in LOOP_NODE_TYPES
     if explicit_contract:
         for field_name in ("requires", "provides"):
             if field_name not in item:
@@ -181,13 +195,6 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
     from vibeflow.core.config.loop import _parse_loop_spec
 
     loop = _parse_loop_spec(item.get("loop", {}), type_used=type_used, provides=provides, field=f"pipeline.nodes[{index}].loop")
-    io = _parse_io_spec(
-        item.get("io", {}),
-        type_used=type_used,
-        requires=requires,
-        provides=provides,
-        field=f"pipeline.nodes[{index}].io",
-    )
     execution_lock = _parse_execution_lock(
         item.get("execution_lock"),
         field=f"pipeline.nodes[{index}].execution_lock",
@@ -207,7 +214,6 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
         similar_to=_parse_node_similarity(item.get("similar_to", {}), field=f"pipeline.nodes[{index}].similar_to"),
         join_policy=join_policy,
         loop=loop,
-        io=io,
         node_config_overrides=_parse_node_config_overrides(item.get("node_configs", {}), field=f"node[{node_id}].node_configs"),
         allow_config_override=_parse_bool(item.get("allow_config_override", item.get("override_child_config", False)), field=f"node[{node_id}].allow_config_override"),
         status=status,
@@ -217,53 +223,6 @@ def _parse_node(item: Any, *, index: int) -> NodeSpec:
     )
 
 
-def _parse_io_spec(
-    value: Any,
-    *,
-    type_used: str,
-    requires: tuple[DataRequirement, ...],
-    provides: tuple[DataProvider, ...],
-    field: str,
-) -> IoSpec:
-    if type_used != IO_NODE_TYPE:
-        if value not in (None, {}):
-            raise GraphConfigError(
-                f"{field} is only allowed on {IO_NODE_TYPE}"
-            )
-        return IoSpec()
-    if not isinstance(value, Mapping):
-        raise GraphConfigError(f"{field} must be an object")
-    unknown = sorted(
-        set(str(key) for key in value) - {"operation", "port"}
-    )
-    if unknown:
-        raise GraphConfigError(
-            f"{field} contains unsupported keys: {unknown}"
-        )
-    operation = str(value.get("operation", "")).strip()
-    if operation not in IO_OPERATIONS:
-        raise GraphConfigError(
-            f"{field}.operation must be receive or send"
-        )
-    port = str(value.get("port", "default")).strip()
-    if not port:
-        raise GraphConfigError(
-            f"{field}.port must be a non-empty string"
-        )
-    if operation == "receive":
-        if requires or len(provides) != 1:
-            raise GraphConfigError(
-                f"{field} receive requires zero inputs and exactly one output"
-            )
-    elif (
-        len(requires) != 1
-        or requires[0].cardinality != "exactly_one"
-        or provides
-    ):
-        raise GraphConfigError(
-            f"{field} send requires one exactly_one input and zero outputs"
-        )
-    return IoSpec(operation=operation, port=port)
 
 
 def _parse_nodesets(value: Any, *, project_root: str = "", root_id: str = "", root_path: str = "") -> dict[str, NodesetSpec]:

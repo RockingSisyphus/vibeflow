@@ -4,7 +4,7 @@
 | --- | --- |
 | 根目录 | 项目入口、许可证、构建与 Git/CI 元数据；不保存临时脚本；离线预览入口 vibeflow-preview.html、用户配置 vibeflow-preview.config.js 和历史目录 vibeflow-preview/ 是默认生成例外，已 Git ignore |
 | .github | GitHub Actions、Issue 和 Pull Request 模板 |
-| src/vibeflow | Core、BlockCompiler、Python/JavaScript Target、Target 共用支持与 Tooling 的核心源码及运行资源 |
+| src/vibeflow | Core、BlockCompiler、Python/JavaScript Target、Target 共用支持、Coordination 与 Tooling 的核心源码及运行资源 |
 | distribution | 构建器、profile 配置、提示词、项目模板、最小项目和 distribution/docs 用户文档原稿 |
 | dist | 最新正式发行目录、对应 ZIP 和校验清单 |
 | archive | 被替换的历史发行 ZIP；同版本不同构建可保存在 history 下 |

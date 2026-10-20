@@ -1845,9 +1845,9 @@ def _assert_execution_plan(case: dict[str, Any], plan) -> None:
                     f"{list(expected)!r}, got {actual!r}"
                 )
         if case.get("expected_workflow_global_state"):
-            if portable.abi_version != "vibeflow.workflow.v8":
+            if portable.abi_version != "vibeflow.workflow.v9":
                 raise AssertionError(
-                    f"expected WorkflowPlan v8, got {portable.abi_version!r}"
+                    f"expected WorkflowPlan v9, got {portable.abi_version!r}"
                 )
             if portable.contains_global_state is not True:
                 raise AssertionError("WorkflowPlan did not propagate global state")

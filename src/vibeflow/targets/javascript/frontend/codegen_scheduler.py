@@ -15,6 +15,7 @@ class SchedulerCodegenMixin:
         workflow = code.workflow
         asynchronous = workflow.entry_mode == "async"
         hook = "await invokeRuntimeHookAsync" if asynchronous else "invokeRuntimeHookSync"
+        named = self.named_workflows if code.index == 0 else {}
         incoming = {node.id: [] for node in workflow.nodes}
         for route in workflow.routes:
             if route.schedule:
@@ -25,12 +26,22 @@ class SchedulerCodegenMixin:
         lines = [f"{'async ' if asynchronous else ''}function {code.function_name}(initial, root, path) {{",
                  "  const running = new Map();", "  try {",
                  f'    {hook}(root, "beforeBlock", {{blockPath: formatBlockPath(path), path: [...path]}});',
-                 f"    const state = createStaticState({code.metadata_name}, initial, root, path);"]
+                 f"    const state = createStaticState({'root.workflow' if named else code.metadata_name}, initial, root, path);"]
         for node in workflow.nodes:
             lines.append(f"    initializeInbox(state, {js(node.id)});")
-            if node.requires and (not incoming[node.id] or any(r.source in empty_starts for r in incoming[node.id])):
+            if named and node.requires:
+                eligible = []
+                for name, selected in named.items():
+                    active = {n.id for n in selected.nodes}
+                    routes = [r for r in selected.routes if r.schedule and r.target == node.id]
+                    starts = {n.id for n in selected.nodes if n.is_terminal and n.id in selected.entries and not n.requires and not n.provides}
+                    if node.id in active and (not routes or any(r.source in starts for r in routes)):
+                        eligible.append(f"state.workflow.selected_entry === {js(name)}")
+                if eligible:
+                    lines.append(f"    if ({' || '.join(eligible)}) seedInbox(state, {js(node.id)}, {js([r.type for r in node.requires])});")
+            elif node.requires and (not incoming[node.id] or any(r.source in empty_starts for r in incoming[node.id])):
                 lines.append(f"    seedInbox(state, {js(node.id)}, {js([r.type for r in node.requires])});")
-        lines.extend([f"    const ready = {js(list(workflow.entries))};",
+        lines.extend([f"    const ready = {'[...state.workflow.entries]' if named else js(list(workflow.entries))};",
                       "    const pendingDispatches = new Map();",
                       "    const activeDispatches = new Map();",
                       "    const releaseDispatch = nodeId => {",
@@ -188,14 +199,26 @@ class SchedulerCodegenMixin:
         )
         return lines
 
-    @staticmethod
     def _availability_tests(
+        self,
         code: WorkflowCode,
         node: EmissionNode,
         incoming: list[Any],
         node_by_id: dict[str, EmissionNode],
     ) -> list[str]:
-        del code
+        if code.index == 0 and self.named_workflows:
+            alternatives = []
+            for name, selected in self.named_workflows.items():
+                active = {item.id for item in selected.nodes}
+                if node.id not in active:
+                    continue
+                tests = self._plain_availability_tests(node, [r for r in incoming if r.source in active], node_by_id)
+                alternatives.append(f"(state.workflow.selected_entry === {js(name)} && ({' && '.join(tests) or 'true'}))")
+            return ["(" + " || ".join(alternatives) + ")"] if alternatives else ["false"]
+        return self._plain_availability_tests(node, incoming, node_by_id)
+
+    @staticmethod
+    def _plain_availability_tests(node, incoming, node_by_id):
         availability: list[str] = []
         edge_tests = [
             f"state.activeEdges.has({js(edge_identity(route.source, route.target))})"

@@ -48,8 +48,8 @@ def test_source_failure_keeps_primary_and_releases_every_plugin(tmp_path, monkey
     if boundary == "compiler":
         monkeypatch.setattr(workspace_service.GraphCompiler, "compile_with_findings", fail)
     else:
-        from vibeflow.tooling.application.python import runner
-        monkeypatch.setattr(runner, "_execute_runtime", fail)
+        from vibeflow.tooling.application.python import execution
+        monkeypatch.setattr(execution, "_execute_runtime", fail)
     with pytest.raises(ValueError, match="original business failure") as captured:
         workspace_service.run_workspace_checked(config, workspace=workspace, run_root=tmp_path / "runs")
     assert released == ["second", "first"]

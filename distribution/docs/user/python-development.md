@@ -152,4 +152,4 @@ python candidate-bundle/run.py delegate-cli -- --help
 
 业务标准流与退出码使用原 delegated CLI 协议；框架诊断写入 run 日志。构建保留原静态审查的 CONCERNS 和 planned stub 开发标记，不把它们改成 PASS。`--replace` 仅替换仍归本工具所有的完整构建目录。
 
-新计划为 Workflow ABI v8，构建元数据为 `vibeflow.aot-build.v3`；共同头保存工作流、ABI、入口和文件，`target_metadata` 保存该语言的 profile、工具链与绑定定位。旧计划或 manifest 不作兼容解码，请用当前源码重新构建；已有独立 JS 产物仍可继续使用其随附运行代码。
+新计划为 Workflow ABI v9，构建元数据为 `vibeflow.aot-build.v3`；共同头保存工作流、ABI、入口和文件，`target_metadata` 保存该语言的 profile、工具链与绑定定位。旧计划或 manifest 不作兼容解码，请用当前源码重新构建；已有独立 JS 产物仍可继续使用其随附运行代码。

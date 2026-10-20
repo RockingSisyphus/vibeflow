@@ -23,7 +23,7 @@ async function runCase(workflow, test, trace = "full") {
   const nodes = events.filter(event => event.kind === "node_start");
   if (trace === "full") {
     const root = nodes.filter(event => event.blockPath === "/").map(event => event.nodeId);
-    assert(JSON.stringify(root) === JSON.stringify(["start", "receive", "offset", "prepare", "companion", "route", test.selected, "choice", "join", "loop", "finish", "send"]), "wrong root execution order", root);
+    assert(JSON.stringify(root) === JSON.stringify(["start", "receive", "offset", "prepare", "companion", "route", test.selected, "choice", "join", "loop", "finish", "send", "send_end"]), "wrong root execution order", root);
     assert(root.includes(test.selected) && !root.includes(test.selected === "square" ? "negative" : "square"), "inactive branch executed", root);
     assert(root.filter(id => id === "choice").length === 1 && root.filter(id => id === "join").length === 1, "join count differs", root);
     assert(nodes.some(event => event.nodePath === "prepare.inner.affine"), "nested path missing", nodes);

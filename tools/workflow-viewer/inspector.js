@@ -59,6 +59,11 @@ window.VFInspector=(()=>{
     }
     if(facts.loop){const part=section(parent,"Loop 规则");table(part,Object.entries(facts.loop));}
     if(facts.io){const part=section(parent,"IO 声明");table(part,Object.entries(facts.io));}
+    if(facts.preview_operations?.length){
+      const part=section(parent,"接口操作与等待行为");
+      for(const action of facts.preview_operations){const row=element("article");row.className="contract-detail";
+        row.append(element("strong",VFModel.operationLabel(action)));table(row,Object.entries(action).map(([key,value])=>[({capability:"Capability",target:"目标别名",entry:"目标入口",wait:"等待执行结束",operation:"操作"})[key]||key,value]));part.append(row);}
+    }
     if(nonempty(definition?.global_config?.values??definition?.global_config)){const part=section(parent,"Nodeset 全局配置声明");table(part,Object.entries(values(definition.global_config)));}
     if(nonempty(facts.metadata)||nonempty(type?.metadata)){const part=section(parent,"补充元数据");table(part,[["调用",facts.metadata],["类型",type?.metadata]]);}
     const rules=facts.selected_rulesets??facts.rulesets??type?.rulesets;

@@ -61,12 +61,12 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
         planned = planned_items(compilation.workflow.graph)
         if planned and not (options.allow_planned_stub and all(item.get('behavior') == 'python_stub' for item in planned)):
             raise ValueError('GRAPH.PLANNED.NODE_IN_RUN: planned nodes cannot run; implement them or enable allow_planned_stub for python_stub')
-        native_plan = bind_python_workflow(prepared,registry=environment.registry,runtime_options=options,instantiate=False)
+        native_plan = bind_python_workflow(prepared,registry=environment.registry,runtime_options=options,instantiate=False,select_entry=False)
         framework = Path(__file__).resolve().parents[3]
         roots = tuple(root for root in workspace.roots if root.project_target == 'python')
         destinations = {root.id:'project/' + root.id for root in roots}
         used = {call.type_used for block in prepared.workflow.blocks for call in block.nodes
-            if not(call.is_nodeset or call.is_loop or call.io_operation or call.status == 'planned')}
+            if not(call.is_nodeset or call.is_loop or call.status == 'planned')}
         from vibeflow.tooling.application.python.build_dependencies import implementation_packages, copy_implementation_packages
         dependency_roots, dependency_resources = implementation_packages(environment.registry, used,
             roots=tuple(root.path.resolve() for root in roots), framework=framework)
@@ -152,7 +152,12 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
         save_blocks(native_plan,prepared.workflow.entry_block)
         from vibeflow.tooling.application.python.delegate_contract import validate_delegate_cli_graph_contract
         delegate_health = validate_delegate_cli_graph_contract(compilation.workflow.graph, health)
-        data = dict(delegate_health=delegate_health.to_dict(), workflow=prepared.workflow.to_dict(),graphs=encode_snapshot(prepared.graphs,relocate=relocate),
+        from vibeflow.core.workflows.entries import project_entry
+        delegate_entries = {name: validate_delegate_cli_graph_contract(
+            project_entry(compilation.workflow.graph, compilation.compiled_graph, name)[0], health).to_dict()
+            for name in compilation.workflow.graph.entries}
+        data = dict(delegate_health=delegate_health.to_dict(), delegate_health_by_entry=delegate_entries,
+            workflow=prepared.workflow.to_dict(),graphs=encode_snapshot(prepared.graphs,relocate=relocate),
             compiled=encode_snapshot(prepared.compiled),globals=encode_snapshot(prepared.globals),overrides=encode_snapshot(prepared.overrides),
             source_roots=list(dict.fromkeys([*destinations.values(),*(destination for _,destination in dependency_roots)])),nodes=nodes,plugins=plugins,blocks=blocks,
             config_path=relative(config),runtime_options=asdict(options),health=health.to_dict())

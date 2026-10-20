@@ -15,19 +15,10 @@
       },
       {
         "id": "receive",
-        "type_used": "vibeflow.io",
+        "type_used": "addition.port_receive_0",
         "display_name": "receive",
         "description": "receive",
-        "requires": [],
-        "provides": [
-          {
-            "key": "pair",
-            "type": "addition.pair",
-            "display_name": "pair"
-          }
-        ],
-        "io": {
-          "operation": "receive",
+        "config": {
           "port": "addition.in"
         }
       },
@@ -45,19 +36,10 @@
       },
       {
         "id": "send",
-        "type_used": "vibeflow.io",
+        "type_used": "addition.port_send_1",
         "display_name": "send",
         "description": "send",
-        "requires": [
-          {
-            "type": "addition.result",
-            "cardinality": "exactly_one",
-            "display_name": "addition.result"
-          }
-        ],
-        "provides": [],
-        "io": {
-          "operation": "send",
+        "config": {
           "port": "addition.out"
         }
       },

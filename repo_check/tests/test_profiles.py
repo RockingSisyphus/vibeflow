@@ -92,6 +92,18 @@ class ProfileTests(unittest.TestCase):
         )
         self.assertIn("LAYER_DEPENDENCY", self.codes("core"))
 
+    def test_coordination_protocol_stays_below_targets_and_tooling(self) -> None:
+        self.fixture.write("src/vibeflow/coordination/server.py", "from vibeflow.targets.python.runtime import PipelineRuntime\n")
+        self.fixture.write("src/vibeflow/coordination/client.py", "from vibeflow.tooling.application import cli\n")
+        findings = run_profile(self.fixture.root, "base").findings
+        rejected = {item.subject_id for item in findings if item.code == "LAYER_DEPENDENCY"}
+        self.assertIn("vibeflow.coordination.server", rejected)
+        self.assertIn("vibeflow.coordination.client", rejected)
+
+    def test_coordination_launcher_can_dispatch_to_its_neutral_command_only(self) -> None:
+        self.fixture.write("src/vibeflow/coordination/__main__.py", "from vibeflow.tooling.application.coordination import main\n")
+        self.assertNotIn("LAYER_DEPENDENCY", self.codes("base"))
+
     def test_core_rejects_filesystem_io(self) -> None:
         self.fixture.write(
             "src/vibeflow/core/loader.py",

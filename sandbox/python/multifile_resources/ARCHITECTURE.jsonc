@@ -14,6 +14,9 @@
         "path": "workflow.jsonc"
       }
     },
+    "entries": {},
+    "default_entry": "",
+    "workflow_targets": {},
     "rulesets": [
       "vibeflow.workflow"
     ],
@@ -72,7 +75,6 @@
         "contract_source": "node_type",
         "join_policy": "safe_any",
         "loop": null,
-        "io": null,
         "invokes": null,
         "config": {
           "call": {
@@ -148,7 +150,6 @@
         "contract_source": "node_type",
         "join_policy": "safe_any",
         "loop": null,
-        "io": null,
         "invokes": null,
         "config": {
           "call": {
@@ -210,7 +211,6 @@
         "contract_source": "node_type",
         "join_policy": "safe_any",
         "loop": null,
-        "io": null,
         "invokes": null,
         "config": {
           "call": {
@@ -1776,6 +1776,7 @@
       "effect_scope": "unconstrained"
     }
   ],
+  "call_policies": {},
   "rule_selections": [
     {
       "kind": "graph",

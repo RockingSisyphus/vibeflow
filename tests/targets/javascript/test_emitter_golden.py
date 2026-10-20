@@ -114,7 +114,7 @@ def _deferred_plan() -> dict[str, object]:
 
 def _detached_plan() -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v8",
+        "abi_version": "vibeflow.workflow.v9",
         "workflow_id": "baseline.detached",
         "entry_mode": "async",
         "inputs": [],
@@ -140,23 +140,17 @@ def _port_plan() -> dict[str, object]:
         provides=[_provider("value", "port.value")],
         completion="suspend",
         capabilities=[{"id": "vibeflow.port", "operations": ["receive"]}],
-        io_operation="receive",
-        io_port="baseline.in",
-        implementation=None,
+        params={"port":"baseline.in"},
     )
-    receive["type_used"] = "vibeflow.io"
     send = _node(
         "send",
         "send",
         requires=[_requirement("port.value")],
         capabilities=[{"id": "vibeflow.port", "operations": ["send"]}],
-        io_operation="send",
-        io_port="baseline.out",
-        implementation=None,
+        params={"port":"baseline.out"},
     )
-    send["type_used"] = "vibeflow.io"
     return {
-        "abi_version": "vibeflow.workflow.v8",
+        "abi_version": "vibeflow.workflow.v9",
         "workflow_id": "baseline.port",
         "entry_mode": "async",
         "inputs": [],
@@ -216,36 +210,36 @@ def _emission_cases() -> dict[str, tuple[dict[str, object], tuple[dict, ...]]]:
 
 # These hashes intentionally freeze generated source formatting as well as its
 # semantic plan.  Update them only after reviewing an intentional ABI change.
-# Workflow ABI v8 uses only ordinary graph calls and explicit routes.
-EMISSION_GOLDENS = {'async': ('8e8f7cd8ebb8604793962158560925889a9db4c57274f239e08e87d0d6341c08',
-           '742f4b399ddd9748b718454000b36adba1063c23733c72aef5b5cd13fd22f880',
-           '555be8452240b24a1e65d2d4b56b23ffe073c6fc30652d5c8c306faf2a79e44d'),
- 'bounded_loop': ('c38b1f5c51e76d3200b780f0b84411392d5be788561e89a88396e14375a4257e',
-                  '2873b3ce54254ebee51701947852fd5bf26ff3fd5d4cd8634baf0fe3515684fc',
-                  '9c864ab89e146eb0081ca521c84b5846c84948c4c464b525c8f6e1fe34a0d875'),
- 'deferred': ('8e8f7cd8ebb8604793962158560925889a9db4c57274f239e08e87d0d6341c08',
-              '742f4b399ddd9748b718454000b36adba1063c23733c72aef5b5cd13fd22f880',
-              '555be8452240b24a1e65d2d4b56b23ffe073c6fc30652d5c8c306faf2a79e44d'),
- 'detached': ('e4e66d79920fe7cc85e8fb1b3e15da259f45b895d9413678177e38510acadf8c',
-              '931f71c1a6f98d4c06ca1d11231f68fa8e780e24c080db6488f350ab5480ec40',
-              '33bfd9c480276f0a0e02f3a87298330020efe4fed76ae91d1811784b068bc98b'),
- 'host_extension': ('0928f72316af232cbb6c0c806c9453fe15453be6cc50f98a62c08df8a81083af',
-                    '7d42f7e7aa8acf3bab7e23816bd025e45f65c766352a4f9ea564c920c58f723f',
-                    '4b62225b03fe3327ac97dbd72d1ccdfdaed5cfdc71f7076b9a54b9f4664a5518'),
- 'nested_nodeset': ('18c448e9f2bfd13ed6b791432f20f6058509519ce3c51f390fc9253948888223',
-                    '2873b3ce54254ebee51701947852fd5bf26ff3fd5d4cd8634baf0fe3515684fc',
-                    '9fccbffe7dc902cc4d1d7fbf4d746b6efc0af754bcce5333dcd43e851af216e9'),
- 'port': ('1837c7d6eedd7ff7aae2fa054dbe4ef9d1c479fa96f69adac9389b5e2c700078',
-          '3b7386483d8723d3fcac187b1ad052d370af5c763086fee71a3c47043a8f0666',
-          '886d31b738bf71b7ced69de258ae465c6c6f1288b7ad5c275e2976f0e5f7f599'),
- 'sync': ('cfc806ac80a62edba7147b52879e1cc411e8c2679f3c1a0390225be5fd06dbf7',
-          '2873b3ce54254ebee51701947852fd5bf26ff3fd5d4cd8634baf0fe3515684fc',
-          '4b62225b03fe3327ac97dbd72d1ccdfdaed5cfdc71f7076b9a54b9f4664a5518'),
- 'unbounded_loop': ('f1fb25bb0a21b8be68bde6818e1ff9ac5887ff0c21e55b5791dbafef399f9ff1',
-                    '2873b3ce54254ebee51701947852fd5bf26ff3fd5d4cd8634baf0fe3515684fc',
-                    'bdc3b5bede59c77114d7037c96be8a34b9bcad6c784ecf394b7e2fa9adc13505')}
+# Workflow ABI v9 stores named entry membership and ordinary SDK port calls.
+EMISSION_GOLDENS = {'async': ('54cc5732d8bf38f9baf7f780e3669e43ffa77c77e759728da20c042c8f06d4bb',
+           '3609d1048dbf04250b39adf6e71c4ed720902e07cf8d4227ef1afbf5cc38268a',
+           '3fc195eba930b4218d5526c1079b151afd7303197cc8036a0e712173a359d163'),
+ 'bounded_loop': ('d61b91831d9d186814ea147c6e1a9a6a45a23d21488e2ba2a4afe3b26b62c6d9',
+                  'fafd35d8aaad20a6b93f60cc07b56733dcd9c2b97d82705bbb09e911257ac0b6',
+                  '16f884b5cb019390c2edb6cf40d1e6a512fd8493ea2d83bd90090771ef6460aa'),
+ 'deferred': ('54cc5732d8bf38f9baf7f780e3669e43ffa77c77e759728da20c042c8f06d4bb',
+              '3609d1048dbf04250b39adf6e71c4ed720902e07cf8d4227ef1afbf5cc38268a',
+              '3fc195eba930b4218d5526c1079b151afd7303197cc8036a0e712173a359d163'),
+ 'detached': ('19f4d9311031ad54f06f622e5806c4963f4062bab68b17f741459cfd4ad02df2',
+              '041a9e90a3276e23b8198e37d2ceb17920af9d8b637068dd94b17fe28d5b2c6f',
+              'a262f296fbdb835048695a98dcfae53965c371365ea24f916f93985dffea035b'),
+ 'host_extension': ('bcc72aec7d0f44ca0c7c3ceea8f7d3279d833ba737373d502b7e77b782aa2e5c',
+                    '032947fd4dc0da9b3c90e312b2792fe5902b1207ce525ae9d01a10d7d4427b9b',
+                    'c8d97ac6cb6e78904e1aeeb1a1c72b0021a2f544321b3b0d7ba72a3591169710'),
+ 'nested_nodeset': ('4df1bd2377bbf7ac00968efe77387fe3c5ac71c351f92b3985a8c34d71ce43b6',
+                    'fafd35d8aaad20a6b93f60cc07b56733dcd9c2b97d82705bbb09e911257ac0b6',
+                    '3dda71b257e630d2bf56649c26835c946c3983de527f5436612249d889d98006'),
+ 'port': ('b07a8a57f0569edc0939d6352b912beae3d19cdecf0073de781b8202431d47ed',
+          '8a3aab72be9d49f43d54f10e4c5dacc92496b12315fdd9ddfb3cf8c8b2c59da4',
+          '792f0e3605dc72a7e848938a6456f73444a8b10f3e0f4d50a06c5747929e1f88'),
+ 'sync': ('0986c967595dd9e266da64fcf3ee35513fa8802f7e80012a73a2c5642da1ce4b',
+          'fafd35d8aaad20a6b93f60cc07b56733dcd9c2b97d82705bbb09e911257ac0b6',
+          'c8d97ac6cb6e78904e1aeeb1a1c72b0021a2f544321b3b0d7ba72a3591169710'),
+ 'unbounded_loop': ('7d07d8fd3c49b2a506ce6751d38157814467788aec854134a7776d29cf936c5c',
+                    'fafd35d8aaad20a6b93f60cc07b56733dcd9c2b97d82705bbb09e911257ac0b6',
+                    'fb9903f3a699c4ad071dcccb014ccae13e21d5586a0e99180a2f2539413fac73')}
 
-NORMALIZED_WORKFLOW_SHA256 = '1cda3058d78da824e62934a5db16f25a8cbd8831c368933ff3ac56d94e2e2f27'
+NORMALIZED_WORKFLOW_SHA256 = '9f750f8031aaae4d9d9564e6575617f5fd56a7f64ff65e9b474e723b38b4aaa1'
 
 def test_canonical_bound_view_payload_is_frozen() -> None:
     workflow = view_fixture(_sync_plan())
@@ -322,23 +316,9 @@ def test_representative_emission_source_declarations_and_plan_hash_are_frozen(
             "VF_ENTRY_MODE_SUSPEND_IN_SYNC",
             "sync workflow contains suspending node 'calculate'",
         ),
-        (
-            "port_missing_name",
-            lambda plan: plan["nodes"][1].update(io_port=""),
-            "VF_IO_PORT",
-            "vibeflow.io node 'receive' must declare a port",
-        ),
-        (
-            "port_bad_send_contract",
-            lambda plan: plan["nodes"][2].update(
-                provides=[_provider("unexpected", "port.value")]
-            ),
-            "VF_IO_CONTRACT",
-            "vibeflow.io send node 'send' requires one exactly_one input",
-        ),
     ],
 )
-def test_sync_completion_and_port_diagnostics_are_frozen(
+def test_sync_completion_diagnostics_are_frozen(
     case_name: str,
     mutate,
     code: str,
@@ -346,8 +326,6 @@ def test_sync_completion_and_port_diagnostics_are_frozen(
 ) -> None:
     source = {
         "sync_suspend": _async_plan,
-        "port_missing_name": _port_plan,
-        "port_bad_send_contract": _port_plan,
     }[case_name]
     plan = deepcopy(source())
     mutate(plan)
@@ -522,7 +500,7 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
         "files": sorted(manifest["files"]),
     } == {
         "format": "vibeflow.aot-build.v3",
-        "abi_version": "vibeflow.workflow.v8",
+        "abi_version": "vibeflow.workflow.v9",
         "project_target": "javascript",
         "workflow_id": "test.workflow",
         "entry_mode": "sync",

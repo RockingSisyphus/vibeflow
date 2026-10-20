@@ -203,7 +203,7 @@ def test_platform_module_failures_remain_native_when_rules_are_unselected(
         ),
         (
             "port_math.jsonc",
-            (("receive",), ("calculate",), ("send",)),
+            (("receive_start",), ("receive",), ("calculate",), ("send",), ("send_end",)),
         ),
     ),
 )

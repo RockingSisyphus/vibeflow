@@ -77,6 +77,7 @@ class CancellationSignal:
 
 class NodeRunContext:
     def __init__(self, runtime, frame):
+        self.signal = CancellationSignal()
         allowed = {}
         descriptor = runtime.registry.descriptor(frame.type_used)
         for requirement in descriptor.capabilities:
@@ -87,17 +88,21 @@ class NodeRunContext:
                     f"capability '{requirement.id}' was not supplied",
                 )
             operations = requirement.operations or tuple(supplied)
+            policy = frame.capability_policy.get("capabilities", {})
+            if requirement.id in policy:
+                operations = tuple(name for name in operations if name in policy[requirement.id])
             if any(not callable(supplied.get(operation)) for operation in operations):
                 raise NodeContractError(
                     "VF_CAPABILITY_MISSING",
                     f"capability '{requirement.id}' is missing a declared operation",
                 )
             allowed[requirement.id] = MappingProxyType(
-                {operation: supplied[operation] for operation in operations}
+                {operation: (supplied[operation].with_signal(self.signal)
+                    if callable(getattr(supplied[operation], "with_signal", None)) else supplied[operation])
+                 for operation in operations}
             )
         self.capabilities = MappingProxyType(allowed)
         self._runtime, self._frame = runtime, frame
-        self.signal = CancellationSignal()
         self._unsubscribe = runtime._signal.subscribe(self.signal.request_stop)
 
     def close(self):

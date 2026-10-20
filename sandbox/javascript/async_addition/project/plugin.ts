@@ -1,3 +1,4 @@
+import {Port0,Port1,portCapability,portSchema0,portSchema1,portSchema2,portSchema3} from "./port_nodes";
 import {definePlugin,defineNode,defineCapability,defineDataSchema,defineHostExtension} from "@vibeflow/plugin";
 import {library} from "./math.ts";
 export const boundary=defineNode({type_key:"addition.boundary",flow_kind:"terminal",rulesets:["vibeflow.process"],contract:{},run(){return {};}});
@@ -13,4 +14,4 @@ export const key=defineDataSchema({type_key:"addition.key",schema:{type:"string"
 export const pair=defineDataSchema({type_key:"addition.pair",schema:{type:"object",properties:{a:{type:"number"},b:{type:"number"}},required:["a","b"],additionalProperties:false}});
 export const request=defineDataSchema({type_key:"addition.request",schema:{type:"object",properties:{key:{type:"string"}},required:["key"],additionalProperties:false}});
 export const response=defineDataSchema({type_key:"addition.response",schema:{type:"object",properties:{value:{type:"number"}},required:["value"],additionalProperties:false}});
-export const plugin=definePlugin({id:"addition.async",resources:[boundary,read,add,unpack,storage,host,library,a,b,result,key,pair,request,response]});
+export const plugin=definePlugin({id:"addition.async",resources:[Port0, Port1, portCapability, portSchema0, portSchema1, portSchema2, portSchema3, boundary,read,add,unpack,storage,host,library,a,b,result,key,pair,request,response]});

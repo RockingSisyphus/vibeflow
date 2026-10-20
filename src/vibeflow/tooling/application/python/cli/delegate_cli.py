@@ -39,6 +39,7 @@ def add_delegate_cli_parser(subparsers, add_runtime_options: Callable[[object], 
         help="optional deterministic run id for tests or controlled runs",
     )
     parser.add_argument("--preview-root", help="override offline preview directory")
+    parser.add_argument("--entry", help="named workflow entry")
     add_runtime_options(parser)
 
 
@@ -53,14 +54,8 @@ def handle_delegate_cli(args) -> int:
         _load_workspace_for_cli,
         _runtime_options_from_args,
     )
-    from vibeflow.tooling.application.python.runner import (
-        CheckedRunError,
-        CheckedRunResult,
-        RunDirectoryExistsError,
-        _new_run_id,
-        _prepare_run_dir,
-        _write_refused_artifacts,
-    )
+    from vibeflow.tooling.application.python.execution import (CheckedRunError, CheckedRunResult, _new_run_id, _prepare_run_dir, _write_refused_artifacts)
+    from vibeflow.tooling.application.python.runner import (RunDirectoryExistsError)
 
     try:
         actual_run_id = _new_run_id() if args.run_id is None else validate_run_id(args.run_id)
@@ -113,6 +108,7 @@ def handle_delegate_cli(args) -> int:
                     delegate_cli=True,
                     _prepared_run_dir=owned_run_dir,
                     preview_root=getattr(args, "preview_root", None),
+                entry=getattr(args, "entry", None),
                 )
     except RunDirectoryExistsError:
         _minimal_stderr("run directory already exists")

@@ -47,19 +47,10 @@
       },
       {
         "id": "receive",
-        "type_used": "vibeflow.io",
+        "type_used": "math.port_receive_0",
         "display_name": "receive",
         "description": "receive",
-        "requires": [],
-        "provides": [
-          {
-            "key": "x",
-            "type": "math.x",
-            "display_name": "x"
-          }
-        ],
-        "io": {
-          "operation": "receive",
+        "config": {
           "port": "math.in"
         }
       },
@@ -200,21 +191,18 @@
       },
       {
         "id": "send",
-        "type_used": "vibeflow.io",
+        "type_used": "math.port_send_1",
         "display_name": "send",
         "description": "send",
-        "requires": [
-          {
-            "type": "math.result",
-            "cardinality": "exactly_one",
-            "display_name": "math.result"
-          }
-        ],
-        "provides": [],
-        "io": {
-          "operation": "send",
+        "config": {
           "port": "math.out"
         }
+      },
+      {
+        "id": "send_end",
+        "type_used": "math.boundary",
+        "display_name": "End",
+        "description": "Explicit end after sending a host value."
       }
     ],
     "edges": [
@@ -279,7 +267,11 @@
       {
         "from": "finish",
         "to": "send"
-      }
+      },
+      [
+        "send",
+        "send_end"
+      ]
     ],
     "outputs": [
       {

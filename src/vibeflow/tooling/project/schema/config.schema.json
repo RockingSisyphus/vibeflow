@@ -307,6 +307,45 @@
         ]
       },
       "uniqueItems": true
+    },
+    "workflow_targets": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "workflow",
+          "command"
+        ],
+        "properties": {
+          "workflow": {
+            "type": "string",
+            "minLength": 1
+          },
+          "command": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "entry": {
+            "type": "string"
+          },
+          "root": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
     }
   },
   "$defs": {
@@ -453,6 +492,37 @@
         },
         "execution_lock": {
           "$ref": "#/$defs/executionLock"
+        },
+        "entries": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "start"
+            ],
+            "properties": {
+              "start": {
+                "type": "string",
+                "minLength": 1
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/pipelineInput"
+                }
+              },
+              "outputs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/pipelineOutput"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "default_entry": {
+          "type": "string"
         }
       }
     },
@@ -522,9 +592,6 @@
           },
           "loop": {
             "$ref": "#/$defs/loopSpec"
-          },
-          "io": {
-            "$ref": "#/$defs/ioSpec"
           },
           "requires": {
             "type": "array",
@@ -639,7 +706,6 @@
               "properties": {
                 "type_used": {
                   "enum": [
-                    "vibeflow.io",
                     "vibeflow.loop.while"
                   ]
                 }
@@ -883,26 +949,6 @@
       },
       "additionalProperties": false
     },
-    "ioSpec": {
-      "type": "object",
-      "required": [
-        "operation"
-      ],
-      "properties": {
-        "operation": {
-          "enum": [
-            "receive",
-            "send"
-          ]
-        },
-        "port": {
-          "type": "string",
-          "minLength": 1,
-          "default": "default"
-        }
-      },
-      "additionalProperties": false
-    },
     "scopedConfig": {
       "type": "object",
       "properties": {
@@ -1063,9 +1109,6 @@
         "loop": {
           "$ref": "#/$defs/loopSpec"
         },
-        "io": {
-          "$ref": "#/$defs/ioSpec"
-        },
         "requires": {
           "type": "array",
           "items": {
@@ -1179,7 +1222,6 @@
             "properties": {
               "type_used": {
                 "enum": [
-                  "vibeflow.io",
                   "vibeflow.loop.while"
                 ]
               }

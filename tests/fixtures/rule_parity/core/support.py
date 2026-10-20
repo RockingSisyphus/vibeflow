@@ -78,3 +78,31 @@ def evaluate_standard_project_quality(facts, policy=None, **kwargs):
     selected = kwargs.pop("rulesets", ("vibeflow.quality.project",))
     return evaluate_project_quality(facts,policy,rulesets=selected,rules=rules,
         ruleset_catalog=rulesets,handlers=handlers,**kwargs)
+
+
+def boundary_registry(graph, registry):
+    """Bind explicit terminal contracts in current formal fact probes.
+
+    Historical baseline adapters still construct their old native boundaries;
+    this helper is called only for the current kernel. No business IO executes.
+    """
+    from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
+    class Boundary:
+        def run_pure(self, inputs, params):
+            return {}
+    pending, visited, declared = [graph], set(), set(registry.available())
+    while pending:
+        current = pending.pop()
+        if id(current) in visited:
+            continue
+        visited.add(id(current))
+        pending.extend(item.graph for item in current.nodesets.values())
+        for call in current.nodes:
+            if not (call.type_used.startswith("probe.boundary.") or call.type_used in {"probe.start", "probe.end"}) or call.type_used in declared:
+                continue
+            declared.add(call.type_used)
+            registry.register(NodeDescriptor(call.type_used, "Boundary", "Explicit fact-probe boundary.", "1.0.0", call.flow_kind or "terminal",
+                contract=NodeContractDescriptor(requires=call.requires,provides=call.provides,
+                    input_semantics={item.type:("Boundary input",) for item in call.requires},
+                    output_semantics={item.key:("Boundary output",) for item in call.provides}),rulesets=()), Boundary)
+    return registry

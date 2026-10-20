@@ -16,6 +16,7 @@ from .models import Finding, SourceLocation
 
 LAYER_MODULES = {
     "core": "vibeflow.core",
+    "coordination": "vibeflow.coordination",
     "block-compiler": "vibeflow.block_compiler",
     "target-services": "vibeflow.targets.shared",
     "python-target": "vibeflow.targets.python",
@@ -25,6 +26,7 @@ LAYER_MODULES = {
 
 LAYER_PATHS = {
     "core": Path("core"),
+    "coordination": Path("coordination"),
     "block-compiler": Path("block_compiler"),
     "target-services": Path("targets/shared"),
     "python-target": Path("targets/python"),
@@ -34,11 +36,12 @@ LAYER_PATHS = {
 
 ALLOWED_LAYERS = {
     "core": frozenset({"core"}),
+    "coordination": frozenset({"coordination", "core"}),
     "block-compiler": frozenset({"block-compiler", "core"}),
     "target-services": frozenset({"target-services", "core"}),
-    "python-target": frozenset({"python-target", "block-compiler", "core", "target-services"}),
+    "python-target": frozenset({"python-target", "block-compiler", "core", "target-services", "coordination"}),
     "javascript-target": frozenset(
-        {"javascript-target", "block-compiler", "core", "target-services"}
+        {"javascript-target", "block-compiler", "core", "target-services", "coordination"}
     ),
     "tooling": frozenset(LAYER_MODULES),
 }
@@ -486,6 +489,10 @@ def _import_findings(
     findings: list[Finding] = []
     for edge in imports:
         target = edge.target
+        # Like the root __main__, this one-line launcher delegates only to its
+        # neutral command entry. Protocol/client/service modules stay independent.
+        if module == "vibeflow.coordination.__main__" and target == "vibeflow.tooling.application.coordination":
+            continue
         destination = target_layer(target)
         message: str | None = None
         if destination is not None and destination not in ALLOWED_LAYERS[layer]:

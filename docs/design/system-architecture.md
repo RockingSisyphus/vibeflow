@@ -14,6 +14,7 @@ Tooling → targets/python ──────┐
 - **Block Compiler**：把已验证 workflow 编译为公共 `WorkflowPlan` / `BlockPlan`。
 - **Python Target**：Python 插件 SDK、按 workflow 装配的内部 NodeRegistry、直接与延迟绑定、源码服务、Rule handler、BindingPlan、Runtime 与目录 AOT。
 - **JavaScript Target**：JS/TS 插件 SDK、worker 中的声明与函数绑定、源码服务、Rule ABI、BindingPlan、AOT emitter 与工具链协议。
+- **Coordination**：本机协议、客户端、邮箱、启动握手和实例状态；不解释业务图，不建立运行组，也不托管子进程清理。Target 宿主适配接入各自执行器，命令与配置编排留在 Tooling。
 - **Tooling**：workspace 与 workflow 文件、选中插件装配、CLI、架构展示和 Target-specific Application 编排。
 
 Core 接收可移植声明、源码定位与事实；Target 持有 callable、worker 对象及工具链配置。依赖沿图中方向流动，内部 NodeRegistry 为 Python 实现绑定服务；用户资源由代码插件贡献。
@@ -34,7 +35,7 @@ Core 在拓扑分析前解析调用契约：
 
 ## 公共计划
 
-Workflow ABI 为 `vibeflow.workflow.v8`。公共计划只保存稳定 ID、可移植值、端口、路由、合流、普通图 Block、Loop、SourceRef、effect scope 与 execution-lock 事实。Target BindingPlan 保存语言实现。
+Workflow ABI 为 `vibeflow.workflow.v9`。公共计划只保存稳定 ID、可移植值、端口、路由、合流、普通图 Block、Loop、SourceRef、effect scope 与 execution-lock 事实。Target BindingPlan 保存语言实现。
 
 Python 和 JavaScript Target 使用相同 Core 语义，但分别声明可执行 feature。Target 不支持的 implemented 语义以稳定 finding 拒绝；planned 内容仍可进入架构审核。
 
@@ -85,8 +86,10 @@ Architecture JSONC 的 implementation_graph 保存当前项目的资源、源码
 
 ## 双语言计划与 AOT
 
-`core.graph_calls` 统一实际调用身份、子图、Loop、配置继承。Rule 在相同身份之上补充未调用定义的审查范围；它们不会成为执行调用。Block Compiler 生成可序列化及读取的 WorkflowPlan/BlockPlan，实际并发执行由 Target 的通用图调度器持有。ABI v8 不携带旧 async/result_key 并发字段。
+`core.graph_calls` 统一实际调用身份、子图、Loop、配置继承。Rule 在相同身份之上补充未调用定义的审查范围；它们不会成为执行调用。Block Compiler 生成可序列化及读取的 WorkflowPlan/BlockPlan，实际并发执行由 Target 的通用图调度器持有。ABI v9 不携带旧 async/result_key 并发字段。
 
 Python 将准备与装配分开：静态阶段保存共同计划及有限的原生图/编译记录，运行阶段绑定类、独立参数容器、活对象和现有 PipelineRuntime。源码与目录 bundle 共用装配函数。生成块在调用时读取追踪和 Hook 选项，不为各 profile 复制编译逻辑。无法生成块的结构保留原动态调度。
 
 Python 的文件收集、加载 API 与 CLI 属于 Tooling；框架通过包资源读取，因此源码、wheel 和 ZIP 发行采用同一构建入口。两种 Target 共用暂存、原子发布、构建结果与 v3 元数据；JS 保留 emitter、esbuild、Node/Browser runtime。加载只解析格式、ABI 和运行所需字段，不重新扫描源码或校验文件哈希。
+
+命名入口和目标的纯解析位于 `core/workflows`，入口范围与调用授权写入公共计划。授权由显式 Rule Record 折叠，不由 `flow_kind` 或外观产生；Python 上下文与 JS 生成模块执行同一有效权限。端口收发改为普通 SDK Node，执行器和计划不再保留原生 IO 分支。

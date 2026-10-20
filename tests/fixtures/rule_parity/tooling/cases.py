@@ -15,6 +15,8 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     observations = []
 
     def emit(name, data, codes=(), *, family="config.schema", classification="preserved", message=""):
+        if variant == "current" and name.startswith("system_io."):
+            codes, classification = ("GRAPH.IO.MIGRATION",), "approved_change"
         try:
             findings = collect_config_schema_findings(data)
             actual = {"status": "FAIL" if any(row.severity == "error" for row in findings) else "CONCERNS" if findings else "PASS",
@@ -104,19 +106,8 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     emit("resources.normal", {**pipeline(), "plugins": ([{"source":{"kind":"file","ref":"plugin.py"}}] if variant == "current" else ["parity.plugin"]), "host_extensions": ["parity.host"],
                              "base_lib": ({"modules": ["support.math"]} if variant == "current" else {"paths": ["support"], "modules": ["support.math"]}), "global_config": {"values": {"size": 1}}}, family="config.resources")
     io = {**NODE, "type_used": "vibeflow.io", "requires": [],
-          "provides": [{"key": "value", "type": "parity.value", "display_name": "Value"}], "io": {"operation": "receive"}}
+          "provides": [{"key":"value","type":"parity.value","display_name":"Value"}], "io":{"operation":"receive"}}
     emit("system_io.normal", pipeline(nodes=[io]), family="config.contract")
-    for field, value, code in [("requires", {}, "NODE_REQUIRES_LIST"), ("provides", [{}], "NODE_PROVIDES_LIST")]:
-        expected = ("CONFIG.SCHEMA." + code,)
-        if field == "requires":
-            expected += ("CONFIG.SCHEMA.NODE_IO_CONTRACT",)
-        emit("system_io." + field, pipeline(nodes=[{**io, field: value}]), expected, family="config.contract")
-    emit("system_io.receive_empty", pipeline(nodes=[{**io, "provides": []}]), ("CONFIG.SCHEMA.NODE_IO_CONTRACT",), family="config.contract")
-    send = {**io, "io": {"operation": "send"}, "provides": [],
-            "requires": [{"type": "parity.value", "cardinality": "exactly_one", "display_name": "Value"}]}
-    emit("system_io.send_normal", pipeline(nodes=[send]), family="config.contract")
-    emit("system_io.send_optional", pipeline(nodes=[{**send, "requires": [{**send["requires"][0], "cardinality": "optional_one"}]}]),
-         ("CONFIG.SCHEMA.NODE_IO_CONTRACT",), family="config.contract")
     planned = {**NODE, "status": "planned", "flow_kind": "process", "requires": [], "provides": []}
     emit("planned.normal", pipeline(nodes=[planned]), family="config.planned")
     emit("planned.invalid_status", changed_node(status="unfinished"), ("GRAPH.PLANNED.STATUS_INVALID",), family="config.planned")

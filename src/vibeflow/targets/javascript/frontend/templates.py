@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from importlib.resources import files
+from vibeflow.targets.javascript.resources import read_text
 
 
 def _runtime_source() -> str:
-    resource = files("vibeflow.targets.javascript.resources").joinpath(
-        "runtime_helpers.mjs"
-    )
-    return (resource.read_text(encoding="utf-8").strip() + "\n"
-            + files("vibeflow.targets.javascript.resources").joinpath("status_helpers.mjs").read_text(encoding="utf-8")
-            + "\n" + files("vibeflow.targets.javascript.resources").joinpath("execution_helpers.mjs").read_text(encoding="utf-8"))
+    names = ("runtime_helpers.mjs", "capability_helpers.mjs", "plugin_helpers.mjs",
+             "root_helpers.mjs", "status_helpers.mjs", "execution_helpers.mjs")
+    return "\n".join(read_text(name) for name in names)
+
 
 
 RUNTIME_SOURCE = _runtime_source()

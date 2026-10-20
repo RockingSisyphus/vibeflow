@@ -60,7 +60,7 @@ node javascript_project/scripts/workflow_execution_probe.mjs
 python tools/verify_project.py --full
 ```
 
-当前发行包版本为 `1.1.4`，Workflow ABI 为 `vibeflow.workflow.v8`，AOT manifest 为 `vibeflow.aot-build.v3`。两个分发包均预装根目录 HTML 入口、配置、离线资源和空历史索引，解压即可打开，无需先运行命令；运行 review 后查看对应快照。SVG 仍为可选对照，无业务配置或快照格式迁移。展开 Nodeset / Loop 时隐藏原卡片，名称与说明显示在分组顶部。完整变更见[1.1.4 发布说明](docs/maintainers/history/release-1.1.4.md)。
+当前发行包版本为 `1.1.5`，Workflow ABI 为 `vibeflow.workflow.v8`，AOT manifest 为 `vibeflow.aot-build.v3`。两个分发包均预装根目录 HTML 入口、配置、离线资源和空历史索引，解压即可打开，无需先运行命令；运行 review 后查看对应快照。SVG 仍为可选对照，无业务配置或快照格式迁移。展开 Nodeset / Loop 时隐藏原卡片，名称与说明显示在分组顶部。Python AOT 固定描述和插件绑定索引按 Bundle 复用，已有 AOT 产物需重新构建以带入修复。完整变更见[1.1.5 构建说明](docs/maintainers/history/release-1.1.5.md)。
 
 质量检查只覆盖当前实际选择的 Rule；不证明业务正确、代码安全、算法确定性或全部无副作用。有限 Python 输入写入规则独立于效果政策，详见[产品检查边界](distribution/docs/user/product-check-boundaries.md)。
 
@@ -83,3 +83,5 @@ python tools/verify_project.py --full
 | [.github](.github/DIRECTORY.md) | GitHub CI 与协作模板 |
 
 新建自行维护的子目录时同步写明职责。过时且不再使用的文件直接删除；运行产物在仓库外临时工作区使用并及时清理。详细规则见[仓库目录职责](docs/maintainers/directory-layout.md)。
+
+当前工作树另在实施未发布的[命名入口与独立 Workflow 通信](distribution/docs/user/workflow-coordination.md)：源码使用 Workflow ABI v9，旧 AOT 需重建，原生 IO 配置需迁移；既有 1.1.5 构建记录仍保留原 ABI 信息。功能的实施与验收证据见[维护记录](docs/maintainers/workflow-communication.md)。本轮不自动发布新版本。

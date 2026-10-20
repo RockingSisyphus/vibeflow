@@ -4,7 +4,7 @@ Python 和 JavaScript 的 `comprehensive_math` 是两个独立项目，分别声
 
 ## 模拟的应用
 
-应用从注入的 `vibeflow.port` 收到 x，经过两层 Nodeset、配置覆盖、条件分支、两种汇合及循环，最后向另一端口发送结果。它使用内核的 `vibeflow.io`、`vibeflow.loop.while` 和原生工作流/过程规则；业务运算由 SDK 声明的 Node 和纯 BaseLib 实现。
+应用从注入的 `vibeflow.port` 收到 x，经过两层 Nodeset、配置覆盖、条件分支、两种汇合及循环，最后向另一端口发送结果。它使用普通 SDK 端口节点、`vibeflow.loop.while` 和原生工作流/过程规则；业务运算由 SDK 声明的 Node 和纯 BaseLib 实现。
 
 公式为：
 

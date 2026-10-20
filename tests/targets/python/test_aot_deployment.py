@@ -207,19 +207,28 @@ def test_zip_installed_framework_can_build_a_standalone_bundle(tmp_path):
 
 
 @pytest.mark.parametrize('execution', ('plan','block','compiled'))
-def test_native_ports_keep_host_objects_and_target_execution_metadata(tmp_path, execution):
+def test_ordinary_ports_keep_host_objects_and_target_execution_metadata(tmp_path, execution):
     source = tmp_path/'source'
     source.mkdir()
     (source/'vibeflow_project.jsonc').write_text('{"project_target":"python"}')
     workspace = source/'vibeflow_config.jsonc'
     workspace.write_text('{"roots":[{"id":"ports","path":"."}]}')
     config = source/'workflow.jsonc'
-    config.write_text(json.dumps({'rulesets':[], 'pipeline':{'nodes':[
-        {'id':'receive','type_used':'vibeflow.io','display_name':'Receive','description':'Host receive',
-            'io':{'operation':'receive'},'requires':[],'provides':[{'key':'value','type':'value','display_name':'Value'}]},
-        {'id':'send','type_used':'vibeflow.io','display_name':'Send','description':'Host send',
-            'io':{'operation':'send'},'requires':[{'type':'value','cardinality':'exactly_one','display_name':'Value'}],'provides':[]}],
-        'edges':[['receive','send']]}}))
+    from vibeflow.core.workflows.interfaces import PORT_SCHEMA_TYPES, port_capability_descriptor
+    ports = (ROOT / "tests/fixtures/support/port_nodes.py").read_text()
+    (source / "port_nodes.py").write_text(ports.replace('"number"', '"value"').replace('"answer"', '"value"'))
+    descriptor = port_capability_descriptor({"receive", "send"}).to_dict()
+    descriptor.pop("kind")
+    plugin = "from vibeflow.targets.python.sdk import Plugin, capability, data_schema\nfrom port_nodes import Receive, Send, Boundary\n"
+    plugin += "interface=capability(**" + repr(descriptor) + ")\n"
+    plugin += "schemas=[data_schema(type_key=k,schema=v) for k,v in " + repr(PORT_SCHEMA_TYPES) + ".items()]\n"
+    plugin += "plugin=Plugin(id='ports',resources=[Receive,Send,Boundary,interface,*schemas,data_schema(type_key='value',schema={})])\n"
+    (source / "plugin.py").write_text(plugin)
+    config.write_text(json.dumps({'rulesets':[], 'plugins':[{'source':{'kind':'file','ref':'plugin.py'}}],
+        'pipeline':{'nodes':[{'id':name,'type_used':key,'display_name':name,'description':name}
+            for name,key in [('start','fixture.port.boundary'),('receive','fixture.port.receive'),
+                             ('send','fixture.port.send'),('end','fixture.port.boundary')]],
+            'edges':[['start','receive'],['receive','send'],['send','end']]}}))
     build_python_aot(PythonBuildRequest(workspace,config,tmp_path/'bundle'))
     shutil.rmtree(source)
     bundle = load_bundle(tmp_path/'bundle')
@@ -227,7 +236,7 @@ def test_native_ports_keep_host_objects_and_target_execution_metadata(tmp_path, 
     port = {'receive':lambda _: {'value':received},'send':lambda item:seen.append(item['value'])}
     bundle.run(capabilities={'vibeflow.port':port},run_root=tmp_path/'runs',runtime_options={'execution':execution})
     assert seen == [received]
-    call = bundle.workflow.blocks[0].nodes[0]
+    call = bundle.workflow.blocks[0].node("receive")
     assert (call.completion,call.executor) == ('immediate','current')
     assert str(source) not in bundle.workflow.to_json()
 

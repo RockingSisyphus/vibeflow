@@ -34,6 +34,12 @@ def collect_config_schema_findings(config: Mapping[str, Any]) -> tuple[HealthFin
         findings.append(_error("CONFIG.SCHEMA.PIPELINE_OBJECT", "pipeline must be an object", "pipeline"))
         return tuple(findings)
     _validate_pipeline(pipeline, "pipeline", findings)
+    if "workflow_targets" in config:
+        from vibeflow.core.workflows.targets import parse_targets
+        try:
+            parse_targets(config["workflow_targets"])
+        except ValueError as error:
+            findings.append(_error("CONFIG.WORKFLOW_TARGET.INVALID", str(error), "workflow_targets"))
     if "nodesets" in config:
         if config.get("__vibeflow_expanded_nodesets__") is True:
             _validate_nodesets(config["nodesets"], findings)
@@ -75,6 +81,13 @@ def _validate_pipeline(value: Mapping[str, Any], prefix: str, findings: list[Hea
             parse_pipeline_inputs(value["inputs"], field=f"{prefix}.inputs")
         except ValueError as exc:
             findings.append(_error("CONFIG.SCHEMA.PIPELINE_INPUTS", str(exc), f"{prefix}.inputs"))
+    from vibeflow.core.workflows.entries import parse_entries
+    try:
+        parse_entries(value.get("entries", {}),
+            node_ids={n.get("id") for n in value.get("nodes", []) if isinstance(n, Mapping)},
+            default=value.get("default_entry", ""), field=prefix + ".entries")
+    except (ValueError, TypeError) as error:
+        findings.append(_error("CONFIG.ENTRY.INVALID", str(error), prefix + ".entries"))
     if "execution_lock" in value:
         _validate_execution_lock(
             value["execution_lock"],

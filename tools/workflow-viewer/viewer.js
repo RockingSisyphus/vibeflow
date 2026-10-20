@@ -3,7 +3,8 @@
 (() => {
   const $ = id => document.getElementById(id);
   let records = new Map(), currentRecord = null, refreshGeneration = 0;
-  const snapshots = new Map(), states = new Map(), modes = new Map();
+  const snapshots = new Map(), states = new Map(), modes = new Map(), entries = new Map();
+  let entry="";
   const ns = "http://www.w3.org/2000/svg", elk = typeof ELK === "undefined" ? null : new ELK();
   const configured=window.VibeFlowViewerConfig;
   const dataRoot=configured?.dataRoot?new URL(configured.dataRoot,document.baseURI):null;
@@ -15,6 +16,7 @@
   const statusNames = {passed:"审查通过",reviewing:"审查中 / 未记录结束",succeeded:"成功",running:"运行中 / 未记录结束",building:"构建中 / 未记录结束",failed:"失败",preview_failed:"预览生成失败"};
   const statusText = record => (record.status==="succeeded"?(categoryNames[record.category]||"")+"成功":statusNames[record.status]||record.status)+(record.check_status==="CONCERNS"?"（有关注项）":"");
   const {drawFlow,drawResources,drawLinks}=VFViews({getData:()=>data,getMode:()=>mode,getCurrent:()=>current,
+    getEntry:()=>entry,
     getVisible:()=>visible,getEdgeFacts:()=>edgeFacts,isCurrent:token=>token===generation,elk,node,layoutBody,factsNodes,empty,showInfo,resourceUrl});
   const renderers = new Map([["flow", drawFlow], ["resources", drawResources], ["links", drawLinks]]);
   window.VibeFlowPreview = {
@@ -68,7 +70,7 @@
       records=next;history();notice();
       if(initial) {
         const hash=readHash();
-        if(hash.snapshot)await open(hash.snapshot,hash.view||"flow",hash.call);
+        if(hash.snapshot)await open(hash.snapshot,hash.view||"flow",hash.call,hash.entry);
         else if(records.size)await navigate(sortedRecords()[0].id,"flow");
       }else if(current){
         const record=records.get(current);
@@ -89,12 +91,13 @@
   function writeHash(call="") {
     const params=new URLSearchParams({snapshot:current,workflow:records.get(current)?.workflow.id||data?.workflow.id||"",view});
     if(call)params.set("call",call);
+    if(entry)params.set("entry",entry);
     const hash="#"+params.toString();if(location.hash!==hash) window.history.pushState(null,"",hash);
   }
   async function navigate(id,tab,call="") { await open(id,tab,call);if(current===id&&records.has(id))writeHash(call); }
-  async function open(id,tab="flow",call="") {
+  async function open(id,tab="flow",call="",selectedEntry=undefined) {
     const token=++generation;
-    current=id;view=tab;mode=modes.get(id)||"structured";data=null;state=null;visible=new Map();$("tabs").replaceChildren();$("scene").replaceChildren();$("dimensions").textContent="";history();empty("正在加载快照…");
+    current=id;view=tab;entry=selectedEntry??entries.get(id)??"";entries.set(id,entry);mode=modes.get(id)||"structured";data=null;state=null;visible=new Map();$("tabs").replaceChildren();$("scene").replaceChildren();$("dimensions").textContent="";history();empty("正在加载快照…");
     try {
       const record=records.get(id);
       if(!record)throw new Error("索引中没有此快照："+id);
@@ -103,7 +106,10 @@
       if(!record.views.length&&["running","building","reviewing"].includes(record.status))throw new Error("预览正在生成；稍后刷新历史。");
       if(!snapshots.has(id))await loadScript(resourceUrl("snapshots/"+encodeURIComponent(id)+"/snapshot.js"));
       if(token!==generation)return;
-      data=snapshots.get(id);if(data)data={...data,artifacts:{...data.artifacts,...record.artifacts},bodies:VFModel.bodies(data.architecture)};if(!data)throw new Error("快照未注册："+id);
+      data=snapshots.get(id);if(data)data={...data,artifacts:{...data.artifacts,...record.artifacts},bodies:VFModel.bodies(data.architecture,data.workflow_graphs,data.workflow)};if(!data)throw new Error("快照未注册："+id);
+      const named=data.architecture.workflow?.entries||{};
+      if(entry&&!named[entry]){entry="";entries.set(id,entry);}
+      $("entry").replaceChildren(new Option("全部入口",""),...Object.keys(named).map(name=>new Option(name+(name===data.architecture.workflow.default_entry?"（默认）":""),name)));$("entry").value=entry;
       $("identity").textContent=data.workflow.name+" · "+statusText(record);
       if(!data.views.some(v=>v.id===view))view=data.views[0]?.id;
       const remembered=states.has(stateKey());
@@ -119,10 +125,10 @@
       button.onclick=()=>navigate(current,item.id);return button;
     }));
   }
-  function stateKey(){return current+"|"+view+"|"+(data.views.find(v=>v.id===view)?.renderer==="flow"?mode:"single");}
+  function stateKey(){return current+"|"+view+"|"+entry+"|"+(data.views.find(v=>v.id===view)?.renderer==="flow"?mode:"single");}
   function getState() {
     const key=stateKey();
-    if(!states.has(key))states.set(key,{x:0,y:0,k:1,expanded:new Set(),selected:"",fitted:false});
+    if(!states.has(key))states.set(key,{x:0,y:0,k:1,expanded:new Set(),targets:new Map(),selected:"",fitted:false});
     return states.get(key);
   }
   function transform() {
@@ -136,6 +142,7 @@
     const descriptor=data.views.find(v=>v.id===view), renderer=renderers.get(descriptor?.renderer);
     $("legend").hidden=descriptor?.renderer!=="flow"||mode!=="structured";
     $("mode").disabled=descriptor?.renderer!=="flow";$("mode").value=descriptor?.renderer==="flow"?mode:"structured";
+    $("entry").disabled=descriptor?.renderer!=="flow"||mode!=="structured";
     $("collapse").disabled=descriptor?.renderer!=="flow"||mode!=="structured";
     try {
       if(!renderer)throw new Error("缺少此视图的渲染器："+descriptor?.renderer);
@@ -152,7 +159,7 @@
     }catch(error){if(token===generation)empty("此视图无法加载："+error.message);}
   }
   function invocationKey(facts) {return "nodeset:"+facts.invokes.target;}
-  function expandable(facts) {return VFModel.nodeInfo(facts,data.architecture).expandable&&!data.bodies[invocationKey(facts)]?.error;}
+  function expandable(facts) {return Boolean(facts.preview_expandable||VFModel.nodeInfo(facts,data.architecture).expandable);}
   function factsNodes(body) {return Array.isArray(body.facts.nodes)?body.facts.nodes:Object.values(body.facts.nodes||{});}
   function layoutBody(...args){return VFLayout.body({data,state,elk},...args);}
   function historyButton(label,root,path,call="") {
@@ -179,7 +186,14 @@
       related.append(historyButton((outgoing?"":"来源 · ")+(link.label||link.kind),outgoing?link.to_root:link.from_root,
         outgoing?link.to_workflow:link.from_workflow,outgoing?"":link.from_call_path||""));
     }
-    $("details").append(VFInspector.render(facts,data?.architecture||{},edge));
+    const item=visible.get(call),architecture=item?.architecture||data?.architecture||{};
+    if(item)for(const option of item.options||[])if(option.workflow){
+      const button=document.createElement("button");button.textContent="原地展开 "+option.label;
+      button.disabled=Boolean(option.error);button.title=option.error||"使用本次准备的目标事实";
+      button.onclick=async()=>{state.targets.set(call,option.key);state.expanded.delete(call);await toggle(call);};$("details").append(button);
+      if(option.error){const p=document.createElement("p");p.textContent=option.label+"："+option.error;$("details").append(p);}
+    }
+    $("details").append(VFInspector.render(facts,architecture,edge));
     if(relevant.length)$("details").append(related);
   }
   function selection() {
@@ -212,23 +226,30 @@
   }
   function findPath(query) {
     let best=null,score=Infinity;const lower=query.toLowerCase();
-    function visit(key,prefix="",ancestors=[]){
+    if(visible.has(query))return {path:query,choices:[]};
+    function visit(key,prefix="",ancestors=[],localPrefix=[],choices=[]){
       if(ancestors.includes(key)||!data.bodies[key])return;
-      for(const facts of factsNodes(data.bodies[key])){
+      const body=data.bodies[key];
+      for(const facts of factsNodes(body)){
         const segment=encodeURIComponent(facts.id),path=prefix?prefix+"/"+segment:segment;
+        const localPath=[...localPrefix,facts.id];
         const rank=path===query?0:facts.id===query?1:facts.type_used===query?2:
           path.toLowerCase()===lower||facts.id.toLowerCase()===lower?3:path.toLowerCase().includes(lower)?4:Infinity;
-        if(rank<score){best=path;score=rank;}
-        if(expandable(facts))visit(invocationKey(facts),path,ancestors.concat(key));
+        if(rank<score){best={path,choices};score=rank;}
+        for(const option of VFModel.childOptions(facts,body,localPath,data.bodies))if(!option.error){
+          const childPrefix=option.workflow?path+"/@workflow/"+encodeURIComponent(option.key):path;
+          visit(option.key,childPrefix,ancestors.concat(key),option.workflow?[]:localPath,[...choices,[path,option.key]]);
+        }
       }
     }
-    visit("workflow");return best;
+    visit(entry?"entry:"+encodeURIComponent(entry):"workflow");return best;
   }
   async function locate(query) {
     if(!query||!data)return;
     if(view!=="flow"){await navigate(current,"flow",query);return;}
     if(mode!=="structured"){mode="structured";modes.set(current,mode);$("mode").value=mode;state=getState();}
-    const path=findPath(query);if(!path){notice("没有找到节点："+query);return;}
+    const found=findPath(query);if(!found){notice("没有找到节点："+query);return;}
+    const {path,choices}=found;for(const [call,key] of choices)state.targets.set(call,key);
     const parts=path.split("/");for(let i=1;i<parts.length;i++)state.expanded.add(parts.slice(0,i).join("/"));
     if(!await draw())return;const item=visible.get(path);if(!item)return;
     const rect=$("viewport").getBoundingClientRect();state.x=rect.width/2-(item.x+item.width/2)*state.k;state.y=rect.height/2-(item.y+item.height/2)*state.k;
@@ -254,6 +275,7 @@
     pointer=null;$("viewport").classList.remove("dragging");
   });
   $("viewport").addEventListener("pointercancel",()=>{pointer=null;$("viewport").classList.remove("dragging");});
+  $("viewport").addEventListener("dblclick",event=>{const path=event.target.closest("[data-call-path]")?.dataset.callPath;if(path&&visible.get(path)?.options?.some(o=>o.workflow&&!o.error))toggle(path);});
   $("viewport").addEventListener("wheel",event=>{event.preventDefault();if(!state)return;const rect=$("viewport").getBoundingClientRect();zoom(state.k*Math.exp(-event.deltaY*.0015),event.clientX-rect.left,event.clientY-rect.top);},{passive:false});
   $("viewport").addEventListener("contextmenu",event=>{
     event.preventDefault();contextPath=event.target.closest("[data-call-path]")?.dataset.callPath;
@@ -272,6 +294,7 @@
   $("actual").onclick=()=>zoom(1);$("fit").onclick=fit;
   $("collapse").onclick=()=>{state.expanded.clear();draw();};
   $("search-form").onsubmit=event=>{event.preventDefault();locate($("search").value.trim());};
-  window.addEventListener("popstate",()=>{const h=readHash();if(h.snapshot)open(h.snapshot,h.view,h.call);});
+  $("entry").onchange=()=>{entry=$("entry").value;entries.set(current,entry);writeHash();draw();};
+  window.addEventListener("popstate",()=>{const h=readHash();if(h.snapshot)open(h.snapshot,h.view,h.call,h.entry||"");});
   refresh(true);
 })();

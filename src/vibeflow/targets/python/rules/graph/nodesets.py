@@ -4,7 +4,6 @@ from typing import Mapping
 
 from vibeflow.core.flow import (
     GraphConfig,
-    IO_NODE_TYPE,
     LOOP_NODE_TYPES,
     STATUS_PLANNED,
 )
@@ -30,7 +29,7 @@ def _validate_node_types_in_scope(nodes, nodesets, *, registry: NodeRegistry, ow
     for node in nodes:
         if node.status == STATUS_PLANNED:
             continue
-        if node.type_used in LOOP_NODE_TYPES or node.type_used == IO_NODE_TYPE:
+        if node.type_used in LOOP_NODE_TYPES:
             continue
         if node.type_used in nodesets:
             continue

@@ -74,8 +74,6 @@ class NodeCodegenMixin:
         node_payload: Mapping[str, Any],
     ) -> str:
         name = code.execute_names[node.id]
-        if node.io_operation:
-            return self._emit_io_execute(code, node)
         if node.is_loop:
             return self._emit_loop_execute(code, node)
         if node.is_nodeset:
@@ -101,62 +99,6 @@ class NodeCodegenMixin:
             ]
         )
 
-    def _emit_io_execute(
-        self,
-        code: WorkflowCode,
-        node: EmissionNode,
-    ) -> str:
-        is_async = code.workflow.entry_mode == "async"
-        name = code.execute_names[node.id]
-        lines = [
-            f"{'async ' if is_async else ''}function {name}(inputs, state) {{",
-            "  const capability = "
-            'nodeContext('
-            f"{code.node_names[node.id]}, state"
-            ').capabilities["vibeflow.port"];',
-        ]
-        if node.io_operation == "receive":
-            await_prefix = "await " if is_async else ""
-            provider = node.provides[0]
-            lines.extend(
-                [
-                    (
-                        f"  const received = {await_prefix}"
-                        f"capability.receive({{{json.dumps('port')}: "
-                        f"{js(node.io_port)}}});"
-                    ),
-                    "  const outputs = dictionary();",
-                    (
-                        f"  setOwn(outputs, {js(provider.key)}, "
-                        "received.value);"
-                    ),
-                ]
-            )
-        else:
-            requirement = node.requires[0]
-            lines.extend(
-                [
-                    (
-                        f"  const input = inputs[{js(requirement.type)}];"
-                    ),
-                    (
-                        f"  capability.send({{{json.dumps('port')}: "
-                        f"{js(node.io_port)}, {json.dumps('value')}: "
-                        "valueFromEnvelope(input)});"
-                    ),
-                    "  const outputs = dictionary();",
-                ]
-            )
-        lines.extend(
-            [
-                (
-                    f"  return validateNodeOutputs("
-                    f"{code.node_names[node.id]}, outputs, state);"
-                ),
-                "}",
-            ]
-        )
-        return "\n".join(lines)
 
     def _emit_nodeset_execute(
         self,

@@ -1,4 +1,5 @@
 """Native Python bindings contributed by the standard plugin."""
+from vibeflow.targets.python.rules.capabilities import handlers as capability_handlers
 
 def python_rule_bindings():
     from vibeflow.targets.python.rules.node.effects import no_side_effects
@@ -16,7 +17,7 @@ def python_rule_bindings():
     from vibeflow.targets.python.quality.policy_parameters import source_policy_consumer
     source_implementations = {key:source_policy_consumer(value) for key,value in source_implementation_handlers(analysis).items()}
     return {
-        **source_implementations, **project_quality_handlers(), **workflow_topic_handlers(), **workflow_plan_handlers(),
+        **capability_handlers(), **source_implementations, **project_quality_handlers(), **workflow_topic_handlers(), **workflow_plan_handlers(),
         "vibeflow.workflow.review": workflow_review,
         "vibeflow.no_side_effects": source_policy_consumer(no_side_effects, sections=("imports",), effect_defaults=True),
         "vibeflow.import_side_effects": source_policy_consumer(import_side_effects, sections=("imports",)),

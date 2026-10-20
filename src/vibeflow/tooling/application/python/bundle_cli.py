@@ -18,6 +18,7 @@ def main(path, argv=None):
             child.add_argument('--input')
         child.add_argument('--run-root')
         child.add_argument('--run-id', type=parse_run_id_argument)
+        child.add_argument('--entry', help='named workflow entry')
         _add_runtime_options(child)
     values = list(sys.argv[1:] if argv is None else argv)
     delegated = []
@@ -26,8 +27,7 @@ def main(path, argv=None):
         values,delegated = values[:separator],values[separator + 1:]
     args = parser.parse_args(values)
     delegate = args.command == 'delegate-cli'
-    from vibeflow.tooling.application.python.runner import (
-        _new_run_id, _prepare_run_dir, _write_execution_report, _checked_run_error_payload, CheckedRunError)
+    from vibeflow.tooling.application.python.execution import (_new_run_id, _prepare_run_dir, _write_execution_report, _checked_run_error_payload, CheckedRunError)
     from vibeflow.targets.python.runtime.observation import observe_run
     from vibeflow.targets.python.runtime.console_capture import capture_process_console
     from vibeflow.tooling.project.diagnostic_sink import core_diagnostic_sink
@@ -46,7 +46,7 @@ def main(path, argv=None):
                     if not delegate and args.input:
                         initial = json.loads(Path(args.input).read_text())
                     result = bundle.run(initial,runtime_options=options,
-                        run_id=run_id,delegate_cli=delegate,_prepared_run_dir=directory)
+                        run_id=run_id,delegate_cli=delegate,_prepared_run_dir=directory,entry=args.entry)
                     if delegate:
                         from vibeflow.tooling.application.python.delegate_contract import extract_delegate_cli_exit_code
                         code,error = extract_delegate_cli_exit_code(result.context)

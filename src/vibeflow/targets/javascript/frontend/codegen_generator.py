@@ -29,24 +29,28 @@ class StaticWorkflowEmitter(
         workflow: EmissionWorkflow,
         payload: Mapping[str, Any],
         binding_expressions: Mapping[str, str],
+        named_workflows=None,
+        default_entry="",
     ) -> None:
         self.workflow = workflow
         self.payload = payload
         self.binding_expressions = binding_expressions
+        self.named_workflows = named_workflows or {}
+        self.default_entry = default_entry
         self._next_index = 0
         self._codes: list[WorkflowCode] = []
 
     def emit(self) -> str:
         root = self._register(self.workflow, self.payload)
+        roots = self.named_workflows
         constants: list[str] = []
         functions: list[str] = []
         for code in self._codes:
             constants.extend(self._emit_constants(code))
-        descriptors, requirements, schemas = self._capability_catalogs()
+        descriptors, _, schemas = self._capability_catalogs()
         constants.extend(
             [
                 constant("__vfCapabilityDescriptors", descriptors),
-                constant("__vfCapabilityRequirements", requirements),
                 constant("__vfSchemaCatalog", schemas),
             ]
         )
@@ -57,17 +61,37 @@ class StaticWorkflowEmitter(
             if self.workflow.entry_mode == "sync"
             else "createStaticWorkflowAsync"
         )
-        functions.append(
-            f"const __vfInvokeWorkflow = {workflow_factory}(\n"
-            f"  {root.metadata_name},\n"
+        for index, (name, selected) in enumerate(roots.items() if roots else [("", self.workflow)]):
+            _, requirements, _ = self._capability_catalogs(self.named_workflows.get(name, self.workflow))
+            constants.append(constant(f"__vfEntryRequirements_{index}", requirements))
+            metadata_name = root.metadata_name
+            if roots:
+                metadata_name = f"__vfEntryMetadata_{index}"
+                constants.append(constant(metadata_name, {**self._workflow_metadata(selected), "selected_entry": name}))
+            functions.append(
+            f"const __vfEntryInvoke_{index} = {workflow_factory}(\n"
+            f"  {metadata_name},\n"
             "  __vfCapabilityDescriptors,\n"
-            "  __vfCapabilityRequirements,\n"
+            f"  __vfEntryRequirements_{index},\n"
             "  __vfSchemaCatalog,\n"
             "  __vfRuntimePluginDescriptors,\n"
             "  __vfRuntimePluginFactories,\n"
             f"  {root.function_name},\n"
             ");"
-        )
+            )
+        if roots:
+            from .codegen_common import js
+            functions.append("const __vfEntryInvocations = new Map([" + ",".join(
+                f"[{js(name)}, __vfEntryInvoke_{index}]" for index, name in enumerate(roots)) + "]);\n"
+                "function __vfInvokeWorkflow(inputs, options = {}) {\n"
+                f"  const name = options.entry ?? {js(self.default_entry or (next(iter(roots)) if len(roots) == 1 else None))};\n"
+                "  const invoke = __vfEntryInvocations.get(name);\n"
+                "  if (!invoke) throw new Error('select a workflow entry: ' + [...__vfEntryInvocations.keys()].join(', '));\n"
+                "  return invoke(inputs, options);\n}")
+        else:
+            functions.append("function __vfInvokeWorkflow(inputs, options = {}) {\n"
+                "  if (options.entry != null) throw new Error('unknown workflow entry: ' + options.entry);\n"
+                "  return __vfEntryInvoke_0(inputs, options);\n}")
         return "\n\n".join((*constants, *functions))
 
     def _register(
@@ -123,9 +147,9 @@ class StaticWorkflowEmitter(
         self._codes.append(code)
         return code
 
-    def _emit_constants(self, code: WorkflowCode) -> list[str]:
-        workflow = code.workflow
-        metadata = {
+    @staticmethod
+    def _workflow_metadata(workflow):
+        return {
             "kind": workflow.kind,
             "routes": [route.to_dict() for route in workflow.routes],
             "node_order": [node.id for node in workflow.nodes],
@@ -135,12 +159,15 @@ class StaticWorkflowEmitter(
             "outputs": [item.to_dict() for item in workflow.outputs],
             "max_steps": workflow.max_steps,
             "entry_mode": workflow.entry_mode,
+            "entries": list(workflow.entries),
             "schemas": {
                 key: dict(value)
                 for key, value in sorted(workflow.schemas.items())
             },
         }
-        result = [constant(code.metadata_name, metadata)]
+    def _emit_constants(self, code: WorkflowCode) -> list[str]:
+        workflow = code.workflow
+        result = [constant(code.metadata_name, self._workflow_metadata(workflow))]
         payload_nodes = code.payload.get("nodes")
         assert isinstance(payload_nodes, list)
         for node, node_payload in zip(
@@ -158,6 +185,7 @@ class StaticWorkflowEmitter(
                 "provides": [item.to_dict() for item in node.provides],
                 "params": dict(node.params),
                 "capabilities": [item.to_dict() for item in node.capabilities],
+                "capability_policy": node.capability_policy,
                 "completion": node.completion,
                 "schedule": node.schedule,
                 "executor": node.executor,
@@ -183,7 +211,7 @@ class StaticWorkflowEmitter(
         return result
 
     def _capability_catalogs(
-        self,
+        self, workflow=None,
     ) -> tuple[dict[str, Any], dict[str, list[str]], dict[str, Any]]:
         descriptors: dict[str, Any] = {}
         requirements: dict[str, set[str]] = {}
@@ -218,7 +246,7 @@ class StaticWorkflowEmitter(
                 if node.subplan is not None:
                     visit(node.subplan)
 
-        visit(self.workflow)
+        visit(workflow or self.workflow)
         return (
             {key: descriptors[key] for key in sorted(descriptors)},
             {

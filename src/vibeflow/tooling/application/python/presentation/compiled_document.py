@@ -49,6 +49,7 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph, *, resou
         "schedule_edges": [list(edge.pair) for edge in compiled.schedule_edges],
         "transfer_edges": [list(edge.pair) for edge in compiled.transfer_edges],
         "providers": dict(compiled.providers),
+        "entry_providers": {name: dict(providers) for name, providers in compiled.entry_providers.items()},
         "consumers": {key: list(values) for key, values in compiled.consumers.items()},
         "nodesets": sorted(graph.nodesets),
         "nodeset_sources": [

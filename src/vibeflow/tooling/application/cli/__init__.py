@@ -44,6 +44,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not raw_args or raw_args[0] in {"-h", "--help"}:
         return _show_root_help(raw_args)
     command = raw_args[0]
+    if command == "coordination":
+        from vibeflow.tooling.application.coordination import main as coordination_main
+        return coordination_main(raw_args[1:])
     if command == "preview":
         from vibeflow.tooling.presentation.preview.cli import main as preview_main
         return preview_main(raw_args[1:])
@@ -126,6 +129,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("export-svg", "render a workflow as SVG"),
         ("review", "review a workflow"),
         ("preview", "open or rebuild the local preview catalog"),
+        ("coordination", "serve local workflow communication or connect a host"),
         ("review-rules", "inspect a workflow's effective rule graphs"),
         ("run", "run a Python workflow"),
         ("delegate-cli", "run a delegated Python CLI workflow"),

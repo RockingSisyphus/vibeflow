@@ -33,6 +33,8 @@ window.VFShapes=(()=>{
       {text:status==="planned"?"计划 · 尚未实现":external?"外部依赖":facts.invokes?(facts.invokes.kind==="loop_body"?"Loop":"Nodeset"):facts.flow_kind||facts.kind||"资源",kind:"status"},
       {text:facts.type_used||facts.kind==="node"?contract:(facts.sources?.length?facts.sources.length+" 个来源":""),kind:"detail"}];
     if(facts.invokes)rows.push({text:info.expandable?"可右键展开内部结构":"暂无内部定义",kind:"detail"});
+    for(const action of (facts.preview_operations||[]).slice(0,3))rows.push({text:VFModel.operationLabel(action)+(action.target?" · "+action.target:""),kind:"detail"});
+    if(!facts.invokes&&facts.preview_expandable)rows.push({text:"双击或右键展开目标 workflow",kind:"detail"});
     const description=info.description;
     if(description){const brief=wrap(description,260,12);rows.splice(titleLines.length+typeLines.length,0,...brief.slice(0,2).map((t,i)=>({text:t+(i===1&&brief.length>2?"…":""),kind:"description"})));}
     if(!supported.has(canonical))rows.push({text:"未支持形状: "+requested,kind:"detail"});

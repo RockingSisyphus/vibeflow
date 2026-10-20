@@ -20,8 +20,6 @@ def validate_javascript_plan(plan: WorkflowPlan) -> None:
             _unique((item.key for item in node.provides), f"node '{node.id}' provider key")
             if (node.is_nodeset or node.is_loop) and not node.child_block:
                 raise AotPlanError(f"composite node '{node.id}' has no child block")
-            if node.type_used == "vibeflow.io":
-                _validate_io(node)
 
 
 def _supported(value: object, location: str) -> None:
@@ -67,17 +65,3 @@ def _validate_block(block: BlockPlan) -> None:
             raise AotPlanError(f"route '{route.source} -> {route.target}' is not a workflow route")
         if not route.schedule and not route.transfer:
             raise AotPlanError(f"route '{route.source} -> {route.target}' must schedule, transfer, or both")
-
-
-def _validate_io(node: object) -> None:
-    if node.io_operation not in {"receive", "send"}:
-        raise AotPlanError(f"vibeflow.io node '{node.id}' must declare receive or send", code="VF_IO_OPERATION")
-    if not node.io_port:
-        raise AotPlanError(f"vibeflow.io node '{node.id}' must declare a port", code="VF_IO_PORT")
-    if node.io_operation == "receive" and (node.requires or len(node.provides) != 1 or node.completion != "suspend"):
-        raise AotPlanError(f"vibeflow.io receive node '{node.id}' requires zero inputs, one output, and suspend completion",
-                           code="VF_IO_CONTRACT")
-    if node.io_operation == "send" and (len(node.requires) != 1 or node.requires[0].cardinality != "exactly_one"
-                                       or node.provides or node.completion != "immediate"):
-        raise AotPlanError(f"vibeflow.io send node '{node.id}' requires one exactly_one input, zero outputs, and immediate completion",
-                           code="VF_IO_CONTRACT")

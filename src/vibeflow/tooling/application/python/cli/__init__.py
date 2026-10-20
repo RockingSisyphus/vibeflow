@@ -105,6 +105,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--workspace", required=False, help="workspace vibeflow_config.jsonc path")
     run.add_argument("--policy", required=False, help="explicit kernel_policy.jsonc/governance.jsonc path")
     run.add_argument("--input", required=False, help="optional JSON object file for initial context")
+    run.add_argument("--entry", help="named workflow entry")
     run.add_argument("--preview-root", help="override offline preview directory")
     run.add_argument("--run-root", required=False, help="directory where run artifacts are created")
     run.add_argument(
@@ -262,7 +263,8 @@ from vibeflow.tooling.application.python.run_observation import observed_cli_run
 def _handle_run(args: argparse.Namespace) -> int:
     from vibeflow.targets.python.project.registry import NodeRegistry
     from vibeflow.tooling.application.python.project.declarations import default_python_registry
-    from vibeflow.tooling.application.python.runner import CheckedRunError, run_checked
+    from vibeflow.tooling.application.python.execution import (CheckedRunError)
+    from vibeflow.tooling.application.python.runner import (run_checked)
 
     try:
         initial = _load_initial_input(Path(args.input)) if args.input else {}
@@ -303,6 +305,7 @@ def _handle_run(args: argparse.Namespace) -> int:
                 runtime_options=_runtime_options_from_args(args),
                 _prepared_run_dir=getattr(args, "_prepared_run_dir", None),
                 preview_root=getattr(args, "preview_root", None),
+                entry=getattr(args, "entry", None),
             )
         else:
             result = run_checked(
@@ -315,12 +318,13 @@ def _handle_run(args: argparse.Namespace) -> int:
                 runtime_options=_runtime_options_from_args(args),
                 _prepared_run_dir=getattr(args, "_prepared_run_dir", None),
                 preview_root=getattr(args, "preview_root", None),
+                entry=getattr(args, "entry", None),
             )
     except CheckedRunError as exc:
-        from vibeflow.tooling.application.python.runner import _checked_run_error_payload
+        from vibeflow.tooling.application.python.execution import (_checked_run_error_payload)
         print_run_report(_checked_run_error_payload(exc))
         return 1
-    from vibeflow.tooling.application.python.runner import _write_execution_report
+    from vibeflow.tooling.application.python.execution import (_write_execution_report)
     print_run_report(_write_execution_report(result))
     return 0
 

@@ -1,6 +1,6 @@
 """Rules over ordinary workflow facts; no source or language access."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from inspect import unwrap
 
 from vibeflow.core.findings import Finding
@@ -13,22 +13,44 @@ class _Findings:
     warnings: list = field(default_factory=list)
 
 
+def _entry_graphs(context):
+    graph, compiled = context.require("graph"), context.require("compiled")
+    if not graph.entries:
+        yield graph, compiled, None
+    else:
+        from vibeflow.core.workflows.entries import project_entry
+        for name in graph.entries:
+            selected, routes = project_entry(graph, compiled, name)
+            yield selected, routes, name
+
+
+def _entry_findings(findings, entry):
+    return tuple(replace(item, details={**item.details, "entry": entry}) if entry is not None else item
+                 for item in findings)
+
+
 def _flow(context, inputs, params):
     from vibeflow.targets.shared.quality_support.workflow_rules.flow import _flowchart_health_facts
     from vibeflow.targets.shared.quality_support.workflow_rules.flow_data import append_data_contract_warnings
-    state = _Findings()
-    _flowchart_health_facts(context.require("graph"), context.require("compiled"), state, owner=context.facts.get("owner", "pipeline"))
-    append_data_contract_warnings(context.require("graph"), context.require("compiled"), state,
+    findings = []
+    for graph, compiled, entry in _entry_graphs(context):
+        state = _Findings()
+        _flowchart_health_facts(graph, compiled, state, owner=context.facts.get("owner", "pipeline"))
+        append_data_contract_warnings(graph, compiled, state,
                                   owner=context.facts.get("owner", "pipeline"),
                                   runtime_flow_kinds=context.facts.get("runtime_flow_kinds"))
-    return RuleResult(findings=tuple((*state.errors, *state.warnings)))
+        findings.extend(_entry_findings((*state.errors, *state.warnings), entry))
+    return RuleResult(findings=tuple(findings))
 
 
 def _join(context, inputs, params):
     from vibeflow.targets.shared.quality_support.workflow_rules.joins import append_join_policy_health
-    state = _Findings()
-    append_join_policy_health(context.require("graph"), context.require("compiled"), state, owner=context.facts.get("owner", "pipeline"))
-    return RuleResult(findings=tuple((*state.errors, *state.warnings)))
+    findings = []
+    for graph, compiled, entry in _entry_graphs(context):
+        state = _Findings()
+        append_join_policy_health(graph, compiled, state, owner=context.facts.get("owner", "pipeline"))
+        findings.extend(_entry_findings((*state.errors, *state.warnings), entry))
+    return RuleResult(findings=tuple(findings))
 
 
 def _nodesets(context, inputs, params):

@@ -19,6 +19,7 @@
 | Workflow 默认、动态选择、Nodeset 接管与 Node 调用选择 | [rule_selection](python/rule_selection/README.md) | [rule_selection](javascript/rule_selection/README.md) |
 | 多文件 Node、库、Plugin 与 Host | [multifile_resources](python/multifile_resources/README.md) | [multifile_resources](javascript/multifile_resources/README.md) |
 | 运行日志、状态与异常 | [runtime_observation](python/runtime_observation/README.md) | [runtime_observation](javascript/runtime_observation/README.md) |
+| AOT 暖调用准备开销诊断 | [aot_preparation](python/aot_preparation/README.md) | [aot_preparation](javascript/aot_preparation/README.md) |
 
 错误配置、运行异常和资源释放属于真实使用场景。内部缓存次数、AST/对象身份、历史实现对照及专门的布局回归属于 tests/fixtures，由功能测试或完整仓库验证入口执行，仍保持原覆盖。
 

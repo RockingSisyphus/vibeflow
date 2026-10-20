@@ -43,7 +43,7 @@ def checked_runtime_plugins(factory, *, config_path, effective_policy, run_dir):
     """Report a native factory failure using the checked-run error contract."""
     from pathlib import Path
     from vibeflow.tooling.application.python.reports import _workspace_error_report
-    from vibeflow.tooling.application.python.runner import CheckedRunError, CheckedRunResult, _write_refused_artifacts
+    from vibeflow.tooling.application.python.execution import (CheckedRunError, CheckedRunResult, _write_refused_artifacts)
     try:
         return factory()
     except Exception as error:

@@ -7,12 +7,14 @@ from dataclasses import fields, is_dataclass
 from collections.abc import Mapping
 
 from vibeflow.core import flow, contracts, planned, compiler
+from vibeflow.core.workflows import entries
+from vibeflow.core.workflows import targets
 from vibeflow.core.rules import models as rule_models
 from vibeflow.core.rules.selection import models as selection_models
 
 
 _RECORDS = {value.__module__ + '.' + value.__name__: value
-    for module in (flow, contracts, planned, compiler, rule_models, selection_models)
+    for module in (flow, contracts, planned, compiler, rule_models, selection_models, entries, targets)
     for value in vars(module).values() if isinstance(value, type) and is_dataclass(value)}
 
 

@@ -58,3 +58,36 @@ jobs:
             ${{ runner.temp }}/verification.log
             ${{ runner.temp }}/verification/*.json
           if-no-files-found: ignore
+
+  workflow-host-windows:
+    runs-on: windows-latest
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Install test environment
+        shell: pwsh
+        run: |
+          python -c "import subprocess,sys,tomllib; dependencies=tomllib.load(open('pyproject.toml','rb'))['project']['optional-dependencies']['test']; subprocess.check_call([sys.executable,'-m','pip','install',*dependencies])"
+      - name: Verify Windows workflow hosts and named entries
+        shell: pwsh
+        env:
+          TMPDIR: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+          TEMP: ${{ runner.temp }}
+        run: |
+          python tools/run_tests.py --workers 4 --scratch "$env:RUNNER_TEMP/workflow-hosts" -- tests/coordination tests/targets/python/test_workflow_entries.py tests/targets/javascript/test_workflow_entries.py 2>&1 | Tee-Object "$env:RUNNER_TEMP/workflow-hosts.log"
+          exit $LASTEXITCODE
+      - name: Preserve workflow host results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: workflow-hosts-windows
+          path: ${{ runner.temp }}/workflow-hosts.log
+          if-no-files-found: ignore
