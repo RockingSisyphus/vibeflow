@@ -97,3 +97,14 @@ def test_concurrent_calls_keep_node_instances_and_parameter_overrides_separate(t
             runtime_options={'execution': 'compiled'}).run({}).get('result')['value']
     with ThreadPoolExecutor(max_workers=4) as workers:
         assert list(workers.map(invoke, range(4))) == list(range(4))
+
+
+def test_preparation_probe_builds_a_current_abi_sample(tmp_path):
+    from pathlib import Path
+    from runpy import run_path
+    from vibeflow.block_compiler import WORKFLOW_ABI_VERSION
+    probe = run_path(str(Path(__file__).resolve().parents[3] / "sandbox/python/aot_preparation/run_probe.py"))
+    report = probe["run"](tmp_path, 2, 2)
+    assert report["abi"] == WORKFLOW_ABI_VERSION
+    assert len(report["samples"]) == 2 and report["runtime_instances_reused"] is False
+    assert not any(row["function"] in {"_descriptor", "decode_resource", "bindings"} for row in report["profile_counts"])

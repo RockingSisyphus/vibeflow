@@ -20,7 +20,7 @@ from vibeflow.block_compiler import (
 from vibeflow.targets.python.project.registry import NodeRegistry
 from tests.fixtures.support.declarations import native_registry
 from vibeflow.targets.python.runtime.planning import build_execution_plan
-from vibeflow.targets.python.runtime.support.portable_adapter import build_workflow_plan
+from vibeflow.block_compiler import compile_graph_plan
 
 
 _TerminalNode_DECLARATION = NodeDescriptor(
@@ -277,7 +277,7 @@ def test_graph_adapter_normalizes_routes_and_preserves_required_inputs() -> None
     )
     compiled = GraphCompiler().compile(graph)
 
-    plan = build_workflow_plan(
+    plan = compile_graph_plan(
         graph,
         compiled,
         params_by_path={("route",): {"configured": True}},
@@ -321,7 +321,7 @@ def test_adapter_rejects_non_json_python_values_in_effective_params() -> None:
     compiled = GraphCompiler().compile(graph)
 
     with pytest.raises(PortablePlanError, match="non-portable value of type PosixPath"):
-        build_workflow_plan(graph, compiled)
+        compile_graph_plan(graph, compiled)
 
 
 def _contains_python_binding(value: object) -> bool:

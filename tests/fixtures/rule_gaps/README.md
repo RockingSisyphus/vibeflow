@@ -1,6 +1,6 @@
 # 第二轮 Rule、Node 与插件接口补测
 
-独立组默认最多并发 8 个 worker，使用 `--workers N` 或 `VIBEFLOW_TEST_WORKERS=N` 调整，命令行优先。资源子组与其他接口组使用同一个调度队列；同一夹具的修改、验证、恢复保持顺序。`--workers 1` 可串行重跑。
+独立组默认最多并发 12 个 worker，使用 `--workers N` 或 `VIBEFLOW_TEST_WORKERS=N` 调整，命令行优先。资源子组与其他接口组使用同一个调度队列；同一夹具的修改、验证、恢复保持顺序。`--workers 1` 可串行重跑。
 
 这组测试将 [第二轮审计](../../../docs/design/history/baseline-rule-coverage-second-audit.md) 的临时探针变为可重复验收，并补齐正常组合。它检查当前实现，保留 [基线对照](../rule_parity/README.md) 的案例 ID 和历史观察。当前声明按已确认的完整 Node 和通用 Rule 接口迁移，理由见 [迁移说明](../../../distribution/docs/user/rule-system-migration.md)。两组真实沙箱都已接入完整门禁。
 

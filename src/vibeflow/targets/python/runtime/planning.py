@@ -89,10 +89,6 @@ class ExecutionPlan:
     order: tuple[str, ...]
     max_steps: int
     blocks: tuple[CompiledBlock, ...] = ()
-    block_by_entry: Mapping[str, CompiledBlock] | None = None
-    compiled_blocks: tuple[CompiledBlock, ...] = ()
-    compiled_block_by_entry: Mapping[str, CompiledBlock] | None = None
-    compiled_node_to_block: Mapping[str, CompiledBlock] | None = None
     workflow_plan: object | None = None
     python_bindings: PythonBindingPlan = field(default_factory=lambda: PythonBindingPlan(block_id="block:/"))
     contains_global_state: bool = False
@@ -101,8 +97,6 @@ class ExecutionPlan:
     def frame(self, name: str) -> NodeFrame:
         return self.frames[name]
 
-    def block_for(self, name: str) -> CompiledBlock | None:
-        return (self.compiled_block_by_entry or self.block_by_entry or {}).get(name)
 
     @property
     def binding_plan(self) -> PythonBindingPlan:

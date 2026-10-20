@@ -29,17 +29,17 @@ python tools/run_tests.py -- tests/core/test_result_scope.py
 python tools/run_tests.py
 ```
 
-测试调度默认最多使用 8 个 worker。以下入口都接受 `--workers`：
+测试调度默认最多使用 12 个 worker。以下入口都接受 `--workers`：
 
 ```bash
 python tools/verify_project.py --full --workers 4
 python tools/run_tests.py --workers 2 -- tests/core
-python tests/fixtures/rule_parity/run_all.py --current-only --workers 8
-python tests/fixtures/rule_gaps/run_all.py --workers 8
+python tests/fixtures/rule_parity/run_all.py --current-only --workers 12
+python tests/fixtures/rule_gaps/run_all.py --workers 12
 VIBEFLOW_TEST_WORKERS=4 python tools/verify_project.py --full
 ```
 
-优先级为命令行、`VIBEFLOW_TEST_WORKERS`、默认值 8；`--workers 1` 使用串行调度，0、负数和非整数报参数错误。该设置只控制验收调度；业务并发由各分发调用的 `config.max_concurrency` 独立控制，不存在全局业务线程池设置。
+优先级为命令行、`VIBEFLOW_TEST_WORKERS`、默认值 12；`--workers 1` 使用串行调度，0、负数和非整数报参数错误。该设置只控制验收调度；业务并发由各分发调用的 `config.max_concurrency` 独立控制，不存在全局业务线程池设置。
 
 pytest 使用独立进程，并按文件分组；同一文件内的测试按顺序执行。每个 worker 有自己的工作目录和临时资料。沙箱使用线程池调度隔离子进程；接口组及资源的六个子组进入同一个队列，避免嵌套线程池叠加并发数。组内的修改、验证、恢复步骤保持顺序；完整验收各阶段及共享一套产物的旧集成场景也保留原先顺序。
 

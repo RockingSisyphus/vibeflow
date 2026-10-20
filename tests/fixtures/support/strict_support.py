@@ -28,7 +28,8 @@ from vibeflow.targets.python.runtime.planning import (
     NodeFrame,
     build_execution_plan,
 )
-from vibeflow.tooling.application.python.runner import CheckedRunError, run_checked
+from vibeflow.tooling.application.python.execution import CheckedRunError
+from vibeflow.tooling.application.python.runner import run_checked
 from vibeflow.tooling.application.python.presentation.ascii_flowchart import export_ascii_flowchart
 from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid
 from vibeflow.tooling.presentation.mermaid import (

@@ -7,6 +7,7 @@
 ```text
 Tooling → targets/python ──────┐
         → targets/javascript ─┴→ Block Compiler → Core
+        → coordination ────────────────────────→ Core
 ```
 
 - **Core**：语言无关模型、契约、有效图、图算法、finding，以及 Rule/Ruleset 的选择、组合、参数覆盖、类型化资料和执行计划；不定义具体内置规则或质量判断。
@@ -93,3 +94,9 @@ Python 将准备与装配分开：静态阶段保存共同计划及有限的原�
 Python 的文件收集、加载 API 与 CLI 属于 Tooling；框架通过包资源读取，因此源码、wheel 和 ZIP 发行采用同一构建入口。两种 Target 共用暂存、原子发布、构建结果与 v3 元数据；JS 保留 emitter、esbuild、Node/Browser runtime。加载只解析格式、ABI 和运行所需字段，不重新扫描源码或校验文件哈希。
 
 命名入口和目标的纯解析位于 `core/workflows`，入口范围与调用授权写入公共计划。授权由显式 Rule Record 折叠，不由 `flow_kind` 或外观产生；Python 上下文与 JS 生成模块执行同一有效权限。端口收发改为普通 SDK Node，执行器和计划不再保留原生 IO 分支。
+
+## 展示产物边界
+
+`tooling/application/presentation_targets.py` 负责工作区定位及当次目标事实准备，跨 Target 通过命令边界加载；它不属于快照存储模块。各 Target 适配器提供架构事实，`tooling/presentation/preview/` 只负责格式、索引和快照写入。数据发布与网页安装分开，默认路径不调用 Mermaid。
+
+独立 HTML 唯一维护源在 `tools/workflow-viewer/`，只消费公开 v2 数据及配置；本地根入口是安装产物。JavaScript 的通信客户端与宿主源码集中在 `targets/javascript/resources/coordination/`，发行时仍交付原公开模块路径。

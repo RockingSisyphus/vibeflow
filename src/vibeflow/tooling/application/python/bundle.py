@@ -187,7 +187,8 @@ class PythonBundle:
 
     def run(self, initial=None, *, runtime_options=None, capabilities=None, run_root=None, run_id=None,
             delegate_cli=False, node_config_overrides=None, global_config=None, _prepared_run_dir=None, entry=None, signal=None):
-        from vibeflow.tooling.application.python.execution import (CheckedRunResult, _new_run_id, _prepare_run_dir, _write_json, _summarize_run_result, _ensure_trace_files)
+        from vibeflow.tooling.application.python.run_directory import prepare_run_dir as _prepare_run_dir
+        from vibeflow.tooling.application.python.execution import (CheckedRunResult, _new_run_id, _write_json, _summarize_run_result, _ensure_trace_files)
         from vibeflow.targets.python.runtime.observation import observe_run
         actual_id = _new_run_id() if run_id is None else run_id
         directory = _prepared_run_dir or _prepare_run_dir(run_root, actual_id)

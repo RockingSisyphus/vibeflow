@@ -100,7 +100,7 @@ def test_instances_exchange_messages_and_kill_confirms_actual_workflow_end(tmp_p
         else:
             command += ["--config", str(config), "--workspace", str(workspace.path)]
     else:
-        command = ["node", str(resources / "workflow_node.mjs"), str(node_module(tmp_path))]
+        command = ["node", str(resources / "coordination" / "workflow_node.mjs"), str(node_module(tmp_path))]
     with WorkflowServer(targets={"peer": {"command": command, "cwd": str(tmp_path)}}) as server:
         caller = WorkflowClient(server.url)
         instances = []
@@ -155,11 +155,11 @@ def test_ordinary_workflow_node_calls_other_target_sends_receives_and_waits(tmp_
             return command + ["--bundle", str(built.out_dir)]
         return command + ["--workspace", str(workspace.path), "--config", str(config)]
     if caller_target == "node":
-        commands = {"caller": ["node", str(resources / "workflow_node.mjs"), str(node_module(caller_root, caller=True))],
+        commands = {"caller": ["node", str(resources / "coordination" / "workflow_node.mjs"), str(node_module(caller_root, caller=True))],
                     "peer": python_command(peer_root, aot=True)}
     else:
         commands = {"caller": python_command(caller_root, caller=True, aot=caller_target.endswith("aot")),
-                    "peer": ["node", str(resources / "workflow_node.mjs"), str(node_module(peer_root))]}
+                    "peer": ["node", str(resources / "coordination" / "workflow_node.mjs"), str(node_module(peer_root))]}
     with WorkflowServer(targets={key: {"command": command, "cwd": str(tmp_path)} for key, command in commands.items()}) as server:
         client = WorkflowClient(server.url)
         try:
@@ -177,7 +177,7 @@ def test_ordinary_workflow_node_calls_other_target_sends_receives_and_waits(tmp_
 
 def test_launcher_and_caller_exit_do_not_end_the_registered_workflow(tmp_path):
     resources = Path(__file__).resolve().parents[2] / "src/vibeflow/targets/javascript/resources"
-    command = ["node", str(resources / "workflow_node.mjs"), str(node_module(tmp_path))]
+    command = ["node", str(resources / "coordination" / "workflow_node.mjs"), str(node_module(tmp_path))]
     wrapper = tmp_path / "launch.py"
     wrapper.write_text("import subprocess\nsubprocess.Popen(" + repr(command) + ")\n")
     with WorkflowServer(targets={"peer": {"command": [sys.executable, str(wrapper)], "cwd": str(tmp_path)}}) as server:

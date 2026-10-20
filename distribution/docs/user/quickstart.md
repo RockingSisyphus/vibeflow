@@ -1,10 +1,10 @@
 # 快速开始
 
-从 1.0.0 及更早版本升级到 1.1.2 的项目须先完成[并发接口迁移](graph-concurrency.md#从旧任务接口迁移)，再重新构建。旧任务管理配置和 ABI v7 产物不能直接交给当前运行器。从 1.0.1 / 1.0.2 升级无需新增业务配置迁移。默认审查交付[离线 HTML 预览](local-preview.md)；旧版预览数据须重新生成，SVG 使用 `review --with-svg` 按需生成。
+当前源码使用 **Workflow ABI v9**。从旧版本升级时，重新构建 AOT；原生 `type_used:"vibeflow.io"` / `io` 配置须迁移为普通 SDK 端口节点。命名入口、调用授权与跨 workflow 通信见[多入口与通信](workflow-coordination.md)。
 
-此前 1.1.5 本地构建修复 Python AOT 固定资料重复准备，保留了 ABI v8。当前源码新增命名入口、独立 workflow 通信和普通端口节点，使用 Workflow ABI v9；旧 AOT 须重新 build，旧原生 IO 配置须迁移。参见[多入口与通信](workflow-coordination.md)。AOT manifest v3 与预览快照 v2 保持原格式，AOT 运行不新增预览报告。
+1.0.0 及更早版本还须完成[普通图并发迁移](graph-concurrency.md#从旧任务接口迁移)。AOT manifest v3 不代表旧 Workflow ABI 兼容。预览快照 v2 保持可读；更早的图元快照需重新生成。对旧 JavaScript v2 历史重新执行 `review`，可补齐计划节点行为。更新浏览工具会保留用户配置和已有历史。
 
-从 1.1.0 升级无需迁移业务配置或 v2 快照格式。重新执行 `review` 可补齐旧 JavaScript 快照缺失的 Nodeset 计划行为；HTML 工具随命令更新，已有历史与用户数据配置保留。
+默认审查交付[离线 HTML 预览](local-preview.md)，SVG 使用 `review --with-svg` 按需生成。AOT 执行不生成预览报告。
 
 发行包包含两个最小可运行项目：`python_project` 使用 Python Runtime，`javascript_project` 使用 JavaScript/TypeScript AOT。每个项目都采用 start、输入边界、一个业务处理 Node、输出边界和 end 的结构。
 

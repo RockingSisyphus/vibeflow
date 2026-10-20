@@ -21,7 +21,7 @@ history = [v₁, v₂, v₃]
 
 ```mermaid
 flowchart LR
-  receive[原生 Port receive] --> prepare[两层 Nodeset: q]
+  start[显式 terminal] --> receive[普通 SDK Port receive] --> prepare[两层 Nodeset: q]
   receive --> companion[BaseLib: c]
   prepare --> route{q ≥ 0?}
   route -->|是| square[q² / 自定义 Rule]
@@ -33,7 +33,7 @@ flowchart LR
   join --> loop[原生 while / carry / collect]
   loop --> finish[2v + offset]
   offset[可选输入] --> finish
-  finish --> send[原生 Port send]
+  finish --> send[普通 SDK Port send] --> end[显式 terminal]
 ```
 
 Node 的 gain=2、shift=1、amount=1 默认值被 config 的 `inner.affine` 和 `subtract` 覆盖为 3、2、3。期望值预先写死，不通过再次调用业务公式算出，避免两边犯同一个错误仍通过。特别加入 x=-1：此时 q=0，能发现把 `≥` 错写为 `>` 的错误。
@@ -58,7 +58,7 @@ Node 的 gain=2、shift=1、amount=1 默认值被 config 的 `inner.affine` 和 
 | 正反源码对照 | 只在临时项目的 square 实现中增加 10 个 t，再重新检查/构建 | 两个自定义 warning 消失，原生 warning 仍存在，errors 仍为空；原案例源码不修改 |
 | 分支与汇合 | 正、负、零边界；any_active 和 all 组合 | 未选分支不执行；choice/join 各执行一次；根图执行顺序精确匹配 |
 | Nodeset 与循环 | 两层 Nodeset；同时携带值和计数，body 第三次返回 done | qualified 路径包含 prepare.inner.affine；step/loop_iteration 各三次，history 逐项一致 |
-| 原生 IO | 测试注入 receive/send，不连接外部网络 | 恰一次 receive(math.in) 和 send(math.out, result)，参数和值精确匹配 |
+| 普通端口 Capability | 测试注入 receive/send，不连接外部网络 | 恰一次 receive(math.in) 和 send(math.out, result)，参数和值精确匹配 |
 | 复用与并发隔离 | 连续使用同一入口；正负两组同时运行 | 不串结果、offset、history 或 trace；JS 一组 full、一组 boundary，boundary 不出现 node_start 且保留 Nodeset 边界 |
 | Python 执行与架构产物 | checked run；再以 plan/block/compiled 执行 | 三后端正负结果一致；Architecture JSONC、结构化快照和 HTML 入口存在；不安装或启动 Mermaid |
 | JS AOT 与真实浏览器 | Node/browser single-esm；浏览器实际导入执行 | 两宿主执行同一组断言、public envelope 只有声明的输出；浏览器 DOM 显示正确值 |

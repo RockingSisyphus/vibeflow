@@ -143,3 +143,69 @@ plugin=Plugin(id="contracts",resources=[Boundary,Cli,Gui,Core,*[data_schema(type
         result = bundle.run(**options) if bundle else run_workspace_checked(config,workspace=workspace,**options)
         assert result.public_outputs == {entry+"_answer":14}
         assert result.context.get("runtime.stop_reason") == "completed"
+
+
+def _partly_planned_project(root, kind):
+    from tests.targets.python.test_code_plugins import project
+    source = '''from vibeflow.targets.python.sdk import Plugin,node
+@node(type_key="boundary",flow_kind="terminal",contract={},rulesets=["vibeflow.process"])
+class Boundary:
+    def run_pure(self,inputs,params):return {}
+@node(type_key="work",contract={},rulesets=["vibeflow.process"])
+class Work:
+    def run_pure(self,inputs,params):return {}
+plugin=Plugin(id="entries",resources=[Boundary,Work])
+'''
+    workspace, config = project(root, source)
+    data = json.loads(config.read_text())
+    data["rulesets"] = ["vibeflow.workflow"]
+    nodes = [{"id": name, "type_used": node_type, "display_name": name, "description": name}
+             for name, node_type in [("a", "boundary"), ("work", "work"), ("end_a", "boundary"),
+                                     ("b", "boundary"), ("end_b", "boundary")]]
+    draft = {"id": "draft", "type_used": "draft.work", "display_name": "Draft", "description": "Future branch"}
+    if kind == "node":
+        draft.update(status="planned", flow_kind="process", requires=[], provides=[])
+    else:
+        draft["type_used"] = "draftset"
+        (root / "draftset.jsonc").write_text(json.dumps({"type_key": "draftset", "display_name": "Draft set",
+            "description": "Future body", "status": "planned", "requires": [], "provides": []}))
+        data["nodeset_imports"] = ["draftset.jsonc"]
+    data["pipeline"] = {"nodes": [*nodes, draft], "edges": [["a", "work"], ["work", "end_a"], ["b", "draft"], ["draft", "end_b"]],
+        "entries": {"ready": {"start": "a"}, "future": {"start": "b"}}, "default_entry": "ready"}
+    config.write_text(json.dumps(data))
+    return workspace, config
+
+
+@pytest.mark.parametrize("kind", ["node", "nodeset"])
+@pytest.mark.parametrize("execution", ["plan", "block", "compiled"])
+def test_unselected_planned_branch_does_not_block_runtime_or_checked_run(tmp_path, kind, execution):
+    from vibeflow.tooling.application.python.workspace_service import load_workspace_graph_for_export, run_workspace_checked
+    from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
+    workspace, config = _partly_planned_project(tmp_path, kind)
+    loaded = load_workspace_graph_for_export(config, workspace=workspace, validate_health=False)
+    graph, _, registry = loaded[:3]
+    assert loaded[4] is None, loaded[4].to_dict()
+    runtime = PipelineRuntime(graph, registry=registry, run_dir=tmp_path / "direct", runtime_options={"execution": execution})
+    runtime.run({})
+    assert runtime._plan.order == ("a", "work", "end_a")
+    with pytest.raises(PipelineRuntimeError, match="planned nodes/nodesets cannot run"):
+        PipelineRuntime(graph, registry=registry, entry="future", run_dir=tmp_path / "blocked")
+    result = run_workspace_checked(config, workspace=workspace, run_root=tmp_path / "runs",
+        preview_root=tmp_path / "preview", runtime_options={"execution": execution})
+    assert result.health.status not in {"FAIL", "ERROR"}
+    assert result.health.info["entry"] == "ready"
+    record = json.loads(next((tmp_path / "preview/vibeflow-preview/snapshots").glob("*/record.json")).read_text())
+    assert record["entry"] == "ready" and record["status"] == "succeeded"
+
+
+def test_run_history_keeps_each_selected_entry(tmp_path):
+    from vibeflow.tooling.application.python.workspace_service import run_workspace_checked
+    workspace, config = _partly_planned_project(tmp_path, "node")
+    data = json.loads(config.read_text())
+    data["pipeline"]["nodes"] = [node for node in data["pipeline"]["nodes"] if node["id"] not in {"draft", "end_b"}]
+    data["pipeline"]["edges"] = [["a", "work"], ["b", "work"], ["work", "end_a"]]
+    config.write_text(json.dumps(data))
+    for entry in ("ready", "future"):
+        run_workspace_checked(config, workspace=workspace, entry=entry, run_root=tmp_path / "runs", preview_root=tmp_path / "preview")
+    records = [json.loads(path.read_text()) for path in (tmp_path / "preview/vibeflow-preview/snapshots").glob("*/record.json")]
+    assert {row["entry"] for row in records} == {"ready", "future"}

@@ -399,7 +399,8 @@ def test_run_workspace_checked_uses_one_effective_root_runtime_options_object(tm
         encoding="utf-8",
     )
     seen: dict[str, object] = {}
-    original_refuse = runner_module._refuse_on_planned_run
+    from vibeflow.tooling.application.python import preflight
+    original_refuse = preflight._refuse_on_planned_run
     from vibeflow.tooling.application.python import execution
     original_execute = execution._execute_runtime
 
@@ -411,7 +412,7 @@ def test_run_workspace_checked_uses_one_effective_root_runtime_options_object(tm
         seen["execute"] = runtime_options
         return original_execute(graph, registry, plugin_registry, initial, run_dir, runtime_options, resources, **kwargs)
 
-    monkeypatch.setattr(runner_module, "_refuse_on_planned_run", record_refuse)
+    monkeypatch.setattr(preflight, "_refuse_on_planned_run", record_refuse)
     monkeypatch.setattr(execution, "_execute_runtime", record_execute)
 
     _select_fixture_plugins(config_path,project_root,framework_root)

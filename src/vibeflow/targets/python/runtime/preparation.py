@@ -113,6 +113,13 @@ def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_reg
     if select_entry:
         prepared = select_python_entry(prepared, entry)
 
+    if instantiate and block_loader is None:
+        from vibeflow.core.workflows.entries import execution_graph
+        from vibeflow.targets.python.runtime.helpers import assert_planned_runtime_allowed
+        from vibeflow.targets.python.runtime.options import runtime_options as normalize_options
+        assert_planned_runtime_allowed(execution_graph(prepared.graphs[prepared.workflow.entry_block]),
+            normalize_options(runtime_options))
+
     def bind(block_id):
         block = prepared.workflow.block(block_id)
         graph = prepared.graphs[block_id]
@@ -169,8 +176,6 @@ def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_reg
                 not frame.is_planned and (frame.execution_lock or (frame.subplan and frame.subplan.contains_execution_locks)
                 ) for frame in frames.values()))
         blocks = block_loader(plan, block_id) if block_loader is not None else compile_blocks(plan, runtime_options)
-        entries = {item.entry:item for item in blocks}
-        return replace(plan, blocks=blocks, block_by_entry=entries, compiled_blocks=blocks,
-            compiled_block_by_entry=entries, compiled_node_to_block={name:item for item in blocks for name in item.nodes})
+        return replace(plan, blocks=blocks)
 
     return bind(prepared.workflow.entry_block)

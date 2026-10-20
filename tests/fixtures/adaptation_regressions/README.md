@@ -10,7 +10,7 @@ python -B tests/fixtures/adaptation_regressions/run_all.py \
   --report /tmp/vibeflow-adaptation-report.json
 ```
 
-`--work` 必须使用新目录。普通运行默认 8 个 worker，可通过 `--workers` 修改。`--group core_sdk/python_runtime/javascript/structure` 可以定向运行；传入多个 `--group` 可组合。JS 工具链和渲染器复用完整验证的安装目录。
+`--work` 必须使用新目录。普通运行默认 12 个 worker，可通过 `--workers` 修改。`--group core_sdk/python_runtime/javascript/structure` 可以定向运行；传入多个 `--group` 可组合。JS 工具链和渲染器复用完整验证的安装目录。
 
 报告保留稳定案例 ID、期待、实际结果、完整诊断、退出码、计数、marker 和产物位置。所有负例都有相同入口的合法对照。观察异常、不匹配或必要案例缺失都会让验证失败。Core DAG 探针只输出对象数量和共享关系，避免观察本身展开大量对象。
 

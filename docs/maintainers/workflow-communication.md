@@ -173,3 +173,19 @@ and consequences in Chinese before asking for a decision (critical-fork). Keep
 independent work progressing and update the acceptance record. Follow
 codex-task-alert for required intervention and final completion, and
 complete-test-batch for failure retention and batch repair.
+
+## 2026-10-21 技术债清理
+
+- 整图流程健康与逐入口契约检查分开，避免入口投影隐藏孤立节点；源码运行只检查所选入口引用的定义，AOT 仍直接选择构建期计划。
+- 运行快照增加实际入口元数据，旧 v2 历史继续可读；预检与执行分离，工作区不再反向依赖 runner 私有辅助函数。
+- 删除执行计划的未使用重复索引、旧计划包装函数和无调用源码分析辅助；目标事实准备移到 Application，工作区定位复用同一入口。
+- JS 通信资源归入独立目录，公开发行模块路径保持不变；Python AOT 性能探针改用当前 SDK 生成样本，历史交接包只保留为历史依据。
+- 更新用户迁移说明、执行/规则设计文档和沙盒目录说明。验收证据另存 `VibeFlow-evidence/technical-debt-20261021`，最终复验结果见下文。
+
+- 首轮完整批次 `technical-debt-20261021/full-1-verification.json`：18 项均结束，17 项通过。pytest 4,668、Python 沙盒 103、JS 沙盒 50、规则一致性 1,210、补充规则 680 全部通过；适配回归 205/207，两个 JS 分析计数夹具因平铺复制未创建新的通信子目录而失败。wheel、两个发行 profile、最终质检和清理均通过。保留此失败，不由后续结果覆盖。
+- 修复夹具的分层复制，并在计数子进程无结果时保留原始进程诊断；同时完成剩余无调用导入和测试对旧 facade 的依赖清理。JavaScript 发射快照只因 helper 文件末尾空行清理而更新源码摘要，声明及公共计划摘要不变。
+
+- 修复后的定向批次：117 项通过；JavaScript 适配 95/95，两个计数案例的同一分析身份重复构造次数均为零。
+- `full-2-verification.json`：固定修复版本、8 workers，完整 18/18 通过。pytest 4,668；Python 沙盒 103/103、JS 50/50（零跳过）；规则一致性 1,210/1,210、补充规则 680/680、适配回归 207/207。真实浏览器、布局、多视图、性能、sdist 到 wheel 的隔离安装、两个发行 profile 解压与执行、最终质检及清理均通过。正式 dist 未替换，本轮未提交、推送或发布。
+- 用户随后要求默认测试并发改为 12。保留上述批次实际使用的 8 workers；批次结束后将公共默认值改为 12，资源分组复用同一默认值，命令行与环境变量继续覆盖。业务图并发容量独立；历史批次的设置不改写。该设置另做定向复验，不声称已完成 12 workers 的整轮门禁。
+- `workers-12.log`：不指定 `--workers`，实际启动 pytest `-n 12`，44 项定向测试通过；覆盖默认值、环境/命令行覆盖、串行、非法参数、并发上限及入口/资源回归。最终仓库质检为零 error/warning/info，清理检查零目标。

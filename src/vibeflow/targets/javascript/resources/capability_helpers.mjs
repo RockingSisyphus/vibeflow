@@ -206,4 +206,3 @@ function prepareCapabilities(workflow, descriptors, requirements, schemas, suppl
 }
 
 const __vfMultipleInputs = Symbol('native input envelopes');
-

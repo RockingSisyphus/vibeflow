@@ -198,7 +198,7 @@ def test_planned_run_refusal_reuses_the_checked_presentation(tmp_path, monkeypat
     from dataclasses import replace
     import pytest
     from vibeflow.core.findings import HealthReport
-    from vibeflow.tooling.application.python import runner
+    from vibeflow.tooling.application.python import runner, preflight
 
     graph, registry, bindings = _fixture(tmp_path)
     graph = replace(graph, nodes=(*graph.nodes[:-1], replace(graph.nodes[-1], status="planned")))
@@ -212,9 +212,9 @@ def test_planned_run_refusal_reuses_the_checked_presentation(tmp_path, monkeypat
         written.append(kwargs["prepared"])
 
     monkeypatch.setattr(GraphCompiler, "compile_with_findings", unexpected_compile)
-    monkeypatch.setattr(runner, "_write_preflight_artifacts", artifacts)
+    monkeypatch.setattr(preflight, "_write_preflight_artifacts", artifacts)
     with pytest.raises(runner.CheckedRunError) as error:
-        runner._refuse_on_planned_run(graph, HealthReport(status="PASS"), tmp_path, "planned",
+        preflight._refuse_on_planned_run(graph, HealthReport(status="PASS"), tmp_path, "planned",
             registry=registry, resources=None, runtime_options=None,
             compiled=prepared.compiled, prepared=prepared)
     assert written == [prepared] and bindings == []

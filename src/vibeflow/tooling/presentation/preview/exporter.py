@@ -19,20 +19,6 @@ def workflow_identity(config, workspace=None, *, target="python", name=None):
             "name": name or config.stem, "target": target}
 
 
-def preview_workspace(config, workspace=None):
-    """A synthetic single-project workspace must not hide a real enclosing workspace."""
-    if workspace is not None and getattr(workspace, "path", None) is not None and workspace.path.name == "vibeflow_config.jsonc":
-        return workspace
-    from vibeflow.tooling.project.workspace_loader import load_workspace_config, find_project_config, load_project_workspace
-    for directory in Path(config).resolve().parents:
-        candidate = directory / "vibeflow_config.jsonc"
-        if candidate.is_file():
-            return load_workspace_config(candidate)
-    if workspace is None:
-        project = find_project_config(config)
-        if project is not None:
-            return load_project_workspace(project)
-    return workspace
 
 
 def workflow_links(workspace):

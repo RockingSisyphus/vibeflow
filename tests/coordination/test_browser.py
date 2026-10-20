@@ -19,7 +19,7 @@ def test_browser_generated_workflow_messages_completion_and_cooperative_stop(tmp
         pytest.skip("browser dependencies are supplied by the full gate")
     resources = Path(__file__).resolve().parents[2] / "src/vibeflow/targets/javascript/resources"
     for name in ("workflow_client.mjs", "workflow_host.mjs"):
-        shutil.copyfile(resources / name, tmp_path / name)
+        shutil.copyfile(resources / "coordination" / name, tmp_path / name)
     node_module(tmp_path)
     (tmp_path / "index.html").write_text("<!doctype html><title>Workflow host acceptance</title>")
     script = Path(__file__).resolve().parents[1] / "fixtures/preview/coordination.cjs"

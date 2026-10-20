@@ -223,4 +223,3 @@ async function disposeRuntimePluginsAsync(root, preserveFailure = false) {
   root.runtimePlugins.length=0;
   if(firstFailure)throw firstFailure;
 }
-

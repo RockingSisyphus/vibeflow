@@ -45,7 +45,7 @@ def test_cancel_receive_does_not_stop_peer_and_kill_confirms_exit():
 
 
 def test_node_and_python_use_the_same_wire_protocol(tmp_path):
-    module = Path(__file__).resolve().parents[2] / "src/vibeflow/targets/javascript/resources/workflow_client.mjs"
+    module = Path(__file__).resolve().parents[2] / "src/vibeflow/targets/javascript/resources/coordination/workflow_client.mjs"
     with WorkflowServer() as server:
         a = WorkflowClient(server.url)
         script = f'''
@@ -103,7 +103,7 @@ def test_invalid_json_outputs_report_failed_instead_of_leaving_a_running_instanc
                     run_host(lambda client: object(), workflow="bad-result", url=server.url)
                 identity = next(item["id"] for item in observer.request("instances", {}) if item["workflow"] == "bad-result")
             else:
-                module = Path(__file__).resolve().parents[2] / "src/vibeflow/targets/javascript/resources/workflow_client.mjs"
+                module = Path(__file__).resolve().parents[2] / "src/vibeflow/targets/javascript/resources/coordination/workflow_client.mjs"
                 result = subprocess.run(["node", "--input-type=module", "-e", f'''
 import {{WorkflowClient}} from {json.dumps(module.as_uri())};
 const client=await WorkflowClient.open({json.dumps(server.url)});

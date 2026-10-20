@@ -10,7 +10,6 @@ from vibeflow.core.constants import (
 )
 from vibeflow.core.descriptors import DescriptorCatalogs, NodeCatalog
 from vibeflow.core.models import ImplementationFact, ImplementationFacts
-from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES
 
 
 class JavascriptImplementationFactsError(ValueError):

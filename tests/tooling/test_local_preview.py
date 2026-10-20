@@ -120,7 +120,8 @@ def test_preview_command_uses_enclosing_workspace_or_standalone_project(tmp_path
 
 
 def test_adapter_discovers_standalone_project_root(tmp_path):
-    from vibeflow.tooling.presentation.preview.exporter import preview_workspace, workflow_identity
+    from vibeflow.tooling.application.presentation_targets import preview_workspace
+    from vibeflow.tooling.presentation.preview.exporter import workflow_identity
     root=tmp_path/"独立 项目";config=root/"configs/main.jsonc";config.parent.mkdir(parents=True)
     (root/"vibeflow_project.jsonc").write_text('{"project_target":"python"}')
     config.write_text('{}')
@@ -170,7 +171,9 @@ def test_source_run_is_not_blocked_by_preview_status_write_failure(tmp_path, mon
     monkeypatch.setattr(preview_run, "python_preview", lambda **kwargs:Record())
     run_dir = tmp_path/"run";run_dir.mkdir()
     with preview_run.source_run_preview(tmp_path/"main.jsonc"):
-        preview_run.start_run_preview(None, run_dir)
+        from types import SimpleNamespace
+        prepared = SimpleNamespace(graph=SimpleNamespace(entries={}, default_entry=""))
+        preview_run.start_run_preview(prepared, run_dir)
     assert "preview device unavailable" in (run_dir/"preview.error.txt").read_text()
 
 

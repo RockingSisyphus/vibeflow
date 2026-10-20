@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Mapping
@@ -8,7 +7,7 @@ from typing import Any, Mapping
 from vibeflow.core.findings import HealthFinding, HealthReport
 from vibeflow.core.flow import GraphConfig
 from vibeflow.targets.python.project.plugins import PluginRegistry
-from vibeflow.targets.python.project.registry import NodeRegistry, NodeRegistryError
+from vibeflow.targets.python.project.registry import NodeRegistry
 from vibeflow.targets.python.runtime.options import (
     RuntimeOptions,
     runtime_options as normalize_runtime_options,
@@ -36,23 +35,10 @@ from vibeflow.tooling.application.python.project.resource_selection import (
     select_python_resources,
 )
 from vibeflow.tooling.application.python.run_observation import observed_checked_run
-from vibeflow.tooling.application.python.execution import (
-    CheckedRunError,
-    CheckedRunResult,
-    _checked_run_error_payload,
-    _checked_runtime_binding,
-    _ensure_trace_files,
-    _execute_runtime,
-    _is_data_envelope_payload,
-    _iter_result_summary_items,
-    _new_run_id,
-    _summarize_result_item,
-    _summarize_run_result,
-    _summarize_shallow_value,
-    _write_execution_report,
-    _write_json,
-    _write_refused_artifacts,
+from vibeflow.tooling.application.python.preflight import (
+    _refuse_on_health_failure, _refuse_on_planned_run, _write_preflight_artifacts,
 )
+from vibeflow.tooling.application.python.execution import CheckedRunError, CheckedRunResult, _execute_runtime, _new_run_id, _summarize_run_result, _write_json, _write_refused_artifacts
 
 
 @observed_checked_run
@@ -143,7 +129,7 @@ def run_checked(
         graph, compiled = compilation.workflow.graph, compilation.compiled_graph
         presentation = prepare_python_presentation(graph, registry=registry, resources=resources, compilation=compilation)
         _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=registry, resources=resources,
-                              runtime_options=effective_runtime_options, compiled=compiled, prepared=presentation)
+                              runtime_options=effective_runtime_options, compiled=compiled, prepared=presentation, entry=entry)
         _write_preflight_artifacts(run_dir, graph, compiled, health, registry=registry, resources=resources, prepared=presentation)
         _refuse_on_health_failure(health, run_dir, actual_run_id)
         context = _execute_runtime(
@@ -275,6 +261,8 @@ def _validate_run_health(
     from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
 
     purity_policy = policy_result.effective_policy.to_purity_policy()
+    from vibeflow.core.workflows.entries import choose_entry
+    selected_entry = choose_entry(graph.entries, graph.default_entry, entry)
     health = validate_graph_health(
         graph,
         registry=registry,
@@ -284,6 +272,7 @@ def _validate_run_health(
         nodeset_max_depth=runtime_options.nodeset_max_depth,
         source_context=collect_workflow_source_context(registry, graph),
         rule_phase="run",
+        **({"entry": selected_entry} if selected_entry is not None else {}),
     )
     info = dict(health.info)
     info["nodeset_imports"] = [dict(item) for item in nodeset_imports]
@@ -312,71 +301,6 @@ def _validate_run_health(
         selected, _ = project_entry(compilation.workflow.graph, compilation.compiled_graph, entry)
         report = validate_delegate_cli_graph_contract(selected, report)
     return report
-
-
-def _write_preflight_artifacts(run_dir: Path, graph: GraphConfig, compiled, health: HealthReport, *, registry: NodeRegistry | None = None, resources: PythonResources | None = None, prepared=None) -> None:
-    from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
-    from vibeflow.tooling.application.python.presentation.compiled_document import compiled_graph_payload
-    from vibeflow.tooling.application.python.preview_run import start_run_preview
-    from vibeflow.tooling.presentation.preview.diagnostics import incidental_preview
-
-    prepared = prepared or prepare_python_presentation(graph, compiled=compiled, registry=registry, resources=resources)
-    _write_json(run_dir / "health_report.json", health.to_dict())
-    _write_json(run_dir / "compiled_graph.json", compiled_graph_payload(prepared.graph, prepared.compiled, resources=resources))
-    incidental_preview(start_run_preview, prepared=prepared, run_dir=run_dir, health=health, error_path=run_dir / "preview.error.txt")
-
-
-def _refuse_on_health_failure(health: HealthReport, run_dir: Path, run_id: str) -> None:
-    if health.status in {"FAIL", "ERROR"}:
-        _ensure_trace_files(run_dir)
-        result = CheckedRunResult(run_id, run_dir, health)
-        raise CheckedRunError(f"run refused: health status {health.status}", result)
-
-
-def _refuse_on_planned_run(
-    graph: GraphConfig,
-    health: HealthReport,
-    run_dir: Path,
-    run_id: str,
-    *,
-    registry: NodeRegistry,
-    resources: PythonResources,
-    runtime_options: object | None,
-    compiled=None,
-    prepared=None,
-) -> None:
-    from vibeflow.targets.python.runtime.helpers import planned_items
-
-    options = normalize_runtime_options(runtime_options)
-    planned = planned_items(graph)
-    if not planned:
-        return
-    if options.allow_planned_stub and all(item.get("behavior") == "python_stub" for item in planned):
-        return
-    planned_ids = [str(item.get("id", "")) for item in planned]
-    non_stub = [str(item.get("id", "")) for item in planned if item.get("behavior") != "python_stub"]
-    reason = "planned nodes/nodesets cannot run"
-    if options.allow_planned_stub:
-        reason = "only planned python_stub nodes/nodesets can run with allow_planned_stub"
-    error = HealthFinding(
-        rule_id="GRAPH.PLANNED.NODE_IN_RUN",
-        severity="error",
-        object_type="pipeline",
-        object_id="pipeline",
-        failure_layer="topology",
-        message=f"{reason}: " + ", ".join(non_stub or planned_ids),
-        suggested_fix_type="implement_node",
-        details={"planned": [dict(item) for item in planned], "allow_planned_stub": options.allow_planned_stub},
-    )
-    failed = replace(health, status="FAIL", errors=(*health.errors, error))
-    if prepared is None:
-        from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
-        prepared = prepare_python_presentation(graph, compiled=compiled, registry=registry, resources=resources)
-    _write_preflight_artifacts(run_dir, graph, prepared.compiled, failed, registry=registry,
-                              resources=resources, prepared=prepared)
-    _ensure_trace_files(run_dir)
-    result = CheckedRunResult(run_id, run_dir, failed)
-    raise CheckedRunError("run refused: planned nodes are not executable", result)
 
 
 def _load_error_report(exc: ConfigLoadError) -> HealthReport:

@@ -8,7 +8,7 @@ import sys
 
 
 def prepare_targets(architecture, *, config, workspace, load_own_target=None):
-    from .exporter import workflow_identity
+    from vibeflow.tooling.presentation.preview.exporter import workflow_identity
     current = workflow_identity(config, workspace, target=architecture.get("project_target", "python"))
     graphs = {current["id"]: {"workflow": current, "architecture": deepcopy(architecture)}}
     pending = [current["id"]]
@@ -57,9 +57,25 @@ def _load(path, workspace):
     if workspace.path.name == "vibeflow_config.jsonc" and workspace.path.is_file():
         command += ["--workspace", str(workspace.path)]
     environment = os.environ.copy()
-    package_root = str(Path(__file__).parents[4])
+    package_root = str(Path(__file__).parents[3])
     environment["PYTHONPATH"] = os.pathsep.join(filter(None, (package_root, environment.get("PYTHONPATH"))))
     result = subprocess.run(command, env=environment, capture_output=True, text=True, encoding="utf-8")
     if result.returncode:
         raise ValueError("target facts unavailable: " + (result.stderr or result.stdout).strip())
     return json.loads(strip_jsonc_comments(result.stdout))
+
+
+def preview_workspace(config, workspace=None):
+    """A synthetic single-project workspace must not hide a real enclosing workspace."""
+    if workspace is not None and getattr(workspace, "path", None) is not None and workspace.path.name == "vibeflow_config.jsonc":
+        return workspace
+    from vibeflow.tooling.project.workspace_loader import load_workspace_config, find_project_config, load_project_workspace
+    for directory in Path(config).resolve().parents:
+        candidate = directory / "vibeflow_config.jsonc"
+        if candidate.is_file():
+            return load_workspace_config(candidate)
+    if workspace is None:
+        project = find_project_config(config)
+        if project is not None:
+            return load_project_workspace(project)
+    return workspace

@@ -7,7 +7,8 @@ import pytest
 from tests.fixtures.support.rule_inspection import node_document
 from tests.fixtures.support.plugins import write_plugin, resource
 from vibeflow.tooling.application.python.project.core import build_workspace_node_registry
-from vibeflow.tooling.application.python.runner import CheckedRunError, run_checked
+from vibeflow.tooling.application.python.execution import CheckedRunError
+from vibeflow.tooling.application.python.runner import run_checked
 from vibeflow.tooling.application.python.workspace_service import run_workspace_checked, validate_workspace_config_path
 from vibeflow.tooling.project.workspace_loader import load_project_workspace, load_workspace_config
 

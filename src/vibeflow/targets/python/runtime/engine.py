@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import time
 from pathlib import Path
 from typing import Any, Mapping
 
-from vibeflow.targets.python.runtime.block_compiler import explain_block_compilation, graph_block, loop_block, nodeset_block
+from vibeflow.targets.python.runtime.block_compiler import explain_block_compilation, graph_block
 from vibeflow.targets.python.project.compiler import GraphCompiler
 from vibeflow.core.contracts import (
     CARDINALITY_EXACTLY_ONE,
@@ -17,7 +16,7 @@ from vibeflow.targets.python.project.plugins import PluginRegistry
 from vibeflow.targets.python.project.registry import NodeRegistry
 from vibeflow.targets.python.runtime.compiled import run_compiled_steps
 from vibeflow.targets.python.runtime.errors import DelegateCliExit, PipelineRuntimeError
-from vibeflow.targets.python.runtime.helpers import condition_matches, elapsed_ms, has_planned, planned_items
+from vibeflow.targets.python.runtime.helpers import condition_matches
 from vibeflow.targets.python.runtime.options import RuntimeOptions, runtime_hook_plan, runtime_options as normalize_runtime_options
 from vibeflow.targets.python.runtime.trace import RuntimeTrace, RuntimeTraceSink
 
@@ -29,7 +28,6 @@ from vibeflow.targets.python.runtime.trace_mixin import RuntimeTraceMixin
 from vibeflow.targets.python.runtime.execution_lock_mixin import RuntimeExecutionLockMixin
 from vibeflow.targets.python.runtime.support.contract_mixin import RuntimeContractMixin
 from vibeflow.targets.python.runtime.types import _RuntimeState
-from vibeflow.targets.python.runtime.summaries import summarize_mapping
 from vibeflow.targets.python.runtime.observation import observe_run
 
 
@@ -51,7 +49,6 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
     ) -> None:
         self.runtime_options = normalize_runtime_options(runtime_options)
         self.delegate_cli = bool(delegate_cli)
-        self._assert_planned_runtime_allowed(graph)
         self.registry = registry
         self._plugin_registry = plugin_registry
         self._runtime_plugins = plugin_registry.runtime_plugins() if plugin_registry is not None else ()
@@ -95,16 +92,6 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         self._has_run = False
         self._reset_execution_lock_state()
 
-    def _assert_planned_runtime_allowed(self, graph: GraphConfig) -> None:
-        if not has_planned(graph):
-            return
-        items = planned_items(graph)
-        if self.runtime_options.allow_planned_stub and all(item.get("behavior") == "python_stub" for item in items):
-            return
-        if self.runtime_options.allow_planned_stub:
-            blocked = [str(item.get("id", "")) for item in items if item.get("behavior") != "python_stub"]
-            raise PipelineRuntimeError("only planned python_stub nodes/nodesets can run with allow_planned_stub: " + ", ".join(blocked))
-        raise PipelineRuntimeError("planned nodes/nodesets cannot run")
 
     @classmethod
     def _from_plan(cls, parent: "PipelineRuntime", plan: ExecutionPlan) -> "PipelineRuntime":

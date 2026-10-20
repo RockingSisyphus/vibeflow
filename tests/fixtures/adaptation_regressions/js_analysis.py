@@ -15,7 +15,10 @@ import vibeflow.targets.javascript.resources as resources
 import vibeflow.targets.javascript.build.rule_session as rules
 from vibeflow.tooling.application.cli import main
 root=Path.cwd(); copied=root.parent/(root.name+"-instrumented-target");copied.mkdir()
-for name in resources.RESOURCE_NAMES:(copied/name).write_text(resources.read_text(name))
+for name in resources.RESOURCE_NAMES:
+    destination=copied/name
+    destination.parent.mkdir(parents=True,exist_ok=True)
+    destination.write_text(resources.read_text(name))
 events_path=root/"analysis-events.jsonl"
 driver=copied/"toolchain_driver.mjs";code=driver.read_text()
 prefix='''import {appendFileSync as __countAppend,readFileSync as __countRead} from "node:fs";
@@ -87,7 +90,7 @@ def counted_case(work,kernel,toolchain,command="validate"):
     args=cli_args(root,command)
     if command=="quality-check":args += ["--config",str(root/"workflow.jsonc")]
     result=run_probe(root,_COUNT_PROBE,kernel,args=args,name="counted-"+command,toolchain=toolchain)
-    observed=result.get("payload") or {};failures=[]
+    observed=result.get("payload") or {"process":result};failures=[]
     if result["exit_code"]!=0 or observed.get("exit_code")!=0 or observed.get("status") not in {"PASS","CONCERNS"}:
         failures.append("counted formal check must complete with its original healthy semantic result")
     if not observed.get("program_constructions") or not observed.get("function_metric_extractions"):

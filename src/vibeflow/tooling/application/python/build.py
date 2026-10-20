@@ -12,7 +12,6 @@ from vibeflow.core.findings import HealthReport
 from vibeflow.targets.shared.aot import BuildResult, artifact_manifest, staged_build, write_manifest
 from vibeflow.targets.python.runtime.preparation import prepare_python_workflow, bind_python_workflow
 from vibeflow.targets.python.runtime.support.snapshot import encode_snapshot
-from vibeflow.targets.python.runtime.options import RuntimeOptions
 
 
 @dataclass(frozen=True)

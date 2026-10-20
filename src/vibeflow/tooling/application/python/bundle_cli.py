@@ -27,7 +27,8 @@ def main(path, argv=None):
         values,delegated = values[:separator],values[separator + 1:]
     args = parser.parse_args(values)
     delegate = args.command == 'delegate-cli'
-    from vibeflow.tooling.application.python.execution import (_new_run_id, _prepare_run_dir, _write_execution_report, _checked_run_error_payload, CheckedRunError)
+    from vibeflow.tooling.application.python.run_directory import prepare_run_dir as _prepare_run_dir
+    from vibeflow.tooling.application.python.execution import (_new_run_id, _write_execution_report, _checked_run_error_payload, CheckedRunError)
     from vibeflow.targets.python.runtime.observation import observe_run
     from vibeflow.targets.python.runtime.console_capture import capture_process_console
     from vibeflow.tooling.project.diagnostic_sink import core_diagnostic_sink

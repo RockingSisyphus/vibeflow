@@ -479,7 +479,7 @@ def _wheel_smoke(scratch: Path) -> None:
             "    assert not root.joinpath(retired).is_file(), retired",
             "for name in ('config.schema.json', 'health_report.schema.json', 'node.schema.json', 'nodeset.schema.json', 'policy.schema.json', 'rule.schema.json', 'ruleset.schema.json'):",
             "    assert root.joinpath('tooling/project/schema', name).is_file()",
-            "for name in ('runtime_helpers.mjs', 'capability_helpers.mjs', 'plugin_helpers.mjs', 'root_helpers.mjs', 'workflow_client.mjs', 'workflow_host.mjs', 'workflow_node.mjs', 'toolchain_driver.mjs', 'plugin_worker.mjs', 'plugin_abi.d.ts', 'rule_abi.d.ts', 'sdk.mjs', 'sdk.d.ts', 'sdk_loader.mjs'):",
+            "for name in ('runtime_helpers.mjs', 'capability_helpers.mjs', 'plugin_helpers.mjs', 'root_helpers.mjs', 'coordination/workflow_client.mjs', 'coordination/workflow_host.mjs', 'coordination/workflow_node.mjs', 'toolchain_driver.mjs', 'plugin_worker.mjs', 'plugin_abi.d.ts', 'rule_abi.d.ts', 'sdk.mjs', 'sdk.d.ts', 'sdk_loader.mjs'):",
             "    assert root.joinpath('targets/javascript/resources', name).is_file()",
             "for name in ('declarations.mjs', 'contracts.d.ts'):",
             "    assert root.joinpath('targets/javascript/nodetypes', name).is_file()",

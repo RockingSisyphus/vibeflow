@@ -751,7 +751,8 @@ def _copy_javascript_sdk(output: Path) -> None:
     target.mkdir(parents=True, exist_ok=True)
     for name in ("sdk.mjs", "sdk.d.ts", "rule_abi.d.ts", "plugin_abi.d.ts",
                  "workflow_client.mjs", "workflow_host.mjs", "workflow_node.mjs"):
-        data = (source / name).read_text(encoding="utf-8")
+        origin = source / "coordination" if name.startswith("workflow_") else source
+        data = (origin / name).read_text(encoding="utf-8")
         (target / name).write_text(data.replace("../nodetypes/", "./nodetypes/"), encoding="utf-8")
     node_source = source.parent / "nodetypes"
     node_target = target / "nodetypes"

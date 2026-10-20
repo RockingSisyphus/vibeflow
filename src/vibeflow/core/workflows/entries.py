@@ -93,3 +93,23 @@ def project_selected_graph(graph, compiled, selected, active):
         consumers={k: tuple(n for n in v if n in active) for k, v in compiled.consumers.items()},
         contains_global_state=any(compiled.flow_kinds.get(n) == "global_state" for n in active))
     return projected, replace(compiled, **updates)
+
+
+def execution_graph(graph):
+    """Keep a named entry's referenced definitions, without interpreting code."""
+    if not graph.selected_entry:
+        return graph
+    from vibeflow.core.flow import LOOP_NODE_TYPES
+
+    def visit(current, inherited, active=()):
+        available = {**inherited, **current.nodesets}
+        keys = {node.loop.body if node.type_used in LOOP_NODE_TYPES else node.type_used
+                for node in current.nodes}
+        definitions = {}
+        for key in keys & available.keys():
+            definition = available[key]
+            definitions[key] = (definition if key in active else replace(definition,
+                graph=visit(definition.graph, available, (*active, key))))
+        return replace(current, nodesets=definitions)
+
+    return visit(graph, {})

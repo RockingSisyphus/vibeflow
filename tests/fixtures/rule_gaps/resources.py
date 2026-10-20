@@ -7,6 +7,8 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from tools.test_parallel import DEFAULT_WORKERS, WORKER_ENVIRONMENT
+
 FAMILIES=("registration","ownership","rules","edits","display","runtime")
 
 
@@ -42,7 +44,7 @@ def run_cases(work_root:Path,variant="current",toolchain_root=None):
                 subprocess.run(command,env={**os.environ,"VIBEFLOW_RESOURCE_CASE_GROUP":name},
                                stdout=log,stderr=subprocess.STDOUT,check=True)
             return json.loads(output.read_text())
-        with ThreadPoolExecutor(max_workers=int(os.environ.get("VIBEFLOW_TEST_WORKERS","8"))) as pool:
+        with ThreadPoolExecutor(max_workers=int(os.environ.get(WORKER_ENVIRONMENT,str(DEFAULT_WORKERS)))) as pool:
             for name,group in zip(groups,pool.map(observe,groups)):
                 rows.extend(group);print(f"resources {name}: {len(group)} observations",flush=True)
         validate_counts(rows)

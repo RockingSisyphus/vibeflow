@@ -112,25 +112,6 @@ def reflected_reference_name(node: ast.AST, aliases: Mapping[str, str]) -> str:
     return ""
 
 
-def record_assignment_aliases(
-    node: ast.Assign | ast.AnnAssign | ast.NamedExpr,
-    aliases: dict[str, str],
-) -> None:
-    """Track simple callable/module aliases and invalidate overwritten names."""
-
-    value = node.value
-    resolved = qualified_reference_name(value, aliases)
-    if isinstance(node, ast.Assign):
-        targets = node.targets
-    else:
-        targets = (node.target,)
-    for target in targets:
-        if not isinstance(target, ast.Name):
-            continue
-        if resolved and resolved != target.id:
-            aliases[target.id] = resolved
-        else:
-            aliases.pop(target.id, None)
 
 
 def import_aliases_from_node(node: ast.Import | ast.ImportFrom) -> dict[str, str]:
@@ -179,8 +160,6 @@ def is_immutable_constant(node: ast.AST) -> bool:
     return False
 
 
-def name_targets(targets: list[ast.expr]) -> tuple[ast.Name, ...]:
-    return tuple(target for target in targets if isinstance(target, ast.Name))
 
 
 def module_matches(module: str, patterns: tuple[str, ...]) -> bool:

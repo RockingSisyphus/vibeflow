@@ -52,4 +52,3 @@ def _serve(args):
         print(json.dumps({"url": server.url, "targets": list(targets)}, ensure_ascii=False), flush=True)
         Event().wait()
     return 0
-
