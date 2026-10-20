@@ -1,5 +1,9 @@
 # 本地预览与历史
 
+自 1.1.2 起，分发包已预装根目录的 `vibeflow-preview.html`、`vibeflow-preview.config.js`、
+`vibeflow-preview/assets/` 和空历史索引，解压后即可双击离线打开；不需要先运行 Python 或安装 Node 依赖。
+初始没有快照时显示生成与刷新提示，分发包不携带开发仓库的历史。1.1.0 / 1.1.1 的旧包可先运行 `python run.py preview` 安装入口。
+
 `review`、`build` 和 Python 源码 `run` / `delegate-cli` 会在工作区根目录
 生成 `vibeflow-preview.html`，并把展示数据保存在同级 `vibeflow-preview/`。
 独立项目使用项目根目录；`--preview-root DIR` 可以重定向两者。双击 HTML

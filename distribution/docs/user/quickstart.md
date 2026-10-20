@@ -1,10 +1,13 @@
 # 快速开始
 
-从 1.0.0 及更早版本升级到 1.1.1 的项目须先完成[并发接口迁移](graph-concurrency.md#从旧任务接口迁移)，再重新构建。旧任务管理配置和 ABI v7 产物不能直接交给当前运行器。从 1.0.1 / 1.0.2 升级无需新增业务配置迁移。默认审查交付[离线 HTML 预览](local-preview.md)；旧版预览数据须重新生成，SVG 使用 `review --with-svg` 按需生成。
+从 1.0.0 及更早版本升级到 1.1.2 的项目须先完成[并发接口迁移](graph-concurrency.md#从旧任务接口迁移)，再重新构建。旧任务管理配置和 ABI v7 产物不能直接交给当前运行器。从 1.0.1 / 1.0.2 升级无需新增业务配置迁移。默认审查交付[离线 HTML 预览](local-preview.md)；旧版预览数据须重新生成，SVG 使用 `review --with-svg` 按需生成。
 
 从 1.1.0 升级无需迁移业务配置或 v2 快照格式。重新执行 `review` 可补齐旧 JavaScript 快照缺失的 Nodeset 计划行为；HTML 工具随命令更新，已有历史与用户数据配置保留。
 
 发行包包含两个最小可运行项目：`python_project` 使用 Python Runtime，`javascript_project` 使用 JavaScript/TypeScript AOT。每个项目都采用 start、输入边界、一个业务处理 Node、输出边界和 end 的结构。
+
+解压后可直接双击根目录 `vibeflow-preview.html` 打开离线浏览工具，初始历史为空。
+运行 `review` 生成快照后，在页面刷新历史或使用命令返回的快照定位链接查看对应 workflow。
 
 ## 选择项目根
 
