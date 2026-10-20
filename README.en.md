@@ -61,5 +61,5 @@ Run the complete source-repository gate with:
 python tools/verify_project.py --full
 ```
 
-Current distribution package version: `1.1.2`. Workflow ABI: `vibeflow.workflow.v8`. AOT manifest: `vibeflow.aot-build.v3`.
-Both distribution profiles now include a root HTML entry, configuration, offline assets and an empty history index. Open the page immediately after extraction, then run review to generate workflow snapshots. SVG remains optional. No business configuration or snapshot format migration is required. See the [1.1.2 release notes](docs/maintainers/history/release-1.1.2.md).
+Current distribution package version: `1.1.4`. Workflow ABI: `vibeflow.workflow.v8`. AOT manifest: `vibeflow.aot-build.v3`.
+Both distribution profiles now include a root HTML entry, configuration, offline assets and an empty history index. Open the page immediately after extraction, then run review to generate workflow snapshots. SVG remains optional. No business configuration or snapshot format migration is required. Expanded Nodeset / Loop groups replace the original card with a group title and description. See the [1.1.4 release notes](docs/maintainers/history/release-1.1.4.md).

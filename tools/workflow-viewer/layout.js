@@ -12,7 +12,9 @@ window.VFLayout={async body(context,key,prefix="",ancestors=[],override=null,ent
     const child=facts.invokes?"nodeset:"+facts.invokes.target:null;
     if(state.expanded.has(path)&&child&&data.bodies[child]?.facts.nodes?.length){
       item.inner=await VFLayout.body(context,child,path,ancestors.concat(key));
-      item.width=Math.max(item.width+36,item.inner.width+40);item.height=card.height+item.inner.height+62;
+      item.width=Math.max(360,item.inner.width+40);
+      item.header=VFShapes.groupHeader(facts,data.architecture,item.width);
+      item.height=item.header.height+item.inner.height+40;
     }
     return item;
   }));
