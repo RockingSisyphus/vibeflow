@@ -20,7 +20,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 sys.path.insert(0, str(ROOT))
 from tools.test_parallel import DEFAULT_WORKERS, WORKER_ENVIRONMENT, add_worker_argument
-from tests.fixtures.rule_gaps.resources import FAMILIES, validate_counts
+from tests.fixtures.rule_gaps.resources import resource_jobs, validate_counts
 GROUPS = ("python", "javascript", "graph", "tooling", "composition", "resources")
 spec = importlib.util.spec_from_file_location("parity_results", HERE.parent / "rule_parity/results.py")
 _results = importlib.util.module_from_spec(spec)
@@ -58,10 +58,11 @@ def install(work, name, source):
     return destination
 
 
-def observe(group, work, toolchain, renderer, resource_family=None, *, workers=DEFAULT_WORKERS):
+def observe(group, work, toolchain, renderer, resource_family=None, resource_part=None, *, workers=DEFAULT_WORKERS):
     directory = work / group
     directory.mkdir(exist_ok=True)
-    prefix = resource_family + "-" if resource_family else ""
+    prefix = "-".join(filter(None, (resource_family, resource_part)))
+    prefix = prefix + "-" if prefix else ""
     output = directory / (prefix + "observations.json")
     cmd = [sys.executable, str(HERE / "worker.py"), "--group", group,
            "--work", str(directory / "projects"), "--output", str(output)]
@@ -69,7 +70,9 @@ def observe(group, work, toolchain, renderer, resource_family=None, *, workers=D
         cmd.extend(("--toolchain", str(toolchain)))
     env = {**environment(toolchain, renderer), WORKER_ENVIRONMENT: str(workers)}
     if resource_family:
-        env["VIBEFLOW_RESOURCE_CASE_GROUP"] = resource_family
+        cmd.extend(("--resource-family", resource_family))
+    if resource_part:
+        cmd.extend(("--resource-part", resource_part))
     process_log = directory / (prefix + "process.log")
     with process_log.open("w") as log:
         process = subprocess.run(cmd, cwd=directory, env=env,
@@ -94,10 +97,11 @@ def run(work, groups, report, *, toolchain=None, renderer=None, workers=DEFAULT_
     if any(group in {"javascript", "composition", "resources"} for group in groups) and renderer is None:
         renderer = install(work, "mermaid-renderer", ROOT / "tools/mermaid-renderer")
     rows, errors = [], []
-    tasks = [(group, family) for group in groups for family in (FAMILIES if group == "resources" else (None,))]
+    tasks = [(group, family, part) for group in groups
+             for family, part in (resource_jobs() if group == "resources" else ((None, None),))]
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        jobs = {pool.submit(observe, group, work, toolchain, renderer, family, workers=workers):
-                group + ("/" + family if family else "") for group, family in tasks}
+        jobs = {pool.submit(observe, group, work, toolchain, renderer, family, part, workers=workers):
+                "/".join(filter(None, (group, family, part))) for group, family, part in tasks}
         for future in as_completed(jobs):
             group = jobs[future]
             try:

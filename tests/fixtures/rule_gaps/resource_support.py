@@ -9,7 +9,7 @@ import sys
 
 from common import ROOT, normalize, row, write
 
-KINDS = ("node", "base_lib", "plugin", "host_extension")
+from tests.fixtures.rule_gaps.resources import KINDS
 FILES = {"node":"node.ts", "base_lib":"math.ts", "plugin":"plugin.ts", "host_extension":"host.ts"}
 PARTS = {"node":"node_support.ts", "base_lib":"math_support.ts", "plugin":"plugin_support.ts", "host_extension":"host_support.ts"}
 IDS = {"node":"demo.model", "base_lib":"demo.math", "plugin":"demo.runtime", "host_extension":"demo.host"}

@@ -17,6 +17,8 @@ def main():
     parser.add_argument("--work", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--toolchain", type=Path)
+    parser.add_argument("--resource-family")
+    parser.add_argument("--resource-part")
     args = parser.parse_args()
     import common
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -34,7 +36,8 @@ def main():
     sys.modules[spec.name] = module
     try:
         spec.loader.exec_module(module)
-        rows = module.run_cases(args.work, "current", args.toolchain)
+        options = {"family": args.resource_family, "part": args.resource_part} if args.group == "resources" else {}
+        rows = module.run_cases(args.work, "current", args.toolchain, **options)
         temp = args.output.with_suffix(".tmp")
         temp.write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         temp.replace(args.output)
