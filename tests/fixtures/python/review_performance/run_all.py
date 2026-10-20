@@ -146,9 +146,11 @@ def inspect_products(project, args):
         failures.append('review Mermaid lost declared color')
     if not args.renderer:
         return failures+['browser evidence requires --renderer']
-    result = subprocess.run(['node',str(ROOT/'tests/fixtures/rule_gaps/resource_browser.mjs'),
+    result = subprocess.run(['node',str(ROOT/'tests/fixtures/support/svg_browser.mjs'),
                              str(args.renderer),str(project/'graph.svg'),str(project/'graph.png')],
-                             capture_output=True,text=True,timeout=60,check=True)
+                             capture_output=True,text=True,timeout=60,check=False)
+    if result.returncode:
+        raise RuntimeError(f"SVG browser exited {result.returncode}: {result.stdout}\n{result.stderr}")
     browser = json.loads(result.stdout)
     (project/'browser.json').write_text(json.dumps(browser,indent=2)+'\n')
     selected = [item for item in browser['nodes'] if 'step0' in item['text']]
