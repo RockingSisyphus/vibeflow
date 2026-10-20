@@ -13,16 +13,27 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     support = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(support)
     from vibeflow.core.contracts import DataProvider, DataRequirement
-    from vibeflow.core.flow import EdgeSpec, GraphConfig, IoSpec, LoopSpec, NodeMetadata, NodeSpec, NodesetSpec
+    from vibeflow.core.flow import EdgeSpec, GraphConfig, LoopSpec, NodeMetadata, NodeSpec, NodesetSpec
     from vibeflow.targets.python.project.registry import NodeRegistry
     if variant == "current":
         from vibeflow.tooling.application.python.project.declarations import default_python_registry as NodeRegistry
     from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
 
     def io(name, operation, signal):
-        return NodeSpec(name, "vibeflow.io", io=IoSpec(operation), metadata=NodeMetadata(name, "Actual native IO boundary."),
+        if variant == "baseline":
+            from vibeflow.core.flow import IoSpec
+            return NodeSpec(name, "vibeflow.io", io=IoSpec(operation), metadata=NodeMetadata(name, "Historical native IO boundary."),
+                provides=(DataProvider(signal, signal, display_name="Received value"),) if operation == "receive" else (),
+                requires=(DataRequirement(signal, "exactly_one", display_name="Sent value"),) if operation == "send" else ())
+        return NodeSpec(name, "probe.boundary."+operation+"."+signal, flow_kind="terminal", metadata=NodeMetadata(name, "Explicit terminal boundary."),
             provides=(DataProvider(signal, signal, display_name="Received value"),) if operation == "receive" else (),
             requires=(DataRequirement(signal, "exactly_one", display_name="Sent value"),) if operation == "send" else ())
+
+    original_validate = validate_graph_health
+    def validate_graph_health(graph, *, registry, **kwargs):
+        if variant == "current":
+            support.boundary_registry(graph, registry)
+        return original_validate(graph, registry=registry, **kwargs)
 
     def graph_for(kind, *, fanout=False, child_empty=False, root_empty=False, selected=None):
         body_nodes = (io("start", "receive", "child.signal"), io("left", "send", "child.signal"))

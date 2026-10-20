@@ -43,7 +43,6 @@ from vibeflow.targets.javascript.frontend.facts import (
     JavascriptImplementationFactsError,
     implementation_facts_from_catalog,
     apply_call_effect_scopes,
-    native_call_execution_facts,
     validate_javascript_descriptor_catalogs,
 )
 from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
@@ -317,7 +316,6 @@ def prepare_project_build(
         implementations={},
         used_nodes={},
         used_types=set(),
-        used_io_operations=set(),
         call_effect_scopes=rule_report.call_effect_scopes,
     )
     _prepare_graph(
@@ -351,7 +349,6 @@ def prepare_project_build(
         state.used_nodes,
         catalogs=catalogs,
         target=request.target,
-        io_operations=state.used_io_operations,
     )
     schema_types = set(state.used_types)
     schema_types.update(_used_schema_types(graph, state.used_nodes, capabilities))
@@ -364,10 +361,14 @@ def prepare_project_build(
         compiled_by_path=state.compiled_by_path,
         params_by_path=state.params_by_path,
         implementation_facts=implementation_facts,
-        call_execution_facts=native_call_execution_facts(graph),
         target_features=target_features,
     )
     declared_host_extensions = selected_hosts
+    from vibeflow.targets.shared.rule_support.capability_policy import policies_from_executions
+    from vibeflow.block_compiler.policies import apply_call_policies
+    paths = [(*block.path, call.id) for block in plan.blocks for call in block.nodes]
+    plan = apply_call_policies(plan, policies_from_executions(
+        (execution for values in rule_report.results.values() for execution in values), paths))
     implemented_host_extensions = tuple(
         item.id
         for item in declared_host_extensions

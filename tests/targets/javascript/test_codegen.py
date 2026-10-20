@@ -24,6 +24,12 @@ RESOURCE_NAMES = (
     'plugin_worker.mjs',
     'rule_abi.d.ts',
     'runtime_helpers.mjs',
+    'capability_helpers.mjs',
+    'plugin_helpers.mjs',
+    'root_helpers.mjs',
+    'workflow_client.mjs',
+    'workflow_host.mjs',
+    'workflow_node.mjs',
     'sdk.d.ts',
     'sdk.mjs',
     'sdk_loader.mjs',
@@ -79,9 +85,9 @@ def test_target_resource_api_is_closed_and_templates_use_canonical_runtime() -> 
     from vibeflow.targets.javascript.frontend.templates import RUNTIME_SOURCE
 
     assert resources.RESOURCE_NAMES == frozenset(RESOURCE_NAMES)
-    assert RUNTIME_SOURCE == (resources.read_text("runtime_helpers.mjs").strip() + "\n"
-                              + resources.read_text("status_helpers.mjs") + "\n"
-                              + resources.read_text("execution_helpers.mjs"))
+    assert RUNTIME_SOURCE == "\n".join(resources.read_text(name) for name in (
+        "runtime_helpers.mjs", "capability_helpers.mjs", "plugin_helpers.mjs",
+        "root_helpers.mjs", "status_helpers.mjs", "execution_helpers.mjs"))
     with pytest.raises(ValueError, match="unknown JavaScript Target resource"):
         resources.resource("../runtime_helpers.mjs")
 

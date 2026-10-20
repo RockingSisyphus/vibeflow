@@ -51,7 +51,7 @@ const workflow = await import(pathToFileURL({json.dumps(str(path))}).href);
 
 def _empty_sync_plan(node_module: Path) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v8",
+        "abi_version": "vibeflow.workflow.v9",
         "workflow_id": "test.host-lifecycle",
         "entry_mode": "sync",
         "inputs": [],
@@ -105,17 +105,14 @@ def test_python_port_nodes_receive_transform_and_send(
             "pipeline": {
                 "entry_mode": "async",
                 "nodes": [
+                    {"id":"start", "type_used":"fixture.port.boundary", "display_name":"Start", "description":"Enter port workflow"},
+                    {"id":"end", "type_used":"fixture.port.boundary", "display_name":"End", "description":"Finish port workflow"},
                     {
                         "id": "receive",
-                        "type_used": "vibeflow.io",
+                        "type_used": "fixture.port.receive",
                         "display_name": "Receive number",
                         "description": "Receives the input number from the math input port.",
-                        "requires": [],
-                        "provides": [_provider("number", "number")],
-                        "io": {
-                            "operation": "receive",
-                            "port": "math.in",
-                        },
+                        "config": {"port": "math.in"},
                     },
                     {
                         "id": "double",
@@ -125,18 +122,13 @@ def test_python_port_nodes_receive_transform_and_send(
                     },
                     {
                         "id": "send",
-                        "type_used": "vibeflow.io",
+                        "type_used": "fixture.port.send",
                         "display_name": "Send answer",
                         "description": "Sends the doubled answer through the math output port.",
-                        "requires": [_requirement("answer")],
-                        "provides": [],
-                        "io": {
-                            "operation": "send",
-                            "port": "math.out",
-                        },
+                        "config": {"port": "math.out"},
                     },
                 ],
-                "edges": [
+                "edges": [["start", "receive"], ["send", "end"],
                     ["receive", "double"],
                     ["double", "send"],
                 ],
@@ -151,6 +143,8 @@ def test_python_port_nodes_receive_transform_and_send(
         }
     )
     registry = native_registry()
+    from tests.fixtures.support.port_nodes import register_ports
+    register_ports(registry)
     registry.register(configured_declaration(_DoubleNode_DECLARATION, {}, {}), _DoubleNode)
     sent: list[dict[str, object]] = []
     runtime = PipelineRuntime(
@@ -172,6 +166,8 @@ def test_python_port_nodes_receive_transform_and_send(
     assert result.get("answer")["value"] == 12
     assert sent == [{"port": "math.out", "value": 12}]
     assert GraphCompiler().compile(graph, registry=registry).flow_kinds == {
+        "start": "terminal",
+        "end": "terminal",
         "receive": "io",
         "double": "process",
         "send": "io",
@@ -184,6 +180,9 @@ def test_javascript_async_port_workflow_is_explicit_and_auditable(
     node_module = tmp_path / "nodes.mjs"
     node_module.write_text(
         """
+export function boundary(){return {};}
+export async function receive(inputs,params,context){const value=await context.capabilities["vibeflow.port"].receive({port:params.port});return {number:value.value};}
+export function send(inputs,params,context){context.capabilities["vibeflow.port"].send({port:params.port,value:inputs.answer.value});return {};}
 export function double(inputs) {
   return { answer: inputs.number.value * 2 };
 }
@@ -191,7 +190,7 @@ export function double(inputs) {
         encoding="utf-8",
     )
     plan = {
-        "abi_version": "vibeflow.workflow.v8",
+        "abi_version": "vibeflow.workflow.v9",
         "workflow_id": "test.port",
         "entry_mode": "async",
         "inputs": [],
@@ -248,16 +247,15 @@ export function double(inputs) {
         "nodes": [
             {
                 "id": "receive",
-                "type_used": "vibeflow.io",
-                "implementation": None,
+                "type_used": "test.receive",
+                "implementation": {"ref":str(node_module),"export":"receive"},
+                "params":{"port":"math.in"},
                 "requires": [],
                 "provides": [{"key": "number", "type": "number"}],
                 "flow_kind": "io",
-                "is_terminal": True,
+                "is_terminal": False,
                 "completion": "suspend",
                 "executor": "event_loop",
-                "io_operation": "receive",
-                "io_port": "math.in",
                 "capabilities": [
                     {
                         "id": "vibeflow.port",
@@ -279,15 +277,14 @@ export function double(inputs) {
             },
             {
                 "id": "send",
-                "type_used": "vibeflow.io",
-                "implementation": None,
+                "type_used": "test.send",
+                "implementation": {"ref":str(node_module),"export":"send"},
+                "params":{"port":"math.out"},
                 "requires": [{"type": "answer", "cardinality": "exactly_one"}],
                 "provides": [],
                 "flow_kind": "io",
-                "is_terminal": True,
+                "is_terminal": False,
                 "completion": "immediate",
-                "io_operation": "send",
-                "io_port": "math.out",
                 "capabilities": [
                     {
                         "id": "vibeflow.port",
@@ -303,6 +300,11 @@ export function double(inputs) {
         "order": ["receive", "double", "send"],
         "max_steps": 10,
     }
+    plan["nodes"].extend([
+        {"id":identifier,"type_used":"test.boundary","is_terminal":True,"flow_kind":"terminal",
+         "implementation":{"ref":str(node_module),"export":"boundary"}} for identifier in ("start","end")])
+    plan["routes"].extend([{"source":"start","target":"receive"},{"source":"send","target":"end"}])
+    plan["order"] = ["start","receive","double","send","end"]
     emitted = emit_fixture(plan)
     workflow = tmp_path / "workflow.mjs"
     workflow.write_text(emitted.source, encoding="utf-8")
@@ -386,7 +388,7 @@ export function createHostExtension() {
         encoding="utf-8",
     )
     plan = {
-        "abi_version": "vibeflow.workflow.v8",
+        "abi_version": "vibeflow.workflow.v9",
         "workflow_id": "test.host",
         "entry_mode": "sync",
         "inputs": [

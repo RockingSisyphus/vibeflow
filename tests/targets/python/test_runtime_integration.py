@@ -352,14 +352,14 @@ def test_python_port_semantics_and_trace_match_all_execution_modes(
             "pipeline": {
                 "entry_mode": "async",
                 "nodes": [
+                    {"id":"start", "type_used":"fixture.port.boundary", "display_name":"Start", "description":"Enter port workflow"},
+                    {"id":"end", "type_used":"fixture.port.boundary", "display_name":"End", "description":"Finish port workflow"},
                     {
                         "id": "receive",
-                        "type_used": "vibeflow.io",
+                        "type_used": "fixture.port.receive",
                         "display_name": "Receive number",
                         "description": "Receives the number used by this integration workflow.",
-                        "requires": [],
-                        "provides": [PROV_SPEC("number")],
-                        "io": {"operation": "receive", "port": "math.in"},
+                        "config": {"port": "math.in"},
                     },
                     _node_call(
                         "double",
@@ -369,20 +369,20 @@ def test_python_port_semantics_and_trace_match_all_execution_modes(
                     ),
                     {
                         "id": "send",
-                        "type_used": "vibeflow.io",
+                        "type_used": "fixture.port.send",
                         "display_name": "Send answer",
                         "description": "Sends the doubled answer from this integration workflow.",
-                        "requires": [REQ_SPEC("answer")],
-                        "provides": [],
-                        "io": {"operation": "send", "port": "math.out"},
+                        "config": {"port": "math.out"},
                     },
                 ],
-                "edges": [["receive", "double"], ["double", "send"]],
+                "edges": [["start", "receive"], ["send", "end"],["receive", "double"], ["double", "send"]],
                 "outputs": [REQ_SPEC("answer")],
             }
         }
     )
     registry = native_registry()
+    from tests.fixtures.support.port_nodes import register_ports
+    register_ports(registry)
     registry.register(configured_declaration(_DoubleNode_DECLARATION, {}, {}), _DoubleNode)
     sent: list[dict[str, object]] = []
 
@@ -409,11 +409,12 @@ def test_python_port_semantics_and_trace_match_all_execution_modes(
 
     assert result.get("answer")["value"] == 12
     assert sent == [{"port": "math.out", "value": 12}]
-    assert "io_receive" in kinds
-    assert "io_send" in kinds
+    assert kinds.count("node") == 5
     assert result.get("runtime.qualified_exec_order") == (
+        "start",
         "receive",
         "double",
         "send",
+        "end",
     )
     assert kinds[-1] == "runtime_summary"

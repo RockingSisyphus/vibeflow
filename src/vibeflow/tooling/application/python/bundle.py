@@ -33,47 +33,57 @@ class PythonBundle:
             decode_snapshot(self.data['compiled'], relocate=relocate),
             decode_snapshot(self.data['globals']), decode_snapshot(self.data['overrides']))
         self.roots = tuple(self.path / value for value in self.data['source_roots'])
-        self._definitions = {}
+        # Fixed, relocated declarations belong to the bundle, not each Runtime.
+        self._node_records = tuple(self._prepare_node(record) for record in self.data['nodes'])
+        self._plugin_records = tuple((self._descriptor(record['descriptor']),
+            self._plugin_source(record['plugin']), record) for record in self.data['plugins'])
+        self._plugin_bindings = {}
         self.generated = load_source_module(self.path / 'generated_blocks.py', '_vibeflow_aot_blocks_' + uuid4().hex)
+
+    def _prepare_node(self, record):
+        binding = dict(record['binding'])
+        if 'plugin' in binding:
+            binding['plugin'] = self._plugin_source(binding['plugin'])
+        else:
+            binding.update(path=self.path / binding['path'], load_root=self.path / binding['load_root'],
+                members=tuple(binding['export'].split('.')))
+        return self._descriptor(record['descriptor']), binding, self._path(record['source']), record['source_line']
+
+    def _plugin_source(self, record):
+        source = dict(record['source'])
+        if source['kind'] == 'file':
+            source['ref'] = self._path(source['ref'])
+        return self.path / record['root'], SourceLocator(**source)
+
+    def _bindings(self, source):
+        if source not in self._plugin_bindings:
+            root, locator = source
+            definition = load_plugin(locator, root=root, source_roots=self.roots)
+            self._plugin_bindings[source] = definition.bindings()
+        return self._plugin_bindings[source]
 
     def _registry(self):
         registry = NodeRegistry()
-        loaded = self._definitions
-
-        def plugin(record):
-            key = json.dumps(record, sort_keys=True)
-            if key not in loaded:
-                source = dict(record['source'])
-                if source['kind'] == 'file' and source['ref'].startswith('@bundle/'):
-                    source['ref'] = str(self.path / source['ref'][len('@bundle/'):])
-                locator = SourceLocator(**source)
-                loaded[key] = load_plugin(locator, root=self.path / record['root'], source_roots=self.roots)
-            return loaded[key]
-
-        for record in self.data['nodes']:
-            descriptor = self._descriptor(record['descriptor'])
-            binding = record['binding']
+        for descriptor, binding, source, line in self._node_records:
             def resolve(binding=binding, key=descriptor.id):
                 if 'plugin' in binding:
-                    return plugin(binding['plugin']).bindings()[('node',key)]
+                    return self._bindings(binding['plugin'])[('node',key)]
                 def load():
-                    with source_paths((self.path / binding['load_root'], *self.roots)):
-                        value = load_source_module(self.path / binding['path'], binding['module'])
-                        for part in binding['export'].split('.'):
+                    with source_paths((binding['load_root'], *self.roots)):
+                        value = load_source_module(binding['path'], binding['module'])
+                        for part in binding['members']:
                             value = getattr(value, part)
                         return value
-                return load_node_implementation(registry, key, self.path / binding['path'], binding['export'], load)
-            registry.register(descriptor,loader=resolve,source=self._path(record['source']),source_line=record['source_line'])
-        return registry, plugin
+                return load_node_implementation(registry, key, binding['path'], binding['export'], load)
+            registry.register(descriptor,loader=resolve,source=source,source_line=line)
+        return registry
 
-    def _plugins(self, plugin_loader):
+    def _plugins(self):
         result = PluginRegistry()
         created = []
         try:
-            for record in self.data['plugins']:
-                descriptor = self._descriptor(record['descriptor'])
-                definition = plugin_loader(record['plugin'])
-                factory = definition.bindings().get(('plugin',descriptor.id))
+            for descriptor, source, record in self._plugin_records:
+                factory = self._bindings(source).get(('plugin',descriptor.id))
                 if factory is None:
                     locator = descriptor.implementations[0].source
                     module = load_source_module(self.path / record['factory_path'], '_vibeflow_aot_factory_' + descriptor.id.replace('.','_'))
@@ -96,37 +106,40 @@ class PythonBundle:
 
     def _blocks(self, plan, block_id):
         from vibeflow.targets.python.runtime.block_compiler import PythonCompiledBlock
-        return tuple(PythonCompiledBlock(name=item['name'], entry=item['entry'], exits=tuple(item['exits']),
-            nodes=tuple(item['nodes']), edge_routes={node:tuple(plan.frames[node].outgoing) if item['kind'] == 'graph' else () for node in item['nodes']},
+        return tuple(PythonCompiledBlock(name=item['name'], entry=plan.order[0] if item['kind'] == 'graph' else item['entry'],
+            exits=tuple(n for n in item['exits'] if n in plan.frames),
+            nodes=tuple(n for n in item['nodes'] if n in plan.frames),
+            edge_routes={node:tuple(plan.frames[node].outgoing) if item['kind'] == 'graph' else () for node in item['nodes'] if node in plan.frames},
             callable=getattr(self.generated, item['function']), source=item['source'], path=tuple(item['path']),
             supports_full_trace=True, supports_node_hooks=True, kind=item['kind'])
-            for item in self.data['blocks'].get(block_id, ()))
+            for item in self.data['blocks'].get(block_id, ()) if item['kind'] == 'graph' or item['entry'] in plan.frames)
 
     def create_runtime(self, *, runtime_options=None, capabilities=None, run_dir=None,
-                       node_config_overrides=None, global_config=None, delegate_cli=False):
+                       node_config_overrides=None, global_config=None, delegate_cli=False, entry=None):
         from vibeflow.targets.python.runtime.engine import PipelineRuntime
         effective = self.effective_options(runtime_options)
         from vibeflow.targets.python.sdk.loading import _discard_foreign_project_modules
         _discard_foreign_project_modules(self.roots)
-        registry, plugin_loader = self._registry()
+        registry = self._registry()
         prepared = self.prepared
         if node_config_overrides or global_config is not None:
             prepared = self._bind_config(prepared, registry, node_config_overrides, global_config)
         def bind(instances, plugins=None):
             return bind_python_workflow(prepared, registry=registry, runtime_options=effective,
                 plugin_registry=plugins, instantiate=instances, block_loader=self._blocks,
+                entry=entry,
                 source_hash_for_path=lambda path:self.metadata['files'][path.relative_to(self.path).as_posix()])
         with source_paths(self.roots):
             plan = bind(False)
             runtime = PipelineRuntime(plan.graph, registry=registry,
                 run_dir=run_dir, runtime_options=effective, capabilities=capabilities,
                 delegate_cli=delegate_cli, _execution_plan=plan)
-        from vibeflow.tooling.application.python.runner import _checked_runtime_binding
+        from vibeflow.tooling.application.python.execution import (_checked_runtime_binding)
         runtime._runtime_plan_factory = lambda plugins: _checked_runtime_binding(
             lambda: bind(True, plugins), health=self.health, run_dir=runtime._run_dir)
         from vibeflow.tooling.application.python.project.lifecycle import checked_runtime_plugins
         runtime._runtime_plugin_factory = lambda: checked_runtime_plugins(
-            lambda: self._plugins(plugin_loader), config_path=self.path / self.data['config_path'],
+            self._plugins, config_path=self.path / self.data['config_path'],
             effective_policy=self.data['health']['effective_policy'], run_dir=runtime._run_dir)
         runtime._bundle_source_roots = self.roots
         return runtime
@@ -153,7 +166,7 @@ class PythonBundle:
             calls = []
             for call in block.nodes:
                 spec = specs[call.id]
-                if (call.is_loop or call.is_nodeset or spec.io.operation) and call.status != 'planned':
+                if (call.is_loop or call.is_nodeset) and call.status != 'planned':
                     config = {**spec.params, **subject.overrides.get(call.id, {})}
                     calls.append(replace(call, max_concurrency=dispatch_limit(config)))
                     continue
@@ -173,32 +186,36 @@ class PythonBundle:
         return merge_runtime_options(self.data['runtime_options'], overrides)
 
     def run(self, initial=None, *, runtime_options=None, capabilities=None, run_root=None, run_id=None,
-            delegate_cli=False, node_config_overrides=None, global_config=None, _prepared_run_dir=None):
-        from vibeflow.tooling.application.python.runner import (
-            CheckedRunResult, _new_run_id, _prepare_run_dir, _write_json,
-            _summarize_run_result, _ensure_trace_files)
+            delegate_cli=False, node_config_overrides=None, global_config=None, _prepared_run_dir=None, entry=None, signal=None):
+        from vibeflow.tooling.application.python.execution import (CheckedRunResult, _new_run_id, _prepare_run_dir, _write_json, _summarize_run_result, _ensure_trace_files)
         from vibeflow.targets.python.runtime.observation import observe_run
         actual_id = _new_run_id() if run_id is None else run_id
         directory = _prepared_run_dir or _prepare_run_dir(run_root, actual_id)
         effective = self.effective_options(runtime_options)
         with observe_run(directory, effective):
-            health = self._health(self.data['delegate_health'] if delegate_cli else self.data['health'])
+            from vibeflow.core.workflows.entries import choose_entry
+            selected = choose_entry({item.name:item for item in self.workflow.named_entries}, self.workflow.default_entry, entry)
+            delegate_health = self.data['delegate_health_by_entry'][selected] if selected is not None else self.data['delegate_health']
+            health = self._health(delegate_health if delegate_cli else self.data['health'])
             _write_json(directory / 'health_report.json', health.to_dict())
             _write_json(directory / 'effective_policy.json', health.effective_policy)
             if health.status in {'FAIL','ERROR'}:
-                from vibeflow.tooling.application.python.runner import CheckedRunError
+                from vibeflow.tooling.application.python.execution import (CheckedRunError)
                 raise CheckedRunError('bundle run refused: invalid delegated CLI contract', CheckedRunResult(actual_id,directory,health))
             from vibeflow.targets.python.runtime.summaries import summarize_mapping
             _write_json(directory / 'input_summary.json', summarize_mapping(dict(initial or {})))
             runtime = self.create_runtime(runtime_options=effective, capabilities=capabilities,
                 run_dir=directory, delegate_cli=delegate_cli,
-                node_config_overrides=node_config_overrides, global_config=global_config)
+                node_config_overrides=node_config_overrides, global_config=global_config, entry=entry)
+            unsubscribe = signal.subscribe(runtime.request_stop) if signal is not None else lambda: None
             try:
                 context = runtime.run(initial)
             finally:
+                unsubscribe()
                 _ensure_trace_files(directory)
             _write_json(directory / 'output_summary.json', _summarize_run_result(context))
-            return CheckedRunResult(actual_id,directory,health,context,bool(self.workflow.outputs))
+            from .execution import checked_result
+            return checked_result(actual_id,directory,health,context,runtime.graph)
 
     @property
     def health(self):

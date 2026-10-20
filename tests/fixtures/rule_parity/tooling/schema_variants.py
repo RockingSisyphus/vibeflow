@@ -19,6 +19,8 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         if variant == "current" and (name.startswith("async.") or name=="io.async"):
             expected_codes=("GRAPH.ASYNC.MIGRATION",)
             classification="approved_change"
+        if variant == "current" and name.startswith("io."):
+            expected_codes, classification = ("GRAPH.IO.MIGRATION",), "approved_change"
         try:
             findings = collect_config_schema_findings(data)
             actual = {"status": "FAIL" if any(f.severity == "error" for f in findings) else "CONCERNS" if findings else "PASS",
@@ -113,13 +115,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             schema("loop." + field + "." + label, pipeline(nodes=[{**loop, "loop": {**loop["loop"], field: value}}]), "NODE_LOOP_INVALID")
         for key in mapping:
             schema("loop." + field + ".missing_" + key, pipeline(nodes=[{**loop, "loop": {**loop["loop"], field: [{k: v for k, v in mapping.items() if k != key}]}}]), "NODE_LOOP_INVALID")
-    io = {**NODE, "type_used": "vibeflow.io", "requires": [], "provides": [PROVIDER], "io": {"operation": "receive"}}
-    for label, raw in (("object", []), ("unknown", {"operation": "receive", "extra": 1}),
-                       ("operation", {"operation": "other"}), ("port", {"operation": "receive", "port": ""})):
-        schema("io." + label, pipeline(nodes=[{**io, "io": raw}]), "NODE_IO_INVALID")
-    schema("io.on_process", node(io={"operation": "receive"}), "NODE_IO_INVALID")
-    schema("io.async", pipeline(nodes=[{**io, "async": "detached"}]), "NODE_IO_ASYNC")
-    schema("io.receive_two", pipeline(nodes=[{**io, "provides": [PROVIDER, {**PROVIDER, "key": "other"}]}]), "NODE_IO_CONTRACT")
+    schema("io.on_process", node(io={"operation":"receive"}), "NODE_IO_INVALID")
     nodeset = {"type_key": "parity.child", "display_name": "Child", "description": "An imported child.",
                "requires": [], "provides": [], "pipeline": pipeline()["pipeline"]}
     emit("nodeset.normal", nodeset)

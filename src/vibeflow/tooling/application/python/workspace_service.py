@@ -23,7 +23,7 @@ from vibeflow.targets.python.runtime.options import RuntimeOptions
 from vibeflow.targets.python.sdk.loading import source_paths
 from vibeflow.targets.python.runtime.summaries import summarize_mapping
 from vibeflow.tooling.application.python.run_directory import validate_run_id
-from vibeflow.tooling.application.python.runner import CheckedRunError, CheckedRunResult
+from vibeflow.tooling.application.python.execution import (CheckedRunError, CheckedRunResult)
 from vibeflow.tooling.project.graph_config import parse_graph_config
 from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
 from vibeflow.tooling.project.config_loader import (
@@ -114,18 +114,11 @@ def run_workspace_checked(
     _prepared_run_dir: Path | None = None,
     _policy_result=None,
     preview_root: str | Path | None = None,
+    entry: str | None = None,
+    signal=None,
 ) -> CheckedRunResult:
-    from vibeflow.tooling.application.python.runner import (
-        _execute_runtime,
-        _new_run_id,
-        _prepare_run_dir,
-        _refuse_on_health_failure,
-        _refuse_on_planned_run,
-        _summarize_run_result,
-        _write_json,
-        _write_preflight_artifacts,
-        _write_refused_artifacts,
-    )
+    from vibeflow.tooling.application.python.execution import (_execute_runtime, _new_run_id, _prepare_run_dir, _summarize_run_result, _write_json, _write_refused_artifacts)
+    from vibeflow.tooling.application.python.runner import (_refuse_on_health_failure, _refuse_on_planned_run, _write_preflight_artifacts)
 
     actual_run_id = _new_run_id() if run_id is None else validate_run_id(run_id)
     if _prepared_run_dir is None:
@@ -154,7 +147,7 @@ def run_workspace_checked(
         graph, resources = prepared.graph, prepared.resources
         plugin_registry, effective_policy = prepared.plugin_registry, prepared.effective_policy
         _write_json(run_dir / "effective_policy.json", effective_policy.to_dict())
-        validation_kwargs = {"delegate_cli": True} if delegate_cli else {}
+        validation_kwargs = {"delegate_cli": True, "entry": entry} if delegate_cli else {}
         health = _validate_prepared_workspace_graph(
             prepared,
             env=env,
@@ -196,10 +189,13 @@ def run_workspace_checked(
             effective_runtime_options,
             resources,
             health=health,
+            entry=entry,
+            signal=signal,
             **execute_kwargs,
             )
         _write_json(run_dir / "output_summary.json", _summarize_run_result(context))
-        return CheckedRunResult(actual_run_id, run_dir, health, context, bool(graph.outputs))
+        from .execution import checked_result
+        return checked_result(actual_run_id, run_dir, health, context, graph, entry)
 
 
 def load_workspace_graph_for_export(
@@ -245,6 +241,7 @@ def _validate_prepared_workspace_graph(
     runtime_options: RuntimeOptions,
     check_architecture_document: bool = True,
     delegate_cli: bool = False,
+    entry: str | None = None,
     rule_phase: str = "static",
 ) -> HealthReport:
     document, graph, compiled = prepared.document, prepared.graph, prepared.compiled
@@ -293,7 +290,9 @@ def _validate_prepared_workspace_graph(
             validate_delegate_cli_graph_contract,
         )
 
-        report = validate_delegate_cli_graph_contract(graph, report)
+        from vibeflow.core.workflows.entries import project_entry
+        selected, _ = project_entry(graph, compiled, entry)
+        report = validate_delegate_cli_graph_contract(selected, report)
     prepared.health = report
     if report.status in {"FAIL", "ERROR"} or not check_architecture_document:
         return report

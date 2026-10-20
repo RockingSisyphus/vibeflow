@@ -396,7 +396,6 @@ def build_javascript_binding_plan(
                     base_libs=_base_lib_ids(node.type_used, base_lib_facts),
                     capabilities=_call_capabilities(
                         node.type_used,
-                        node.io_operation,
                         capability_facts,
                     ),
                     completion=completion,
@@ -530,11 +529,6 @@ def _schema_member_order_key(
 
 
 def _completion(node: object, metadata: Mapping[str, object]) -> str:
-    operation = str(getattr(node, "io_operation", ""))
-    if operation == "receive":
-        return "suspend"
-    if operation == "send":
-        return "immediate"
     value = metadata.get("completion", getattr(node, "completion", "immediate"))
     return str(value or "immediate")
 
@@ -547,14 +541,11 @@ def _javascript_executor(completion: str) -> str:
 
 def _call_capabilities(
     type_key: str,
-    io_operation: str,
     facts: Mapping[
         str,
         Sequence[CapabilityRequirement | Mapping[str, object]],
     ],
 ) -> tuple[CapabilityRequirement, ...]:
-    if io_operation:
-        return (CapabilityRequirement("vibeflow.port", (io_operation,)),)
     normalized: list[CapabilityRequirement] = []
     for index, raw in enumerate(facts.get(type_key, ())):
         if isinstance(raw, CapabilityRequirement):

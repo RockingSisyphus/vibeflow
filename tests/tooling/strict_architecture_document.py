@@ -131,6 +131,7 @@ def test_architecture_document_is_deterministic_and_keeps_planned_and_unused_bod
         "node_types",
         "resources",
         "call_effect_scopes",
+        "call_policies",
         "rule_selections",
     ]
     assert payload["project_target"] == "python"

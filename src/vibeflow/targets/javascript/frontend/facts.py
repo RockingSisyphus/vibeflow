@@ -171,21 +171,11 @@ def _effect_scope(policy: Mapping[str, Any] | None) -> str:
     return EFFECT_SCOPE_NONE
 
 
-def native_call_execution_facts(graph: GraphConfig):
-    """Supply JS completion/executor facts at actual native call identities."""
-    from vibeflow.core.graph_calls import graph_call_subjects
-    from vibeflow.core.flow import IO_NODE_TYPE
-    return {(*subject.call_path,node.id):ImplementationFact(node.type_used,
-        completion="suspend" if node.io.operation == "receive" else "immediate",
-        executor="event_loop" if node.io.operation == "receive" else "current")
-        for subject in graph_call_subjects(graph) for node in subject.graph.nodes
-        if node.type_used == IO_NODE_TYPE}
 
 
 __all__ = [
     "JavascriptImplementationFactsError",
     "implementation_facts_from_catalog",
-    "native_call_execution_facts",
     "target_neutral_implementation_facts_from_catalog",
     "validate_javascript_descriptor_catalogs",
 ]

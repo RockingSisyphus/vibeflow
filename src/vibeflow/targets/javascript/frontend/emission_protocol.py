@@ -38,8 +38,7 @@ class EmissionNode(Protocol):
     completion: str
     schedule: str
     executor: str
-    io_operation: str
-    io_port: str
+    capability_policy: Mapping[str, Any]
 
 
 class EmissionWorkflow(Protocol):

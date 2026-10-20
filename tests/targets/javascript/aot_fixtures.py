@@ -88,7 +88,6 @@ def plan_fixture(description, *, project_root=None, import_policy=None, host_ext
                 is_terminal=raw.get("is_terminal", False), is_nodeset=raw.get("is_nodeset", False),
                 is_loop=raw.get("is_loop", False), nodeset_type_key="", child_block=child_id, exports=(),
                 completion=completion, schedule=schedule, executor=executor,
-                io_operation=raw.get("io_operation", ""), io_port=raw.get("io_port", ""),
                 effect_scope=raw.get("effect_scope", "none"),
             ))
         from vibeflow.block_compiler.model import RoutePlan

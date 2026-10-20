@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping, TypeAlias
 
 
-WORKFLOW_ABI_VERSION = "vibeflow.workflow.v8"
+WORKFLOW_ABI_VERSION = "vibeflow.workflow.v9"
 _CARDINALITIES = frozenset({"exactly_one", "optional_one", "all"})
 _BLOCK_KINDS = frozenset({"workflow", "nodeset", "loop"})
 _CONDITION_OPERATORS = frozenset({"==", "!="})
@@ -315,12 +315,11 @@ class NodeCallPlan:
     completion: str = "immediate"
     schedule: str = "inline"
     executor: str = "current"
-    io_operation: str = ""
-    io_port: str = ""
     effect_scope: str = "none"
     execution_lock: ExecutionLockPlan | None = None
     contains_global_state: bool = False
     max_concurrency: int = 8
+    capability_policy: PortableObject = PortableObject()
 
     def __post_init__(self) -> None:
         if not isinstance(self.max_concurrency, int) or isinstance(self.max_concurrency, bool) or self.max_concurrency < 1:
@@ -376,9 +375,8 @@ class NodeCallPlan:
             "completion": self.completion,
             "schedule": self.schedule,
             "executor": self.executor,
-            "io_operation": self.io_operation,
-            "io_port": self.io_port,
             "effect_scope": self.effect_scope,
+            "capability_policy": self.capability_policy.to_value(),
 
             "execution_lock": (
                 self.execution_lock.to_dict()
@@ -454,6 +452,20 @@ class BlockPlan:
 
 
 @dataclass(frozen=True)
+class WorkflowEntryPlan:
+    name: str
+    start: str
+    nodes: tuple[str, ...]
+    inputs: tuple[PipelineInputSpec, ...]
+    outputs: tuple[PipelineOutputSpec, ...]
+
+    def to_dict(self):
+        return {"name": self.name, "start": self.start, "nodes": list(self.nodes),
+                "inputs": [item.to_dict() for item in self.inputs],
+                "outputs": [item.to_dict() for item in self.outputs]}
+
+
+@dataclass(frozen=True)
 class WorkflowPlan:
     abi_version: str
     workflow_id: str
@@ -466,6 +478,9 @@ class WorkflowPlan:
     entry_mode: str = "sync"
     execution_lock: ExecutionLockPlan | None = None
     contains_global_state: bool = False
+    named_entries: tuple[WorkflowEntryPlan, ...] = ()
+    default_entry: str = ""
+    selected_entry: str = ""
 
     def __post_init__(self) -> None:
         if self.abi_version != WORKFLOW_ABI_VERSION:
@@ -506,6 +521,9 @@ class WorkflowPlan:
             "blocks": [item.to_dict() for item in self.blocks],
             "max_steps": self.max_steps,
             "entry_mode": self.entry_mode,
+            "named_entries": [item.to_dict() for item in self.named_entries],
+            "default_entry": self.default_entry,
+            "selected_entry": self.selected_entry,
             "execution_lock": (
                 self.execution_lock.to_dict()
                 if self.execution_lock is not None

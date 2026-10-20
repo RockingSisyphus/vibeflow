@@ -178,13 +178,14 @@ class BoundNodeView:
             BoundProviderView(item) for item in source.provides
         )
         self.capabilities = tuple(binding.capabilities)
+        self.capability_policy = source.capability_policy.to_value()
         self.params = binding.params.to_value()
         self.params_schema = _ordered_contract_schemas(
             context, binding, "params_schema"
         )
         self.implementation = (
             None
-            if source.is_nodeset or source.is_loop or source.io_operation
+            if source.is_nodeset or source.is_loop
             else BoundImplementationView(binding)
         )
 
@@ -224,12 +225,6 @@ class BoundNodeView:
     @property
     def executor(self) -> str:
         return self._binding.executor
-    @property
-    def io_operation(self) -> str:
-        return self._source.io_operation
-    @property
-    def io_port(self) -> str:
-        return self._source.io_port
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = dict(
@@ -249,8 +244,7 @@ class BoundNodeView:
             completion=self.completion,
             schedule=self.schedule,
             executor=self.executor,
-            io_operation=self.io_operation,
-            io_port=self.io_port,
+            capability_policy=self.capability_policy,
         )
         if self.implementation is not None:
             payload["implementation"] = self.implementation.to_dict()
@@ -277,6 +271,8 @@ class BoundWorkflowView:
         self.abi_version = context.plan.abi_version
         self.workflow_id = workflow_id
         self.entry_mode = context.plan.entry_mode
+        self.named_entry_contracts = context.plan.named_entries if block.id == context.plan.entry_block else ()
+        self.default_entry = context.plan.default_entry
         self.max_steps = block.max_steps
         self.schemas = context.schemas
         self.capabilities = context.capabilities
@@ -376,6 +372,19 @@ def emission_payload(workflow: EmissionWorkflow) -> dict[str, Any]:
     """Serialize the canonical bound view for emission and its content hash."""
 
     return workflow.to_dict()
+
+
+def bound_entry_view(workflow, entry):
+    """Project the checked view using the compiler's saved entry membership."""
+    from copy import copy
+    result = copy(workflow)
+    active = set(entry.nodes)
+    result.nodes = tuple(node for node in workflow.nodes if node.id in active)
+    result.routes = tuple(route for route in workflow.routes if route.source in active and route.target in active)
+    result.order, result.entries = entry.nodes, (entry.start,)
+    result.inputs = tuple(BoundInputView(item, workflow.schemas.get(item.type)) for item in entry.inputs)
+    result.outputs = tuple(BoundOutputView(item, workflow.schemas.get(item.type)) for item in entry.outputs)
+    return result
 
 
 def _capability_views(

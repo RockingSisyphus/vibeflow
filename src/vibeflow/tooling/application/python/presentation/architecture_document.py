@@ -8,7 +8,7 @@ from typing import Mapping
 
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
-from vibeflow.core.flow import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, LoopSpec, NodeSpec, STATUS_PLANNED
+from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, LoopSpec, NodeSpec, STATUS_PLANNED
 from vibeflow.core.constants import FLOW_KIND_GLOBAL_STATE
 from vibeflow.core.planned import effective_planned_behavior
 from vibeflow.tooling.presentation.node_presentation import registry_descriptor, resolve_presentation
@@ -65,6 +65,8 @@ def build_architecture_facts(prepared) -> dict[str, object]:
             roots={str(root_id):str(path) for path,root_id in registry.source_root_ids.items()})
     from vibeflow.core.rules.planning import selection_report
     payload["call_effect_scopes"] = [{"call_path":list(path), "effect_scope":scope} for path,scope in sorted(getattr(registry,"call_effect_scopes",{}).items())]
+    from vibeflow.tooling.presentation.workflow_facts import policy_facts
+    payload["call_policies"] = policy_facts(getattr(registry, "call_capability_policies", {}))
     catalogs = getattr(getattr(registry, "loaded_plugins", None), "catalogs", None)
     if catalogs is not None:
         payload["rule_selections"] = selection_report(graph, catalogs)
@@ -160,7 +162,9 @@ def _graph_body_document(
         registry=registry,
         prepared=prepared,
     )
+    from vibeflow.tooling.presentation.workflow_facts import entry_facts
     return {
+        **entry_facts(graph, compiled),
         "rulesets": selection_data(graph.rulesets),
         "inputs": providers_to_dicts(graph.inputs),
         "outputs": requirements_to_dicts(graph.outputs),
@@ -273,7 +277,6 @@ def _node_document(
         "contract_source": _contract_source(graph, node),
         "join_policy": node.join_policy,
         "loop": node.loop.to_dict() or None,
-        "io": node.io.to_dict() or None,
         "invokes": invokes,
         "config": {
             "call": _config_declaration(node.params, source=source),
@@ -286,7 +289,7 @@ def _node_document(
 def _contract_source(graph: GraphConfig, node: NodeSpec) -> str:
     if node.status == STATUS_PLANNED:
         return "planned_config"
-    if node.type_used == IO_NODE_TYPE or node.type_used in LOOP_NODE_TYPES:
+    if node.type_used in LOOP_NODE_TYPES:
         return "system_config"
     if invocation_for_node(graph, node) is not None:
         return "nodeset"
@@ -406,8 +409,6 @@ def _node_type_document(
 ) -> dict[str, object]:
     if type_key in LOOP_NODE_TYPES:
         return _loop_node_type_document(type_key, roots=roots)
-    if type_key == IO_NODE_TYPE:
-        return _io_node_type_document(type_key)
     has_implemented_occurrence = any(node.status != STATUS_PLANNED for _, node in occurrences)
     node_cls = registry_node_class(registry, type_key) if has_implemented_occurrence else None
     descriptor = registry_descriptor(registry, type_key)
@@ -493,49 +494,6 @@ def _loop_node_type_document(type_key: str, *, roots: Mapping[str, str]) -> dict
     }
 
 
-def _io_node_type_document(type_key: str) -> dict[str, object]:
-    return {
-        "type_key": type_key,
-        "source": {
-            "kind": "kernel",
-            "runtime": {
-                "python": (
-                    "vibeflow.targets.python.runtime.node_mixin."
-                    "RuntimeNodeMixin._run_io_node"
-                ),
-                "javascript": "VibeFlow AOT static io emitter",
-            },
-        },
-        "info": {
-            "display_name": "VibeFlow Port IO",
-            "description": (
-                "Receives from or sends to a host-provided vibeflow.port "
-                "Capability."
-            ),
-            "flow_kind": "io",
-            "effect_scope": "unconstrained",
-            "external": False,
-        },
-        "contract": {
-            "receive": {
-                "requires": 0,
-                "provides": 1,
-                "completion": "suspend",
-            },
-            "send": {
-                "requires": "one exactly_one",
-                "provides": 0,
-                "completion": "immediate",
-            },
-        },
-        "config": {
-            "schema": {
-                "node_field": "io",
-                "operations": ["receive", "send"],
-                "capability": "vibeflow.port",
-            }
-        },
-    }
 
 
 def _node_info_document(info: object) -> dict[str, object]:

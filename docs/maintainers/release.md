@@ -1,3 +1,7 @@
+# 当前源码：多入口与独立 Workflow 通信（未发布）
+
+命名入口、调用级 Capability 授权、本机通信协议和普通端口节点使用 Workflow ABI v9；旧 AOT 需重建，旧原生 IO 配置须迁移。保留先前 1.1.5 AOT 准备优化；本项不自动提交、推送或发布。实施与验收见[工作记录](workflow-communication.md)。以下段落记录各次历史发行，不代表当前源码协议。
+
 # VibeFlow 1.1.2
 
 两个分发 profile 预装根目录 HTML、配置、离线资源和空历史索引，解压即可双击打开。构建器调用包内现有 preview 安装入口，不生成审查、构建或运行历史；使用者执行 review 后再查看真实快照。ABI 和格式不变，已发布历史资产保持原样。详见 [1.1.2 发布说明](history/release-1.1.2.md)。
@@ -24,7 +28,7 @@
 
 # 发行与文档装配
 
-VibeFlow 当前发行版本为 1.1.2，提供 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目、Workflow ABI v8 和 AOT manifest v3。并发升级见[普通图并发迁移](../../distribution/docs/user/graph-concurrency.md#从旧任务接口迁移)，更早资源接口迁移见 [统一资源迁移](../../distribution/docs/user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖历史发行包。
+此处记录的 1.1.2 发行提供 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目、Workflow ABI v8 和 AOT manifest v3。并发升级见[普通图并发迁移](../../distribution/docs/user/graph-concurrency.md#从旧任务接口迁移)，更早资源接口迁移见 [统一资源迁移](../../distribution/docs/user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖历史发行包。
 
 此前 1.0.0 统一 Block Compiler，并新增 Python 目录 AOT：计划 ABI v7、构建 manifest v3。旧计划需重新构建；历史发行资产保持原字节。实施与完整验收见[双语言 AOT 与维护整理记录](aot-unification-implementation.md)，历史变更与发行验证见[1.0.0 发布说明](history/release-1.0.0.md)。
 

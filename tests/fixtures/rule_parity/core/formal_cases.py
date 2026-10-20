@@ -1,7 +1,7 @@
 """Formal Target consumption controls for language-neutral graph findings.
 
 Both kernels use their public Python workflow validator. The graph contains
-only native IO and Nodeset declarations; no business implementation executes.
+explicit terminal contracts and Nodeset declarations; no business implementation executes.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from pathlib import Path
 
 def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None) -> list[dict]:
     from vibeflow.core.contracts import DataProvider, DataRequirement
-    from vibeflow.core.flow import EdgeSpec, GraphConfig, IoSpec, NodeMetadata, NodeSpec, NodesetSpec
+    from vibeflow.core.flow import EdgeSpec, GraphConfig, NodeMetadata, NodeSpec, NodesetSpec
     from vibeflow.targets.python.project.registry import NodeRegistry
     if variant == "current":
         from vibeflow.tooling.application.python.project.declarations import default_python_registry as NodeRegistry
@@ -27,7 +27,12 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
 
     def io(name, operation, *, missing_metadata=False, signal="child.signal"):
         metadata = NodeMetadata() if missing_metadata else NodeMetadata(name, "Declared native IO boundary.")
-        return NodeSpec(name, "vibeflow.io", io=IoSpec(operation), metadata=metadata,
+        if variant == "baseline":
+            from vibeflow.core.flow import IoSpec
+            return NodeSpec(name, "vibeflow.io", io=IoSpec(operation), metadata=metadata,
+                provides=(DataProvider(signal, signal, display_name="Received value"),) if operation == "receive" else (),
+                requires=(DataRequirement(signal, "exactly_one", display_name="Sent value"),) if operation == "send" else ())
+        return NodeSpec(name, "probe.boundary."+operation+"."+signal, flow_kind="terminal", metadata=metadata,
             provides=(DataProvider(signal, signal, display_name="Received value"),) if operation == "receive" else (),
             requires=(DataRequirement(signal, "exactly_one", display_name="Sent value"),) if operation == "send" else ())
 
@@ -44,7 +49,13 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
                   ("GRAPH.FLOW.CANNOT_REACH_END", "error"),
                   ("GRAPH.DATA.UNCONSUMED_PROVIDER", "warning")), "Disconnected receiving node has no end path or consumer."),
     )
+    if variant == "current":
+        cases += (("process_orphan", (("GRAPH.FLOW.UNREACHABLE_FROM_START","error"),
+            ("GRAPH.FLOW.CANNOT_REACH_END","error"),("GRAPH.FLOW.ORPHAN_NODE","error"),
+            ("GRAPH.DATA.UNCONSUMED_PROVIDER","warning")), "Ordinary disconnected data producer keeps all flow/data diagnostics."),)
     for topic, expected_codes, note in cases:
+        if variant == "current" and topic == "flow":
+            expected_codes = (("GRAPH.FLOW.ORPHAN_NODE", "error"),)
         for used in (False, True):
             case_id = "core.formal.nodeset." + topic + (".used" if used else ".unused")
             root = work_root / case_id
@@ -56,6 +67,11 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
                     (EdgeSpec("start", "left"), EdgeSpec("start", "right")), **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
             elif topic == "flow":
                 body = GraphConfig((io("start", "receive"), io("end", "send"), io("orphan", "receive", signal="orphan.signal")), (EdgeSpec("start", "end"),), **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
+            elif topic == "process_orphan":
+                orphan = NodeSpec("orphan","probe.boundary.orphan",flow_kind="process",
+                    metadata=NodeMetadata("Orphan","Disconnected ordinary data producer."),
+                    provides=(DataProvider("orphan.signal","orphan.signal",display_name="Unused data"),))
+                body = replace(healthy(),nodes=(*healthy().nodes,orphan))
             else:
                 body = healthy()
             required = (DataRequirement("root.signal", "exactly_one", display_name="Root value"),)
@@ -67,7 +83,9 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
                 graph = GraphConfig((io("start", "receive", signal="root.signal"), stage, io("end", "send")), (EdgeSpec("start", "stage"), EdgeSpec("stage", "end")), **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
             graph = replace(graph, nodesets={child.type_key: child})
             try:
-                report = validate_graph_health(graph, registry=NodeRegistry())
+                from tests.fixtures.rule_parity.core.support import boundary_registry
+                registry = boundary_registry(graph, NodeRegistry()) if variant == "current" else NodeRegistry()
+                report = validate_graph_health(graph, registry=registry)
                 findings = (*report.errors, *report.warnings)
                 actual = {"status": report.status,
                     "codes": [{"code": code, "severity": severity} for code, severity in sorted({(item.rule_id, item.severity) for item in findings})],
@@ -81,11 +99,11 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             observations.append({"id": case_id,
                 "title": "正式报告保留已载入 Nodeset 声明的 " + topic + ("（实际调用）" if used else "（未调用）"),
                 "family": "workflow.formal_consumption",
-                "classification": "preserved",
+                "classification": "new_feature" if topic == "process_orphan" else "approved_change" if topic == "flow" and variant == "current" else "preserved",
                 "expected": {"codes": [{"code": code, "severity": severity} for code, severity in expected_codes], "exact_codes": True,
                     **({"metrics": {"mainline_owners": ["nodeset:probe.child", "pipeline"]}} if topic == "mainline" else {})},
                 "actual": actual,
-                "notes": note + " An already loaded declaration remains within the existing command scope; this is not an isolated-source scan. Child default selection is unchanged.",
+                "notes": note + (" Scheme C replaces the implicit receive-only boundary with an explicit terminal: it is also an end, so cannot-reach-end and unconsumed-provider do not apply. The ordinary process-orphan controls retain those checks." if topic == "flow" and variant == "current" else "") + " An already loaded declaration remains within the existing command scope; this is not an isolated-source scan. Child default selection is unchanged.",
                 "evidence": {"entrypoint": "vibeflow.targets.python.quality.workflow.validate_graph_health", "fixture": str(root),
                     "baseline": "workflow/validation.py:93-97; workflow/flow_data.py:57-100; workflow/mainline.py:26-34",
                     "current": "workflow/rule_phase.py:22-37,64-73; rules/workflow.py:46-58"}})
@@ -98,7 +116,7 @@ def _source_consumption_cases(work_root: Path, variant: str) -> list[dict]:
     import importlib.util
     import sys
     from vibeflow.core.contracts import DataProvider, DataRequirement
-    from vibeflow.core.flow import EdgeSpec, ExecutionLockSpec, GraphConfig, IoSpec, NodeMetadata, NodeSimilarity, NodeSpec
+    from vibeflow.core.flow import EdgeSpec, ExecutionLockSpec, GraphConfig, NodeMetadata, NodeSimilarity, NodeSpec
     from vibeflow.targets.python.project.registry import NodeRegistry
     if variant == "current":
         from vibeflow.tooling.application.python.project.declarations import default_python_registry as NodeRegistry
@@ -160,7 +178,12 @@ def _source_consumption_cases(work_root: Path, variant: str) -> list[dict]:
                 calls.append(PythonSourceCall("pipeline", node_id, key, {}, str(path), node_id))
         def io(name, operation):
             signal = "root.signal" if operation == "receive" else "node" + str(len(kinds) - 1) + ".signal"
-            return NodeSpec(name, "vibeflow.io", io=IoSpec(operation), metadata=NodeMetadata(name, "Declared native IO boundary."),
+            if variant == "baseline":
+                from vibeflow.core.flow import IoSpec
+                return NodeSpec(name, "vibeflow.io", io=IoSpec(operation), metadata=NodeMetadata(name, "Historical native boundary."),
+                    provides=(DataProvider(signal, signal, display_name="Received value"),) if operation == "receive" else (),
+                    requires=(DataRequirement(signal, "exactly_one", display_name="Sent value"),) if operation == "send" else ())
+            return NodeSpec(name, "probe.boundary."+operation+"."+signal, flow_kind="terminal", metadata=NodeMetadata(name, "Explicit terminal boundary."),
                 provides=(DataProvider(signal, signal, display_name="Received value"),) if operation == "receive" else (),
                 requires=(DataRequirement(signal, "exactly_one", display_name="Sent value"),) if operation == "send" else ())
         nodes = (io("start", "receive"), *(NodeSpec("work" + str(index), "probe.node" + str(index),
@@ -171,6 +194,9 @@ def _source_consumption_cases(work_root: Path, variant: str) -> list[dict]:
             execution_lock=ExecutionLockSpec("shared") if mode == "advisory_locked" else None, **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
         try:
             kwargs = {"source_context": build_python_source_context(selected, files, calls=calls)} if variant == "current" else {}
+            from tests.fixtures.rule_parity.core.support import boundary_registry
+            if variant == "current":
+                boundary_registry(graph, registry)
             report = validate_graph_health(graph, registry=registry, **kwargs)
             portable = report.to_dict()
             findings = (*portable["errors"], *portable["warnings"])

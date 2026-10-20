@@ -16,7 +16,6 @@ from vibeflow.core.compiler import (
     explicit_flow_cycles,
 )
 from vibeflow.core.flow import (
-    IO_NODE_TYPE,
     LOOP_NODE_TYPES,
     STATUS_PLANNED,
     GraphConfig,
@@ -183,7 +182,7 @@ def _adapt_implementation_facts(
             for node in current.nodes
             if node.status != STATUS_PLANNED
             and node.type_used not in LOOP_NODE_TYPES
-            and node.type_used != IO_NODE_TYPE
+
             and node.type_used not in nodeset_types
         )
         for nodeset in current.nodesets.values():

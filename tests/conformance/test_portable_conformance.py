@@ -300,6 +300,9 @@ class _DetachedAuditNode:
 
 
 JAVASCRIPT_SOURCE = """
+export async function portReceive(inputs,params,context){const result=await context.capabilities["vibeflow.port"].receive({port:params.port});return {number:result.value};}
+export function portSend(inputs,params,context){context.capabilities["vibeflow.port"].send({port:params.port,value:inputs.answer.value});return {};}
+
 export function terminal() { return {}; }
 export function aliasValues() {
   return { exact: 3, optional: 4, item: 5 };
@@ -373,6 +376,7 @@ export function unusedComposite() {
 
 
 JAVASCRIPT_COMPLETIONS = {
+    "fixture.port.receive": "suspend",
     "fixture.async_route": "suspend",
     "fixture.async_double": "suspend",
     "fixture.detached_audit": "suspend",
@@ -380,6 +384,9 @@ JAVASCRIPT_COMPLETIONS = {
 
 
 JAVASCRIPT_EXPORTS = {
+    "fixture.port.receive": "portReceive",
+    "fixture.port.send": "portSend",
+    "fixture.port.boundary": "terminal",
     "fixture.terminal": "terminal",
     "fixture.alias": "aliasValues",
     "fixture.add": "add",
@@ -409,6 +416,8 @@ JAVASCRIPT_EXPORTS = {
 
 def _registry() -> NodeRegistry:
     registry = NodeRegistry()
+    from tests.fixtures.support.port_nodes import register_ports
+    register_ports(registry)
     registry.register(_TerminalNode_DECLARATION, _TerminalNode)
     registry.register(_AliasNode_DECLARATION, _AliasNode)
     registry.register(_AddNode_DECLARATION, _AddNode)
@@ -515,7 +524,7 @@ def _node(
         "description": f"Conformance node {node_id}.",
         **extra,
     }
-    if type_key in {"vibeflow.io", "vibeflow.loop.while"} or extra.get("status") == "planned":
+    if type_key in {"vibeflow.loop.while"} or extra.get("status") == "planned":
         node["requires"] = requires or []
         node["provides"] = provides or []
     return node
@@ -1235,12 +1244,11 @@ def test_portable_conformance_port_receive_transform_and_send(
     document = {
         "pipeline": {
             "entry_mode": "async",
-            "nodes": [
+            "nodes": [_node("start", "fixture.terminal"), _node("end", "fixture.terminal"),
                 _node(
                     "receive",
-                    "vibeflow.io",
-                    provides=[_provider("number")],
-                    io={"operation": "receive", "port": "math.in"},
+                    "fixture.port.receive",
+                    config={"port":"math.in"},
                 ),
                 _node(
                     "add",
@@ -1251,12 +1259,11 @@ def test_portable_conformance_port_receive_transform_and_send(
                 ),
                 _node(
                     "send",
-                    "vibeflow.io",
-                    requires=[_requirement("answer")],
-                    io={"operation": "send", "port": "math.out"},
+                    "fixture.port.send",
+                    config={"port":"math.out"},
                 ),
             ],
-            "edges": [
+            "edges": [_edge("start","receive"), _edge("send","end"),
                 _edge("receive", "add"),
                 _edge("add", "send"),
             ],

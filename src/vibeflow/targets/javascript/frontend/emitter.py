@@ -17,6 +17,7 @@ from vibeflow.targets.javascript.frontend.emission_protocol import (
 )
 from vibeflow.targets.javascript.frontend.emission_view import (
     bound_workflow_view,
+    bound_entry_view,
     emission_payload,
     module_specifier,
 )
@@ -55,6 +56,8 @@ def emit_workflow_module(
         _plugin_binding_value(item) for item in javascript_bindings.runtime_plugins
     )
     serializable = emission_payload(workflow)
+    serializable["named_entries"] = [item.to_dict() for item in plan.named_entries]
+    serializable["default_entry"] = plan.default_entry
     bindings: dict[tuple[str, str], str] = {}
     modules: list[str] = []
     _bind_implementations(
@@ -91,6 +94,8 @@ def emit_workflow_module(
         workflow=workflow,
         payload=serializable,
         binding_expressions=binding_expressions,
+        named_workflows={item.name: bound_entry_view(workflow, item) for item in plan.named_entries},
+        default_entry=plan.default_entry,
     ).emit()
     plugin_descriptors = [
         {

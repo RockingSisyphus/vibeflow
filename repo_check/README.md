@@ -29,7 +29,9 @@ Imports at module scope, inside functions, under `TYPE_CHECKING`, and fixed-stri
 JavaScript profiles also follow their application entry-point closures and
 report the shortest path to a cross-Target dependency. The base profile keeps
 shared Tooling and CLI code Target-neutral; explicit Target application entry
-points are the only boundary it may dispatch through.
+points are the only boundary it may dispatch through. Coordination is a separate
+stdlib/Core layer; only its thin `__main__` may delegate to the neutral command
+entry. Its protocol, clients and service cannot import Targets or Tooling.
 
 The checker's own tests use only `unittest`. The runner also prevents test
 bytecode from being written into the source tree:

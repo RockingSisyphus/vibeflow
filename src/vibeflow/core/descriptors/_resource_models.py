@@ -235,7 +235,7 @@ class CapabilityDescriptor:
         )
         if not targets:
             raise DescriptorModelError("capability.targets cannot be empty")
-        unknown = sorted(set(targets) - {"node", "browser"})
+        unknown = sorted(set(targets) - {"python", "node", "browser"})
         if unknown:
             raise DescriptorModelError(
                 f"capability.targets contains unsupported targets: {unknown}"

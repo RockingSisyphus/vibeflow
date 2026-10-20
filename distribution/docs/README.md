@@ -4,6 +4,7 @@
 
 - [overview](overview.md)
 - [quickstart](user/quickstart.md)
+- [命名入口与 Workflow 通信](user/workflow-coordination.md)：接口、授权、宿主、消息、目标展开和原生 IO 迁移。
 - [workflow-and-config](user/workflow-and-config.md)
 - [python-development](user/python-development.md)
 - [javascript-development](user/javascript-development.md)

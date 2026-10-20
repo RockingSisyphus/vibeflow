@@ -24,7 +24,7 @@ def _artifact(path: Path, marker: str) -> None:
     plan_hash = hashlib.sha256(marker.encode()).hexdigest()
     manifest = {
         "format": FORMAT,
-        "abi_version": "vibeflow.workflow.v8",
+        "abi_version": "vibeflow.workflow.v9",
         "project_target": "javascript",
         "workflow_id": "publish-test",
         "entry_mode": "sync",

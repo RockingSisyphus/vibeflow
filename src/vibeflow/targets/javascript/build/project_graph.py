@@ -15,7 +15,6 @@ from vibeflow.core.descriptors import (
 )
 from vibeflow.core.flow import (
     GraphConfig,
-    IO_NODE_TYPE,
     LOOP_NODE_TYPES,
     STATUS_PLANNED,
     NodeSpec,
@@ -48,7 +47,6 @@ class PreparationState:
     implementations: dict[str, object]
     used_nodes: dict[str, NodeDescriptor]
     used_types: set[str]
-    used_io_operations: set[str]
     call_effect_scopes: Mapping = None
 
 
@@ -88,10 +86,6 @@ def _prepare_calls(graph, *, state, path, overrides, global_scope):
                 "planned nodes cannot target JavaScript",
                 call_path,
             )
-        if spec.type_used == IO_NODE_TYPE:
-            state.used_io_operations.add(spec.io.operation)
-            state.params_by_path[call_path] = scheduling_config({**spec.params, **overrides.get(spec.id, {})})
-            continue
         is_loop = spec.type_used in LOOP_NODE_TYPES
         is_nodeset = spec.type_used in graph.nodesets and not is_loop
         if is_loop or is_nodeset:

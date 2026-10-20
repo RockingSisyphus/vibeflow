@@ -19,7 +19,6 @@ from vibeflow.core import (
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
 from vibeflow.core.descriptors import DescriptorCatalogs, PluginSelectionError
 from vibeflow.core.flow import (
-    IO_NODE_TYPE,
     LOOP_NODE_TYPES,
     STATUS_PLANNED,
     GraphConfig,
@@ -426,8 +425,6 @@ def _validate_graph_tree(
     for node in graph.nodes:
         call_path = (*path, node.id)
         if node.status == STATUS_PLANNED:
-            continue
-        if node.type_used == IO_NODE_TYPE:
             continue
         is_loop = node.type_used in LOOP_NODE_TYPES
         is_nodeset = node.type_used in graph.nodesets and not is_loop

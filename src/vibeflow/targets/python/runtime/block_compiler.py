@@ -179,7 +179,7 @@ def _generated_graph_block_source(name: str, nodes: tuple[str, ...]) -> str:
     return "\n".join([
         "def compiled_block(runtime, state):",
         "    from vibeflow.targets.python.runtime.block_compiler import run_graph_block",
-        f"    return run_graph_block(runtime, state, {name!r}, {nodes!r})",
+        "    return run_graph_block(runtime, state, 'graph:' + runtime._plan.order[0], runtime._plan.order)",
     ])
 
 

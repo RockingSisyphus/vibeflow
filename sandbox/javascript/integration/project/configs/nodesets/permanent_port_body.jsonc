@@ -8,22 +8,19 @@
     "entry_mode": "async",
     "nodes": [
       {
+        "id": "receive_start",
+        "type_used": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Explicit entry before receiving a host value."
+      },
+      {
         "id": "receive",
-        "type_used": "vibeflow.io",
+        "type_used": "sandbox.port_receive_0",
         "display_name": "Receive number",
         "description": "Waits for the next number from the sandbox Port.",
-        "provides": [
-          {
-            "key": "number",
-            "type": "sandbox.number",
-            "display_name": "Received number"
-          }
-        ],
-        "io": {
-          "operation": "receive",
+        "config": {
           "port": "sandbox.permanent.in"
-        },
-        "requires": []
+        }
       },
       {
         "id": "calculate",
@@ -37,24 +34,25 @@
       },
       {
         "id": "send",
-        "type_used": "vibeflow.io",
+        "type_used": "sandbox.port_send_1",
         "display_name": "Send result",
         "description": "Submits the calculated result to the sandbox Port.",
-        "requires": [
-          {
-            "type": "sandbox.math.result",
-            "cardinality": "exactly_one",
-            "display_name": "Calculated result"
-          }
-        ],
-        "io": {
-          "operation": "send",
+        "config": {
           "port": "sandbox.permanent.out"
-        },
-        "provides": []
+        }
+      },
+      {
+        "id": "send_end",
+        "type_used": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Explicit end after sending a host value."
       }
     ],
     "edges": [
+      [
+        "receive_start",
+        "receive"
+      ],
       {
         "from": "receive",
         "to": "calculate"
@@ -62,7 +60,11 @@
       {
         "from": "calculate",
         "to": "send"
-      }
+      },
+      [
+        "send",
+        "send_end"
+      ]
     ],
     "outputs": []
   },

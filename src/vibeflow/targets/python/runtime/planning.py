@@ -6,7 +6,7 @@ from typing import Any, Mapping
 from vibeflow.targets.python.runtime.block_compiler import CompiledBlock
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.contracts import DataProvider, DataRequirement, provider_keys, requirement_types
-from vibeflow.core.flow import EdgeSpec, GraphConfig, IoSpec, LoopSpec, ExecutionLockSpec, STATUS_IMPLEMENTED, STATUS_PLANNED
+from vibeflow.core.flow import EdgeSpec, GraphConfig, LoopSpec, ExecutionLockSpec, STATUS_IMPLEMENTED, STATUS_PLANNED
 from vibeflow.targets.python.nodetypes.protocols import PureNode
 from vibeflow.targets.python.project.bindings import PythonBindingPlan
 from vibeflow.core.planned import PLANNED_BEHAVIOR_PYTHON_STUB, PlannedBehavior, blocking_planned_behavior
@@ -32,13 +32,11 @@ class NodeFrame:
     transfer_incoming: tuple[EdgeSpec, ...] = ()
     transfer_outgoing: tuple[EdgeSpec, ...] = ()
     is_loop: bool = False
-    is_io: bool = False
     join_policy: str = ""
     max_concurrency: int = 8
     nodeset_type_key: str = ""
     exports: tuple[DataProvider, ...] = ()
     loop_spec: LoopSpec = field(default_factory=LoopSpec)
-    io_spec: IoSpec = field(default_factory=IoSpec)
     execution_lock: ExecutionLockSpec | None = None
     subplan: "ExecutionPlan | None" = None
     accepts_context: bool = False
@@ -46,6 +44,7 @@ class NodeFrame:
     planned_stub_module: str = ""
     planned_stub_path: str = ""
     planned_stub_hash: str = ""
+    capability_policy: Mapping[str, object] = field(default_factory=dict)
 
     @property
     def name(self) -> str:
@@ -148,6 +147,7 @@ def build_execution_plan(
     plugin_registry: object | None = None,
     _contracts_resolved: bool = False,
     _path: tuple[str, ...] = (),
+    entry: str | None = None,
 ) -> ExecutionPlan:
     from vibeflow.targets.python.runtime.preparation import prepare_python_workflow, bind_python_workflow
     if not _contracts_resolved:
@@ -159,7 +159,7 @@ def build_execution_plan(
         collect_workflow_source_context(registry, graph)
     prepared = prepare_python_workflow(graph, compiled, registry=registry,
         global_config=global_config, node_config_overrides=node_config_overrides)
-    return bind_python_workflow(prepared, registry=registry, runtime_options=runtime_options, plugin_registry=plugin_registry)
+    return bind_python_workflow(prepared, registry=registry, runtime_options=runtime_options, plugin_registry=plugin_registry, entry=entry)
 
 
 __all__ = ["CompiledBlock", "ExecutionPlan", "NodeFrame", "build_execution_plan"]

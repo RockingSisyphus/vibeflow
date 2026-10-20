@@ -47,4 +47,4 @@ Python 的 `context.signal` 和 JavaScript 的 `context.signal` 保留取消协�
 
 删除旧 `task_manager` 类型、`vibeflow.task_manager` Ruleset、`task_targets` 配置、TaskRef/TaskController/TaskOutcome、`context.tasks` 以及 `async_max_workers`。将隐藏目标移到 `pipeline.nodes`，补上分发到工作节点、工作节点到收集节点、收集节点到结束节点的显式边。不要只改名称而保留业务内部的启动和等待循环。
 
-旧配置被明确拒绝，不提供兼容执行器。公共 Workflow ABI 为 `vibeflow.workflow.v8`，AOT manifest 仍为 `vibeflow.aot-build.v3`；manifest 版本未变不表示旧 Workflow 计划兼容。旧生成产物必须从迁移后的配置重新构建，并重新生成 Architecture 与流程图，再执行项目验证。图结构校验与流程图都使用相同的普通节点和边，断路检查对所有工作节点生效。
+旧配置被明确拒绝，不提供兼容执行器。公共 Workflow ABI 为 `vibeflow.workflow.v9`，AOT manifest 仍为 `vibeflow.aot-build.v3`；manifest 版本未变不表示旧 Workflow 计划兼容。旧生成产物必须从迁移后的配置重新构建，并重新生成 Architecture 与流程图，再执行项目验证。图结构校验与流程图都使用相同的普通节点和边，断路检查对所有工作节点生效。

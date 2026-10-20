@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Mapping
 
 from vibeflow.core.compiler import CompiledGraph
-from vibeflow.core.flow import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, LoopSpec, NodeSpec, NodesetSpec, STATUS_PLANNED
+from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, LoopSpec, NodeSpec, NodesetSpec, STATUS_PLANNED
 
 if TYPE_CHECKING:
     from vibeflow.targets.python.project.registry import NodeRegistry
@@ -103,7 +103,7 @@ def node_review_effect_scope(graph: GraphConfig, node: NodeSpec, registry: NodeR
         return "unavailable"
     if compiled is not None and node.id in compiled.effect_scopes:
         return compiled.effect_scopes[node.id]
-    if node.type_used in LOOP_NODE_TYPES or invocation is not None or node.type_used == IO_NODE_TYPE:
+    if node.type_used in LOOP_NODE_TYPES or invocation is not None:
         return "unconstrained"
     if registry is not None and node.type_used in registry.available():
         return registry.effect_scope(node.type_used)

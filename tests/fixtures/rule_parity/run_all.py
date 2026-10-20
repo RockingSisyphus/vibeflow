@@ -154,6 +154,8 @@ def run_current(work, targets, report, toolchain=None, *, workers=DEFAULT_WORKER
                     rows.append({**item, "mismatches": mismatch(item),
                                  "baseline": historical.get(item["id"]), "original_current": previous.get(item["id"])})
                 missing = (historical.keys() | previous.keys()) - {item["id"] for item in observed}
+                from tests.fixtures.rule_parity.retirements import RETIRED
+                missing -= RETIRED.get(target, frozenset())
                 if missing:
                     raise ValueError("lost case IDs: " + repr(sorted(missing)))
                 print(f"{target}: {len(observed)} observations", flush=True)
@@ -162,7 +164,9 @@ def run_current(work, targets, report, toolchain=None, *, workers=DEFAULT_WORKER
     rows.sort(key=lambda row: row["id"])
     summary = {"cases": len(rows), "matched": sum(not row["mismatches"] for row in rows),
                "unmatched": sum(bool(row["mismatches"]) for row in rows), "process_errors": len(errors)}
+    from tests.fixtures.rule_parity.retirements import RETIRED
     result = {"baseline": reference["baseline"], "original_current": reference["original_current"],
+              "retired_native_io_cases": {target: sorted(values) for target, values in RETIRED.items()},
               "current_includes_working_files": True, "mode": "current", "targets": list(targets),
               "workers": workers, "summary": summary, "cases": rows, "errors": errors}
     report.parent.mkdir(parents=True, exist_ok=True)

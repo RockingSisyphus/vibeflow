@@ -46,6 +46,7 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         runtime_options: RuntimeOptions | Mapping[str, object] | None = None,
         delegate_cli: bool = False,
         capabilities: Mapping[str, object] | None = None,
+        entry: str | None = None,
         _execution_plan: ExecutionPlan | None = None,
     ) -> None:
         self.runtime_options = normalize_runtime_options(runtime_options)
@@ -76,7 +77,10 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
             runtime_options=self.runtime_options,
             plugin_registry=plugin_registry,
             _contracts_resolved=True,
+            entry=entry,
         )
+        self.graph, self.compiled = self._plan.graph, self._plan.compiled
+        graph = self.graph
         self.trace = RuntimeTrace()
         self._node_runs: dict[str, int] = {node.name: 0 for node in graph.nodes}
         self._frames = self._plan.frames

@@ -849,7 +849,7 @@ def test_delegate_cli_run_directory_race_does_not_overwrite_foreign_log(monkeypa
         (run_dir / "vibeflow.log").write_text("OTHER-RUN\n", encoding="utf-8")
         return original_prepare_run_dir(run_root, run_id)
 
-    monkeypatch.setattr("vibeflow.tooling.application.python.runner._prepare_run_dir", race_for_run_directory)
+    monkeypatch.setattr("vibeflow.tooling.application.python.execution._prepare_run_dir", race_for_run_directory)
 
     status = main(
         [

@@ -1,3 +1,4 @@
+from port_nodes import Port0, Port1, portCapability, portSchema0, portSchema1, portSchema2, portSchema3
 from vibeflow.targets.python.sdk import Plugin, ruleset, base_lib, data_schema
 from nodes.boundary import Boundary as boundary_node
 from nodes.affine import Affine as affine_node
@@ -60,4 +61,4 @@ schema_18 = data_schema(**{'type_key': 'math.value', 'representation': 'json', '
 
 schema_19 = data_schema(**{'type_key': 'math.x', 'representation': 'json', 'schema': {'type': 'number'}})
 
-plugin = Plugin(id="math.python", resources=[boundary_node, affine_node, subtract_node, route_node, square_node, negative_node, choice_node, companion_node, join_node, step_node, offset_node, finish_node, helpers, min_t, advice, source_rules, process_rules, schema_0, schema_1, schema_2, schema_3, schema_4, schema_5, schema_6, schema_7, schema_8, schema_9, schema_10, schema_11, schema_12, schema_13, schema_14, schema_15, schema_16, schema_17, schema_18, schema_19])
+plugin = Plugin(id="math.python", resources=[Port0, Port1, portCapability, portSchema0, portSchema1, portSchema2, portSchema3, boundary_node, affine_node, subtract_node, route_node, square_node, negative_node, choice_node, companion_node, join_node, step_node, offset_node, finish_node, helpers, min_t, advice, source_rules, process_rules, schema_0, schema_1, schema_2, schema_3, schema_4, schema_5, schema_6, schema_7, schema_8, schema_9, schema_10, schema_11, schema_12, schema_13, schema_14, schema_15, schema_16, schema_17, schema_18, schema_19])

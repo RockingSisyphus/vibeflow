@@ -14,6 +14,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 from time import perf_counter
 
@@ -35,6 +36,7 @@ TEST_GROUPS = (
     "tests/targets",
     "tests/tooling",
     "tests/conformance",
+    "tests/coordination",
     "tests/integration",
 )
 
@@ -427,10 +429,22 @@ def _wheel_smoke(scratch: Path) -> None:
 
     shutil.copy2(ROOT / "src/vibeflow_build.py", source_root / "src/vibeflow_build.py")
     shutil.copytree(ROOT / "tools/workflow-viewer", source_root / "tools/workflow-viewer")
+    sdist_root = scratch / "source-dist"
+    _run(
+        (PYTHON, "-m", "build", "--sdist", "--outdir", sdist_root),
+        cwd=source_root,
+        overrides={"PYTHONPATH": None},
+    )
+    archives = sorted(sdist_root.glob("vibeflow-*.tar.gz"))
+    if len(archives) != 1:
+        raise VerificationError(f"sdist build produced {len(archives)} matching artifacts")
+    unpacked = scratch / "sdist-unpacked"
+    with tarfile.open(archives[0]) as archive:
+        archive.extractall(unpacked, filter="data")
     wheel_root = scratch / "wheel-dist"
     _run(
         (PYTHON, "-m", "build", "--wheel", "--outdir", wheel_root),
-        cwd=source_root,
+        cwd=next(unpacked.iterdir()),
         overrides={"PYTHONPATH": None},
     )
     wheels = sorted(wheel_root.glob("vibeflow-*.whl"))
@@ -465,7 +479,7 @@ def _wheel_smoke(scratch: Path) -> None:
             "    assert not root.joinpath(retired).is_file(), retired",
             "for name in ('config.schema.json', 'health_report.schema.json', 'node.schema.json', 'nodeset.schema.json', 'policy.schema.json', 'rule.schema.json', 'ruleset.schema.json'):",
             "    assert root.joinpath('tooling/project/schema', name).is_file()",
-            "for name in ('runtime_helpers.mjs', 'toolchain_driver.mjs', 'plugin_worker.mjs', 'plugin_abi.d.ts', 'rule_abi.d.ts', 'sdk.mjs', 'sdk.d.ts', 'sdk_loader.mjs'):",
+            "for name in ('runtime_helpers.mjs', 'capability_helpers.mjs', 'plugin_helpers.mjs', 'root_helpers.mjs', 'workflow_client.mjs', 'workflow_host.mjs', 'workflow_node.mjs', 'toolchain_driver.mjs', 'plugin_worker.mjs', 'plugin_abi.d.ts', 'rule_abi.d.ts', 'sdk.mjs', 'sdk.d.ts', 'sdk_loader.mjs'):",
             "    assert root.joinpath('targets/javascript/resources', name).is_file()",
             "for name in ('declarations.mjs', 'contracts.d.ts'):",
             "    assert root.joinpath('targets/javascript/nodetypes', name).is_file()",

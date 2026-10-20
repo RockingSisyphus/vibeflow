@@ -52,7 +52,7 @@ Config 提供实际构建和执行的工作流结构。修改已有环节时，�
 
 每个调用实例必须有非空 `display_name` 和 `description`。`id` 在当前作用域唯一，`type_used` 指向 Node `type_key`、Nodeset `type_key` 或系统类型。
 
-已实现普通 Node 和 Nodeset 调用不在 Config 重复写 `requires` / `provides`。planned Node、`vibeflow.io`、`vibeflow.loop.while` 以及 pipeline 公共输入输出继续显式声明其结构。
+已实现普通 Node 和 Nodeset 调用不在 Config 重复写 `requires` / `provides`。planned Node、`vibeflow.loop.while` 以及 pipeline 公共输入输出继续显式声明其结构。
 
 Python Runtime 与 JavaScript/TypeScript AOT 使用同一公共输入契约。每个 `pipeline.inputs` 项都必须显式写布尔值 `required`：`true` 要求调用时提供该 key，`false` 允许省略；两者都拒绝未声明的输入 key。省略 `inputs` 或声明空列表时，调用输入只能是 `{}`。`required` 不能省略或写成 `null`。
 
@@ -187,3 +187,5 @@ python run.py validate --config <root>/configs/main.jsonc
 Workflow 顶层的 `rulesets` 未填写时，使用内置及所选 Plugin 的 Workflow 默认；非空列表替代全部默认，`[]` 取消根图规则。Node 调用自身的 `rulesets` 独立控制局部规则，不解除图级约束。需要同时保留内置 Workflow 审查与自定义图规则时，应显式列出 `["vibeflow.workflow", "example.graph"]`。定义和接入方法见 [规则选择与插件示例](rules-and-nodes.md)。
 
 普通节点的并发分发、显式汇合、取消与实际收尾合同见[普通图并发](graph-concurrency.md)。
+
+命名入口、独立 workflow 调用与消息、普通端口节点迁移见[多入口与通信](workflow-coordination.md)。旧原生 `vibeflow.io` / `io` 配置不再执行；`vibeflow.io` Ruleset 继续保留。

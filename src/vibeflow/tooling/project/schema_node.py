@@ -14,7 +14,7 @@ from vibeflow.tooling.project.schema_common import (
     _validate_requirement_list,
     _warning,
 )
-from vibeflow.core.flow import IO_NODE_TYPE, JOIN_POLICIES, LOOP_NODE_TYPES, LOOP_WHILE_TYPE, SIMILAR_TO_RELATIONSHIPS
+from vibeflow.core.flow import JOIN_POLICIES, LOOP_NODE_TYPES, LOOP_WHILE_TYPE, SIMILAR_TO_RELATIONSHIPS
 from vibeflow.core.findings import HealthFinding
 from vibeflow.core.constants import FLOW_KINDS
 from vibeflow.core.planned import PLANNED_BEHAVIOR_BLOCKING, PLANNED_BEHAVIOR_PYTHON_STUB, PLANNED_BEHAVIOR_TRANSPARENT, validate_stub_module_ref
@@ -25,6 +25,9 @@ STATUSES = {"planned", "implemented"}
 def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> None:
     if not isinstance(value, Mapping):
         findings.append(_error("CONFIG.SCHEMA.NODE_OBJECT", f"{prefix} must be an object", prefix))
+        return
+    if "io" in value or value.get("type_used") == "vibeflow.io":
+        findings.append(_error("GRAPH.IO.MIGRATION", "use ordinary SDK nodes with explicit contracts and vibeflow.port Capability; add terminal boundaries", prefix))
         return
     status = str(value.get("status", "implemented")).strip()
     if "rulesets" in value:
@@ -45,7 +48,6 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
         findings.append(_error("GRAPH.TASK.MIGRATION", "declare normal nodes and explicit edges", prefix))
     _validate_node_join_policy(value, prefix, findings)
     _validate_node_loop(value, prefix, findings)
-    _validate_node_io(value, prefix, findings)
     if "execution_lock" in value:
         _validate_execution_lock(
             value["execution_lock"],
@@ -91,7 +93,7 @@ def _validate_node_contract_fields(
     status: str,
 ) -> None:
     type_used = str(value.get("type_used", "")).strip()
-    explicit_contract = status == "planned" or type_used in LOOP_NODE_TYPES or type_used == IO_NODE_TYPE
+    explicit_contract = status == "planned" or type_used in LOOP_NODE_TYPES
     if explicit_contract:
         for field in ("requires", "provides"):
             if field not in value:
@@ -284,92 +286,6 @@ def _validate_node_loop(value: Mapping[str, Any], prefix: str, findings: list[He
             _validate_loop_list(loop[field], f"{prefix}.loop.{field}", findings, required_fields=required)
 
 
-def _validate_node_io(
-    value: Mapping[str, Any],
-    prefix: str,
-    findings: list[HealthFinding],
-) -> None:
-    node_type = str(value.get("type_used", "")).strip()
-    raw = value.get("io")
-    if node_type != IO_NODE_TYPE:
-        if "io" in value:
-            findings.append(
-                _error(
-                    "CONFIG.SCHEMA.NODE_IO_INVALID",
-                    f"{prefix}.io is only allowed on {IO_NODE_TYPE}",
-                    f"{prefix}.io",
-                )
-            )
-        return
-    if not isinstance(raw, Mapping):
-        findings.append(
-            _error(
-                "CONFIG.SCHEMA.NODE_IO_INVALID",
-                f"{prefix}.io must be an object",
-                f"{prefix}.io",
-            )
-        )
-        return
-    unknown = sorted(set(raw) - {"operation", "port"})
-    if unknown:
-        findings.append(
-            _error(
-                "CONFIG.SCHEMA.NODE_IO_INVALID",
-                f"{prefix}.io contains unsupported keys: {unknown}",
-                f"{prefix}.io",
-            )
-        )
-    operation = raw.get("operation")
-    if operation not in {"receive", "send"}:
-        findings.append(
-            _error(
-                "CONFIG.SCHEMA.NODE_IO_INVALID",
-                f"{prefix}.io.operation must be receive or send",
-                f"{prefix}.io.operation",
-            )
-        )
-    if "port" in raw and not _non_empty_string(raw.get("port")):
-        findings.append(
-            _error(
-                "CONFIG.SCHEMA.NODE_IO_INVALID",
-                f"{prefix}.io.port must be a non-empty string",
-                f"{prefix}.io.port",
-            )
-        )
-    requires = value.get("requires", [])
-    provides = value.get("provides", [])
-    if operation == "receive" and (
-        not isinstance(requires, list)
-        or requires
-        or not isinstance(provides, list)
-        or len(provides) != 1
-    ):
-        findings.append(
-            _error(
-                "CONFIG.SCHEMA.NODE_IO_CONTRACT",
-                "receive requires zero inputs and exactly one output",
-                prefix,
-            )
-        )
-    if operation == "send":
-        valid_requirement = (
-            isinstance(requires, list)
-            and len(requires) == 1
-            and isinstance(requires[0], Mapping)
-            and requires[0].get("cardinality") == "exactly_one"
-        )
-        if (
-            not valid_requirement
-            or not isinstance(provides, list)
-            or provides
-        ):
-            findings.append(
-                _error(
-                    "CONFIG.SCHEMA.NODE_IO_CONTRACT",
-                    "send requires one exactly_one input and zero outputs",
-                    prefix,
-                )
-            )
 def _validate_loop_mapping(value: Any, prefix: str, findings: list[HealthFinding], *, required_fields: tuple[str, ...]) -> None:
     if not isinstance(value, Mapping):
         findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix} must be an object", prefix))

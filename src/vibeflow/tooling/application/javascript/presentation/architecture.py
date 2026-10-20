@@ -2,7 +2,7 @@
 from pathlib import Path
 from typing import Mapping
 from vibeflow.core import CompiledGraph
-from vibeflow.core.flow import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, STATUS_PLANNED
+from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, STATUS_PLANNED
 from vibeflow.core.constants import FLOW_KIND_GLOBAL_STATE
 from vibeflow.core.descriptors import DescriptorCatalogs
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
@@ -43,8 +43,14 @@ def build_architecture_facts(
     from .status import node_health_classes
     if rule_report is not None:
         findings = rule_report.findings
+    from vibeflow.tooling.presentation.workflow_facts import policy_facts
+    from vibeflow.targets.shared.rule_support.capability_policy import policies_from_executions
+    from vibeflow.core.graph_calls import graph_call_subjects
+    paths = [(*subject.call_path, node.id) for subject in graph_call_subjects(graph) for node in subject.graph.nodes]
+    policies = policies_from_executions((item for values in rule_report.results.values() for item in values), paths) if rule_report else {}
     health_classes = node_health_classes(graph, findings)
     payload = {
+        "call_policies": policy_facts(policies),
         "project_target": "javascript",
         "workflow": _javascript_graph_document(
             graph,
@@ -161,7 +167,9 @@ def _javascript_graph_document(
     health_classes: Mapping[tuple[int, str], str] | None = None,
 ) -> dict[str, object]:
     report = build_architecture_report(graph, compiled=compiled)
+    from vibeflow.tooling.presentation.workflow_facts import entry_facts
     return {
+        **entry_facts(graph, compiled),
         "source": dict(source),
         "rulesets": selection_data(graph.rulesets),
         "inputs": providers_to_dicts(graph.inputs),
@@ -241,7 +249,7 @@ def _javascript_node_document(
         "planned_config"
         if status == STATUS_PLANNED
         else "system_config"
-        if type_used == IO_NODE_TYPE or is_loop
+        if is_loop
         else "nodeset"
         if nodeset is not None
         else "node_type"
@@ -277,7 +285,6 @@ def _javascript_node_document(
         "provides": providers_to_dicts(getattr(node, "provides")),
         "join_policy": str(getattr(node, "join_policy", "")),
         "loop": getattr(node, "loop").to_dict() or None,
-        "io": getattr(node, "io").to_dict() or None,
         "invokes": invokes,
         "config": {
             "call": dict(getattr(node, "params")),

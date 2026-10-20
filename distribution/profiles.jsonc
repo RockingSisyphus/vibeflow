@@ -5,6 +5,7 @@
       "distribution/docs/overview.md",
       "distribution/docs/user/quickstart.md",
       "distribution/docs/user/workflow-and-config.md",
+      "distribution/docs/user/workflow-coordination.md",
       "distribution/docs/user/python-development.md",
       "distribution/docs/user/javascript-development.md",
       "distribution/docs/user/nodesets-and-loops.md",

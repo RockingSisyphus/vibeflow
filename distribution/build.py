@@ -33,6 +33,8 @@ except ImportError:  # direct ``python distribution/build.py`` execution
     )
 
 ROOT = Path(__file__).resolve().parents[1]
+# Derive generated interfaces from this checkout, without an installed kernel.
+sys.path.insert(0, str(ROOT / "src"))
 DEFAULT_OUTPUT = ROOT / "dist" / "vibeflow-distribution"
 DEFAULT_AUTONOMOUS_OUTPUT = ROOT / "dist" / "vibeflow-distribution-autonomous"
 DEFAULT_ARCHIVE_DIR = ROOT / "dist"
@@ -396,6 +398,7 @@ def _populate_distribution(output: Path, *, profile: DistributionProfile | None 
     _copy_license(output)
     _copy_third_party_notices(output)
     _copy_javascript_sdk(output)
+    _copy_coordination_templates(output)
     _write_kernel_archive(ROOT / "src" / "vibeflow", output / KERNEL_ZIP_RELATIVE,
                           viewer_source=ROOT / "tools" / "workflow-viewer")
     _ensure_standard_project_dirs(output)
@@ -683,6 +686,8 @@ def _verify_distribution_document_links(output: Path) -> None:
     documents.extend(sorted((output / "kernel" / "docs").rglob("*.md")))
     for document in documents:
         source = document.read_text(encoding="utf-8")
+        # Code examples are not Markdown links, even when they contain api["op"](...).
+        source = re.sub(r"(`+).*?\1", "CODE", source, flags=re.S)
         for raw_target in re.findall(r"(?<!!)\[[^\]]+\]\(([^)]+)\)", source):
             target = raw_target.strip()
             if target.startswith("<") and target.endswith(">"):
@@ -744,7 +749,8 @@ def _copy_javascript_sdk(output: Path) -> None:
     source = ROOT / "src/vibeflow/targets/javascript/resources"
     target = output / "kernel/javascript"
     target.mkdir(parents=True, exist_ok=True)
-    for name in ("sdk.mjs", "sdk.d.ts", "rule_abi.d.ts", "plugin_abi.d.ts"):
+    for name in ("sdk.mjs", "sdk.d.ts", "rule_abi.d.ts", "plugin_abi.d.ts",
+                 "workflow_client.mjs", "workflow_host.mjs", "workflow_node.mjs"):
         data = (source / name).read_text(encoding="utf-8")
         (target / name).write_text(data.replace("../nodetypes/", "./nodetypes/"), encoding="utf-8")
     node_source = source.parent / "nodetypes"
@@ -753,6 +759,24 @@ def _copy_javascript_sdk(output: Path) -> None:
     for name in ("declarations.mjs", "contracts.d.ts"):
         data = (node_source / name).read_text(encoding="utf-8")
         (node_target / name).write_text(data.replace("../resources/sdk", "../sdk"), encoding="utf-8")
+
+
+def _copy_coordination_templates(output: Path) -> None:
+    """Copy ordinary SDK examples; protocol declarations have one Core source."""
+    from vibeflow.core.workflows.interfaces import (
+        WORKFLOW_SCHEMA_TYPES, PORT_SCHEMA_TYPES,
+        workflow_capability_descriptor, port_capability_descriptor,
+    )
+    target = output / "kernel/templates"
+    _copy_tree(ROOT / "distribution/templates", target)
+    capabilities = [workflow_capability_descriptor().to_dict(),
+                    port_capability_descriptor({"receive", "send"}).to_dict()]
+    for descriptor in capabilities:
+        descriptor.pop("kind", None)
+    source = "// Generated from vibeflow.core.workflows.interfaces.\n"
+    source += "export const capabilities=" + json.dumps(capabilities, ensure_ascii=False) + ";\n"
+    source += "export const schemas=" + json.dumps({**WORKFLOW_SCHEMA_TYPES, **PORT_SCHEMA_TYPES}) + ";\n"
+    (target / "workflow_nodes/interfaces.mjs").write_text(source, encoding="utf-8")
 
 
 def _copy_mermaid_renderer_config(output: Path) -> None:

@@ -27,10 +27,8 @@ def test_retired_project_host_field_is_rejected_by_loaders_preview_and_validate(
     workspace.write_text(json.dumps({"roots": [{"id": "main", "path": "."}]}), encoding="utf-8")
     workflow = tmp_path / "workflow.jsonc"
     workflow.write_text(json.dumps({"rulesets": [], "host_extensions": [], "pipeline": {"nodes": [{
-        "id": "input", "type_used": "vibeflow.io", "display_name": "Input",
-        "description": "Receive native input", "requires": [],
-        "provides": [{"key": "data.in", "type": "data.in", "display_name": "Input data"}],
-        "io": {"operation": "receive", "port": "in"},
+        "id": "input", "type_used": "example.input", "display_name": "Input",
+        "description": "Ordinary SDK input node",
     }]}}), encoding="utf-8")
     expected = "javascript.host_extensions was removed; select host_extensions in the workflow"
     for loader, path in (

@@ -15,7 +15,7 @@ SCENARIOS = (
 
 def assert_execution_order(order, case):
     expected = {"start", "receive", "offset", "prepare", "companion", "route",
-                case["selected"], "choice", "join", "loop", "finish", "send"}
+                case["selected"], "choice", "join", "loop", "finish", "send", "send_end"}
     assert len(order) == len(expected) and set(order) == expected, order
     positions = {name: index for index, name in enumerate(order)}
     dependencies = (
@@ -24,7 +24,7 @@ def assert_execution_order(order, case):
         ("prepare", "route"), ("route", case["selected"]),
         (case["selected"], "choice"), ("choice", "join"),
         ("companion", "join"), ("join", "loop"),
-        ("loop", "finish"), ("offset", "finish"), ("finish", "send"),
+        ("loop", "finish"), ("offset", "finish"), ("finish", "send"), ("send", "send_end"),
     )
     for source, target in dependencies:
         assert positions[source] < positions[target], (source, target, order)

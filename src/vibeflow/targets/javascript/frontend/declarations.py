@@ -75,20 +75,37 @@ def declarations(
             f"  readonly {json.dumps(item.alias)}{optional}: {value_type};"
         )
     capability_lines = _capability_declarations(workflow)
+    contracts = ["export interface WorkflowInputs {", *input_lines, "}", "",
+                 "export interface WorkflowOutputs {", *output_lines, "}"]
+    named = getattr(workflow, "named_entry_contracts", ())
+    if named:
+        from .emission_view import bound_entry_view
+        inputs, outputs = [], []
+        for entry in named:
+            selected = bound_entry_view(workflow, entry)
+            input_type = "{ " + " ".join(f"readonly {json.dumps(item.key)}{'' if item.required else '?'}: {schema_to_typescript(item.schema)};" for item in selected.inputs) + " }"
+            output_members = []
+            for item in selected.outputs:
+                value_type = schema_to_typescript(item.schema)
+                if item.cardinality == "all":
+                    value_type = f"readonly ({value_type})[]"
+                output_members.append(f"readonly {json.dumps(item.alias)}{'?' if item.cardinality == 'optional_one' else ''}: {value_type};")
+            inputs.append(f"  readonly {json.dumps(entry.name)}: {input_type};")
+            outputs.append(f"  readonly {json.dumps(entry.name)}: {{ {' '.join(output_members)} }};")
+        contracts = ["export interface WorkflowEntryInputs {", *inputs, "}",
+            "export interface WorkflowEntryOutputs {", *outputs, "}",
+            "export type WorkflowEntry = keyof WorkflowEntryInputs;",
+            "export type WorkflowInputs = WorkflowEntryInputs[WorkflowEntry];",
+            "export type WorkflowOutputs = WorkflowEntryOutputs[WorkflowEntry];"]
     lines = [
             _DECLARATION_PREAMBLE.rstrip(),
             "",
-            "export interface WorkflowInputs {",
-            *input_lines,
-            "}",
-            "",
-            "export interface WorkflowOutputs {",
-            *output_lines,
-            "}",
+            *contracts,
             "",
             *capability_lines,
             "",
             "export interface WorkflowRunOptions {",
+            "  readonly entry?: WorkflowEntry;" if named else "  readonly entry?: string;",
             "  readonly signal?: VibeFlowAbortSignal;",
             '  readonly trace?: WorkflowTraceMode;',
             "  readonly onTrace?: (event: WorkflowTraceEvent) => void;",
@@ -99,7 +116,7 @@ def declarations(
             "  readonly onStatus?: (status: WorkflowRunStatus) => void;",
             "}",
             "",
-            "export const VIBEFLOW_WORKFLOW_ABI: \"vibeflow.workflow.v7\";",
+            "export const VIBEFLOW_WORKFLOW_ABI: \"vibeflow.workflow.v9\";",
             "export const VIBEFLOW_PLUGIN_ABI: \"vibeflow.plugin.v3\";",
             _entry_declaration(workflow),
     ]
@@ -110,6 +127,19 @@ def declarations(
 
 
 def _entry_declaration(workflow: EmissionWorkflow) -> str:
+    named = getattr(workflow, "named_entry_contracts", ())
+    if named:
+        function = "runWorkflow" if workflow.entry_mode == "sync" else "runWorkflowAsync"
+        result = "WorkflowEntryOutputs[E]" if workflow.entry_mode == "sync" else "Promise<WorkflowEntryOutputs[E]>"
+        signatures = [f"export function {function}<E extends WorkflowEntry>(inputs: WorkflowEntryInputs[E], options: WorkflowRunOptions & {{readonly entry: E}}): {result};"]
+        default = workflow.default_entry or (named[0].name if len(named) == 1 else None)
+        if default is not None:
+            key = json.dumps(default)
+            result = f"WorkflowEntryOutputs[{key}]"
+            if workflow.entry_mode == "async":
+                result = f"Promise<{result}>"
+            signatures.append(f"export function {function}(inputs: WorkflowEntryInputs[{key}], options?: WorkflowRunOptions & {{readonly entry?: {key}}}): {result};")
+        return "\n".join(signatures)
     if workflow.entry_mode == "sync":
         return (
             "export function runWorkflow("
@@ -124,7 +154,7 @@ def _entry_declaration(workflow: EmissionWorkflow) -> str:
 
 
 def _host_declarations(workflow: EmissionWorkflow) -> list[str]:
-    invocation = (
+    invocation = _entry_declaration(workflow).replace("export function ", "") if getattr(workflow, "named_entry_contracts", ()) else (
         "runWorkflow(inputs: WorkflowInputs, "
         "options?: WorkflowRunOptions): WorkflowOutputs;"
         if workflow.entry_mode == "sync"

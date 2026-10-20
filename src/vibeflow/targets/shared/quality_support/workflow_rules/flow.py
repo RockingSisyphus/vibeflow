@@ -5,7 +5,7 @@ from collections import Counter
 from typing import Any, Mapping, Sequence
 
 from vibeflow.core.contracts import provider_keys
-from vibeflow.core.flow import IO_NODE_TYPE, LOOP_NODE_TYPES, STATUS_PLANNED
+from vibeflow.core.flow import LOOP_NODE_TYPES, STATUS_PLANNED
 from vibeflow.core.findings import HealthFinding
 from vibeflow.core.constants import FLOW_KIND_DECISION, FLOW_KIND_TERMINAL
 from vibeflow.core.planned import PLANNED_BEHAVIOR_PYTHON_STUB, PLANNED_BEHAVIOR_TRANSPARENT, effective_planned_behavior
@@ -37,7 +37,6 @@ def _flowchart_health_facts(
         for name in active_names
         if (
             compiled.flow_kinds.get(name) == FLOW_KIND_TERMINAL
-            or _is_io_boundary(node_by_name[name], "receive")
         )
         and not incoming[name]
     }
@@ -46,7 +45,6 @@ def _flowchart_health_facts(
         for name in active_names
         if (
             compiled.flow_kinds.get(name) == FLOW_KIND_TERMINAL
-            or _is_io_boundary(node_by_name[name], "send")
             or _is_permanent_loop(node_by_name[name])
         )
         and not outgoing[name]
@@ -105,12 +103,6 @@ def _is_permanent_loop(node: object) -> bool:
     )
 
 
-def _is_io_boundary(node: object, operation: str) -> bool:
-    return (
-        getattr(node, "type_used", "") == IO_NODE_TYPE
-        and getattr(getattr(node, "io", None), "operation", "")
-        == operation
-    )
 
 
 def _append_boundary_findings(starts: set[str], ends: set[str], state, *, owner: str) -> None:

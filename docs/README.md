@@ -14,13 +14,14 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 
 - [系统架构](design/system-architecture.md)：当前内核分层、插件装配与共享架构资料。
 - [执行模型](design/execution-model.md)：普通图调度、显式汇合、规则入口与宿主生命周期。
-- [普通图并发设计](design/graph-concurrency.md)：ABI v8 编译链路、分发局部额度、两侧执行器、取消收尾与维护验证。
+- [普通图并发设计](design/graph-concurrency.md)：ABI v9 编译链路、分发局部额度、两侧执行器、取消收尾与维护验证。
 - [Rule 机制设计](design/rule-system.md)：统一选择、资料与负责范围、协作、复用及维护边界。
 
 ## 设计演进与验收记录
 
 以下记录保留各阶段基线、决定与验证资料。当前使用接口以使用者手册为准，当前内核机制见系统设计。
 
+- [多入口与通信实施记录](maintainers/workflow-communication.md)
 - [本地预览实现与验收](maintainers/local-preview.md)
 
 - [运行观测与类型注解修复记录](design/history/runtime-observation-results.md)
@@ -52,6 +53,8 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - [综合数学沙箱说明](maintainers/comprehensive-math-sandbox.md)
 - [VibeFlow 职责边界与整改规格](maintainers/product-boundary-refactor-spec-20261009.md)：完整职责定义、11 项源码定位、当前与目标逻辑、删改停止点和实施后验收。
 - [双语言 AOT 与维护整理实施记录](maintainers/aot-unification-implementation.md)
+- [AOT 暖调用准备开销复现与方案](maintainers/aot-preparation-analysis.md)：Python 重复元数据装配与 JS 空钩子工作，含测量范围和职责建议。
+- [1.1.5 构建说明](maintainers/history/release-1.1.5.md)：Python AOT 固定资料按 Bundle 准备，运行实例保持独立。
 - [1.1.4 发布说明](maintainers/history/release-1.1.4.md)：展开 Nodeset / Loop 改用分组标题与说明。
 - [1.1.2 发布说明](maintainers/history/release-1.1.2.md)：分发包预装离线 HTML 入口，解压即可打开。
 - [1.1.1 发布说明](maintainers/history/release-1.1.1.md)：planned 展示修复与 HTML 快照审核交付。

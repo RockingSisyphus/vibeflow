@@ -19,7 +19,6 @@ from typing import Any, Mapping
 
 from vibeflow.targets.javascript.frontend.emitter import emit_workflow_module
 from vibeflow.targets.javascript.frontend.bindings import build_javascript_binding_plan
-from vibeflow.targets.javascript.frontend.facts import native_call_execution_facts
 from vibeflow.core.contracts import (
     CARDINALITY_ALL,
     DataEnvelope,
@@ -141,7 +140,6 @@ def run_portable_conformance(
     javascript_plan = compile_graph_plan(
         javascript_compilation.workflow.graph, javascript_compilation.compiled_graph, workflow_id=case.name,
         source_by_type=sources, implementation_facts=javascript_facts,
-        call_execution_facts=native_call_execution_facts(javascript_compilation.workflow.graph),
         target_features=javascript_features, compile_nested=True,
     )
 
@@ -157,6 +155,7 @@ def run_portable_conformance(
         case.inputs,
         port_inputs=case.port_inputs,
         work_dir=work_dir / "javascript-run",
+        case=case,
     )
     return PortableConformanceResult(
         portable_plan=portable_plan.to_dict(),
@@ -201,11 +200,12 @@ def _run_javascript(
     *,
     port_inputs: Mapping[str, tuple[Any, ...]],
     work_dir: Path,
+    case: PortableConformanceCase,
 ) -> RuntimeObservation:
     work_dir.mkdir(parents=True, exist_ok=True)
     (work_dir / "nodes.mjs").write_text(node_source, encoding="utf-8")
     emitted = emit_workflow_module(
-        portable_plan, javascript_bindings=_javascript_bindings(portable_plan),
+        portable_plan, javascript_bindings=_javascript_bindings(portable_plan, case),
     )
     workflow_path = work_dir / "workflow.mjs"
     workflow_path.write_text(emitted.source, encoding="utf-8")
@@ -364,20 +364,12 @@ def _python_port_capabilities(
     }
 
 
-def _javascript_bindings(portable_plan):
-    """Bind JS capabilities without changing the canonical portable plan."""
-    operations = {}
-    for block in portable_plan.blocks:
-        for node in block.nodes:
-            if node.io_operation:
-                operation = node.io_operation
-                operations[operation] = {
-                    "input_type": f"vibeflow.port.{operation}.request",
-                    "output_type": f"vibeflow.port.{operation}.result",
-                    "completion": "suspend" if operation == "receive" else "immediate",
-                }
-    capabilities = {"vibeflow.port": {"operations": operations}} if operations else {}
-    return build_javascript_binding_plan(portable_plan, capabilities=capabilities)
+def _javascript_bindings(portable_plan, case):
+    """Declare ordinary node Capability requirements through the same binding sidecar."""
+    from vibeflow.core.workflows.interfaces import PORT_SCHEMA_TYPES, port_capability_descriptor
+    requirements = {key: tuple(item.to_dict() for item in case.registry.descriptor(key).capabilities) for key in case.registry.available()}
+    return build_javascript_binding_plan(portable_plan, capabilities_by_type=requirements,
+        schemas=PORT_SCHEMA_TYPES, capabilities={"vibeflow.port":port_capability_descriptor({"receive","send"}).to_dict()})
 
 
 _TASK_EVENT_KINDS = frozenset(

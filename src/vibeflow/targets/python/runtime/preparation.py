@@ -9,7 +9,7 @@ from vibeflow.block_compiler import WorkflowPlan, compile_graph_plan
 from vibeflow.block_compiler.compiler import _block_id
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.config.scope import normalize_config_scope, scoped_node_params
-from vibeflow.core.flow import GraphConfig, IO_NODE_TYPE, LOOP_NODE_TYPES, STATUS_PLANNED
+from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, STATUS_PLANNED
 from vibeflow.core.models import TargetFeatureSet
 from vibeflow.core.planned import effective_planned_behavior
 from vibeflow.core.graph_calls import graph_call_subjects
@@ -59,7 +59,7 @@ def prepare_python_workflow(graph, compiled, *, registry, global_config=None, no
                 parameters[(*path, spec.id)] = {**spec.params, **local_overrides.get(spec.id, {})}
                 continue
             composite = spec.type_used in current.nodesets or spec.type_used in LOOP_NODE_TYPES
-            if composite or spec.type_used == IO_NODE_TYPE:
+            if composite:
                 parameters[(*path, spec.id)] = scheduling_config(
                     {**spec.params, **local_overrides.get(spec.id, {})}
                 )
@@ -78,11 +78,26 @@ def prepare_python_workflow(graph, compiled, *, registry, global_config=None, no
         )
     except ValueError as exc:
         raise PipelineRuntimeError(str(exc)) from exc
+    from vibeflow.block_compiler.policies import apply_call_policies
+    workflow = apply_call_policies(workflow, registry.call_capability_policies)
     return PreparedPythonWorkflow(workflow, graphs,
         {_block_id(path): value for path, value in compilations.items()}, globals_by_block, overrides_by_block)
 
 
-def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_registry=None, block_loader=None, instantiate=True, source_hash_for_path=None):
+def select_python_entry(prepared, entry=None):
+    from vibeflow.block_compiler.entries import select_workflow_entry
+    from vibeflow.core.workflows.entries import project_selected_graph
+    workflow = select_workflow_entry(prepared.workflow, entry)
+    if not workflow.selected_entry:
+        return prepared
+    key = workflow.entry_block
+    graph, compiled = project_selected_graph(prepared.graphs[key], prepared.compiled[key],
+        workflow.selected_entry, set(workflow.block(key).order))
+    return replace(prepared, workflow=workflow, graphs={**prepared.graphs, key: graph},
+        compiled={**prepared.compiled, key: compiled})
+
+
+def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_registry=None, block_loader=None, instantiate=True, source_hash_for_path=None, entry=None, select_entry=True):
     """Instantiate the existing runtime frames from the common plan.
 
     ``block_loader`` binds saved generated functions during AOT loading; it
@@ -94,6 +109,9 @@ def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_reg
     from vibeflow.targets.python.runtime.support.planned import resolve_stub_module_path, hash_file
     from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
     from vibeflow.core.config.scope import attach_global_config
+
+    if select_entry:
+        prepared = select_python_entry(prepared, entry)
 
     def bind(block_id):
         block = prepared.workflow.block(block_id)
@@ -107,7 +125,7 @@ def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_reg
             behavior = effective_planned_behavior(spec, nodeset)
             implementation = None
             accepts_context = False
-            if instantiate and not (call.is_nodeset or call.is_loop or spec.type_used == IO_NODE_TYPE or behavior.kind == 'python_stub'):
+            if instantiate and not (call.is_nodeset or call.is_loop or behavior.kind == 'python_stub'):
                 implementation_type = registry.get(call.type_used)
                 implementation = implementation_type()
                 accepts_context = len(signature(implementation.run_pure).parameters) == 3
@@ -124,7 +142,7 @@ def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_reg
             params = call.params.to_value()
             if behavior.kind == 'python_stub':
                 params = business_config({**spec.params, **prepared.globals[block_id], **prepared.overrides[block_id].get(call.id,{})})
-            bound_params = params if (call.is_nodeset or call.is_loop or spec.type_used == IO_NODE_TYPE) and behavior.kind != 'python_stub' else attach_global_config(params, prepared.globals[block_id])
+            bound_params = params if (call.is_nodeset or call.is_loop) and behavior.kind != 'python_stub' else attach_global_config(params, prepared.globals[block_id])
             frames[call.id] = NodeFrame(
                 id=call.id, type_used=call.type_used, node=implementation,
                 requires=spec.requires, provides=spec.provides,
@@ -134,12 +152,13 @@ def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_reg
                 transfer_incoming=tuple(e for e in compiled.resolved_transfer_edges if e.target == call.id),
                 transfer_outgoing=tuple(e for e in compiled.resolved_transfer_edges if e.source == call.id),
                 flow_kind=call.flow_kind, is_terminal=call.is_terminal,
-                is_nodeset=call.is_nodeset, is_loop=call.is_loop, is_io=spec.type_used == IO_NODE_TYPE,
+                is_nodeset=call.is_nodeset, is_loop=call.is_loop,
                 status=call.status, effect_scope='unconstrained' if behavior.kind == 'python_stub' else call.effect_scope, join_policy=call.join_policy,
                 nodeset_type_key=call.nodeset_type_key, exports=tuple(getattr(nodeset,'provides',())),
-                loop_spec=spec.loop, io_spec=spec.io, execution_lock=spec.execution_lock,
+                loop_spec=spec.loop, execution_lock=spec.execution_lock,
                 subplan=bind(call.child_block) if call.child_block else None,
                 accepts_context=accepts_context, planned_behavior=behavior,
+                capability_policy=call.capability_policy.to_value(),
                 planned_stub_module=behavior.stub_module, planned_stub_path=stub_path, planned_stub_hash=stub_hash)
         bindings = build_python_binding_plan(frames, order=block.order, path=block.path,
             plugin_registry=plugin_registry if block_id == prepared.workflow.entry_block else None)

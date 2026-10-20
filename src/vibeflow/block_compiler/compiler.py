@@ -24,11 +24,11 @@ from vibeflow.block_compiler.model import (
     RoutePlan,
     SourceRef,
     WorkflowPlan,
+    WorkflowEntryPlan,
     freeze_json_object,
 )
 from vibeflow.core.compiler import CompiledGraph, GraphCompiler as CoreGraphCompiler
 from vibeflow.core.flow import (
-    IO_NODE_TYPE,
     LOOP_NODE_TYPES,
     GraphConfig,
     LoopSpec,
@@ -144,6 +144,12 @@ def compile_graph_plan(
         inherited_lock_key="",
     )
     root_block = state.blocks[0]
+    from vibeflow.core.workflows.entries import project_entry
+    entries = []
+    for name, definition in graph.entries.items():
+        selected, selected_compiled = project_entry(graph, compiled, name)
+        entries.append(WorkflowEntryPlan(name, definition.start, selected_compiled.order,
+            _root_inputs(selected, None), _root_outputs(selected, None)))
     return WorkflowPlan(
         abi_version=WORKFLOW_ABI_VERSION,
         workflow_id=_workflow_id(graph, workflow_id),
@@ -154,6 +160,8 @@ def compile_graph_plan(
         blocks=tuple(state.blocks),
         max_steps=graph.max_steps,
         entry_mode=graph.entry_mode,
+        named_entries=tuple(entries), default_entry=graph.default_entry,
+        selected_entry=graph.selected_entry,
         execution_lock=_execution_lock_plan(
             graph.execution_lock,
             scope="root",
@@ -369,7 +377,7 @@ class _PlannerState:
             or getattr(nodeset, "status", "implemented") == STATUS_PLANNED
             else spec.status
         )
-        completion, schedule, executor = self._execution_semantics(spec, call_path=call_path, native=is_nodeset or is_loop or spec.type_used == IO_NODE_TYPE)
+        completion, schedule, executor = self._execution_semantics(spec, call_path=call_path, native=is_nodeset or is_loop)
         effect_scope = compiled.effect_scopes.get(
             spec.id,
             (
@@ -400,7 +408,7 @@ class _PlannerState:
             planned_behavior=planned_behavior,
             is_terminal=(
                 flow_kind == "terminal"
-                or spec.type_used == IO_NODE_TYPE
+
             ),
             is_nodeset=is_nodeset,
             is_loop=is_loop,
@@ -413,8 +421,6 @@ class _PlannerState:
             completion=completion,
             schedule=schedule,
             executor=executor,
-            io_operation=spec.io.operation,
-            io_port=spec.io.port if spec.io.operation else "",
             effect_scope=effect_scope,
 
             execution_lock=_execution_lock_plan(

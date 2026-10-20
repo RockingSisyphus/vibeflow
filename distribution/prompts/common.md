@@ -4,6 +4,7 @@
 
 按任务阅读规范：
 
+- 多入口、跨 workflow 调用/消息、端口节点或原生 IO 迁移：[`kernel/docs/user/workflow-coordination.md`](kernel/docs/user/workflow-coordination.md)；功能来自 Capability 与显式 Rule，不按节点名称或外观赋权。
 - 修改 workflow、Config 或 edge：[`kernel/docs/user/workflow-and-config.md`](kernel/docs/user/workflow-and-config.md)
 - 开发 Python Node 或 BaseLib：[`kernel/docs/user/python-development.md`](kernel/docs/user/python-development.md)
 - 开发 JavaScript/TypeScript Node：[`kernel/docs/user/javascript-development.md`](kernel/docs/user/javascript-development.md)

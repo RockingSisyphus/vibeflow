@@ -12,7 +12,6 @@ from vibeflow.core.constants import (
 )
 from vibeflow.core.contracts import provider_keys
 from vibeflow.core.flow import (
-    IO_NODE_TYPE,
     LOOP_NODE_TYPES,
     STATUS_PLANNED,
     EdgeSpec,
@@ -47,6 +46,7 @@ class CompiledGraph:
     schedule_edges: tuple[EdgeSpec, ...] = ()
     transfer_edges: tuple[EdgeSpec, ...] = ()
     edge_roles_resolved: bool = False
+    entry_providers: dict[str, dict[str, str]] = field(default_factory=dict)
 
     @property
     def resolved_schedule_edges(self) -> tuple[EdgeSpec, ...]:
@@ -112,7 +112,8 @@ def compile_core(request: CoreCompileRequest) -> CoreCompilation:
     )
     providers = _collect_providers(
         graph,
-        input_keys=set(provider_keys(graph.inputs)),
+        input_keys=set() if graph.entries else set(provider_keys(graph.inputs)),
+        allow_exclusive=bool(graph.entries),
     )
     consumers = _collect_consumers(graph)
     effective_edges = _deduplicate_edges(graph.edges)
@@ -190,6 +191,16 @@ def compile_core(request: CoreCompileRequest) -> CoreCompilation:
         transfer_edges=mainline.transfer_edges,
         edge_roles_resolved=True,
     )
+    if graph.entries:
+        from vibeflow.core.workflows.entries import project_entry
+        entry_providers = {}
+        for name in graph.entries:
+            try:
+                selected, _ = project_entry(graph, compiled, name)
+            except ValueError as error:
+                raise GraphCompileError(str(error), "GRAPH.ENTRY.INVALID") from error
+            entry_providers[name] = _collect_providers(selected, input_keys=set(provider_keys(selected.inputs)))
+        compiled = replace(compiled, entry_providers=entry_providers)
     return CoreCompilation(
         workflow=ValidatedWorkflow(
             graph=graph,
@@ -270,7 +281,7 @@ def _resolve_effective_nodes(
 
     resolved_nodes: list[NodeSpec] = []
     for node in nodes:
-        if node.status == STATUS_PLANNED or node.type_used in LOOP_NODE_TYPES or node.type_used == IO_NODE_TYPE:
+        if node.status == STATUS_PLANNED or node.type_used in LOOP_NODE_TYPES:
             resolved_nodes.append(node)
             continue
         nodeset = definition_by_key.get(node.type_used)
@@ -386,8 +397,6 @@ def _validate_node_types(
             continue
         if node.type_used in LOOP_NODE_TYPES:
             continue
-        if node.type_used == IO_NODE_TYPE:
-            continue
         if node.type_used in nodesets:
             continue
         if implementations.get(node.type_used) is None:
@@ -402,9 +411,11 @@ def _collect_providers(
     graph: GraphConfig,
     *,
     input_keys: set[str] | None = None,
+    allow_exclusive: bool = False,
 ) -> dict[str, str]:
     input_keys = input_keys or set()
     providers: dict[str, str] = {}
+    ambiguous = set()
     for node in graph.nodes:
         if not _node_is_executable(node, graph):
             continue
@@ -413,8 +424,13 @@ def _collect_providers(
             if key in input_keys:
                 raise GraphCompileError(f"key '{key}' is declared by pipeline.inputs and provided by node '{node.id}'")
             if key in providers:
+                if allow_exclusive:
+                    ambiguous.add(key)
+                    providers.pop(key)
+                    continue
                 raise GraphCompileError(f"key '{key}' provided by both '{providers[key]}' and '{node.id}'")
-            providers[key] = node.id
+            if key not in ambiguous:
+                providers[key] = node.id
     return providers
 
 
@@ -546,9 +562,6 @@ def _node_flow_kinds(
         if spec.type_used in LOOP_NODE_TYPES:
             kinds[name] = FLOW_KIND_PREDEFINED
             continue
-        if spec.type_used == IO_NODE_TYPE:
-            kinds[name] = FLOW_KIND_IO
-            continue
         if spec.type_used in nodesets:
             kinds[name] = FLOW_KIND_PREDEFINED
             continue
@@ -573,7 +586,7 @@ def _node_effect_scopes(
         if (
             spec.status == STATUS_PLANNED
             or spec.type_used in LOOP_NODE_TYPES
-            or spec.type_used == IO_NODE_TYPE
+
             or spec.type_used in nodesets
         ):
             scopes[node_id] = fallback

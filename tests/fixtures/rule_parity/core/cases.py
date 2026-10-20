@@ -16,7 +16,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     from vibeflow.core.config.graph import parse_graph_config_data
     from vibeflow.core.contracts import PipelineInputSpec, DataProvider, DataRequirement
     from vibeflow.core.flow import (
-        EdgeSpec, ExecutionLockSpec, GraphConfig, IoSpec, LoopSpec, NodeMetadata,
+        EdgeSpec, ExecutionLockSpec, GraphConfig, LoopSpec, NodeMetadata,
         NodeSpec, NodesetSpec,
     )
     from vibeflow.core.models import CoreCompileRequest, ImplementationFact, ImplementationFacts, TargetFeatureSet
@@ -268,14 +268,12 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         if supplied is None:
             supplied=ImplementationFacts(tuple(ImplementationFact(spec.type_used, flow_kind=spec.flow_kind,
                 requires=spec.requires, provides=spec.provides) for spec in graph.nodes
-                if spec.type_used != "vibeflow.io" and not spec.type_used.startswith("vibeflow.loop.") and spec.type_used not in graph.nodesets))
+                if not spec.type_used.startswith("vibeflow.loop.") and spec.type_used not in graph.nodesets))
         return compile_core(CoreCompileRequest(graph, supplied, supported))
-    def io(name,operation):
-        return NodeSpec(name,"vibeflow.io",io=IoSpec(operation),metadata=NodeMetadata(name,"Parity IO boundary."))
     def healthy(mid=()):
-        nodes=(io("start","receive"),*mid,io("end","send"))
+        nodes=(node("start","terminal"),*mid,node("end","terminal"))
         return GraphConfig(nodes,tuple(EdgeSpec(a.id,b.id) for a,b in zip(nodes,nodes[1:])))
-    emit("native.normal", "真实编译 receive→process→send", "native.graph", lambda:compile_graph(healthy((node("work"),))), {"should_accept":True},evidence=native_evidence)
+    emit("native.normal", "真实编译显式 terminal→process→terminal", "native.graph", lambda:compile_graph(healthy((node("work"),))), {"should_accept":True},evidence=native_evidence)
     emit("native.strict_unknown", "严格实现事实表中缺 Node", "native.facts",
         lambda:compile_graph(GraphConfig((node("missing"),)),ImplementationFacts(strict=True)),codes(("NODE.TYPE.UNKNOWN","error")),evidence=native_evidence)
     emit("native.duplicate_provider", "两个节点声明同一输出 key", "native.contract",
@@ -488,7 +486,9 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         definition=NodesetSpec("probe.child","Child","A valid empty source-free child.",(),(),child)
         graph=healthy((NodeSpec("stage","probe.child",metadata=NodeMetadata("Stage","Calls child.")),))
         graph=replace(graph,nodesets={definition.type_key:definition}, **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
-        return validate_graph_health(graph,registry=NodeRegistry())
+        from tests.fixtures.rule_parity.core.support import boundary_registry
+        registry=boundary_registry(graph,NodeRegistry()) if variant == "current" else NodeRegistry()
+        return validate_graph_health(graph,registry=registry)
     emit("workflow.unconstrained_child_identity","父图默认审查仍识别显式[]子Nodeset","workflow.orchestration",unconstrained_child,{"should_accept":True},
         classification="approved_change",notes="baseline无子图Ruleset选择；current明确[]仅免审查，原生Nodeset身份应保留。不得xfail。",
         evidence="targets/python/quality/rules/workflow.py:18,34-35; baseline workflow/validation.py:80-107")

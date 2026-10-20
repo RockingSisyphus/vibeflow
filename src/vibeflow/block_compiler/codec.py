@@ -48,6 +48,7 @@ def _node(value):
         exports=tuple(_record(v, m.DataProviderPlan) for v in value["exports"]),
         params=m.freeze_json_object(value["params"]),
         config_overrides=m.freeze_json_object(value["config_overrides"]),
+        capability_policy=m.freeze_json_object(value.get("capability_policy", {})),
         execution_lock=_lock(value["execution_lock"]),
     )
 
@@ -73,6 +74,9 @@ def workflow_plan_from_dict(value: Mapping[str, object]) -> m.WorkflowPlan:
             inputs=tuple(_record(v, m.PipelineInputSpec) for v in value["inputs"]),
             outputs=tuple(_output(v) for v in value["outputs"]),
             blocks=tuple(_block(v) for v in value["blocks"]),
+            named_entries=tuple(_record(v, m.WorkflowEntryPlan, nodes=tuple(v["nodes"]),
+                inputs=tuple(_record(i, m.PipelineInputSpec) for i in v["inputs"]),
+                outputs=tuple(_output(i) for i in v["outputs"])) for v in value.get("named_entries", ())),
             execution_lock=_lock(value["execution_lock"]))
         blocks = {block.id: block for block in plan.blocks}
         if len(blocks) != len(plan.blocks) or plan.entry_block not in blocks:

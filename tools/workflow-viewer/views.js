@@ -1,6 +1,6 @@
 /* Flow, resource and declared-workflow views over the common card renderer. */
 "use strict";
-window.VFViews=({getData,getMode,getCurrent,getVisible,getEdgeFacts,isCurrent,elk,node,layoutBody,factsNodes,empty,showInfo,resourceUrl})=>{
+window.VFViews=({getData,getMode,getCurrent,getEntry=()=>"",getVisible,getEdgeFacts,isCurrent,elk,node,layoutBody,factsNodes,empty,showInfo,resourceUrl})=>{
   let sequence=0;
   function arrows(group){
     const defs=node("defs"),ids={};
@@ -66,7 +66,8 @@ window.VFViews=({getData,getMode,getCurrent,getVisible,getEdgeFacts,isCurrent,el
       wrapper.append(node("image",{href:url,width:picture.naturalWidth||1200,height:picture.naturalHeight||800,"pointer-events":"none"}));return wrapper;
     }
     if(!factsNodes(body).length){empty(body.error||"当前 workflow 没有可显示节点。");return null;}
-    const layout=await layoutBody("workflow");if(!isCurrent(token))return null;return drawBody(layout);
+    const key=getEntry()?"entry:"+encodeURIComponent(getEntry()):"workflow";
+    const layout=await layoutBody(key);if(!isCurrent(token))return null;return drawBody(layout);
   }
   async function cards(values,relations,token) {
     if(!elk)throw new Error("离线 ELK 布局资源缺失。");

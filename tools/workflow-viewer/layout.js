@@ -1,24 +1,29 @@
 /* Hierarchical placement of data-driven cards with bundled ELK. */
 "use strict";
-window.VFLayout={async body(context,key,prefix="",ancestors=[],override=null,entity="call"){
+window.VFLayout={async body(context,key,prefix="",ancestors=[],override=null,entity="call",localPrefix=[]){
   const {data,state,elk}=context;
   if(!elk)throw new Error("离线 ELK 布局资源缺失。");
-  if(ancestors.includes(key))throw new Error("Nodeset 定义形成递归："+ancestors.concat(key).join(" → "));
   const body=override||data.bodies[key];if(!body)throw new Error("缺少图定义 "+key);
+  if(ancestors.includes(key)&&body.kind!=="workflow")throw new Error("Nodeset 定义形成递归："+ancestors.concat(key).join(" → "));
+  const architecture=body.architecture||data.architecture;
   const facts=Array.isArray(body.facts.nodes)?body.facts.nodes:Object.values(body.facts.nodes||{});
-  const values=await Promise.all(facts.map(async facts=>{
-    const segment=encodeURIComponent(facts.id),path=entity==="resource"?facts.id:prefix?prefix+"/"+segment:segment,card=VFShapes.measure(facts,data.architecture?.node_types,data.architecture?.nodesets);
-    const item={id:facts.id,path,facts,card,width:card.width,height:card.height};
-    const child=facts.invokes?"nodeset:"+facts.invokes.target:null;
-    if(state.expanded.has(path)&&child&&data.bodies[child]?.facts.nodes?.length){
-      item.inner=await VFLayout.body(context,child,path,ancestors.concat(key));
+  const values=await Promise.all(facts.map(async original=>{
+    const localPath=[...localPrefix,original.id];
+    const options=VFModel.childOptions(original,body,localPath,data.bodies);
+    const facts={...original,preview_operations:architecture.call_policies?.[JSON.stringify(localPath)]?.actions||[],preview_expandable:options.some(o=>!o.error)};
+    const segment=encodeURIComponent(facts.id),path=entity==="resource"?facts.id:prefix?prefix+"/"+segment:segment,card=VFShapes.measure(facts,architecture?.node_types,architecture?.nodesets);
+    const item={id:facts.id,path,localPath,body,architecture,options,facts,card,width:card.width,height:card.height};
+    const selected=options.find(o=>o.key===state.targets?.get(path))||options.find(o=>!o.error),child=selected?.key;
+    if(state.expanded.has(path)&&child&&!selected.error&&data.bodies[child]?.facts.nodes?.length){
+      const childPrefix=selected.workflow?path+"/@workflow/"+encodeURIComponent(child):path;
+      item.inner=await VFLayout.body(context,child,childPrefix,ancestors.concat(key),null,"call",selected.workflow?[]:localPath);
       item.width=Math.max(360,item.inner.width+40);
-      item.header=VFShapes.groupHeader(facts,data.architecture,item.width);
+      item.header=VFShapes.groupHeader(facts,architecture,item.width);
       item.height=item.header.height+item.inner.height+40;
     }
     return item;
   }));
-  const edgeInfo=VFModel.graphEdges(body.facts,data.architecture);
+  const edgeInfo=VFModel.graphEdges(body.facts,architecture);
   const edges=edgeInfo.map((info,i)=>{
     info.key=prefix+"/@edge/"+i;
     info.labelLines=info.lines.flatMap(line=>VFShapes.wrap(line,300,12));

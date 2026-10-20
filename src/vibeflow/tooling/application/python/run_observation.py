@@ -43,7 +43,7 @@ def observed_checked_run(function):
     def invoke(*args, **kwargs):
         if current_observation() is not None:
             return function(*args, **kwargs)
-        from vibeflow.tooling.application.python.runner import _new_run_id, _prepare_run_dir
+        from vibeflow.tooling.application.python.execution import (_new_run_id, _prepare_run_dir)
         run_id = _new_run_id() if kwargs.get("run_id") is None else kwargs["run_id"]
         run_dir = kwargs.get("_prepared_run_dir")
         if run_dir is None:
@@ -81,7 +81,7 @@ def observed_cli_run(function):
     @wraps(function)
     def observed(args):
         from vibeflow.tooling.application.python.cli import _runtime_options_from_args
-        from vibeflow.tooling.application.python.runner import _new_run_id, _prepare_run_dir
+        from vibeflow.tooling.application.python.execution import (_new_run_id, _prepare_run_dir)
         from vibeflow.targets.python.runtime.console_capture import capture_process_console
         from vibeflow.tooling.application.python.run_directory import RunDirectoryExistsError
         run_id = _new_run_id() if args.run_id is None else args.run_id

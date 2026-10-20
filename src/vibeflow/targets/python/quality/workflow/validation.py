@@ -82,6 +82,13 @@ def validate_graph_health(graph, *, registry=None, plugin_registry=None,
     execute_workflow_rules(graph, state, registry=registry, source_context=source_context, phase=rule_phase,
         purity_policy=purity_policy, quality_policy=quality_policy, nodeset_max_depth=nodeset_max_depth,
         global_config=global_config, compiled=compiled, compilation_findings=compilation.findings, source_report=source_report)
+    if registry is not None:
+        from vibeflow.core.graph_calls import graph_call_subjects
+        from vibeflow.targets.shared.rule_support.capability_policy import policies_from_executions, policy_findings
+        paths = [(*subject.call_path, node.id) for subject in graph_call_subjects(graph) for node in subject.graph.nodes]
+        registry.call_capability_policies = policies_from_executions(state.rule_executions, paths)
+        _append_findings(state, policy_findings(graph, registry.call_capability_policies,
+            lambda key: registry.descriptor(key) if key in registry.available() else None))
     return _build_health_report(graph, compiled, plugin_registry, state)
 
 

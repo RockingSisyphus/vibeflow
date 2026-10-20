@@ -139,32 +139,29 @@ def _portable_call(
     child_block: str = "",
     is_nodeset: bool = False,
     is_loop: bool = False,
-    io_operation: str = "",
 ) -> NodeCallPlan:
     return NodeCallPlan(
         id=node_id,
         type_used=type_key,
         implementation=SourceRef(
-            kind=("catalog" if child_block or io_operation else "typescript"),
-            ref=type_key if child_block or io_operation else f"nodes/{node_id}.ts",
-            export="" if child_block or io_operation else "run",
+            kind=("catalog" if child_block else "typescript"),
+            ref=type_key if child_block else f"nodes/{node_id}.ts",
+            export="" if child_block else "run",
         ),
         requires=(),
         provides=(),
         params=freeze_json_object({"node": node_id}),
         config_overrides=freeze_json_object({}),
-        flow_kind="terminal" if io_operation else "process",
+        flow_kind="process",
         join_policy="safe_any",
         status="implemented",
         planned_behavior="blocking",
-        is_terminal=bool(io_operation),
+        is_terminal=node_id == "start",
         is_nodeset=is_nodeset,
         is_loop=is_loop,
         nodeset_type_key=type_key if child_block else "",
         child_block=child_block,
         exports=(),
-        io_operation=io_operation,
-        io_port="events" if io_operation else "",
     )
 
 
@@ -192,8 +189,7 @@ def _binding_workflow_plan() -> WorkflowPlan:
             ),
             _portable_call(
                 "receive",
-                "vibeflow.io",
-                io_operation="receive",
+                "demo.receive",
             ),
         ),
         routes=(),
@@ -231,7 +227,7 @@ def _binding_workflow_plan() -> WorkflowPlan:
         max_steps=20,
     )
     return WorkflowPlan(
-        abi_version="vibeflow.workflow.v8",
+        abi_version="vibeflow.workflow.v9",
         workflow_id="binding.workflow",
         source=SourceRef(kind="graph", ref="binding.workflow"),
         entry_block="block:/",
@@ -254,12 +250,14 @@ def test_binding_builder_shadows_all_call_paths_and_resource_facts() -> None:
         "implementations": {
             "demo.add": {"completion": "suspend"},
             "demo.start": {"completion": "immediate"},
+            "demo.receive": {"completion": "suspend"},
         },
         "base_libs_by_type": {
             "demo.add": ("demo.math", "demo.core"),
             "demo.multiply": ("demo.math",),
         },
         "capabilities_by_type": {
+            "demo.receive": ({"id":"vibeflow.port","operations":["receive"]},),
             "demo.add": (
                 {"id": "demo.storage", "operations": ["write", "read"]},
             ),

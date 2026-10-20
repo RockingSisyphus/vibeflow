@@ -148,6 +148,7 @@ _DOCUMENT_COMMAND_PATTERNS = (
                 "review",
                 "review-rules",
                 "preview",
+                "coordination",
                 "run",
                 "svg",
                 "validate",
@@ -173,6 +174,7 @@ _DOCUMENT_COMMAND_PATTERNS = (
                 "review",
                 "review-rules",
                 "preview",
+                "coordination",
                 "run",
                 "validate",
             }
@@ -196,6 +198,7 @@ _DOCUMENT_COMMAND_PATTERNS = (
                 "review",
                 "review-rules",
                 "preview",
+                "coordination",
                 "run",
                 "validate",
             }
@@ -748,6 +751,7 @@ def check_base(root: Path, *, node_executable: str | None = None) -> list[Findin
     graph = build_import_graph(root)
     findings.extend(scan_layer(root, "tooling", graph=graph))
     findings.extend(scan_layer(root, "target-services", graph=graph))
+    findings.extend(scan_layer(root, "coordination", graph=graph))
     findings.extend(neutral_tooling_findings(root, graph))
     findings.extend(_documentation_findings(root))
     findings.extend(_directory_role_findings(root))

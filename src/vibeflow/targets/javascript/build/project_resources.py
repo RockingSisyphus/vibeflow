@@ -28,60 +28,6 @@ from vibeflow.core.descriptors.source_bundle import implementation_sources, sour
 from vibeflow.core.flow import GraphConfig
 
 
-PORT_CAPABILITY_ID = "vibeflow.port"
-PORT_SCHEMA_TYPES = {
-    "vibeflow.port.receive.request": {
-        "type": "object",
-        "required": ["port"],
-        "properties": {"port": {"type": "string"}},
-        "additionalProperties": False,
-    },
-    "vibeflow.port.receive.result": {
-        "type": "object",
-        "required": ["value"],
-        "properties": {"value": {}},
-        "additionalProperties": False,
-    },
-    "vibeflow.port.send.request": {
-        "type": "object",
-        "required": ["port", "value"],
-        "properties": {
-            "port": {"type": "string"},
-            "value": {},
-        },
-        "additionalProperties": False,
-    },
-    "vibeflow.port.send.result": {"type": "null"},
-}
-
-
-def port_capability_descriptor(
-    operations: set[str],
-) -> CapabilityDescriptor:
-    available = {
-        "receive": CapabilityOperationDescriptor(
-            input_type="vibeflow.port.receive.request",
-            output_type="vibeflow.port.receive.result",
-            completion="suspend",
-        ),
-        "send": CapabilityOperationDescriptor(
-            input_type="vibeflow.port.send.request",
-            output_type="vibeflow.port.send.result",
-            completion="immediate",
-        ),
-    }
-    return CapabilityDescriptor(
-        id=PORT_CAPABILITY_ID,
-        targets=("browser", "node"),
-        operations={
-            name: available[name]
-            for name in sorted(operations)
-        },
-        display_name="VibeFlow Port",
-        description="Host-provided receive/send queue boundary.",
-    )
-
-
 def base_lib_closure(
     nodes: Mapping[str, NodeDescriptor],
     *,
@@ -143,7 +89,6 @@ def required_capabilities(
     *,
     catalogs: DescriptorCatalogs,
     target: str,
-    io_operations: set[str] | None = None,
 ) -> tuple[CapabilityDescriptor, ...]:
     selected: dict[str, CapabilityDescriptor] = {}
     for node in nodes.values():
@@ -177,10 +122,6 @@ def required_capabilities(
                     ),
                 )
             selected[capability.id] = capability
-    if io_operations:
-        selected[PORT_CAPABILITY_ID] = port_capability_descriptor(
-            io_operations
-        )
     return tuple(selected[key] for key in sorted(selected))
 
 
@@ -211,11 +152,7 @@ def host_extension_closure(
                 ),
             )
         for capability_id in descriptor.provides:
-            capability = (
-                port_capability_descriptor({"receive", "send"})
-                if capability_id == PORT_CAPABILITY_ID
-                else catalogs.capabilities.get(capability_id)
-            )
+            capability = catalogs.capabilities.get(capability_id)
             if capability is None:
                 raise ProjectBuildError(
                     "VF_AOT_HOST_EXTENSION_CAPABILITY",
@@ -277,6 +214,9 @@ def used_schema_types(
     for descriptor in nodes.values():
         used.update(item.type for item in descriptor.contract.requires)
         used.update(item.type for item in descriptor.contract.provides)
+    for entry in graph.entries.values():
+        used.update(item.type for item in entry.inputs or ())
+        used.update(item.type for item in entry.outputs or ())
     for capability in capabilities:
         for operation in capability.operations.values():
             used.add(operation.input_type)
@@ -294,11 +234,7 @@ def schemas_for_types(
     for type_key in sorted(type_keys):
         descriptor = catalogs.schemas.get(type_key)
         if descriptor is None:
-            builtin = PORT_SCHEMA_TYPES.get(type_key)
-            if builtin is not None:
-                schemas[type_key] = dict(builtin)
-            else:
-                missing.append(type_key)
+            missing.append(type_key)
             continue
         payload = descriptor.to_dict()
         schema = dict(payload["schema"])

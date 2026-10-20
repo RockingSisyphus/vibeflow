@@ -11,6 +11,8 @@ import tempfile
 
 RESOURCE_NAMES = frozenset(
     {
+        "capability_helpers.mjs", "plugin_helpers.mjs", "root_helpers.mjs",
+        "workflow_client.mjs", "workflow_host.mjs", "workflow_node.mjs",
         "runtime_helpers.mjs", "execution_helpers.mjs", "status_helpers.mjs", "node_observation.mjs",
         "sdk.mjs", "sdk.d.ts", "sdk_loader.mjs",
         "plugin_worker.mjs",

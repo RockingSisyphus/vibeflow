@@ -5,7 +5,6 @@ from typing import Mapping
 
 from vibeflow.core.flow import (
     GraphConfig,
-    IO_NODE_TYPE,
     LOOP_NODE_TYPES,
     NodeSpec,
     NodesetSpec,
@@ -47,7 +46,7 @@ def current_node_configuration_findings(graph, *, registry, owner, global_config
     scope = normalize_config_scope(global_config)
     overrides = overrides or {}
     for node in graph.nodes:
-        if node.status == STATUS_PLANNED or node.type_used == IO_NODE_TYPE:
+        if node.status == STATUS_PLANNED:
             continue
         child = _resolve_composite_child(node, graph)
         if child is not None:

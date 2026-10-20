@@ -530,6 +530,12 @@ def run_javascript_workflow_rules(graph: Any, catalogs: Any, *, compiled_by_path
             findings.extend(replace(item, details={**item.details, **({} if subject.declaration_only or item.details.get("call_paths") else {"call_paths":[list(subject.call_path)]})}) for result in executions for item in result.findings)
             if phase == "import" and any(item.severity == "error" for result in executions for item in result.findings):
                 break
+    if phase != "import":
+        from vibeflow.targets.shared.rule_support.capability_policy import policies_from_executions, policy_findings
+        from vibeflow.core.graph_calls import graph_call_subjects
+        paths = [(*subject.call_path, node.id) for subject in graph_call_subjects(graph) for node in subject.graph.nodes]
+        policies = policies_from_executions((item for values in results.values() for item in values), paths)
+        findings.extend(policy_findings(graph, policies, catalogs.nodes.get))
     return JavascriptRuleReport(results, tuple(findings), node_report.policies, node_report.facts,
         node_report.call_effect_scopes, node_report.call_effect_policies, node_report.source_scopes, choices)
 
