@@ -19,7 +19,7 @@
 | D15 文档与沙盒 | 更新架构、目录、检查会话、中英文入口、发行文档与提示词；数学沙盒不再安装不用的渲染器，事实断言按 Architecture 命名 |
 | D16 首页图片 | 从当前综合工作流重新导出 Mermaid/SVG；移除可见的 runtime_dispatch 遗留，来源及更新方法见 assets/README |
 
-JavaScript 的[事实入口](../../src/vibeflow/tooling/application/javascript/presentation/architecture.py)、[可选绘图](../../src/vibeflow/tooling/application/javascript/presentation/diagrams.py)及[发布适配](../../src/vibeflow/tooling/application/javascript/presentation/preview.py)职责分开。语言中立的[Mermaid 支持](../../src/vibeflow/tooling/presentation/mermaid/README.md)不进入默认数据导出链路；[独立浏览器](../../tools/workflow-viewer/README.md)继续只依赖 v2 快照。
+JavaScript 的[事实入口](../../../src/vibeflow/tooling/application/javascript/presentation/architecture.py)、[可选绘图](../../../src/vibeflow/tooling/application/javascript/presentation/diagrams.py)及[发布适配](../../../src/vibeflow/tooling/application/javascript/presentation/preview.py)职责分开。语言中立的[Mermaid 支持](../../../src/vibeflow/tooling/presentation/mermaid/README.md)不进入默认数据导出链路；[独立浏览器](../../../tools/workflow-viewer/README.md)继续只依赖 v2 快照。
 
 ## 保留边界
 

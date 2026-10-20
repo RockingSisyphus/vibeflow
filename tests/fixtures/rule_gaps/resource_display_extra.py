@@ -1,7 +1,7 @@
 """Invalid styles, status provenance and nonpublication of failed formal reviews."""
 import hashlib
 
-from resource_support import project,cli,documents,observe,KINDS,IDS,PARTS,mutate_presentation,config,rgb,replace,display_resource,display_nodes
+from resource_support import project,cli,documents,observe,KINDS,IDS,PARTS,mutate_presentation,config,rgb,replace,display_resource,display_nodes,preview_style_matches,preview_nodes
 
 
 def run_cases(work,toolchain,*,kinds=KINDS,state_kinds=("host_extension","plugin_declaration","node_external")):
@@ -29,10 +29,11 @@ def run_cases(work,toolchain,*,kinds=KINDS,state_kinds=("host_extension","plugin
             actual["metrics"].update(marker="warning" in source_resource.get("markers",()),
                 diagnostic=any(item.get("severity")=="warning" for item in source_resource.get("diagnostics",())),
                 fill_origin=sources.get("fill"),status_fill=fields.get("fill"),
-                matches_svg=any(shape["fill"]==rgb(fields["fill"]) for node in nodes for shape in node["shapes"]))
+                matches_svg=any(shape["fill"]==rgb(fields["fill"]) for node in nodes for shape in node["shapes"]),
+                matches_preview=preview_style_matches(browser,architecture,kind))
             rows.append(observe(case,"resource-display",actual,metrics={"marker":True,"diagnostic":True,
                 "fill_origin":"call" if override else "status",
-                "status_fill":"#ffeebb" if override else "#fef3c7","matches_svg":True,"browser_exit_code":0,"mermaid_exit_code":0}))
+                "status_fill":"#ffeebb" if override else "#fef3c7","matches_svg":True,"matches_preview":True,"browser_exit_code":0,"mermaid_exit_code":0}))
         case=f"display.{kind}.failed_review_keeps_previous";root=project(work/case,toolchain=toolchain)
         before,_,_,_=documents(root,name="formal")
         svg=root/"evidence/formal.svg";document=root/"ARCHITECTURE.jsonc"
@@ -56,7 +57,14 @@ def run_cases(work,toolchain,*,kinds=KINDS,state_kinds=("host_extension","plugin
         actual,architecture,_,browser=documents(root,name="status",screenshot=True)
         key="node:demo.model" if kind=="node_external" else "plugin_declaration:pending" if kind=="plugin_declaration" else "host_extension:demo.host"
         resource=architecture.get("implementation_graph",{}).get("resources",{}).get(key,{})
+        view="flow" if kind=="node_external" else "plugin" if kind=="plugin_declaration" else kind
+        cards=preview_nodes(browser,architecture,"node") if kind=="node_external" else [
+            card for card in browser.get("preview",{}).get("views",{}).get(view,()) if card["id"]==key]
+        values=(display_resource(architecture,"node") if kind=="node_external" else resource).get("effective_presentation",{}).get("values",{})
         actual["metrics"].update(marker=("external" if kind=="node_external" else "planned") in resource.get("markers",()),
-            fill_origin=resource.get("effective_presentation",{}).get("sources",{}).get("fill"),has_sources=bool(resource.get("sources")))
-        rows.append(observe(case,"resource-display",actual,metrics={"marker":True,"fill_origin":"status","has_sources":kind!="plugin_declaration","browser_exit_code":0}))
+            fill_origin=resource.get("effective_presentation",{}).get("sources",{}).get("fill"),has_sources=bool(resource.get("sources")),
+            preview_status=len(cards)==1 and ("外部依赖" if kind=="node_external" else "计划 · 尚未实现") in cards[0]["text"],
+            preview_status_fill=len(cards)==1 and cards[0]["outline"]["fill"]==rgb(values["fill"]))
+        rows.append(observe(case,"resource-display",actual,metrics={"marker":True,"fill_origin":"status","has_sources":kind!="plugin_declaration","browser_exit_code":0,
+            "preview_status":True,"preview_status_fill":True}))
     return rows

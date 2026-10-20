@@ -8,8 +8,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping
 
-from vibeflow.tooling.project.config_schema import collect_policy_schema_findings
-from vibeflow.core.findings import HealthFinding
 from vibeflow.targets.python.project.policy import (
     DEFAULT_POLICY_DATA,
     EffectivePolicy,

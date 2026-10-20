@@ -5,7 +5,7 @@ from typing import Any, Mapping
 from vibeflow.core.descriptors.contributions import contribution_facts
 from vibeflow.core.descriptors.source_bundle import source_resources, implementation_sources
 from vibeflow.core.rules.models import plain
-from vibeflow.targets.shared.facts import FactStore, fact_key
+from vibeflow.targets.shared.facts import FactStore
 from vibeflow.targets.javascript.build.graph_wire import graph_wire
 
 

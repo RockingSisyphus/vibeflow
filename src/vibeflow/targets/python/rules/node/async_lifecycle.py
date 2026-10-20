@@ -33,7 +33,8 @@ class _OwnedWorkScanner:
     @staticmethod
     def findings(context, sources, node, symbol):
         from .effect_visitors import ModulePurityVisitor, qualified_reference_name
-        from .helpers import source_info, source_policy
+        from .helpers import source_info
+        from vibeflow.targets.python.quality.policy_parameters import source_policy
         from vibeflow.targets.python.quality.source_analysis.resource_slices import node_source_slices
         constructors = {'threading.Thread', 'multiprocessing.Process',
                         'concurrent.futures.ThreadPoolExecutor', 'concurrent.futures.ProcessPoolExecutor'}

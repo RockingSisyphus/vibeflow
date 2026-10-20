@@ -15,13 +15,13 @@
 | `graph` | 不同默认值和新增参数的实现替换及来源；显式 includes；未绑定/冲突输入、参数 schema；源码 consumer 的 typed inputs/有效参数缓存和新 session；直接选择公开 implementation leaf 的真实正常/超限源码；合法和非法 findings 的 Core/Python/JS 边界 |
 | `tooling` | 完整 Node shape、已移除分类资源的明确诊断、Rule 端口类型；正式单个 JSON、资源位置和实现尚未执行；混合语言同 ID、跨 root 引用及双方冲突来源；预览选择一致 |
 | `composition` | 领域 Bundle 的模型 Node 在分支、Nodeset、Loop 中实际计算；参数化 tags 归属、非法 helper 模型定义、完整调用路径；Node 自己声明浅蓝色，验证 Architecture、Mermaid 和真实 SVG |
-| `resources` | 475 个真实 CLI 案例：四类资源登记、源码归属、规则、连续修改、全部公开形状，以及 Python/Node.js/浏览器执行；最终 SVG 的真实计算颜色与几何、单 Host 和实例隔离 |
+| `resources` | 475 个真实 CLI 案例：四类资源登记、源码归属、规则、连续修改、全部公开形状，以及 Python/Node.js/浏览器执行；离线 HTML 与可选 SVG 的真实计算颜色、几何、单 Host 和实例隔离 |
 
 插件贡献正常例将 BaseLib、DataSchema、Capability、Host Extension、Runtime Plugin 全部经选中插件装配，检查数值结果及完整生命周期。历史案例 ID 保留 bundle 名称，产品接入仍只使用语言 SDK。两平台纯数值构建产物在 Node 中实际执行；资源专项组另外运行真正的浏览器产物。
 
 多文件资源的 [案例对应表](../../../docs/design/history/multifile-resource-cases.md) 和 [正式示例](../../../docs/maintainers/history/multifile-resource-sandbox.md) 记录专项检查及 SVG/Architecture 证据。此前 205 项接口场景保留原 ID，与新资源组分别统计。
 
-资源展示组保留全部 103 个案例及 47 个连续修改案例的 ID。当前观察通过公开 `review` 与 `export-mermaid --mermaid-layout review-columns` 取得真实用户图，定位实际 Node 调用或所选 Plugin/BaseLib/Host 目录条目；所有 14 种形状与颜色、文字、图标仍由最终 SVG 的浏览器几何及计算样式验收。插件条目按配置选中的包 ID 定位，包内生命周期的源码健康诊断另在 Architecture 中核对。原来的独立 Node 类型卡、源码文件卡和 reference 图断言已撤销，历史机器报告不覆盖。
+资源展示组保留全部 103 个案例及 47 个连续修改案例的 ID。当前观察通过公开 `review` 与 `export-mermaid --mermaid-layout review-columns` 取得真实用户图，定位实际 Node 调用或所选 Plugin/BaseLib/Host 目录条目；同一浏览器进程同时验收可选 SVG，以及离线 HTML 快照的流程、BaseLib、Plugin 和 Host Extension 四种视图；用公开调用/资源身份定位卡片，检查 14 种形状、颜色、文字、图标、状态与覆盖来源，拦截并报告 HTML 的联网请求。连续样式修改同时检查 HTML 更新和恢复。插件条目按配置选中的包 ID 定位，包内生命周期的源码健康诊断另在 Architecture 中核对。原来的独立 Node 类型卡、源码文件卡和 reference 图断言已撤销，历史机器报告不覆盖。
 
 ## 运行
 

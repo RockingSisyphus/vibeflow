@@ -4,8 +4,6 @@ from vibeflow.core.rules.selection import selection_data
 
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.constants import (
-    EFFECT_SCOPE_GLOBAL_STATE,
-    EFFECT_SCOPE_NONE,
     FLOW_KIND_GLOBAL_STATE,
 )
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts

@@ -68,6 +68,8 @@ def test_offline_browser_selects_entries_and_expands_a_workflow(tmp_path):
     record = preview_project(tmp_path)
     record.metadata.update(category="run", entry="cli")
     record.update(status="succeeded")
+    from vibeflow.tooling.presentation.preview import reindex
+    reindex(tmp_path)
     browser = Path(__file__).resolve().parents[1] / "fixtures/preview/workflows.cjs"
     result = subprocess.run(["node", str(browser), str(_find_mmdc().resolve()), str(tmp_path / "vibeflow-preview.html")],
         text=True, capture_output=True, timeout=60)

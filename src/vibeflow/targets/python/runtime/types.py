@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Mapping
 
 from vibeflow.core.contracts import DataEnvelope, RunResult
 from vibeflow.targets.python.runtime.errors import PipelineRuntimeError

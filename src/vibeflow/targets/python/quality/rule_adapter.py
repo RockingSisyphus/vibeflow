@@ -7,7 +7,7 @@ from typing import Mapping
 
 from vibeflow.core.findings import Finding, HealthFinding
 from vibeflow.targets.shared.rule_support.effect_records import EFFECT_POLICY_TYPE
-from vibeflow.core.rules import RuleContext, RuleGraphError, compile_ruleset, execute_rule_plan, rule_graph_error_finding
+from vibeflow.core.rules import RuleGraphError, compile_ruleset, execute_rule_plan, rule_graph_error_finding
 from vibeflow.targets.python.quality.policy_parameters import complete_source_policy_plan, native_rule_bindings, native_rule_origins
 from vibeflow.core.rules.selection import resolve_node_selection
 from vibeflow.targets.python.quality.node_context import local_sources, bind_native_analysis

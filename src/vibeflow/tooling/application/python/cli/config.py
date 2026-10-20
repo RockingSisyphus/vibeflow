@@ -4,8 +4,6 @@ from pathlib import Path
 
 from vibeflow.tooling.application.python.reports import (
     config_load_error_report,
-    dedupe_findings,
-    fail_report,
     graph_config_error_report,
 )
 from vibeflow.targets.python.project.compiler import GraphCompiler, GraphCompileError
@@ -15,7 +13,7 @@ from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
 from vibeflow.core.flow import GraphConfigError
 from vibeflow.core.findings import HealthReport, HealthFinding
 from vibeflow.tooling.project.graph_config import parse_graph_config, project_root_for_config
-from vibeflow.tooling.application.python.project.effective_policy import default_effective_policy, resolve_effective_policy
+from vibeflow.tooling.application.python.project.effective_policy import resolve_effective_policy
 
 
 def validate_config_path(path: Path, *, policy_path: Path | None = None) -> HealthReport:

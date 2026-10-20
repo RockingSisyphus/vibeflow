@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Mapping
 
 from vibeflow.targets.javascript.frontend.emission_protocol import EmissionNode

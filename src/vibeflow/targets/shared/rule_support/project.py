@@ -5,14 +5,13 @@ local graph overrides use the same precedence as every other review Rule.
 """
 
 from dataclasses import asdict, fields
-from inspect import unwrap
 
 from vibeflow.core.findings import HealthFinding
 from vibeflow.targets.shared.quality_support.models import (
     ProjectQualityFacts, QualityPolicy, QualityStructureConventions,
     QualityStructureLimits, QualityStructureRoles, QualityThresholds,
 )
-from vibeflow.core.rules.models import RuleCall, RuleRecord, RuleRelation, RuleResult, RulesetDescriptor, plain
+from vibeflow.core.rules.models import RuleRecord, RuleResult, plain
 
 
 _FILE_LIMITS = ("max_file_lines", "warn_file_lines", "max_file_bytes", "max_functions_per_file",

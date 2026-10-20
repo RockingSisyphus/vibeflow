@@ -6,7 +6,7 @@ from vibeflow.core.descriptors.json_values import freeze_mapping
 from vibeflow.targets.python.project.resource_bindings import PythonResourceBinding
 from vibeflow.core.findings import HealthFinding
 from vibeflow.tooling.project.host_extensions import (
-    HostExtensionResource, host_extension_resources, resolve_host_extension_resources,
+    HostExtensionResource, host_extension_resources,
 )
 
 

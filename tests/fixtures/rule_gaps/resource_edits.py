@@ -43,12 +43,14 @@ def diagram(root,kind,name):
     fields=resource.get("effective_presentation",{}).get("values",{})
     nodes=display_nodes(browser,kind)
     # The rendered call or directory card uses its actual effective style.
-    from resource_support import rgb
+    from resource_support import rgb,preview_style_matches
     correct=any(shape["fill"]==rgb(fields["fill"]) for node in nodes for shape in node["shapes"])
     project_file=root/"vibeflow_project.jsonc"
     data=json.loads(project_file.read_text());data.pop("architecture",None);write(project_file,data)
     return {"review_exit":actual["metrics"]["exit_code"],"browser_exit":actual["metrics"].get("browser_exit_code"),
-            "fill":fields.get("fill"),"shape":fields.get("shape"),"matches_svg":correct}
+            "fill":fields.get("fill"),"shape":fields.get("shape"),"matches_svg":correct,
+            "matches_preview":preview_style_matches(browser,architecture,kind),
+            "preview_errors":browser.get("preview",{}).get("errors"),"preview_network":browser.get("preview",{}).get("network")}
 
 
 def run_cases(work,toolchain,*,kinds=KINDS,include_extra=True):
@@ -83,7 +85,8 @@ def run_cases(work,toolchain,*,kinds=KINDS,include_extra=True):
                 actual["metrics"]["modified_run"]=modified_run
             if modified_diagram:
                 fill,shape=("#bbddaa","rect") if variant=="colour" else ("#ddbbff","diamond")
-                metrics.update(modified_diagram={"review_exit":0,"browser_exit":0,"fill":fill,"shape":shape,"matches_svg":True},diagram_restored=True)
+                metrics.update(modified_diagram={"review_exit":0,"browser_exit":0,"fill":fill,"shape":shape,"matches_svg":True,
+                    "matches_preview":True,"preview_errors":[],"preview_network":[]},diagram_restored=True)
                 actual["metrics"].update(modified_diagram=modified_diagram,diagram_restored=before_diagram==restored_diagram)
             descriptor=next((item for item in declarations(inspected) if item.get("id",item.get("type_key"))==IDS[kind]),{})
             if variant=="ruleset":

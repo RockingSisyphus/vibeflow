@@ -5,7 +5,6 @@ from vibeflow.core.algorithms import strongly_connected_components
 from vibeflow.core.constants import (
     FLOW_KIND_DECISION,
     FLOW_KIND_GLOBAL_STATE,
-    FLOW_KIND_IO,
     FLOW_KIND_PREDEFINED,
     TARGET_FEATURE_EXECUTION_LOCKS,
     TARGET_FEATURE_GLOBAL_STATE,

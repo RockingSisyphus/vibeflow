@@ -6,7 +6,6 @@ from vibeflow.targets.python.nodetypes.protocols import EFFECT_SCOPE_GLOBAL_STAT
 from vibeflow.targets.python.quality.source_analysis.ast_facts import (
     path_effect_call_name,
     qualified_call_name,
-    qualified_reference_name,
 )
 from vibeflow.targets.python.quality.source_analysis.ast_facts import call_name as _call_name, is_immutable_constant, module_matches
 from vibeflow.targets.python.rules.node.policy import BANNED_ATTR_CALLS, BANNED_IMPORT_ROOTS, PurityPolicy

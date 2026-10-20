@@ -8,9 +8,7 @@ from typing import Any, Mapping, Sequence
 
 from vibeflow.block_compiler import SourceRef
 from vibeflow.core.descriptors import (
-    DescriptorModelError,
     PluginCatalog,
-    PluginDescriptor,
     PluginResolution,
     PluginSelection,
     PluginSelectionError,

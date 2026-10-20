@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import json
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -32,7 +31,6 @@ from vibeflow.targets.javascript.frontend.errors import AotPlanError
 
 from vibeflow.targets.javascript.build.toolchain import (
     AotToolchainError,
-    ToolchainInfo,
     run_build_driver,
 )
 

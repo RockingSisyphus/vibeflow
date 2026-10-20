@@ -1,6 +1,6 @@
 """python Workflow analysis and review Rule definitions."""
 from vibeflow.core.rules import RuleDescriptor
-from vibeflow.targets.shared.rule_support.workflow import ANALYSIS, analysis, summary, review, nodesets, topic, graph_contexts, review_graph
+from vibeflow.targets.shared.rule_support.workflow import ANALYSIS, analysis, summary, review, nodesets, topic
 
 
 def workflow_plan_resources():

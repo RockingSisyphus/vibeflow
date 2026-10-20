@@ -16,7 +16,7 @@ from vibeflow.targets.python.project import NodeRegistry
 from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from vibeflow.targets.python.project.registry import NodeRegistryQueries, NodeRegistryError
 from vibeflow.targets.python.quality.rule_adapter import execute_python_node_rules
-from vibeflow.targets.python.rules.node.helpers import source_policy
+from vibeflow.targets.python.quality.policy_parameters import source_policy
 from vibeflow.targets.python.rules.node.policy import PurityPolicy
 from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
 

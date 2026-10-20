@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from importlib.resources import as_file
 import json
 from pathlib import Path
 import re
@@ -9,7 +8,6 @@ import subprocess
 import tempfile
 from typing import Any, Mapping
 
-from vibeflow.targets.javascript.resources import resource
 
 
 NODE_MINIMUM = (22, 12, 0)
