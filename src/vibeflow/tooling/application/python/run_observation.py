@@ -37,13 +37,14 @@ def observed_checked_run(function):
     def observed(*args, **kwargs):
         from vibeflow.tooling.application.python.preview_run import source_run_preview
         config = args[0] if args else kwargs["config_path"]
-        with source_run_preview(config, workspace=kwargs.get("workspace"), preview_root=kwargs.get("preview_root")):
+        with source_run_preview(config, workspace=kwargs.get("workspace"), preview_root=kwargs.get("preview_root"), entry=kwargs.get("entry")):
             return invoke(*args, **kwargs)
 
     def invoke(*args, **kwargs):
         if current_observation() is not None:
             return function(*args, **kwargs)
-        from vibeflow.tooling.application.python.execution import (_new_run_id, _prepare_run_dir)
+        from vibeflow.tooling.application.python.run_directory import prepare_run_dir as _prepare_run_dir
+        from vibeflow.tooling.application.python.execution import (_new_run_id)
         run_id = _new_run_id() if kwargs.get("run_id") is None else kwargs["run_id"]
         run_dir = kwargs.get("_prepared_run_dir")
         if run_dir is None:
@@ -81,7 +82,8 @@ def observed_cli_run(function):
     @wraps(function)
     def observed(args):
         from vibeflow.tooling.application.python.cli import _runtime_options_from_args
-        from vibeflow.tooling.application.python.execution import (_new_run_id, _prepare_run_dir)
+        from vibeflow.tooling.application.python.run_directory import prepare_run_dir as _prepare_run_dir
+        from vibeflow.tooling.application.python.execution import (_new_run_id)
         from vibeflow.targets.python.runtime.console_capture import capture_process_console
         from vibeflow.tooling.application.python.run_directory import RunDirectoryExistsError
         run_id = _new_run_id() if args.run_id is None else args.run_id
@@ -99,7 +101,7 @@ def observed_cli_run(function):
         args._prepared_run_dir = run_dir
         options = _resolve_observation_options(Path(args.config), _runtime_options_from_args(args))
         from vibeflow.tooling.application.python.preview_run import source_run_preview, bind_run_observer
-        with source_run_preview(args.config, preview_root=getattr(args, "preview_root", None)):
+        with source_run_preview(args.config, preview_root=getattr(args, "preview_root", None), entry=getattr(args, "entry", None)):
             with observe_run(run_dir, options) as observer:
                 bind_run_observer(observer)
                 with core_diagnostic_sink(observer.write_kernel), capture_process_console(observer):

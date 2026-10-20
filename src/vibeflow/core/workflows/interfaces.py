@@ -96,5 +96,3 @@ def workflow_capability_descriptor():
             input_type=f"vibeflow.workflow.{name}.request", output_type=f"vibeflow.workflow.{name}.result",
             completion="immediate" if name in {"self", "send"} else "suspend") for name in _REQUESTS},
         display_name="Workflow coordination", description="Independent workflow instances and local JSON messages.")
-
-

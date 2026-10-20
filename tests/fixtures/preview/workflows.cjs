@@ -9,6 +9,8 @@ const [renderer,entry]=process.argv.slice(2),puppeteer=createRequire(renderer)('
   page.on('pageerror',error=>errors.push(error.message));
   await page.setRequestInterception(true);page.on('request',r=>{if(/^https?:/.test(r.url())){network.push(r.url());r.abort();}else r.continue();});
   await page.goto(pathToFileURL(entry).href);await page.waitForSelector('[data-call-path="work"]');
+  assert.equal(await page.$eval('#entry',e=>e.value),'cli');
+  assert.match(await page.$eval('#history',e=>e.textContent),/入口 cli/);
   assert.match(await page.$eval('[data-call-path="work"]',e=>e.textContent),/启动 workflow · 等待结束/);
   await page.select('#entry','gui');await page.waitForSelector('[data-call-path="gui"]');
   assert.equal(await page.$('[data-call-path="start"]'),null);

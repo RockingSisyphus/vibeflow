@@ -7,19 +7,22 @@ from vibeflow.tooling.presentation.preview.diagnostics import incidental_preview
 from vibeflow.tooling.application.python.presentation.preview import python_preview
 from vibeflow.tooling.presentation.preview.catalog import new_record, utc_now
 from vibeflow.tooling.presentation.viewer import install_page
-from vibeflow.tooling.presentation.preview.exporter import workflow_identity, preview_workspace
+from vibeflow.tooling.presentation.preview.exporter import workflow_identity
+from vibeflow.tooling.application.presentation_targets import preview_workspace
 
 _session = ContextVar("vibeflow_source_run_preview", default=None)
 
 
 @contextmanager
-def source_run_preview(config, *, workspace=None, preview_root=None):
+def source_run_preview(config, *, workspace=None, preview_root=None, entry=None):
     if _session.get() is not None:
         if workspace is not None:
             _session.get()["workspace"] = workspace
+        if entry is not None:
+            _session.get()["entry"] = entry
         yield
         return
-    session = dict(config=Path(config).resolve(), workspace=workspace, preview_root=preview_root, record=None, started=utc_now())
+    session = dict(config=Path(config).resolve(), workspace=workspace, preview_root=preview_root, entry=entry, record=None, started=utc_now())
     token = _session.set(session)
     try:
         yield
@@ -57,6 +60,8 @@ def _missing_preview(session, status, error):
     install_page(root)
     record = new_record(root, workflow_identity(session["config"], workspace), "run", status)
     record.metadata.update(created_at=session["started"], preview_error=error or "本次操作未生成可用展示数据。")
+    if session["entry"] is not None:
+        record.metadata["entry"] = session["entry"]
     return record
 
 
@@ -64,29 +69,24 @@ def start_run_preview(prepared, run_dir, health=None):
     session = _session.get()
     if session is None or session["record"] is not None:
         return
-    workspace = session["workspace"]
-    if workspace is None:
-        from vibeflow.tooling.project.workspace_loader import load_workspace_config, find_project_config, load_project_workspace
-        for directory in session["config"].parents:
-            candidate = directory / "vibeflow_config.jsonc"
-            if candidate.is_file():
-                workspace = load_workspace_config(candidate)
-                break
-        if workspace is None and find_project_config(session["config"]):
-            workspace = load_project_workspace(session["config"])
+    workspace = preview_workspace(session["config"], session["workspace"])
+    from vibeflow.core.workflows.entries import choose_entry
+    entry = choose_entry(prepared.graph.entries, prepared.graph.default_entry, session["entry"])
     session["error_path"] = Path(run_dir) / "preview.error.txt"
     session["record"] = incidental_preview(python_preview, prepared=prepared, config=session["config"],
         workspace=workspace, preview_root=session["preview_root"], category="run", status="running",
         error_path=session["error_path"])
     if session["record"] is not None:
         incidental_preview(_attach_run_preview, record=session["record"], run_dir=run_dir,
-            health=health, error_path=session["error_path"])
+            health=health, entry=entry, error_path=session["error_path"])
 
 
-def _attach_run_preview(record, run_dir, health):
+def _attach_run_preview(record, run_dir, health, entry=None):
     import json
     import os
     record.metadata["run_id"] = Path(run_dir).name
+    if entry is not None:
+        record.metadata["entry"] = entry
     if health is not None:
         record.metadata["check_status"] = health.status
     record.update("running")

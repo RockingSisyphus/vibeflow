@@ -5,49 +5,8 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 from dataclasses import replace
 
-from vibeflow.block_compiler.compiler import _normalize_source_map, _root_inputs, _root_outputs, _workflow_id, compile_graph_plan
+from vibeflow.block_compiler.compiler import _normalize_source_map, _root_inputs, _root_outputs, _workflow_id
 from vibeflow.block_compiler.model import PipelineInputSpec, PipelineOutputSpec, PortablePlanError, SourceRef, WorkflowPlan, freeze_json_object
-from vibeflow.core.compiler import CompiledGraph
-from vibeflow.core.flow import GraphConfig
-
-
-def build_workflow_plan(
-    graph: GraphConfig,
-    compiled: CompiledGraph,
-    *,
-    execution_plan: Any | None = None,
-    workflow_id: str | None = None,
-    source_by_type: Mapping[str, SourceRef] | None = None,
-    compiled_by_path: Mapping[tuple[str, ...], CompiledGraph] | None = None,
-    params_by_path: Mapping[tuple[str, ...], Mapping[str, object]] | None = None,
-    pipeline_inputs: Sequence[PipelineInputSpec] | None = None,
-    pipeline_outputs: Sequence[PipelineOutputSpec] | None = None,
-) -> WorkflowPlan:
-    """Preserve the historical graph/ExecutionPlan planning interface."""
-
-    if execution_plan is not None:
-        if execution_plan.graph is not graph or execution_plan.compiled is not compiled:
-            raise PortablePlanError(
-                "execution plan must have been built from the supplied graph "
-                "and compiled graph"
-            )
-        return workflow_plan_from_execution_plan(
-            execution_plan,
-            workflow_id=workflow_id,
-            source_by_type=source_by_type,
-            pipeline_inputs=pipeline_inputs,
-            pipeline_outputs=pipeline_outputs,
-        )
-    return compile_graph_plan(
-        graph,
-        compiled,
-        workflow_id=workflow_id,
-        source_by_type=source_by_type,
-        compiled_by_path=compiled_by_path,
-        params_by_path=params_by_path,
-        pipeline_inputs=pipeline_inputs,
-        pipeline_outputs=pipeline_outputs,
-    )
 
 
 def workflow_plan_from_execution_plan(
@@ -87,8 +46,4 @@ def workflow_plan_from_execution_plan(
         inputs=_root_inputs(graph,pipeline_inputs),outputs=_root_outputs(graph,pipeline_outputs),entry_mode=graph.entry_mode)
 
 
-def execution_plan_effect_scope(frame: Any) -> str:
-    return str(getattr(frame, "effect_scope", "unconstrained"))
-
-
-__all__ = ["build_workflow_plan", "workflow_plan_from_execution_plan"]
+__all__ = ["workflow_plan_from_execution_plan"]

@@ -230,4 +230,3 @@ function createStaticWorkflowAsync(
     return result.publicOutputs;
   };
 }
-

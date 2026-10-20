@@ -1,7 +1,6 @@
 """Rules over ordinary workflow facts; no source or language access."""
 
 from dataclasses import dataclass, field, replace
-from inspect import unwrap
 
 from vibeflow.core.findings import Finding
 from vibeflow.core.rules import RuleRecord, RuleResult
@@ -33,9 +32,13 @@ def _flow(context, inputs, params):
     from vibeflow.targets.shared.quality_support.workflow_rules.flow import _flowchart_health_facts
     from vibeflow.targets.shared.quality_support.workflow_rules.flow_data import append_data_contract_warnings
     findings = []
+    graph, compiled = context.require("graph"), context.require("compiled")
+    state = _Findings()
+    _flowchart_health_facts(graph, compiled, state, owner=context.facts.get("owner", "pipeline"),
+        entry_starts={item.start for item in graph.entries.values()} if graph.entries else None)
+    findings.extend((*state.errors, *state.warnings))
     for graph, compiled, entry in _entry_graphs(context):
         state = _Findings()
-        _flowchart_health_facts(graph, compiled, state, owner=context.facts.get("owner", "pipeline"))
         append_data_contract_warnings(graph, compiled, state,
                                   owner=context.facts.get("owner", "pipeline"),
                                   runtime_flow_kinds=context.facts.get("runtime_flow_kinds"))

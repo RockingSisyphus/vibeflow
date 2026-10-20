@@ -98,3 +98,5 @@ window.VibeFlowViewerConfig = {
 `VibeFlowPreview.snapshot(data)` 注册展示数据。索引只包含列表元数据，选中时
 才加载快照；页面使用本地经典脚本，不通过 `fetch` 读取 JSON。
 快照正文只含 Architecture、视图、关联和可选附件引用，不内嵌 SVG 或重复节点图元。
+
+Python 源码运行记录显示实际命名入口，首次打开时默认选择该入口；查看其他入口不会改变原运行记录。旧历史没有入口字段时继续默认显示全部入口。

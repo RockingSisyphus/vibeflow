@@ -14,16 +14,7 @@ from vibeflow.targets.javascript.frontend.schema import (
     PortableSchemaError,
     validate_portable_json_schema,
 )
-from vibeflow.core.descriptors import (
-    BaseLibCatalog,
-    BaseLibDescriptor,
-    CapabilityDescriptor,
-    CapabilityOperationDescriptor,
-    DescriptorCatalogs,
-    HostExtensionDescriptor,
-    ImplementationDescriptor,
-    NodeDescriptor,
-)
+from vibeflow.core.descriptors import BaseLibCatalog, BaseLibDescriptor, CapabilityDescriptor, DescriptorCatalogs, ImplementationDescriptor, NodeDescriptor
 from vibeflow.core.descriptors.source_bundle import implementation_sources, source_resources
 from vibeflow.core.flow import GraphConfig
 

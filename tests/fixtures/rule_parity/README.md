@@ -1,6 +1,6 @@
 # 基线规则对照沙箱
 
-独立 Target/版本观察默认最多并发 8 个 worker。使用 `--workers N` 或 `VIBEFLOW_TEST_WORKERS=N` 调整，命令行优先；`--workers 1` 可串行重跑。Target 内共享资料的场景仍按原顺序执行。
+独立 Target/版本观察默认最多并发 12 个 worker。使用 `--workers N` 或 `VIBEFLOW_TEST_WORKERS=N` 调整，命令行优先；`--workers 1` 可串行重跑。Target 内共享资料的场景仍按原顺序执行。
 
 这组测试保留 `f169429` 和修复前 `15adf51` 的冻结观察，检查当前工作区是否漏掉旧规则或错误拒绝合法输入。它与领域插件、规则图及图形沙箱互补，已接入 `verify_project.py --full`。
 

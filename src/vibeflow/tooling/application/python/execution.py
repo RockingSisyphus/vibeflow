@@ -13,7 +13,6 @@ from uuid import uuid4
 
 from vibeflow.core.findings import HealthReport
 from vibeflow.targets.python.project.registry import NodeRegistryError
-from vibeflow.tooling.application.python.run_directory import prepare_run_dir as _prepare_run_dir
 
 if TYPE_CHECKING:
     from vibeflow.core.flow import GraphConfig
@@ -200,4 +199,3 @@ def _ensure_trace_files(run_dir: Path) -> None:
         path = run_dir / name
         if not path.exists():
             path.write_text("", encoding="utf-8")
-

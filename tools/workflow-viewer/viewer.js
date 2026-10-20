@@ -59,7 +59,7 @@
       const button=document.createElement("button");button.className="record"+(r.id===current?" active":"");button.dataset.status=r.status;button.dataset.recordId=r.id;
       const badge=document.createElement("span");badge.className="badge";badge.textContent=categoryNames[r.category]||r.category;
       const title=document.createElement("strong");title.textContent=r.workflow.name;
-      const info=document.createElement("small");info.textContent=new Date(r.created_at).toLocaleString()+"\n"+r.workflow.root_id+" · "+r.workflow.target+" · "+statusText(r)+(r.preview_error?" · 预览不可用":"");
+      const info=document.createElement("small");info.textContent=new Date(r.created_at).toLocaleString()+"\n"+r.workflow.root_id+" · "+r.workflow.target+(r.entry?" · 入口 "+r.entry:"")+" · "+statusText(r)+(r.preview_error?" · 预览不可用":"");
       button.append(badge,title,info);button.onclick=()=>navigate(r.id,"flow");return button;
     }));
   }
@@ -97,7 +97,7 @@
   async function navigate(id,tab,call="") { await open(id,tab,call);if(current===id&&records.has(id))writeHash(call); }
   async function open(id,tab="flow",call="",selectedEntry=undefined) {
     const token=++generation;
-    current=id;view=tab;entry=selectedEntry??entries.get(id)??"";entries.set(id,entry);mode=modes.get(id)||"structured";data=null;state=null;visible=new Map();$("tabs").replaceChildren();$("scene").replaceChildren();$("dimensions").textContent="";history();empty("正在加载快照…");
+    current=id;view=tab;entry=selectedEntry??entries.get(id)??records.get(id)?.entry??"";entries.set(id,entry);mode=modes.get(id)||"structured";data=null;state=null;visible=new Map();$("tabs").replaceChildren();$("scene").replaceChildren();$("dimensions").textContent="";history();empty("正在加载快照…");
     try {
       const record=records.get(id);
       if(!record)throw new Error("索引中没有此快照："+id);

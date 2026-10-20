@@ -11,9 +11,7 @@ from vibeflow.core.findings import HealthReport
 from vibeflow.tooling.application.python.run_directory import InvalidRunIdError, parse_run_id_argument, validate_run_id
 from vibeflow.tooling.application.python.delegate_contract import (
     CLI_ARGV_TYPE,
-    CLI_EXIT_CODE_TYPE,
     extract_delegate_cli_exit_code,
-    validate_delegate_cli_graph_contract,
 )
 
 
@@ -54,7 +52,8 @@ def handle_delegate_cli(args) -> int:
         _load_workspace_for_cli,
         _runtime_options_from_args,
     )
-    from vibeflow.tooling.application.python.execution import (CheckedRunError, CheckedRunResult, _new_run_id, _prepare_run_dir, _write_refused_artifacts)
+    from vibeflow.tooling.application.python.run_directory import prepare_run_dir as _prepare_run_dir
+    from vibeflow.tooling.application.python.execution import (CheckedRunError, CheckedRunResult, _new_run_id, _write_refused_artifacts)
     from vibeflow.tooling.application.python.runner import (RunDirectoryExistsError)
 
     try:

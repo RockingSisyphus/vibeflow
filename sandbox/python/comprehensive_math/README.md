@@ -1,6 +1,6 @@
 # Python 综合数学沙箱
 
-独立 SDK 项目：插件注册源码 Rule、typed-record 依赖、Node 与多文件 BaseLib，config 组合原生 IO、两层 Nodeset、条件分支、汇合和 while 循环。测试包含真实 checked run、结构化架构快照、plan/block/compiled、连续复用、并发以及 warning 的源码修正对照。
+独立 SDK 项目：插件注册源码 Rule、typed-record 依赖、Node 与多文件 BaseLib，config 组合普通 SDK 端口节点与显式 terminal、两层 Nodeset、条件分支、汇合和 while 循环。测试包含真实 checked run、结构化架构快照、plan/block/compiled、连续复用、并发以及 warning 的源码修正对照。
 
 完整公式、输入矩阵与通过判定见 [共用案例说明](../../../docs/maintainers/comprehensive-math-sandbox.md)。
 

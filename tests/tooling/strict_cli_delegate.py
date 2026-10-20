@@ -10,11 +10,11 @@ from pathlib import Path
 import pytest
 
 from vibeflow.tooling.application.python.cli import main
-from vibeflow.tooling.application.python.cli.delegate_cli import extract_delegate_cli_exit_code, validate_delegate_cli_graph_contract
+from vibeflow.tooling.application.python.delegate_contract import extract_delegate_cli_exit_code, validate_delegate_cli_graph_contract
 from vibeflow.core.contracts import DataEnvelope, DataProvider, DataRequirement, RunResult
 from vibeflow.core import HealthReport
 from vibeflow.tooling.project.diagnostic_sink import emit_core_diagnostic
-from vibeflow.tooling.application.python.runner import CheckedRunResult
+from vibeflow.tooling.application.python.execution import CheckedRunResult
 from vibeflow.tooling.project.graph_config import parse_graph_config
 
 from vibeflow.targets.python.project.plugins import PluginRegistry
@@ -841,7 +841,7 @@ def test_delegate_cli_log_escapes_run_and_config_path_line_breaks(monkeypatch, t
 
 
 def test_delegate_cli_run_directory_race_does_not_overwrite_foreign_log(monkeypatch, tmp_path, capsys) -> None:
-    from vibeflow.tooling.application.python.runner import _prepare_run_dir as original_prepare_run_dir
+    from vibeflow.tooling.application.python.run_directory import prepare_run_dir as original_prepare_run_dir
 
     def race_for_run_directory(run_root, run_id):
         run_dir = Path(run_root) / run_id
@@ -849,7 +849,7 @@ def test_delegate_cli_run_directory_race_does_not_overwrite_foreign_log(monkeypa
         (run_dir / "vibeflow.log").write_text("OTHER-RUN\n", encoding="utf-8")
         return original_prepare_run_dir(run_root, run_id)
 
-    monkeypatch.setattr("vibeflow.tooling.application.python.execution._prepare_run_dir", race_for_run_directory)
+    monkeypatch.setattr("vibeflow.tooling.application.python.run_directory.prepare_run_dir", race_for_run_directory)
 
     status = main(
         [

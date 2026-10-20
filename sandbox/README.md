@@ -45,7 +45,7 @@ python sandbox/javascript/rule_selection/run_all.py
 
 覆盖入口见 [TEST_COVERAGE](TEST_COVERAGE.md)，目录职责见 [开发说明](../docs/maintainers/directory-layout.md)，历史原始观察见 [证据索引](../docs/maintainers/evidence/index.md)。
 
-当前两个 integration runner 登记 152 项（Python 103、JavaScript 49）。其中两项是新增的规则选择综合案例；此前 150 项的完整分类与原名见 [任务清单](../docs/maintainers/history/audits/sandbox-task-inventory-workflow-20261010.md)。
+当前两个 integration runner 登记 153 项（Python 103、JavaScript 50）。其中两项是新增的规则选择综合案例；此前 150 项的完整分类与原名见 [任务清单](../docs/maintainers/history/audits/sandbox-task-inventory-workflow-20261010.md)。
 
 JavaScript workflow_math 内含[同一起终点的多条条件边回归](javascript/workflow_math/README.md)：模拟 `done`、`failed` 都进入同一收尾节点，覆盖顺序交换、完全重复与条件重叠。它随 integration 自动执行，无需另行启用。
 

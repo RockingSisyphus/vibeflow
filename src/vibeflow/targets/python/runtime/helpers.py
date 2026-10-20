@@ -112,3 +112,15 @@ __all__ = [
     "planned_items",
     "referenced_nodeset_names",
 ]
+
+
+def assert_planned_runtime_allowed(graph: GraphConfig, options) -> None:
+    if not has_planned(graph):
+        return
+    items = planned_items(graph)
+    if options.allow_planned_stub and all(item.get("behavior") == "python_stub" for item in items):
+        return
+    if options.allow_planned_stub:
+        blocked = [str(item.get("id", "")) for item in items if item.get("behavior") != "python_stub"]
+        raise PipelineRuntimeError("only planned python_stub nodes/nodesets can run with allow_planned_stub: " + ", ".join(blocked))
+    raise PipelineRuntimeError("planned nodes/nodesets cannot run")

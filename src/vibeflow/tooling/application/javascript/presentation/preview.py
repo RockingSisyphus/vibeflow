@@ -5,7 +5,7 @@ from .architecture import build_prepared_architecture
 
 
 def _publish(result, architecture, *, preview_root, category, status):
-    from vibeflow.tooling.presentation.preview.targets import prepare_targets
+    from vibeflow.tooling.application.presentation_targets import prepare_targets
     architecture, targets = prepare_targets(architecture, config=result.config_path, workspace=result.workspace, load_own_target=_load_own_target)
     record=publish_preview(root=preview_root or result.workspace.root,
         workflow=workflow_identity(result.config_path,result.workspace,target="javascript"),

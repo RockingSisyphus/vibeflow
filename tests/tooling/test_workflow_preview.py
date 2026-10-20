@@ -66,6 +66,8 @@ def test_offline_browser_selects_entries_and_expands_a_workflow(tmp_path):
     if not is_mermaid_svg_renderer_available():
         pytest.skip("browser dependencies are supplied by the full gate")
     record = preview_project(tmp_path)
+    record.metadata.update(category="run", entry="cli")
+    record.update(status="succeeded")
     browser = Path(__file__).resolve().parents[1] / "fixtures/preview/workflows.cjs"
     result = subprocess.run(["node", str(browser), str(_find_mmdc().resolve()), str(tmp_path / "vibeflow-preview.html")],
         text=True, capture_output=True, timeout=60)
@@ -74,7 +76,7 @@ def test_offline_browser_selects_entries_and_expands_a_workflow(tmp_path):
 
 def test_foreign_target_facts_cross_the_cli_boundary_and_missing_targets_are_local(tmp_path):
     from tests.targets.javascript.test_code_plugins import project as javascript_project
-    from vibeflow.tooling.presentation.preview.targets import prepare_targets
+    from vibeflow.tooling.application.presentation_targets import prepare_targets
     caller, worker = tmp_path / "caller", tmp_path / "worker"
     caller.mkdir()
     worker.mkdir()

@@ -1,120 +1,96 @@
-"""Warm public Python AOT calls; optional process-local metadata experiments."""
+"""Build current-ABI SDK chains and measure fresh Runtime preparation."""
 from pathlib import Path
 import argparse
 import cProfile
-from contextlib import contextmanager
 import json
 import statistics
 import sys
 import tempfile
 import time
 import uuid
-from zipfile import ZipFile
 
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'src'))
 
 
-def run(bundle_path, work, rounds):
-    from vibeflow.tooling.application.python.bundle import load_bundle, PythonBundle
-    from vibeflow.targets.python.sdk.plugin import Plugin
+def run(work, count, rounds):
+    from vibeflow.block_compiler import WORKFLOW_ABI_VERSION
+    from vibeflow.tooling.application.python.build import PythonBuildRequest, build_python_aot
+    from vibeflow.tooling.application.python.bundle import load_bundle
+    from vibeflow.tooling.project.workspace_loader import load_workspace_config
+
+    project = work / f'chain-{count}'
+    project.mkdir()
+    (project / 'vibeflow_config.jsonc').write_text(json.dumps({'roots': [{'id': 'probe', 'path': '.'}]}))
+    (project / 'vibeflow_project.jsonc').write_text('{"project_target":"python","quality_enabled":false}')
+    source = ['from vibeflow.targets.python.sdk import Plugin,node,data_schema',
+        '@node(type_key="boundary",flow_kind="terminal",contract={},rulesets=[])',
+        'class Boundary:', ' def run_pure(self,inputs,params):return {}']
+    for index in range(count):
+        contract = {'requires': [{'type': f'value.{index}', 'cardinality': 'exactly_one', 'display_name': 'Input'}],
+            'provides': [{'key': f'result{index}', 'type': f'value.{index+1}', 'display_name': 'Result'}],
+            'input_semantics': {f'value.{index}': ['Previous result']},
+            'output_semantics': {f'result{index}': ['Add one']}}
+        source.extend([f'@node(type_key="step{index}",contract={contract!r},rulesets=[])',
+            f'class Step{index}:', f' def run_pure(self,inputs,params):return {{"result{index}":inputs["value.{index}"]["value"]+1}}'])
+    source.append('plugin=Plugin(id="probe",resources=[Boundary,' + ','.join(f'Step{i}' for i in range(count))
+        + ',*[data_schema(type_key=f"value.{i}",schema={"type":"number"}) for i in range(' + str(count+1) + ')]])')
+    (project / 'plugin.py').write_text('\n'.join(source))
+    ids = ['start', *[f'step{i}' for i in range(count)], 'end']
+    config = project / 'workflow.jsonc'
+    config.write_text(json.dumps({'plugins': [{'source': {'kind': 'file', 'ref': 'plugin.py'}}], 'rulesets': [], 'pipeline': {
+        'inputs': [{'key': 'number', 'type': 'value.0', 'required': True, 'display_name': 'Number'}],
+        'outputs': [{'type': f'value.{count}', 'as': 'number', 'cardinality': 'exactly_one', 'display_name': 'Result'}],
+        'nodes': [{'id': key, 'type_used': 'boundary' if key in {'start', 'end'} else key,
+                   'display_name': key, 'description': 'Current SDK chain'} for key in ids],
+        'edges': [ids[i:i+2] for i in range(len(ids)-1)]}}))
+    built = build_python_aot(PythonBuildRequest(load_workspace_config(project / 'vibeflow_config.jsonc'),
+        config, work / f'built-{count}', preview_root=work / 'preview'))
     started = time.perf_counter()
-    bundle = load_bundle(bundle_path)
-    load_seconds = time.perf_counter() - started
-    descriptor = PythonBundle._descriptor
-    bindings = Plugin.bindings
-    descriptions, indexes = {}, {}
+    bundle = load_bundle(built.out_dir)
+    load_ms = (time.perf_counter()-started)*1000
 
-    def cached_descriptor(owner, record):
-        key = (id(owner), id(record))
-        if key not in descriptions:
-            descriptions[key] = descriptor(owner, record)
-        return descriptions[key]
-
-    def cached_bindings(owner):
-        key = id(owner)
-        if key not in indexes:
-            indexes[key] = bindings(owner)
-        return indexes[key]
-
-    @contextmanager
-    def mode(name):
-        PythonBundle._descriptor = cached_descriptor if name in {'descriptors', 'both'} else descriptor
-        Plugin.bindings = cached_bindings if name in {'bindings', 'both'} else bindings
-        try:
-            yield
-        finally:
-            PythonBundle._descriptor, Plugin.bindings = descriptor, bindings
-
-    def call():
+    def call(value):
         started = time.perf_counter()
         runtime = bundle.create_runtime(run_dir=work / 'runs' / uuid.uuid4().hex,
             runtime_options={'execution': 'compiled', 'trace': 'off'})
         prepared = time.perf_counter()
-        context = runtime.run({
-            'core.request': {'operation': 'settings.get', 'params': {},
-                'caller': {'actor': 'ai', 'binding': {'harness': 'codex',
-                    'instance': 'aot-sandbox', 'conversation': 'synthetic'}}},
-            'core.runtime': {'state_dir': str(work / 'state'), 'invocation_id': uuid.uuid4().hex,
-                'now': time.time(), 'mono': time.monotonic(), 'timezone': 'UTC',
-                'default_profile': {'id': 'aot-sandbox', 'overrides': {}}}})
+        result = runtime.run({'number': value})
         ended = time.perf_counter()
-        result = context.get('core.request_result')['value']
-        assert result['status'] == 'ok', result
-        return result['settings'], {'prepare_ms': (prepared-started)*1000,
-            'run_ms': (ended-prepared)*1000, 'total_ms': (ended-started)*1000}
+        assert result.get('number')['value'] == value+count
+        return {'prepare_ms': (prepared-started)*1000, 'run_ms': (ended-prepared)*1000,
+                'total_ms': (ended-started)*1000}
 
-    expected, _ = call()
-    # Separate profiling from latency measurements: profile overhead is not a latency result.
+    call(0)
     profile = cProfile.Profile()
     profile.enable()
-    for _ in range(5):
-        value, _ = call()
-        assert value == expected
+    for index in range(5):
+        call(index)
     profile.disable()
-    selected = {'_descriptor', '_registry', 'bindings', 'decode_resource',
-        '_discard_foreign_project_modules', 'bind_python_workflow'}
-    counts = [{'file': row.code.co_filename, 'function': row.code.co_name, 'calls': row.callcount}
-        for row in profile.getstats() if not isinstance(row.code, str) and row.code.co_name in selected]
-    for name in ['descriptors', 'bindings', 'both']:
-        with mode(name):
-            value, _ = call()
-            assert value == expected
-    samples = []
-    # Reverse order on alternating rounds rather than timing all baselines first.
-    for index in range(rounds):
-        names = ['normal', 'descriptors', 'bindings', 'both']
-        for name in names if index % 2 == 0 else reversed(names):
-            with mode(name):
-                value, sample = call()
-                assert value == expected
-            samples.append({'mode': name, **sample})
-    return {'platform': sys.platform, 'python': sys.version.split()[0],
-        'framework': str(Path(sys.modules[PythonBundle.__module__].__file__).resolve()),
-        'node_types': len(bundle.data['nodes']), 'load_seconds': load_seconds,
-        'runtime_instances_reused': False, 'profile_warm_calls': 5, 'profile_counts': counts,
-        'scope': 'Real handoff settings.get, private empty state. Cached modes are diagnostic only; no SDK files changed.',
-        'medians_ms': {name: {field: statistics.median(s[field] for s in samples if s['mode'] == name)
-            for field in ['prepare_ms', 'run_ms', 'total_ms']} for name in ['normal', 'descriptors', 'bindings', 'both']},
-        'samples': samples}
+    measured = {'_descriptor', '_registry', 'bindings', 'decode_resource', 'bind_python_workflow'}
+    counts = [{'function': row.code.co_name, 'calls': row.callcount} for row in profile.getstats()
+              if not isinstance(row.code, str) and row.code.co_name in measured]
+    samples = [call(index) for index in range(rounds)]
+    return {'abi': WORKFLOW_ABI_VERSION, 'node_types': count+1, 'load_ms': load_ms,
+        'runtime_instances_reused': False, 'profile_counts': counts, 'samples': samples,
+        'medians_ms': {key: statistics.median(row[key] for row in samples) for key in samples[0]}}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--handoff', type=Path, required=True, help='Original author handoff ZIP')
-    parser.add_argument('--rounds', type=int, default=8)
+    parser.add_argument('--nodes', type=int, nargs='+', default=[1, 32, 138])
+    parser.add_argument('--rounds', type=int, default=20)
     parser.add_argument('--report', type=Path, required=True)
     args = parser.parse_args()
+    if args.rounds < 1 or any(count < 1 for count in args.nodes):
+        parser.error('nodes and rounds must be positive')
     with tempfile.TemporaryDirectory(prefix='python-aot-preparation-') as name:
-        work = Path(name)
-        with ZipFile(args.handoff) as archive:
-            archive.extractall(work)
-        report = run(work / 'vibeflow-author-handoff/bundle', work, args.rounds)
-        args.report.parent.mkdir(parents=True, exist_ok=True)
-        args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
-        print(json.dumps({k: v for k, v in report.items() if k not in {'samples', 'profile_counts'}}, ensure_ascii=False))
-        print(json.dumps(report['profile_counts'], ensure_ascii=False))
+        rows = [run(Path(name), count, args.rounds) for count in args.nodes]
+    report = {'scope': 'Current SDK chains; separate profiling and latency samples; no old bundle compatibility.', 'rows': rows}
+    args.report.parent.mkdir(parents=True, exist_ok=True)
+    args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2)+'\n')
+    print(json.dumps(report, ensure_ascii=False))
 
 
 if __name__ == '__main__':

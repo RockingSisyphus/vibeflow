@@ -84,4 +84,4 @@ python tools/verify_project.py --full
 
 新建自行维护的子目录时同步写明职责。过时且不再使用的文件直接删除；运行产物在仓库外临时工作区使用并及时清理。详细规则见[仓库目录职责](docs/maintainers/directory-layout.md)。
 
-当前工作树另在实施未发布的[命名入口与独立 Workflow 通信](distribution/docs/user/workflow-coordination.md)：源码使用 Workflow ABI v9，旧 AOT 需重建，原生 IO 配置需迁移；既有 1.1.5 构建记录仍保留原 ABI 信息。功能的实施与验收证据见[维护记录](docs/maintainers/workflow-communication.md)。本轮不自动发布新版本。
+当前源码已实现尚未发布的[命名入口与独立 Workflow 通信](distribution/docs/user/workflow-coordination.md)：源码使用 Workflow ABI v9，旧 AOT 需重建，原生 IO 配置需迁移；既有 1.1.5 构建记录仍保留原 ABI 信息。功能的实施与验收证据见[维护记录](docs/maintainers/workflow-communication.md)。本轮不自动发布新版本。

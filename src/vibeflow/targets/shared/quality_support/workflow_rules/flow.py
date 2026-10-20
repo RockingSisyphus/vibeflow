@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from collections import Counter
-from typing import Any, Mapping, Sequence
+from typing import Mapping, Sequence
 
-from vibeflow.core.contracts import provider_keys
 from vibeflow.core.flow import LOOP_NODE_TYPES, STATUS_PLANNED
 from vibeflow.core.findings import HealthFinding
 from vibeflow.core.constants import FLOW_KIND_DECISION, FLOW_KIND_TERMINAL
@@ -25,6 +24,7 @@ def _flowchart_health_facts(
     state,
     *,
     owner: str = "pipeline",
+    entry_starts: set[str] | None = None,
 ) -> None:
     active_nodes = [node for node in graph.nodes if _node_participates_in_flow(graph, node)]
     if not active_nodes:
@@ -40,6 +40,8 @@ def _flowchart_health_facts(
         )
         and not incoming[name]
     }
+    if entry_starts is not None:
+        starts &= entry_starts
     ends = {
         name
         for name in active_names

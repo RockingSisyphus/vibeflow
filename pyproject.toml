@@ -24,6 +24,7 @@ where = ["src"]
 vibeflow = [
     "tooling/presentation/mermaid/*.mjs",
     "targets/javascript/resources/*.mjs",
+    "targets/javascript/resources/coordination/*.mjs",
     "targets/javascript/nodetypes/*.mjs",
     "targets/javascript/nodetypes/*.d.ts",
     "targets/javascript/resources/*.d.ts",

@@ -1,7 +1,7 @@
 """Build facts, then execute explicitly selected workflow and Node rules."""
 from __future__ import annotations
 from dataclasses import dataclass, field
-from vibeflow.core.findings import HealthFinding, HealthReport
+from vibeflow.core.findings import HealthFinding
 from vibeflow.targets.python.quality.rule_adapter import execute_python_node_rules
 from vibeflow.targets.python.quality.workflow.rule_phase import execute_workflow_rules, workflow_invocations
 from vibeflow.targets.python.quality.workflow.report import _build_health_report
@@ -24,7 +24,7 @@ class _HealthValidationState:
 
 def validate_graph_health(graph, *, registry=None, plugin_registry=None,
     global_config=None, purity_policy=None, nodeset_max_depth=4,
-    source_context=None, rule_phase="static", quality_policy=None, compilation=None):
+    source_context=None, rule_phase="static", quality_policy=None, compilation=None, entry=None):
     from vibeflow.targets.python.project.compiler import GraphCompiler, GraphCompileError
     from vibeflow.targets.python.project.check_session import current_python_check
     session = current_python_check(registry) if registry is not None else None
@@ -71,6 +71,10 @@ def validate_graph_health(graph, *, registry=None, plugin_registry=None,
         session.compilation_input = graph
         session.compilation = compilation
     graph, compiled = compilation.workflow.graph, compilation.compiled_graph
+    if rule_phase == "run" and entry is not None:
+        from vibeflow.core.workflows.entries import execution_graph, project_entry
+        graph, compiled = project_entry(graph, compiled, entry)
+        graph = execution_graph(graph)
     if registry is not None and source_context is not None:
         for call in source_context.calls:
             key = (call.owner,call.node_id)
@@ -89,7 +93,11 @@ def validate_graph_health(graph, *, registry=None, plugin_registry=None,
         registry.call_capability_policies = policies_from_executions(state.rule_executions, paths)
         _append_findings(state, policy_findings(graph, registry.call_capability_policies,
             lambda key: registry.descriptor(key) if key in registry.available() else None))
-    return _build_health_report(graph, compiled, plugin_registry, state)
+    report = _build_health_report(graph, compiled, plugin_registry, state)
+    if graph.selected_entry:
+        from dataclasses import replace
+        report = replace(report, info={**report.info, "entry": graph.selected_entry})
+    return report
 
 
 def workflow_graphs(graph):

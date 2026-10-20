@@ -1,13 +1,10 @@
 <!-- vibeflow-directory-purpose -->
 # Python AOT 调用准备开销
 
-使用作者交接 ZIP 中原有的 139 节点监工 Bundle，但通过当前仓库 src 的公开 `load_bundle/create_runtime/run` 执行真实 `settings.get`。每次新建 Runtime，使用独立合成身份和空数据库，不访问原任务状态。
+使用当前公开 SDK 与正式 Python AOT 构建入口，生成 1、32、138 个串行加一节点；加上共享边界声明为 2、33、139 种节点类型。每次创建独立 Runtime，改变输入并核对输出，不复用业务实例。样本自行构建为当前 ABI，不依赖外部交接包。
 
-`run_probe.py --handoff /path/to/vibeflow-author-handoff.zip --report /outside/repo/python.json`。
-临时目录由 `TMPDIR` 指定，结束自动删除。报告显式保留在仓库外；不把包和运行目录复制进沙盒源码。
+运行 `python sandbox/python/aot_preparation/run_probe.py --nodes 1 32 138 --rounds 20 --report /outside/repo/python.json`。临时项目和 Bundle 位于 TMPDIR，结束自动删除；正式报告显式保留在仓库外。专用节点数/轮数仅用于控制测量规模，不设毫秒数通过门槛。
 
-五次暖调用的 cProfile 只用于次数；耗时另用未开启 profiler 的交错顺序测量。四种模式为原实现、只缓存固定 Descriptor、只缓存固定 Plugin 绑定表、两者；后面三种仅进程内实验，退出恢复方法，不修改内核文件，不复用业务对象。它们不能替代跨 Bundle、并发和生命周期验收。
+Bundle 只加载一次，先预热，再分别进行五次 cProfile 计数与无 profiler 的计时。报告给出装载、Runtime 准备、执行和总耗时，以及固定描述/绑定工作次数。没有历史类方法替换或重复缓存方案。它不是监工业务的移植，不能把 Python 与 JS 数字相除作为语言性能倍率。
 
-当前实测与方案见[分析记录](../../../docs/maintainers/aot-preparation-analysis.md)。此专项需要原交接包，按需运行，不自动加入完整验收批次。
-
-方案二修复后，normal 即生产实现，暖 profile 应不再出现 Descriptor 解码与完整绑定表构造。保留的缓存分组用于历史诊断对照；各组不再增加额外固定资料复用，不用其计时差异冒充新的优化收益。
+[原交接分析](../../../docs/maintainers/aot-preparation-analysis.md)保留当时结果；其中 ABI v8 交接 Bundle 不能直接用于当前加载器。长期回归位于 tests/targets/python/test_aot_preparation.py，覆盖固定资料复用及实例、参数、插件隔离。

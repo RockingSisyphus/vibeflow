@@ -31,9 +31,9 @@ def test_in_repository_scratch_is_rejected_before_creating_work(runner, tmp_path
 
 def test_default_environment_and_cli_precedence(monkeypatch):
     monkeypatch.delenv(WORKER_ENVIRONMENT, raising=False)
-    assert parse_workers() == 8
-    assert run_tests._parser().parse_args([]).workers == 8
-    assert verify_project._parser().parse_args([]).workers == 8
+    assert parse_workers() == 12
+    assert run_tests._parser().parse_args([]).workers == 12
+    assert verify_project._parser().parse_args([]).workers == 12
     monkeypatch.setenv(WORKER_ENVIRONMENT, "3")
     assert parse_workers() == 3
     assert parse_workers(["--workers", "2"]) == 2
@@ -52,7 +52,7 @@ def test_invalid_workers_are_cli_errors(monkeypatch, value):
     assert error.value.code == 2
 
 
-@pytest.mark.parametrize("workers", [1, 2, 8])
+@pytest.mark.parametrize("workers", [1, 2, 8, 12])
 def test_rule_jobs_share_one_bounded_pool(tmp_path, monkeypatch, workers):
     active = peak = 0
     lock = Lock()
@@ -79,7 +79,7 @@ def test_rule_jobs_share_one_bounded_pool(tmp_path, monkeypatch, workers):
                       toolchain=tmp_path, renderer=tmp_path, workers=workers)
     result = json.loads(report.read_text())
     assert status == 0
-    assert peak == workers
+    assert peak == min(workers, len(calls))
     assert len(calls) == 11
     assert len({(group, family) for group, family, _ in calls}) == 11
     assert all(count == workers for _, _, count in calls)

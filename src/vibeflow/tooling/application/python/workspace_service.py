@@ -13,7 +13,6 @@ from vibeflow.tooling.application.python.reports import (
     fail_report,
 )
 from vibeflow.core.findings import HealthFinding, HealthReport
-from vibeflow.core.descriptors import PluginSelectionError
 from vibeflow.core.flow import GraphConfigError
 from vibeflow.tooling.application.python.project.prepared_graph import PreparedWorkspaceGraph
 from vibeflow.targets.python.project.compiler import GraphCompileError, GraphCompiler
@@ -33,19 +32,8 @@ from vibeflow.tooling.project.config_loader import (
 from vibeflow.tooling.project.config_schema import (
     collect_config_schema_findings,
 )
-from vibeflow.tooling.project.descriptor_loader import (
-    DescriptorLoadError,
-    load_workflow_catalogs,
-)
-from vibeflow.tooling.project.plugin_review import (
-    load_plugin_review_resources,
-)
-from vibeflow.tooling.application.python.project.resource_selection import (
-    PythonResources,
-    HostExtensionResource,
-    select_python_resources,
-    resolve_host_extension_resources,
-)
+from vibeflow.tooling.project.descriptor_loader import DescriptorLoadError
+from vibeflow.tooling.application.python.project.resource_selection import PythonResources, select_python_resources, resolve_host_extension_resources
 from vibeflow.tooling.application.python.presentation.architecture_validation import (
     _validate_registered_architecture_document,
 )
@@ -117,8 +105,9 @@ def run_workspace_checked(
     entry: str | None = None,
     signal=None,
 ) -> CheckedRunResult:
-    from vibeflow.tooling.application.python.execution import (_execute_runtime, _new_run_id, _prepare_run_dir, _summarize_run_result, _write_json, _write_refused_artifacts)
-    from vibeflow.tooling.application.python.runner import (_refuse_on_health_failure, _refuse_on_planned_run, _write_preflight_artifacts)
+    from vibeflow.tooling.application.python.run_directory import prepare_run_dir as _prepare_run_dir
+    from vibeflow.tooling.application.python.execution import (_execute_runtime, _new_run_id, _summarize_run_result, _write_json, _write_refused_artifacts)
+    from vibeflow.tooling.application.python.preflight import (_refuse_on_health_failure, _refuse_on_planned_run, _write_preflight_artifacts)
 
     actual_run_id = _new_run_id() if run_id is None else validate_run_id(run_id)
     if _prepared_run_dir is None:
@@ -147,7 +136,11 @@ def run_workspace_checked(
         graph, resources = prepared.graph, prepared.resources
         plugin_registry, effective_policy = prepared.plugin_registry, prepared.effective_policy
         _write_json(run_dir / "effective_policy.json", effective_policy.to_dict())
-        validation_kwargs = {"delegate_cli": True, "entry": entry} if delegate_cli else {}
+        from vibeflow.core.workflows.entries import choose_entry
+        selected_entry = choose_entry(graph.entries, graph.default_entry, entry)
+        validation_kwargs = {"delegate_cli": True} if delegate_cli else {}
+        if selected_entry is not None:
+            validation_kwargs["entry"] = selected_entry
         health = _validate_prepared_workspace_graph(
             prepared,
             env=env,
@@ -164,7 +157,7 @@ def run_workspace_checked(
         from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
         presentation = prepare_python_presentation(graph, registry=env.registry, resources=resources, compilation=compilation)
         _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=env.registry, resources=resources,
-                              runtime_options=effective_runtime_options, compiled=compiled, prepared=presentation)
+                              runtime_options=effective_runtime_options, compiled=compiled, prepared=presentation, entry=entry)
         _write_preflight_artifacts(run_dir, graph, compiled, health, registry=env.registry, resources=resources, prepared=presentation)
         _refuse_on_health_failure(health, run_dir, actual_run_id)
         execute_kwargs = {"delegate_cli": True} if delegate_cli else {}
@@ -258,6 +251,7 @@ def _validate_prepared_workspace_graph(
         source_context=collect_workflow_source_context(env.registry, graph),
         rule_phase=rule_phase,
         compilation=prepared.compilation,
+        **({"entry": entry} if entry is not None and rule_phase == "run" else {}),
     )
     if health.status not in {"FAIL", "ERROR"}:
         compilation = _final_compilation(graph, env.registry)
