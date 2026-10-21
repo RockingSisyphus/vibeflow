@@ -192,18 +192,12 @@ def _expand_nodeset_imports(
     import_records: list[Mapping[str, Any]] = []
     for index, item in enumerate(imports):
         import_path, import_root = _parse_nodeset_import(item, path=path, index=index, workspace=workspace)
-        _validate_nodeset_import_target(
-            source_path=path,
-            import_path=import_path,
-            import_root=import_root,
-            workspace=workspace,
-            index=index,
-        )
         document = _load_config_document(import_path, import_stack=import_stack, cache=cache, workspace=workspace, expand_nodeset_imports=True)
         selected = _nodeset_definitions_from_document(document.data, import_path)
         selected = _nodesets_with_source(selected, path=import_path, root=import_root)
         imported_nodesets.extend(_nodesets_with_file_global_config(selected, document.data.get("global_config")))
         record: dict[str, object] = {
+            **_nodeset_import_metadata(path, import_path, workspace, index),
             "path": str(import_path),
             "type_keys": [str(node.get("type_key", "")) for node in selected if isinstance(node, Mapping)],
         }
@@ -244,11 +238,10 @@ def _parse_nodeset_import(item: object, *, path: Path, index: int, workspace: ob
     if workspace is None:
         raise _nodeset_import_error("CONFIG.NODESET_IMPORT.ROOT", f"nodeset_imports[{index}].root requires a workspace config", path)
     try:
-        root = workspace.root_by_id(raw_root)
         import_path = workspace.resolve_root_path(raw_root, raw_path)
     except Exception as exc:
         raise _nodeset_import_error("CONFIG.NODESET_IMPORT.ROOT", str(exc), path) from exc
-    return import_path, root
+    return import_path, _workspace_root_for_path(workspace, import_path)
 
 
 def _resolve_import_path(value: str, base_path: Path) -> Path:
@@ -267,87 +260,17 @@ def _workspace_root_for_path(workspace: object | None, path: Path) -> object | N
     return method(path)
 
 
-def _validate_nodeset_import_target(
-    *,
-    source_path: Path,
-    import_path: Path,
-    import_root: object | None,
-    workspace: object | None,
-    index: int,
-) -> None:
-    source_root = _workspace_root_for_path(workspace, source_path)
-    actual_import_root = _workspace_root_for_path(workspace, import_path)
-    source_location = _nearest_project_target(source_path)
-    imported_location = _nearest_project_target(import_path)
-    source_target = str(getattr(source_root, "project_target", "")) or (
-        source_location.target if source_location is not None else ""
-    )
-    imported_owner_root = actual_import_root if workspace is not None else import_root
-    imported_target = str(
-        getattr(imported_owner_root, "project_target", "")
-    ) or (imported_location.target if imported_location is not None else "")
-
-    if workspace is not None and actual_import_root is None:
-        raise ConfigLoadError(rule_id="WORKSPACE.NODESET.OUTSIDE_ROOT",
-            message="NodesetType definitions must belong to the importing root",
-            failure_layer="workspace", source_location={"path":str(source_path),
-                "field":f"nodeset_imports[{index}]", "import_path":str(import_path)})
-    if workspace is not None and source_root is not None and actual_import_root != source_root:
-        raise ConfigLoadError(rule_id="WORKSPACE.NODESET.PRIVATE",
-            message="another root's private NodesetType cannot be imported; share project resources or call its workflow",
-            failure_layer="workspace", source_location={"path":str(source_path),
-                "field":f"nodeset_imports[{index}]", "import_path":str(import_path)})
-    if actual_import_root is not None and import_path.is_relative_to(actual_import_root.path / "plugins"):
-        raise ConfigLoadError(rule_id="WORKSPACE.NODESET.PLUGIN_PRIVATE",
-            message="Plugin private files cannot be selected independently with nodeset_imports; declare root NodesetTypes under configs/",
-            failure_layer="workspace", source_location={"path":str(source_path), "import_path":str(import_path)})
-    if not source_target or not imported_target or source_target == imported_target:
-        return
-
-    source_root_id = str(getattr(source_root, "id", ""))
-    imported_root_id = str(getattr(imported_owner_root, "id", ""))
-    source_owner = (
-        f"root {source_root_id!r}"
-        if source_root_id
-        else f"project {str(source_location.root_path)!r}"
-        if source_location is not None
-        else "project"
-    )
-    imported_owner = (
-        f"root {imported_root_id!r}"
-        if imported_root_id
-        else f"project {str(imported_location.root_path)!r}"
-        if imported_location is not None
-        else "project"
-    )
-    raise ConfigLoadError(
-        rule_id="WORKSPACE.NODESET.TARGET_MISMATCH",
-        message=(
-            f"nodeset_imports[{index}] crosses project targets: "
-            f"{source_target!r} {source_owner} cannot import "
-            f"{imported_target!r} {imported_owner}"
-        ),
-        failure_layer="workspace",
-        source_location={
-            "path": str(source_path),
-            "field": f"nodeset_imports[{index}]",
-            "source_root_id": source_root_id,
-            "source_target": source_target,
-            "import_root_id": imported_root_id,
-            "import_target": imported_target,
-            "import_path": str(import_path),
-            **(
-                {"source_project_config": str(source_location.config_path)}
-                if source_location is not None
-                else {}
-            ),
-            **(
-                {"import_project_config": str(imported_location.config_path)}
-                if imported_location is not None
-                else {}
-            ),
-        },
-    )
+def _nodeset_import_metadata(source, target, workspace, index):
+    """Resolve import facts; project/root Rules decide whether to permit them."""
+    source_root = _workspace_root_for_path(workspace, source)
+    target_root = _workspace_root_for_path(workspace, target)
+    source_location = _nearest_project_target(source) if source_root is None else None
+    target_location = _nearest_project_target(target) if target_root is None else None
+    return {"importer": str(source), "field": f"nodeset_imports[{index}]",
+            "importer_root": getattr(source_root, "id", ""),
+            "import_root": getattr(target_root, "id", ""),
+            "source_target": getattr(source_root, "project_target", getattr(source_location, "target", "")),
+            "import_target": getattr(target_root, "project_target", getattr(target_location, "target", ""))}
 
 
 def _nearest_project_target(path: Path) -> _ProjectTargetLocation | None:

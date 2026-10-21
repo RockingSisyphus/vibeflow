@@ -258,7 +258,7 @@ def test_bundle_locators_are_relocated_and_publication_handles_python_caches(tmp
     assert Path(descriptor.implementations[0].source.ref).is_relative_to(path)
     assert Path(runtime.registry.source_info('demo').path).is_relative_to(path)
     assert Path(bundle.workflow.source.ref).is_relative_to(path)
-    cache = path/'roots/source/__pycache__'
+    cache = Path(descriptor.implementations[0].source.ref).parent / '__pycache__'
     cache.mkdir(parents=True, exist_ok=True)
     (cache/'plugin.cpython-313.pyc').write_bytes(b'generated cache')
     validate_owned_build_directory(path,manifest_format='vibeflow.aot-build.v4')

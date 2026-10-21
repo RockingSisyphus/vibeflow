@@ -2,7 +2,7 @@
 
 这个目录模拟真实业务项目使用 `vibeflow` 的方式：业务侧通过代码插件和 SDK 声明执行 Node、`base_lib`、Rule/Ruleset、生命周期插件，再用 JSONC 配置组织。运行器通过 `pyproject.toml` 与 `src/vibeflow` 自动定位仓库，不会在 Sandbox 中创建内核软链接。
 
-入口目前登记 102 项，包括独立的 [综合数学应用](../comprehensive_math/README.md)。该应用合并了七个重复正例的运行；错误路径及其他专项仍单独执行，详见 [逐项替代归档](../../../docs/maintainers/history/audits/comprehensive-sandbox-20261009.md)。Python 与 JavaScript 两个 integration runner 合计 150 项（102+48）；历史 177 项清单保留当时记录。
+入口包含独立的[综合数学应用](../comprehensive_math/README.md)及下列功能与错误路径专项。具体任务和结果以 runner 生成的报告为准。
 
 运行：
 
@@ -23,9 +23,8 @@ PYTHONPATH=src python sandbox/python/integration/run_all.py
 - 独立 [cli_addition](../cli_addition/README.md) 使用 YAML、pathlib、标准流三个适配配置执行 `2+3+4=9`。精确检查 stdout/stderr、文件字节、退出码、效果范围、执行次数、日志隔离和架构导出无业务副作用。
 - 独立 [object_addition](../object_addition/README.md) 用 Box 和 Counter 做连续加法，检查原对象身份、非 JSON 报告、Nodeset 导出、绑定参数、固定与条件循环，以及 plan/block/compiled 执行。
 - 独立 [plugin_addition](../plugin_addition/README.md) 检查多文件 Node/BaseLib/Plugin、参数覆盖、编译/运行钩子，并在临时 helper 修改、恢复后确认 `5→6→5`。
-- 此前三个入口接替 11 个旧 Python 任务，完整映射见 [简单数学整合归档](../../../docs/maintainers/history/audits/addition-sandboxes-20261009.md)。
-- 新增 [workflow_math](../workflow_math/README.md) 接替 13 个嵌套、循环和执行/trace 任务，五个配置共 17 组观察；[逐项迁移与验收](../../../docs/maintainers/history/audits/workflow-math-20261010.md)。
-- 新增 [piecewise_math](../piecewise_math/README.md) 接替另外 11 个直线、分支、互斥汇合和数据旁路任务；四个配置共享短小加法节点，包含等号边界、24 组执行观察、真实编译块和源码、trace、运行与导出图检查。详见 [逐项迁移记录](../../../docs/maintainers/history/audits/piecewise-math-20261010.md)。
+- [workflow_math](../workflow_math/README.md) 验证嵌套、循环和执行/trace，五个配置共 17 组观察。
+- [piecewise_math](../piecewise_math/README.md) 验证直线、分支、互斥汇合和数据旁路；四个配置共享短小加法节点，包含等号边界、24 组执行观察、真实编译块和源码、trace、运行与导出图检查。
 
 完整入口还复用独立的跨 root 质检沙箱：从发行最小项目构造 framework/project 双 root，Node 的契约与计算 helper 来自 framework BaseLib，通过真实 `run.py` 对比 `validate`、`quality` 与 `quality --path project`。用例覆盖默认及显式 workspace、直接内核 CLI、所选 root 的扫描范围、真实未声明 BaseLib 错误、workspace policy、独立 root、文件/子目录扫描、禁用 workflow 质检和混合 Target 的隔离子进程。可只运行这一组：
 

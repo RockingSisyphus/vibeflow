@@ -162,8 +162,6 @@ def discover_resources(directory, *, project_config, package_root, node_command=
                 except ValueError as error:
                     error.location=dict(item['origin'])
                     raise
-                if resource_kind(descriptor) != kind:
-                    raise ValueError(f"{path}: declarations under {path.parent.name}/ must be {kind} resources")
                 origin = item["origin"]
                 found.append(ResourceDefinition(descriptor, path=origin["path"], line=origin.get("line"),
                                                 symbol=origin.get("symbol", "")))

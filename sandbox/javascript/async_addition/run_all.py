@@ -7,6 +7,7 @@ sys.dont_write_bytecode = True
 FIXTURE = Path(__file__).resolve().parent
 REPOSITORY = FIXTURE.parents[2]
 sys.path[:0] = [str(REPOSITORY), str(REPOSITORY / "src"), str(REPOSITORY / "sandbox/javascript/integration")]
+from tests.fixtures.support.artifacts import artifact_directory
 from tests.fixtures.support.addition_sandboxes import main, workspace
 from sandbox_support import run_node
 from vibeflow.targets.javascript.build.driver_session import check_scope
@@ -16,8 +17,9 @@ from vibeflow.tooling.application.javascript.build import ProjectBuildRequest, b
 @check_scope
 def run(work, *, toolchain=None):
     workspace_path = workspace(FIXTURE, work, toolchain)
+    output = artifact_directory(work)
     def build(name, target="node", profile="single-esm"):
-        return build_project_aot(ProjectBuildRequest(workspace=workspace_path, config=work / "project/configs" / (name + ".jsonc"), out_dir=work / (name + "-" + target), target=target, profile=profile))
+        return build_project_aot(ProjectBuildRequest(workspace=workspace_path, config=work / "project/configs" / (name + ".jsonc"), out_dir=output / (name + "-" + target), target=target, profile=profile))
     driver = json.dumps((FIXTURE / "scenario_driver.mjs").as_uri())
     finite = build("finite")
     first = run_node(finite.entry, f'import {{finite}} from {driver}; const result=await finite(workflow); process.stdout.write(JSON.stringify(result));')

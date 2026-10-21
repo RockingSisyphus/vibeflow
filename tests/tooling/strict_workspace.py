@@ -265,9 +265,9 @@ def test_workspace_root_exposes_project_target_and_rejects_cross_target_nodeset(
 
     assert workspace.root_by_id("project").project_target == "python"
     assert workspace.root_by_id("framework").project_target == "javascript"
-    with pytest.raises(ConfigLoadError) as mismatch:
-        load_workspace_config_document(workflow_path, workspace=workspace)
-    assert mismatch.value.rule_id == "WORKSPACE.NODESET.PRIVATE"
+    document = load_workspace_config_document(workflow_path, workspace=workspace)
+    assert document.nodeset_imports[0]["import_target"] == "javascript"
+    assert document.nodeset_imports[0]["source_target"] == "python"
 
 
 def test_workspace_project_config_override_and_missing_project_config(tmp_path) -> None:
@@ -661,8 +661,11 @@ def test_workspace_declarations_cannot_import_another_roots_private_source(tmp_p
     data["implementations"][0]["source"]["ref"] = str(framework_root / "private.py")
     (framework_root / "private.py").write_text("class SeedNode: pass")
     declaration.write_text(json.dumps(data))
-    with pytest.raises(ValueError,match="outside its owner"):
-        build_workspace_node_registry(load_workspace_config(workspace_path), config_path=_fixture_scope(load_workspace_config(workspace_path)))
+    workspace = load_workspace_config(workspace_path)
+    build_workspace_node_registry(workspace, config_path=_fixture_scope(workspace))
+    from vibeflow.tooling.project.preparation import ProjectPreparation
+    (project_root / "root_rules.jsonc").write_text('{"rulesets":[{"rule_id":"vibeflow.root.resources"}]}')
+    assert any(item.rule_id == "ROOT.RESOURCE.PRIVATE_IMPORT" for item in ProjectPreparation(workspace).review().findings)
 
 
 def test_workspace_mode_rejects_config_level_policy(tmp_path) -> None:

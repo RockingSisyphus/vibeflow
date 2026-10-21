@@ -10,7 +10,7 @@ def python_preview(prepared, *, config, workspace=None, preview_root=None, categ
     from vibeflow.tooling.application.presentation_targets import prepare_targets
     architecture, targets = prepare_targets(prepared.architecture(), config=config, workspace=workspace, load_own_target=_load_own_target)
     record = publish_preview(root=root, workflow=workflow_identity(config, workspace), category=category,
-        status=status, architecture=architecture, links=workflow_links(workspace), check_status=check_status, target_graphs=targets)
+        status=status, architecture=architecture, links=workflow_links(workspace), check_status=check_status, target_graphs=targets, workspace=workspace)
     install_for_record(record)
     return record
 

@@ -6,6 +6,7 @@ sys.dont_write_bytecode=True
 FIXTURE=Path(__file__).resolve().parent
 ROOT=FIXTURE.parents[2]
 sys.path[:0]=[str(ROOT),str(ROOT/'src')]
+from tests.fixtures.support.artifacts import artifact_directory
 from tests.fixtures.support.addition_sandboxes import cli,workspace,main
 from tests.fixtures.support.graph_concurrency import (
     SUCCESS_CASES, assert_worker_trace, check_topology_cases, write_cases,
@@ -16,6 +17,7 @@ from vibeflow.tooling.application.python.bundle import load_bundle
 
 def run(work,*,toolchain=None):
     workspace(FIXTURE,work)
+    output = artifact_directory(work)
     write_cases(work)
     rows=check_topology_cases(work)
     for name,scenario,capacity in SUCCESS_CASES:
@@ -24,16 +26,16 @@ def run(work,*,toolchain=None):
         for execution in ('plan','block','compiled'):
             run_id=f'{name}-{execution}'
             result=json.loads(cli(['run','--workspace',work/'vibeflow_config.jsonc','--config',config,
-                '--input',input_file,'--execution',execution,'--run-root',work/'runs','--run-id',run_id]).stdout)
+                '--input',input_file,'--execution',execution,'--run-root',output/'runs','--run-id',run_id]).stdout)
             assert result['status'] in ('PASS','CONCERNS'),result
-            trace=[json.loads(line) for line in (work/'runs'/run_id/'runtime_trace.jsonl').read_text().splitlines()]
+            trace=[json.loads(line) for line in (output/'runs'/run_id/'runtime_trace.jsonl').read_text().splitlines()]
             rows.append({'case':name,'execution':execution,'status':'PASS',
                 **assert_worker_trace(trace,capacity)})
-        build_python_aot(PythonBuildRequest(work/'vibeflow_config.jsonc',config,work/f'{name}-bundle'))
-        bundle=load_bundle(work/f'{name}-bundle')
+        build_python_aot(PythonBuildRequest(work/'vibeflow_config.jsonc',config,output/f'{name}-bundle'))
+        bundle=load_bundle(output/f'{name}-bundle')
         rounds=[]
         for _ in range(2):
-            result=bundle.run({'scenario':scenario},run_root=work/'aot-runs',runtime_options={'trace':'full'})
+            result=bundle.run({'scenario':scenario},run_root=output/'aot-runs',runtime_options={'trace':'full'})
             assert result.context.get('report')['value']==list(range(12))
             trace=[json.loads(line) for line in (result.run_dir/'runtime_trace.jsonl').read_text().splitlines()]
             rounds.append(assert_worker_trace(trace,capacity))

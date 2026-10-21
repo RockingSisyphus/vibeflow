@@ -5,14 +5,27 @@ from dataclasses import replace
 from vibeflow.core.rules import RuleCall, RuleDescriptor, RuleRelation, RuleResult, RulesetDescriptor
 
 
+RESOURCE_DIRECTORIES = {"node": "nodes", "base_lib": "base_lib",
+    **dict.fromkeys(("node_type", "rule", "ruleset", "data_schema", "capability", "plugin"), "plugins")}
+
+
 def governance_resources(source_rules=()):
     rules = (
         RuleDescriptor("vibeflow.project.layout", level="project",
             params_schema={"directories": {"type": "array"}}, params_defaults={"directories": []}),
         RuleDescriptor("vibeflow.project.shared_resources", level="project"),
-        RuleDescriptor("vibeflow.root.resources", level="root"),
+        RuleDescriptor("vibeflow.root.resources", level="root",
+            params_schema={"allow_cross_root_imports":{"type":"boolean"}},
+            params_defaults={"allow_cross_root_imports":False}),
         RuleDescriptor("vibeflow.root.layout", level="root",
             params_schema={"directories": {"type": "array"}}, params_defaults={"directories": []}),
+        RuleDescriptor("vibeflow.project.structure", level="project"),
+        RuleDescriptor("vibeflow.project.packages", level="project"),
+        RuleDescriptor("vibeflow.project.dependencies", level="project",
+            params_schema={"allow_cross_root_imports":{"type":"boolean"}},
+            params_defaults={"allow_cross_root_imports":False}),
+        RuleDescriptor("vibeflow.root.nodesets", level="root"),
+        RuleDescriptor("vibeflow.root.packages", level="root"),
     )
     quality = tuple(replace(rule, id=rule.id.replace("vibeflow.quality.", "vibeflow.root."), level="root")
                     for rule in source_rules if rule.id.startswith("vibeflow.quality."))
@@ -21,8 +34,10 @@ def governance_resources(source_rules=()):
     quality_calls = tuple(RuleCall(rule.id.rsplit(".", 1)[1], rule_id=rule.id) for rule in quality)
     rulesets = (
         RulesetDescriptor("vibeflow.project.default", calls=(
-            RuleCall("layout", rule_id=rules[0].id), RuleCall("shared", rule_id=rules[1].id))),
-        RulesetDescriptor("vibeflow.root.default", calls=(RuleCall("layout", rule_id=rules[3].id), RuleCall("resources", rule_id=rules[2].id), *quality_calls),
+            RuleCall("layout", rule_id=rules[0].id), RuleCall("shared", rule_id=rules[1].id),
+            *(RuleCall(name, rule_id="vibeflow.project." + name) for name in ("structure", "packages", "dependencies")))),
+        RulesetDescriptor("vibeflow.root.default", calls=(RuleCall("layout", rule_id=rules[3].id), RuleCall("resources", rule_id=rules[2].id),
+            RuleCall("nodesets", rule_id="vibeflow.root.nodesets"), RuleCall("packages", rule_id="vibeflow.root.packages"), *quality_calls),
             relations=(RuleRelation("structure", "dependencies", "requires", {"graph": "graph", "import_sites": "import_sites"}),)
                       if quality_calls else ()),
     )
@@ -85,6 +100,13 @@ def shared_resources(context, inputs, params):
             state="unavailable")
     findings = []
     for resource in facts["resources"]:
+        expected = RESOURCE_DIRECTORIES.get(resource["kind"])
+        if resource["owner"]["kind"] == "project" and expected and resource["relative_path"].split("/")[0] != expected:
+            findings.append(_finding(context, "PROJECT.RESOURCE.LOCATION",
+                f"{resource['kind']} '{resource['id']}' must be declared under {expected}/", resource["path"]))
+    if not facts.get("usage_complete", True):
+        return RuleResult(findings=tuple(findings))
+    for resource in facts["resources"]:
         if resource["owner"]["kind"] != "project" or resource["kind"] not in {"node", "base_lib", "plugin_declaration"}:
             continue
         if resource.get("governance"):
@@ -99,12 +121,20 @@ def shared_resources(context, inputs, params):
 
 def root_resources(context, inputs, params):
     facts = context.facts["root"]
-    findings = []
-    directories = {"node": "nodes", "base_lib": "base_lib", "node_type": "plugins"}
+    from vibeflow.targets.shared.rule_support.resource_governance import resource_boundaries
+    findings = resource_boundaries(context, facts, params)
+    if not params["allow_cross_root_imports"]:
+        for item in facts.get("private_root_imports", ()):
+            if item.get("shared"):
+                continue
+            importer = "project shared code" if item.get("shared") else f"root '{facts['id']}'"
+            findings.append(_finding(context, "ROOT.RESOURCE.PRIVATE_IMPORT",
+                f"{importer} imports private code from root '{item['root']}'",
+                item["path"], imported_path=item["imported_path"], imported_root=item["root"], line=item["line"]))
     for resource in facts["resources"]:
         if resource["owner"]["kind"] != "root":
             continue
-        expected = directories.get(resource["kind"])
+        expected = RESOURCE_DIRECTORIES.get(resource["kind"])
         if expected and resource["relative_path"].split("/")[0] != expected:
             findings.append(_finding(context, "ROOT.RESOURCE.LOCATION",
                 f"{resource['kind']} '{resource['id']}' must be declared under {expected}/",
@@ -129,7 +159,11 @@ def governance_handlers():
                     source_location=location, source_path=location.get("path", ""))
             return replace(result, findings=tuple(map(annotate, result.findings)))
         return check
-    return {"vibeflow.project.layout": project_layout,
+    from vibeflow.targets.shared.rule_support.resource_governance import project_structure, packages, nodesets, shared_dependencies
+    return {"vibeflow.project.structure": project_structure, "vibeflow.project.packages": packages,
+            "vibeflow.project.dependencies": shared_dependencies,
+            "vibeflow.root.nodesets": nodesets, "vibeflow.root.packages": packages,
+            "vibeflow.project.layout": project_layout,
             "vibeflow.project.shared_resources": shared_resources,
             "vibeflow.root.resources": root_resources, "vibeflow.root.layout": root_layout,
             **{"vibeflow.graph.source." + name: handler for name, handler in

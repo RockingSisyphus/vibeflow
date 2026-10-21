@@ -177,19 +177,13 @@ def test_sync_entry_rejects_suspending_runtime_plugin() -> None:
     assert async_plan.runtime_plugins[0].completion == "suspend"
 
 
-def test_active_plugin_source_cannot_escape_project_root(tmp_path: Path) -> None:
-    descriptor = decode_resource(
-        _descriptor(source="../outside.ts")
-    )
-    with pytest.raises(JavascriptPluginError) as failure:
-        resolve_javascript_plugins(
-            (parse_javascript_plugin_selection(descriptor.id),),
-            catalog=PluginCatalog((descriptor,)),
-            target="browser",
-            entry_mode="sync",
-            project_root=tmp_path,
-        )
-    assert failure.value.code == "VF_AOT_PLUGIN_SOURCE"
+def test_active_plugin_source_resolution_does_not_enforce_root_policy(tmp_path: Path) -> None:
+    descriptor = decode_resource(_descriptor(source="../outside.ts"))
+    plan = resolve_javascript_plugins(
+        (parse_javascript_plugin_selection(descriptor.id),),
+        catalog=PluginCatalog((descriptor,)), target="browser", entry_mode="sync", project_root=tmp_path)
+    assert plan.runtime_plugins[0].module == str(tmp_path.parent / "outside.ts")
+
 
 
 def test_plugin_abi_declaration_is_packaged_with_the_target() -> None:

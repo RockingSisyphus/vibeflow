@@ -618,14 +618,8 @@ def _plugin_manifest_binding(
         return payload
     root = project_root.resolve()
     source = Path(binding.module).resolve()
-    try:
-        relative = source.relative_to(root).as_posix()
-    except ValueError as exc:
-        raise ProjectBuildError(
-            "VF_AOT_PLUGIN_SOURCE",
-            f"plugin '{binding.id}' source escapes project root: {source}",
-        ) from exc
-    payload["module"] = relative
+    from os.path import relpath
+    payload["module"] = Path(relpath(source, root)).as_posix()
     return payload
 
 

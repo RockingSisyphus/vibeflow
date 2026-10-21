@@ -255,10 +255,11 @@ def _presentations(root):
     architecture = build_architecture_facts(graph,compiled=prepared.compiled,compiled_nodeset_types=compiled_nodeset_types,
         catalogs=catalogs,used_node_ids=frozenset({descriptor.id}),active_base_lib_ids=frozenset(),
         plugin_records=(),root_id="fixture",source_path="main.jsonc")
-    root_model=SimpleNamespace(id="fixture",path=root,project_config={"preview":{"workflow_links":[
+    root_model=SimpleNamespace(id="fixture",path=root,project_target="python",architecture_documents=(),project_config={"preview":{"workflow_links":[
         {"from_workflow":"main.jsonc","from_call_path":"first","to_root":"remote","to_workflow":"other.jsonc","kind":"call","label":"历史目标"},
         {"from_workflow":"main.jsonc","to_root":"missing","to_workflow":"absent.jsonc","kind":"reference","label":"缺失目标"}]}})
-    remote_model=SimpleNamespace(id="remote",path=root/"remote",project_config={"preview":{"workflow_links":[
+    (root/"remote").mkdir()
+    remote_model=SimpleNamespace(id="remote",path=root/"remote",project_target="javascript",architecture_documents=(),project_config={"preview":{"workflow_links":[
         {"from_workflow":"other.jsonc","to_root":"fixture","to_workflow":"main.jsonc","kind":"reference"}]}})
     workspace=SimpleNamespace(root=root,roots=(root_model,remote_model),root_for_path=lambda p:root_model)
     javascript=SimpleNamespace(warnings=(),graph=graph,compiled=prepared.compiled,compiled_nodeset_types=compiled_nodeset_types,

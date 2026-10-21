@@ -85,4 +85,4 @@ python sandbox/javascript/comprehensive_math/run_all.py
 
 Python 首次检查与数据导出后复用组装图测试输入矩阵；JS 在同一检查会话内复用解析资料，每个 Target 构建一次，再复用生成物执行矩阵。源码修正后再检查/构建，检验资料确实随源码失效。这样减少重复解析、启动进程和重复检查，同时保留上述独立观察。
 
-原案例的逐项替代与实际验证成绩见 [整合归档](history/audits/comprehensive-sandbox-20261009.md)。
+各次运行的实际观察与失败项写入所选工作目录的 `report.json`；完整验证入口见[开发与验证](development.md#验证层级)。

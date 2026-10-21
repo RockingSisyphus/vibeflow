@@ -1,0 +1,75 @@
+{
+  "plugins": [
+    {
+      "scope": "root",
+      "source": {
+        "kind": "file",
+        "ref": "../vibetrain/plugins/node_exports.py"
+      }
+    },
+    {
+      "source": {
+        "kind": "file",
+        "ref": "../vibetrain/plugins/libraries.py"
+      }
+    }
+  ],
+  "nodeset_imports": [
+    {
+      "root": "vibetrain",
+      "path": "configs/body.jsonc"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "request",
+        "type": "payload.request",
+        "display_name": "Public request",
+        "required": true
+      }
+    ],
+    "outputs": [
+      {
+        "type": "payload.response",
+        "cardinality": "exactly_one",
+        "display_name": "Public response"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "definition_id": "minimal.start",
+        "display_name": "Start request workflow",
+        "description": "Starts this generic input-to-output workflow."
+      },
+      {
+        "id": "shared",
+        "definition_id": "probe.body",
+        "display_name": "Call shared body",
+        "description": "Invoke the same subgraph"
+      },
+      {
+        "id": "end",
+        "definition_id": "minimal.end",
+        "display_name": "End request workflow",
+        "description": "Ends after the declared public response is available.",
+        "similar_to": {
+          "node": "start",
+          "relationship": "copy",
+          "reason": "The start and end terminal implementations intentionally return no data at opposite workflow boundaries."
+        }
+      }
+    ],
+    "edges": [
+      [
+        "start",
+        "shared"
+      ],
+      [
+        "shared",
+        "end"
+      ]
+    ]
+  }
+}

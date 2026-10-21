@@ -7,10 +7,6 @@ from .catalog import ensure_catalog, reindex
 from ..viewer import install_page
 
 
-def _default_root():
-    from vibeflow.tooling.project.workspace_loader import load_project_workspace
-    return load_project_workspace(Path.cwd()).root
-
 
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="vibeflow preview")
@@ -20,8 +16,14 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         from vibeflow.tooling.project.workspace_loader import load_workspace_config
-        root = args.preview_root or (load_workspace_config(args.workspace).root if args.workspace else _default_root())
+        from vibeflow.tooling.project.workspace_loader import load_project_workspace
+        workspace = load_workspace_config(args.workspace) if args.workspace else (
+            None if args.preview_root else load_project_workspace(Path.cwd()))
+        root = args.preview_root or workspace.root
         install_page(root.resolve())
+        if workspace is not None:
+            from .exporter import publish_project
+            publish_project(root, workspace)
         if args.reindex:
             result = reindex(root)
         else:

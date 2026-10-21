@@ -74,7 +74,7 @@ class ProfileTests(unittest.TestCase):
         self.fixture.write("dist/SHA256SUMS-0.17.0.txt", "hash")
         self.fixture.write("archive/history/old-build/vibeflow-distribution-0.15.1.zip", "old")
         self.fixture.write("docs/assets/architecture.svg", "image")
-        self.fixture.write("docs/assets/audits/test-inventory/table.xlsx", "workbook")
+        self.fixture.write("docs/assets/architecture/table.xlsx", "workbook")
         self.fixture.write("docs/maintainers/design.pdf", "document")
         self.fixture.write("docs/maintainers/notes.txt", "notes")
         self.fixture.write("docs/design/diagram.json", "{}")

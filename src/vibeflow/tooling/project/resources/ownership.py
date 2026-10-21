@@ -22,7 +22,7 @@ def selected_plugin_scope(workspace, root, selection):
     if root.project_target == "project" and scope != "project":
         raise ValueError("project governance can only select project Plugins")
     if scope not in {"root", "project"}:
-        raise ValueError("plugin scope must be root or project; other roots' private Plugins are unavailable")
+        raise ValueError("plugin scope must be root or project")
     path = workspace.root if scope == "project" else root.path
     source = selection.get("source", {})
     suffix = Path(source.get("ref", "")).suffix
@@ -41,7 +41,8 @@ def standalone_resources(workspace, root, contributions, *, node_ids, node_comma
     types = {entry.descriptor.id: entry.descriptor for contribution in contributions
              for entry in contribution.resources if resource_kind(entry.descriptor) == "node_type"}
     found, bindings, inventory, states = [], {}, [], {}
-    for kind, identifier, directory in (("project", "project", workspace.root), ("root", root.id, root.path)):
+    scopes = (("project", "project", workspace.root),) if root.path != workspace.root else ()
+    for kind, identifier, directory in (*scopes, ("root", root.id, root.path)):
         owner = ResourceOwner(kind, identifier, root.id if kind == "root" else "", str(directory))
         key = (root.project_target, directory)
         cache = discovery_cache if discovery_cache is not None else {}
@@ -53,26 +54,30 @@ def standalone_resources(workspace, root, contributions, *, node_ids, node_comma
         resources = cache[key]
         states.update(resources.load_states)
         for resource in resources.resources:
+            actual_owner = workspace.root_for_path(resource.path)
+            if (kind == "project" and actual_owner is not None) or (kind == "root" and actual_owner != root):
+                continue
             descriptor = resolve_descriptor_sources(resource.descriptor, directory)
             origin = ResourceOrigin(owner, resource.path, resource.line, symbol=resource.symbol)
             from vibeflow.tooling.application.project_targets import preparation_adapter
             descriptor = preparation_adapter(root.project_target).normalize_resource(ResourceDeclaration(descriptor,origin),
                 resource.implementation, directory=directory, root=root, workspace=workspace)
-            for implementation in getattr(descriptor, "implementations", ()):
-                for locator in (implementation.source, *getattr(implementation, "implementation_files", ())):
-                    if locator.kind != "file":
-                        continue
-                    path = Path(locator.ref).resolve()
-                    if not path.is_relative_to(directory) or kind == "project" and any(path.is_relative_to(item.path) for item in workspace.roots):
-                        raise ValueError(f"{resource.path}: {resource_kind(descriptor)} '{descriptor.id}' references code outside its owner: {path}")
             inventory.append(ResourceDeclaration(descriptor, origin))
-            if resource_kind(descriptor) == "node":
-                if descriptor.id not in node_ids:
-                    continue
-                descriptor = resolve_node_type(descriptor, types)
-            found.append(ResourceDeclaration(descriptor, origin))
             if resource.implementation is not None:
                 bindings[(resource_kind(descriptor), descriptor.id)] = resource.implementation
+    # Identity belongs to the complete visible declaration scope. Resolving a
+    # NodeType belongs only to workflows that actually reference that Node.
+    from vibeflow.core.descriptors.contributions import compose_contributions
+    compose_contributions((), resources=tuple(inventory))
+    types.update({entry.descriptor.id: entry.descriptor for entry in inventory
+                  if resource_kind(entry.descriptor) == "node_type"})
+    for entry in inventory:
+        descriptor = entry.descriptor
+        if resource_kind(descriptor) == "node":
+            if descriptor.id not in node_ids:
+                continue
+            descriptor = resolve_node_type(descriptor, types)
+        found.append(replace(entry, descriptor=descriptor))
     return tuple(found), bindings, tuple(inventory), states
 
 
@@ -112,24 +117,3 @@ def bind_plugin_owner(contribution, *, root_id, package_path):
     owner = ResourceOwner("plugin", contribution.id, root_id, str(package_path))
     return replace(contribution, resources=tuple(replace(entry,
         origin=replace(entry.origin, owner=owner)) for entry in contribution.resources))
-
-
-def check_plugin_package(contribution, *, package_path, source_paths=(), project_path=None):
-    package = Path(package_path).resolve()
-    for filename in source_paths:
-        path = Path(filename).resolve()
-        if project_path is None or not path.is_relative_to(project_path) or path.is_relative_to(package):
-            continue
-        relative = path.relative_to(project_path)
-        if "node_modules" in relative.parts or path.name == "__init__.py" and not path.read_text().strip():
-            continue
-        raise ValueError(f"Plugin '{contribution.id}' imports project code outside its package: {path}")
-    for resource in contribution.resources:
-        if resource_kind(resource.descriptor) == "node":
-            raise ValueError("Plugin.resources must not contain business Nodes; define NodeTypes and place Nodes in nodes/")
-        if not Path(resource.origin.path).resolve().is_relative_to(package):
-            raise ValueError(f"Plugin '{contribution.id}' contribution is outside its package: {resource.origin.path}")
-        for implementation in getattr(resource.descriptor, "implementations", ()):
-            for locator in (implementation.source, *getattr(implementation, "implementation_files", ())):
-                if locator.kind == "file" and not Path(locator.ref).resolve().is_relative_to(package):
-                    raise ValueError(f"Plugin '{contribution.id}' implementation is outside its package: {locator.ref}")

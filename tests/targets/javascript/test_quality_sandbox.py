@@ -15,7 +15,6 @@ from vibeflow.targets.shared.quality_support import SourceQualityFacts, QualityP
 from tests.fixtures.support.project_rules import evaluate_standard_project_quality
 from vibeflow.targets.shared.quality_support.implementation import analyze_call_graph
 from vibeflow.targets.javascript.build.toolchain import run_quality_facts_driver
-from vibeflow.tooling.application.javascript.quality_scan import scan_javascript_quality
 from vibeflow.targets.python.quality import PythonSource, analyze_python_source
 from vibeflow.tooling.application.cli import main as dispatch_main
 from vibeflow.tooling.application.javascript.cli import main
@@ -171,11 +170,11 @@ def test_unregistered_source_and_exclusions(quality_case, capsys) -> None:
         "src/auto.generated.tsx": "export const generated = 1;\n" + "\n" * 1000,
         "src/compact.min.mjs": "export const minified = 1;\n" + "\n" * 1000,
     })
-    report = scan_javascript_quality(root, package_root=root)
+    report = evaluate_standard_project_quality(_source_facts(root, package_root=root), QualityPolicy())
     assert report.status == "FAIL"
     assert {item.path for item in report.files} == {"src/large.ts", "tests/test.ts"}
     assert any(item.code == "QUALITY.FILE.MAX_LINES" for item in report.findings)
-    excluded = scan_javascript_quality(root, package_root=root, excluded_dirs=(*__import__("vibeflow.targets.javascript.quality.source", fromlist=["DEFAULT_EXCLUDED_DIRS"]).DEFAULT_EXCLUDED_DIRS, "src", "tests"))
+    excluded = evaluate_standard_project_quality(_source_facts(root, package_root=root, excluded_dirs=(*__import__("vibeflow.targets.javascript.quality.source", fromlist=["DEFAULT_EXCLUDED_DIRS"]).DEFAULT_EXCLUDED_DIRS, "src", "tests")), QualityPolicy())
     assert excluded.status == "PASS" and not excluded.files
 
 
@@ -196,7 +195,7 @@ def test_source_facts_cover_syntax_typescript_types_and_internal_imports(quality
         "src/helper.ts": "export const value = 1;\n",
         "src/bare.ts": "import { value } from 'src/helper.ts';\nexport const result = value;\n",
     })
-    report = scan_javascript_quality(root, package_root=root)
+    report = evaluate_standard_project_quality(_source_facts(root, package_root=root), QualityPolicy())
     file = next(item for item in report.files if item.path == "src/index.ts")
     assert report.status in {"PASS", "CONCERNS"}
     assert "src/helper.ts" in report.dependency_graph["src/index.ts"]
@@ -209,7 +208,7 @@ def test_source_facts_cover_syntax_typescript_types_and_internal_imports(quality
     assert not any(item.rule_id == "QUALITY.SYNTAX.JAVASCRIPT" for item in report.findings)
     broken_line = "export const broken = ;"
     broken = quality_case({"broken.ts": f"export const valid = 1;\n{broken_line}\n"})
-    syntax = scan_javascript_quality(broken, package_root=broken)
+    syntax = evaluate_standard_project_quality(_source_facts(broken, package_root=broken), QualityPolicy())
     assert syntax.status == "FAIL"
     assert syntax.findings[0].rule_id == "QUALITY.SYNTAX.JAVASCRIPT"
     assert syntax.findings[0].source_location["line"] == 2
@@ -225,7 +224,7 @@ def test_every_handwritten_javascript_extension_has_distinct_file_identity(quali
         )
         for suffix in suffixes
     })
-    report = scan_javascript_quality(root, package_root=root)
+    report = evaluate_standard_project_quality(_source_facts(root, package_root=root), QualityPolicy())
     assert {item.path for item in report.files} == {f"src/sample{suffix}" for suffix in suffixes}
     assert len({item.module for item in report.files}) == len(suffixes)
     assert not any(item.rule_id == "QUALITY.SYNTAX.JAVASCRIPT" for item in report.findings)
@@ -246,49 +245,8 @@ def test_target_source_facts_do_not_assemble_default_rules(quality_case, monkeyp
     assert facts.findings == ()
 
 
-def test_application_source_scan_reuses_supplied_catalog_and_bindings(quality_case, monkeypatch):
-    from vibeflow.targets.shared.rule_support.plugin import BuiltinPlugin
-    from vibeflow.tooling.project.resources import load_builtin_plugins
-    root = quality_case({"large.ts":"export const value = 1;\n" + "\n" * 500})
-    contributed = []
-    original = BuiltinPlugin.contributions
-    def counted(self, config=None):
-        contributed.append(self.id)
-        return original(self, config)
-    monkeypatch.setattr(BuiltinPlugin, "contributions", counted)
-    catalog = load_builtin_plugins("javascript").catalogs
-    cache = {}
-    report = scan_javascript_quality(root, package_root=root, catalog=catalog, facts_cache=cache)
-    assert contributed == ["vibeflow.core"]
-    assert report.checked_rulesets == ("vibeflow.quality.source",)
-    assert len(report.rule_executions) == 1
-    assert any(item.code == "QUALITY.FILE.MAX_LINES" for item in report.findings)
-    assert len(cache[str(root)].files) == len(report.files) == 1
 
 
-def test_source_scan_does_not_configure_same_id_external_rule(quality_case):
-    from types import SimpleNamespace
-    from vibeflow.core.descriptors.contributions import ContributionBuilder, compose_contributions
-    from vibeflow.core.rules import RuleCall, RuleDescriptor, RuleResult, RulesetDescriptor
-    from vibeflow.targets.shared.bindings import attach_native_bindings
-    root = quality_case({"source.ts": "export const value = 1;\n"})
-    rule = RuleDescriptor("vibeflow.quality.files",
-        params_schema={"max_file_lines": {"type": "object"}},
-        params_defaults={"max_file_lines": {"label": "external parameter"}})
-    builder = ContributionBuilder("external.project")
-    builder.add(rule)
-    builder.add(RulesetDescriptor("vibeflow.quality.source", (RuleCall("external", rule.id),)))
-    catalog = compose_contributions((builder.finish(),))
-    observed = []
-    def check(context, inputs, params):
-        observed.append(dict(params))
-        return RuleResult()
-    definition = SimpleNamespace(id=builder.id, bindings=lambda: {("rule", rule.id): check})
-    attach_native_bindings(catalog, (definition,))
-    report = scan_javascript_quality(root, package_root=root, catalog=catalog,
-        thresholds=QualityThresholds(max_file_lines=1))
-    assert report.status == "PASS"
-    assert observed == [{"max_file_lines": {"label": "external parameter"}}]
 
 
 def test_source_import_resolution_handles_index_reexport_and_package_alias(quality_case) -> None:
@@ -307,7 +265,7 @@ def test_source_import_resolution_handles_index_reexport_and_package_alias(quali
     data = json.loads(package.read_text(encoding="utf-8"))
     data["imports"] = {"#alias": "./src/alias.ts"}
     package.write_text(json.dumps(data), encoding="utf-8")
-    report = scan_javascript_quality(root, package_root=root)
+    report = evaluate_standard_project_quality(_source_facts(root, package_root=root), QualityPolicy())
     assert set(report.dependency_graph["src/main.ts"]) == {
         "src/util/index.ts", "src/alias.ts", "src/other.ts",
     }
@@ -333,7 +291,7 @@ def test_language_facts_count_optional_parameters_and_control_flow(quality_case)
         ),
         "src/types.d.ts": "export declare const declared: number;\n",
     })
-    report = scan_javascript_quality(root, package_root=root)
+    report = evaluate_standard_project_quality(_source_facts(root, package_root=root), QualityPolicy())
     assert {item.path for item in report.files} == {"src/flow.ts", "src/types.d.ts"}
     flow = next(item for item in report.files if item.path == "src/flow.ts")
     method = next(item for item in flow.functions if item.qualname == "run")
@@ -357,7 +315,7 @@ def test_simple_python_and_javascript_facts_share_core_rule(quality_case) -> Non
         text="def branch(value):\n    if value:\n        return 1\n    return 0\n",
     ))
     thresholds = QualityThresholds(max_function_branches=0)
-    javascript = scan_javascript_quality(root, package_root=root, thresholds=thresholds)
+    javascript = evaluate_standard_project_quality(_source_facts(root, package_root=root), QualityPolicy(thresholds=thresholds))
     js_function = javascript.files[0].functions[0]
     py_function = python.file.functions[0]
     assert (js_function.param_count, js_function.branches) == (
@@ -395,10 +353,10 @@ def test_dynamic_parameter_call_does_not_invent_internal_edge(quality_case) -> N
 
 def test_source_threshold_boundary_and_independent_file(quality_case, capsys) -> None:
     root = quality_case({"exact.ts": "export const x = 1;\n" + "\n" * 499})
-    report = scan_javascript_quality(root, package_root=root, thresholds=QualityThresholds(max_file_lines=500, warn_file_lines=500))
+    report = evaluate_standard_project_quality(_source_facts(root, package_root=root), QualityPolicy(thresholds=QualityThresholds(max_file_lines=500, warn_file_lines=500)))
     assert report.status == "CONCERNS"
     assert {item.rule_id for item in report.findings} == {"QUALITY.FILE.WARN_LINES"}
-    report = scan_javascript_quality(root / "exact.ts", package_root=root, thresholds=QualityThresholds(max_file_lines=499, warn_file_lines=499))
+    report = evaluate_standard_project_quality(_source_facts(root / "exact.ts", package_root=root), QualityPolicy(thresholds=QualityThresholds(max_file_lines=499, warn_file_lines=499)))
     assert report.status == "FAIL" and len(report.files) == 1
 
 
@@ -469,7 +427,7 @@ def test_generated_local_preview_is_not_application_source(tmp_path, capsys):
     code = main(["quality-check", "--workspace", str(workspace), "--json"])
     payload = json.loads(capsys.readouterr().out)
     assert code == 0, payload
-    facts = scan_javascript_quality(project, package_root=project)
+    facts = evaluate_standard_project_quality(_source_facts(project, package_root=project), QualityPolicy())
     assert facts.files
     assert not any("vibeflow-preview" in row.path for row in facts.files)
 
@@ -1023,7 +981,11 @@ def test_selected_metrics_keep_one_file_and_sdk_declaration_attribution(tmp_path
     code = main(["quality-check", "--workspace", str(workspace), "--json"])
     payload = json.loads(capsys.readouterr().out)
     assert code == 1 and len(payload["reports"]) == 1
-    files = scan_javascript_quality(project, package_root=project).files
+    from vibeflow.tooling.project.preparation import ProjectPreparation
+    from vibeflow.tooling.project.workspace_loader import load_workspace_config
+    preparation = ProjectPreparation(load_workspace_config(workspace))
+    preparation.review()
+    files = preparation.source_facts(preparation.workspace.root_for_path(project)).files
     assert sum(item.path == "nodes/greet.ts" for item in files) == 1
     node_errors = [item for item in _formal_findings(payload,"error") if item["rule_id"] == "NODE.PURITY.SOURCE_TOO_LARGE"]
     assert {item["object_id"] for item in node_errors} == {
@@ -1064,3 +1026,10 @@ def test_quality_cli_reports_completed_checks_from_source_and_resource_rules(tmp
     assert "direct_input_writes" not in checked  # Python-only Rule is unavailable on JS.
     assert {"code_security", "general_execution_semantics", "determinism", "all_side_effects"} <= {
         item["id"] for item in payload["not_checked"]}
+
+
+def _source_facts(root, *, package_root, **options):
+    """Target parser facts only; pure algorithm cases select their Rule separately."""
+    from vibeflow.targets.javascript.build.quality_source import collect_javascript_quality_facts, _file_fact, _finding_fact
+    measured = collect_javascript_quality_facts(root, package_root=package_root, **options)
+    return SourceQualityFacts(str(root), tuple(map(_file_fact, measured.files)), tuple(map(_finding_fact, measured.findings)))

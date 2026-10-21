@@ -32,9 +32,17 @@ def test_loads_actual_containing_project_instead_of_synthesizing_root(tmp_path):
     (["app", "app/child"], "WORKSPACE.ROOT.OVERLAP"),
 ])
 def test_rejects_ambiguous_or_missing_root_ownership(tmp_path, paths, code):
-    with pytest.raises(WorkspaceConfigError) as error:
-        load_workspace_config(project(tmp_path, paths))
-    assert error.value.rule_id == code
+    config = project(tmp_path, paths)
+    if not paths:
+        with pytest.raises(WorkspaceConfigError) as error:
+            load_workspace_config(config)
+        assert error.value.rule_id == code
+        return
+    from vibeflow.tooling.project.preparation import ProjectPreparation
+    workspace = load_workspace_config(config)
+    assert code in {item.rule_id for item in ProjectPreparation(workspace).review().findings}
+    (tmp_path / "project_rules.jsonc").write_text('{"rulesets":[]}')
+    assert code not in {item.rule_id for item in ProjectPreparation(workspace).review().findings}
 
 
 def test_standalone_and_unregistered_roots_are_not_accepted(tmp_path):

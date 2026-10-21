@@ -420,6 +420,8 @@ def _directory_role_findings(root: Path) -> list[Finding]:
                     or path.name in packages
                     or path.name in {f"SHA256SUMS-{v}.txt" for v in versions}
                     or (not versions and re.fullmatch(r"vibeflow-distribution(?:-autonomous)?-[0-9][\w.-]*\.zip", path.name))
+                    or (not versions and re.fullmatch(r"SHA256SUMS-[\w.-]+\.txt", path.name)
+                        and any(dist.glob("vibeflow-distribution*-" + path.stem.removeprefix("SHA256SUMS-") + ".zip")))
                 )
             if not valid:
                 misplaced.append(path)

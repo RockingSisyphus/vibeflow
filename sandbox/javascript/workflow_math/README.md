@@ -21,7 +21,7 @@ python sandbox/javascript/workflow_math/run_all.py --work-dir /tmp/workflow-math
   --toolchain-root /path/to/project-with-installed-node_modules
 ```
 
-共十六组观察，其中 trace_matrix 包含三次独立调用，conditional_routes 包含八次 AOT 构建、二十四次真实 Node.js 调用。入口自动纳入 JS integration，并由根目录 `python tools/verify_project.py --full` 执行。原配置仍被 pytest 和架构审查使用，继续保留。详见 [整合归档](../../../docs/maintainers/history/audits/workflow-math-20261010.md)。
+共十六组观察，其中 trace_matrix 包含三次独立调用，conditional_routes 包含八次 AOT 构建、二十四次真实 Node.js 调用。入口自动纳入 JS integration，并由根目录 `python tools/verify_project.py --full` 执行。原配置仍被 pytest 和架构审查使用，继续保留。完整验证的执行方式见[开发与验证](../../../docs/maintainers/development.md#验证层级)。
 
 条件边回归的固定配置是 [conditional_routes.jsonc](project/configs/conditional_routes.jsonc)。修改内核时不要把两个不同条件改成一条边来使测试通过：本例保护的正是同一起点和终点允许多条独立条件边。旧的按起终点合并行为会让 `failed` 丢失；交换顺序后则让 `done` 丢失。完全重复和重叠用例额外检查不会重复执行或重复传入同一份数据。变体配置仅生成在临时工作区；保留默认 Workflow/Node Rules。
 

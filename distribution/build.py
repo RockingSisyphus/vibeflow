@@ -1072,6 +1072,8 @@ def _write_preview_entry(output: Path) -> None:
     environment = os.environ.copy()
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     environment.pop("PYTHONPATH", None)
+    # Generated templates have no user edit time; preserve reproducible catalogs.
+    environment.setdefault("SOURCE_DATE_EPOCH", "0")
     completed = subprocess.run(
         [sys.executable, "run.py", "preview"],
         cwd=output,

@@ -21,9 +21,23 @@ window.VFShapes=(()=>{
     for(const row of rows){row.y=y;y+=row.kind==="title"?23:18;}
     return {rows,height:y+10};
   }
+  const operationStyles={
+    call:{shape:"fr-rect",fill:"#ede9fe",stroke:"#7c3aed",text:"#3b0764"},
+    wait:{shape:"hex",fill:"#fef3c7",stroke:"#d97706",text:"#78350f"},
+    send:{shape:"lean-r",fill:"#e0f2fe",stroke:"#0284c7",text:"#0c4a6e"},
+    receive:{shape:"lean-l",fill:"#dcfce7",stroke:"#16a34a",text:"#14532d"},
+    kill:{shape:"rounded",fill:"#ffe4e6",stroke:"#be123c",text:"#881337"},
+    self:{shape:"circle",fill:"#e2e8f0",stroke:"#475569",text:"#1e293b"},
+    multiple:{shape:"doc",fill:"#ccfbf1",stroke:"#0f766e",text:"#134e4a"}
+  };
   function measure(facts,architecture={}) {
     const info=VFModel.nodeInfo(facts,architecture),external=Boolean(info.definitionInfo.external||facts.external||facts.info?.external);
-    const values=facts.presentation?.values||facts.effective_presentation?.values||{};
+    const presentation=facts.presentation?.values?facts.presentation:facts.effective_presentation||{},values={...presentation.values},sources={...presentation.sources};
+    const operations=[...new Set((facts.preview_operations||[]).filter(a=>a.capability==="vibeflow.workflow"&&operationStyles[a.operation]).map(a=>a.operation))];
+    const operation=operations.length>1?"multiple":operations[0],defaults=operationStyles[operation];
+    if(defaults)for(const [key,value] of Object.entries(defaults)){
+      if(!values[key]||sources[key]==="native"){values[key]=value;sources[key]="workflow 操作 · "+operation;}
+    }
     const requested=values.shape||"rect",canonical=requested,shape=supported.has(canonical)?canonical:"rect";
     const titleLines=wrap(title(facts),260,16),typeLines=wrap(facts.definition_id||facts.kind||"",260,12);
     const contract=(facts.requires??info.contract.requires??[]).length+" 输入 · "+(facts.provides??info.contract.provides??[]).length+" 输出";
@@ -46,7 +60,7 @@ window.VFShapes=(()=>{
     else if(shape==="cloud"){w+=58;h+=36;}
     else if(shape==="cyl")h+=64;
     else if(shape==="doc")h+=32;
-    return {width:Math.ceil(w),height:Math.ceil(h),shape,requested,values,rows,contentHeight};
+    return {width:Math.ceil(w),height:Math.ceil(h),shape,requested,values,rows,contentHeight,operation,presentation:{values,sources}};
   }
   function outline(shape,w,h){
     const polygon=points=>node("polygon",{points});
@@ -63,6 +77,7 @@ window.VFShapes=(()=>{
   }
   function draw(card,facts){
     const {width:w,height:h,shape,values}=card,g=node("g",{"data-shape":card.requested,class:"node-card"});
+    if(card.operation)g.dataset.workflowOperation=card.operation;
     const shell=outline(shape,w,h);shell.setAttribute("class","card-outline");shell.setAttribute("fill",values.fill||"#f3efe3");shell.setAttribute("stroke",values.stroke||"#24231f");shell.setAttribute("stroke-width",2);g.append(shell);
     if(shape==="dbl-circ")g.append(node("ellipse",{cx:w/2,cy:h/2,rx:w/2-7,ry:h/2-7,fill:"none",stroke:values.stroke||"#24231f","stroke-width":1.5}));
     if(shape==="fr-rect")for(const x of [9,w-9])g.append(node("path",{d:`M${x} 0 V${h}`,stroke:values.stroke||"#24231f","stroke-width":1.5}));

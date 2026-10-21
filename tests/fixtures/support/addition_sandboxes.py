@@ -1,6 +1,7 @@
 """Small I/O helpers for the independent arithmetic sandbox runners."""
 from __future__ import annotations
 
+from tests.fixtures.support.artifacts import artifact_directory
 from tests.fixtures.support.preview import preview_directory, preview_architecture, preview_snapshot
 
 import argparse
@@ -29,6 +30,7 @@ def workspace(fixture, work, toolchain=None):
             (work / "project/node_modules").symlink_to(toolchain.resolve() / "node_modules", target_is_directory=True)
         else:
             subprocess.run(["npm", "ci"], cwd=work / "project", check=True)
+    artifact_directory(work)
     return work / "vibeflow_config.jsonc"
 
 

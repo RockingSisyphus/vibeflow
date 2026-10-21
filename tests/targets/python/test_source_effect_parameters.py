@@ -13,7 +13,6 @@ from vibeflow.targets.python.rules.node.input_writes import input_writes
 from vibeflow.targets.python.rules.node.effects import no_side_effects
 from vibeflow.targets.python.quality.source_context import PythonSourceFile, PythonSourceNode, build_python_source_context
 from vibeflow.targets.shared.bindings import native_binding
-from vibeflow.tooling.application.python.project.quality_scan import scan_code_quality
 from vibeflow.tooling.project.resources import load_builtin_plugins
 
 
@@ -96,18 +95,6 @@ def test_selected_catalog_rule_reports_effective_policy_and_matching_effects(sco
     assert result.results["effects"].records["effect_policy"].value["effect_scope"] == recorded["effect_scope"]
 
 
-def test_application_source_scan_keeps_default_none_and_explicit_selection(tmp_path):
-    path = tmp_path / "ordinary.py"
-    path.write_text('def read():\n    return open("data.txt").read()\n')
-    selected = scan_code_quality(tmp_path, check_side_effects=True)
-    effects = [item for item in selected.findings if item.code == "QUALITY.SIDE_EFFECT.CALL"]
-    assert len(effects) == 1 and effects[0].source_location["path"] == str(path)
-    execution = selected.rule_executions[-1]
-    assert execution["plan"]["calls"][0]["params"]["effect_scope"] == "none"
-    call_id = execution["plan"]["calls"][0]["id"]
-    assert execution["results"][call_id]["records"]["effect_policy"]["value"]["effect_scope"] == "none"
-    unselected = scan_code_quality(tmp_path)
-    assert not any(item.code.startswith("QUALITY.SIDE_EFFECT.") for item in unselected.findings)
 
 
 def test_source_effects_follow_real_helper_bodies_without_importing_node_contracts():

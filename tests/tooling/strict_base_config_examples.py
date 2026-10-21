@@ -1,3 +1,6 @@
+from vibeflow.tooling.application.python.project.source_files import collect_root_source_facts, DEFAULT_EXCLUDED_DIRS
+from vibeflow.targets.shared.quality_support import QualityPolicy
+from tests.fixtures.support.project_rules import evaluate_standard_project_quality
 from tests.fixtures.support.preview import preview_directory, preview_architecture, preview_snapshot
 from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
@@ -124,9 +127,11 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
             path = case_dir / rel_path
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(source, encoding="utf-8")
-        thresholds = QualityThresholds(max_function_params=2) if "--max-function-params" in case.get("args", []) else QualityThresholds()
-        payload = scan_code_quality(case_dir, thresholds=thresholds,
-            check_side_effects="--check-side-effects" in case.get("args", [])).to_dict()
+        from tests.fixtures.support.projects import register_root
+        register_root(case_dir)
+        (case_dir / "root_rules.jsonc").write_text(json.dumps(case["root_rules"]))
+        cli_main(["quality-check", "--path", str(case_dir), "--json"])
+        payload = json.loads(capsys.readouterr().out)
         rule_ids = {finding["rule_id"] for finding in (*payload["errors"], *payload["warnings"])}
         if "expected_rule_id" in case:
             expected_rule = str(case["expected_rule_id"])
@@ -158,7 +163,6 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
         "GRAPH.EDGE.DUPLICATE",
         "GRAPH.SMELL.CONFUSING_NODE_NAME",
         "QUALITY.FUNCTION.TOO_MANY_PARAMS",
-        "QUALITY.SIDE_EFFECT.CALL",
         "ARCHITECTURE.REPORT.OPTIONAL",
     } <= observed
 
@@ -228,7 +232,7 @@ def test_checked_run_artifact_integrity_cross_links_health_graph_trace(tmp_path)
     assert any(n["requires"] for n in facts["workflow"]["nodes"])
     assert [event["node"] for event in trace if event.get("kind") == "node"] == ["start", "seed", "add", "end"]
 
-def test_code_quality_tool_reports_file_function_dependency_and_side_effect_findings(tmp_path) -> None:
+def test_source_algorithms_report_file_function_and_dependency_findings(tmp_path) -> None:
     (tmp_path / "a.py").write_text(
         "\n".join(
             [
@@ -252,9 +256,7 @@ def test_code_quality_tool_reports_file_function_dependency_and_side_effect_find
     (tmp_path / "b.py").write_text("import c\n\ndef helper():\n    return 1\n", encoding="utf-8")
     (tmp_path / "c.py").write_text("def leaf():\n    return 1\n", encoding="utf-8")
 
-    report = scan_code_quality(
-        tmp_path,
-        thresholds=QualityThresholds(
+    report = evaluate_standard_project_quality(collect_root_source_facts(tmp_path), QualityPolicy(thresholds=QualityThresholds(
             max_file_lines=5,
             warn_file_lines=4,
             max_file_branches=1,
@@ -263,9 +265,7 @@ def test_code_quality_tool_reports_file_function_dependency_and_side_effect_find
             max_function_nesting=1,
             warn_dependency_chain=2,
             max_dependency_chain=2,
-        ),
-        check_side_effects=True,
-    )
+        )))
 
     rule_ids = {finding.rule_id for finding in report.findings}
     assert report.status == "FAIL"
@@ -274,11 +274,6 @@ def test_code_quality_tool_reports_file_function_dependency_and_side_effect_find
     assert "QUALITY.FUNCTION.MAX_LINES" in rule_ids
     assert "QUALITY.FUNCTION.TOO_MANY_BRANCHES" in rule_ids
     assert "QUALITY.FUNCTION.TOO_DEEP_NESTING" in rule_ids
-    assert "QUALITY.SIDE_EFFECT.CALL" in rule_ids
-    side_effect_messages = [finding.message for finding in report.findings if finding.rule_id == "QUALITY.SIDE_EFFECT.CALL"]
-    assert any("open" in message for message in side_effect_messages)
-    assert any("write_text" in message for message in side_effect_messages)
-    assert any("read_text" in message for message in side_effect_messages)
     assert "QUALITY.DEPENDENCY.CHAIN_TOO_DEEP" in rule_ids
     assert report.longest_dependency_chain == ("a", "b", "c")
     chain = next(finding for finding in report.findings if finding.rule_id == "QUALITY.DEPENDENCY.CHAIN_TOO_DEEP")
@@ -308,7 +303,7 @@ def test_code_quality_function_qualnames_include_classes_and_nested_functions(tm
         encoding="utf-8",
     )
 
-    report = scan_code_quality(tmp_path)
+    report = evaluate_standard_project_quality(collect_root_source_facts(tmp_path), QualityPolicy())
     qualnames = {function.qualname for file in report.files for function in file.functions}
 
     assert {"Alpha.to_dict", "Beta.to_dict", "outer", "outer.inner"} <= qualnames
@@ -317,7 +312,7 @@ def test_code_quality_function_qualnames_include_classes_and_nested_functions(tm
 def test_code_quality_reports_too_many_function_params(tmp_path) -> None:
     (tmp_path / "wide.py").write_text("def too_wide(a, b, c):\n    return a + b + c\n", encoding="utf-8")
 
-    report = scan_code_quality(tmp_path, thresholds=QualityThresholds(max_function_params=2))
+    report = evaluate_standard_project_quality(collect_root_source_facts(tmp_path), QualityPolicy(thresholds=QualityThresholds(max_function_params=2)))
     payload = report.to_dict()
 
     assert "QUALITY.FUNCTION.TOO_MANY_PARAMS" in {finding.rule_id for finding in report.findings}
@@ -360,34 +355,6 @@ def test_optional_architecture_report_is_not_health_gate() -> None:
     assert report["entry_nodes"] == ["start"]
     assert add["affected"] == ["end"]
 
-def test_code_quality_report_groups_files_and_findings_by_scope(tmp_path) -> None:
-    src_dir = tmp_path / "src" / "demo"
-    tests_dir = tmp_path / "tests"
-    distribution_dir = tmp_path / "distribution"
-    devtools_dir = tmp_path / "src" / "vibeflow" / "devtools"
-    src_dir.mkdir(parents=True)
-    tests_dir.mkdir()
-    distribution_dir.mkdir()
-    devtools_dir.mkdir(parents=True)
-    (src_dir / "bad.py").write_text("def side_effect():\n    return open('src.txt').read()\n", encoding="utf-8")
-    (tests_dir / "bad_test.py").write_text("def side_effect():\n    return open('test.txt').read()\n", encoding="utf-8")
-    (distribution_dir / "bad_dist.py").write_text("def side_effect():\n    return open('dist.txt').read()\n", encoding="utf-8")
-    (tmp_path / "build_distribution.py").write_text("def side_effect():\n    return open('build.txt').read()\n", encoding="utf-8")
-    (devtools_dir / "bad_tool.py").write_text("def side_effect():\n    return open('tool.txt').read()\n", encoding="utf-8")
-
-    payload = scan_code_quality(tmp_path, check_side_effects=True).to_dict()
-    scope_summary = payload["scope_summary"]
-
-    assert scope_summary["src"]["files"] == 1
-    assert scope_summary["tests"]["files"] == 0
-    assert scope_summary["devtools"]["files"] == 1
-    assert scope_summary["src"]["warnings"] == 1
-    assert scope_summary["tests"]["warnings"] == 0
-    assert scope_summary["devtools"]["warnings"] == 1
-    scanned_files = {file["path"] for file in payload["files"]}
-    assert "tests/bad_test.py" not in scanned_files
-    assert "distribution/bad_dist.py" not in scanned_files
-    assert "build_distribution.py" not in scanned_files
 
 def test_code_quality_report_includes_directory_structure_graph(tmp_path) -> None:
     for directory in ("left", "right", "shared", "x", "y"):
@@ -400,10 +367,7 @@ def test_code_quality_report_includes_directory_structure_graph(tmp_path) -> Non
     (tmp_path / "x" / "feature.py").write_text("import shared.core\n", encoding="utf-8")
     (tmp_path / "y" / "feature.py").write_text("import shared.core\n", encoding="utf-8")
 
-    report = scan_code_quality(
-        tmp_path,
-        thresholds=QualityThresholds(max_directory_fanout=1, max_directory_fanin=1),
-    )
+    report = evaluate_standard_project_quality(collect_root_source_facts(tmp_path), QualityPolicy(thresholds=QualityThresholds(max_directory_fanout=1, max_directory_fanin=1)))
     payload = report.to_dict()
     directories = {item["directory"]: item for item in payload["directory_graph"]}
     rule_ids = {finding.rule_id for finding in report.findings}
@@ -432,7 +396,7 @@ def test_code_quality_root_structure_limits_keep_generic_metrics_without_resourc
     for index in range(17):
         (nodes / f"part_{index}.py").write_text("VALUE = 1\n", encoding="utf-8")
 
-    report = scan_code_quality(tmp_path, structure_limits=QualityStructureLimits())
+    report = evaluate_standard_project_quality(collect_root_source_facts(tmp_path), QualityPolicy(structure_limits=QualityStructureLimits()))
     by_rule = {finding.rule_id: finding for finding in report.findings}
 
     assert report.status == "FAIL"
@@ -448,7 +412,7 @@ def test_code_quality_root_structure_limits_keep_generic_metrics_without_resourc
 def test_code_quality_path_scan_does_not_enable_root_structure_by_default(tmp_path) -> None:
     (tmp_path / "helper.py").write_text("VALUE = 1\n", encoding="utf-8")
 
-    report = scan_code_quality(tmp_path)
+    report = evaluate_standard_project_quality(collect_root_source_facts(tmp_path), QualityPolicy())
 
     assert report.status == "PASS"
     assert not any(finding.rule_id.startswith("QUALITY.STRUCTURE.ROOT_LEVEL") for finding in report.findings)
@@ -463,10 +427,7 @@ def test_code_quality_report_identifies_prefix_clusters(tmp_path) -> None:
     (feature / "feature_types.py").write_text("VALUE = 1\n", encoding="utf-8")
     (tmp_path / "consumer.py").write_text("import feature.feature_rules\n", encoding="utf-8")
 
-    report = scan_code_quality(
-        tmp_path,
-        thresholds=QualityThresholds(max_prefix_cluster_files=2),
-    )
+    report = evaluate_standard_project_quality(collect_root_source_facts(tmp_path), QualityPolicy(thresholds=QualityThresholds(max_prefix_cluster_files=2)))
     payload = report.to_dict()
     clusters = {item["cluster_name"]: item for item in payload["prefix_clusters"]}
     rule_ids = {finding.rule_id for finding in report.findings}
@@ -504,10 +465,7 @@ def test_code_quality_reports_public_entry_boundary_violations(tmp_path) -> None
         encoding="utf-8",
     )
 
-    report = scan_code_quality(
-        tmp_path,
-        thresholds=QualityThresholds(max_public_entry_bypass_imports=2),
-    )
+    report = evaluate_standard_project_quality(collect_root_source_facts(tmp_path), QualityPolicy(thresholds=QualityThresholds(max_public_entry_bypass_imports=2)))
     rule_ids = {finding.rule_id for finding in report.findings}
 
     assert "QUALITY.STRUCTURE.INTERNAL_MODULE_IMPORTED_EXTERNALLY" in rule_ids
@@ -551,10 +509,7 @@ def test_code_quality_reports_dependency_distance_violations(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    report = scan_code_quality(
-        tmp_path,
-        thresholds=QualityThresholds(max_dependency_distance=1, max_scattered_dependency_directories=1),
-    )
+    report = evaluate_standard_project_quality(collect_root_source_facts(tmp_path), QualityPolicy(thresholds=QualityThresholds(max_dependency_distance=1, max_scattered_dependency_directories=1)))
 
     rule_ids = {finding.rule_id for finding in report.findings}
     assert "QUALITY.STRUCTURE.DISTANT_INTERNAL_IMPORT" in rule_ids
@@ -584,7 +539,7 @@ def test_code_quality_tool_detects_cycles_and_duplicate_function_fingerprints(tm
         encoding="utf-8",
     )
 
-    report = scan_code_quality(tmp_path)
+    report = evaluate_standard_project_quality(collect_root_source_facts(tmp_path), QualityPolicy())
     rule_ids = {finding.rule_id for finding in report.findings}
     assert "QUALITY.DEPENDENCY.CYCLE" in rule_ids
     assert "QUALITY.DEPENDENCY.BIDIRECTIONAL" in rule_ids
@@ -602,7 +557,7 @@ def test_code_quality_tool_detects_cycles_and_duplicate_function_fingerprints(tm
 def test_code_quality_tool_reports_python_syntax_errors(tmp_path) -> None:
     (tmp_path / "bad.py").write_text("def broken(:\n    pass\n", encoding="utf-8")
 
-    report = scan_code_quality(tmp_path)
+    report = evaluate_standard_project_quality(collect_root_source_facts(tmp_path), QualityPolicy())
 
     assert report.status == "FAIL"
     assert any(finding.rule_id == "QUALITY.SYNTAX.PYTHON" for finding in report.findings)

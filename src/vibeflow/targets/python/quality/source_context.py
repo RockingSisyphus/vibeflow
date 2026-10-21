@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 from copy import deepcopy
 from dataclasses import dataclass, field
+from pathlib import PurePath
 from typing import Iterable, Mapping
 
 from vibeflow.core.descriptors.models import NodeDescriptor
@@ -232,13 +233,26 @@ class PythonSourceContext:
         return deepcopy(self._analysis._implementation_tree(self, path, name))
 
 
-def build_python_source_context(nodes: Iterable[PythonSourceNode], files: Iterable[PythonSourceFile], *, calls: Iterable[PythonSourceCall] = ()) -> PythonSourceContext:
+def build_python_source_context(nodes: Iterable[PythonSourceNode], files: Iterable[PythonSourceFile], *, calls: Iterable[PythonSourceCall] = (), source_roots: Iterable[PurePath] = ()) -> PythonSourceContext:
     selected_nodes = tuple(sorted(nodes, key=lambda item: (item.definition_id, item.path, item.symbol)))
     selected_files = tuple(sorted(files, key=lambda item: item.path))
     symbols = tuple(symbol for source in selected_files if source._tree for symbol in _symbols(source))
     by_id = {symbol.id: symbol for symbol in symbols}
     by_module = {source.module: source.path for source in selected_files}
-    imports = tuple(item for source in selected_files for item in _source_imports(source,by_module))
+    # A file can be imported from both the root and project search paths.
+    # Keep symbol identity physical; module spellings are lookup aliases only.
+    for root in reversed(tuple(source_roots)):
+        for source in selected_files:
+            try:
+                relative = PurePath(source.path).relative_to(root)
+            except ValueError:
+                continue
+            parts = list(relative.with_suffix("").parts)
+            if parts and parts[-1] == "__init__":
+                parts.pop()
+            by_module[".".join(parts)] = source.path
+    by_path = {str(PurePath(source.path)): source.path for source in selected_files}
+    imports = tuple(item for source in selected_files for item in _source_imports(source, by_module, by_path))
     from vibeflow.targets.python.quality.source_analysis.class_members import class_members
     members = {}
     for symbol in symbols:
@@ -391,7 +405,14 @@ def _reference_scope_nodes(node, path, aliases, locals_, *, definition_aliases, 
         yield from walk(node, aliases, locals_)
 
 
-def _source_imports(source: PythonSourceFile, modules: dict[str, str]) -> tuple[PythonSourceImport,...]:
+def _source_imports(source: PythonSourceFile, modules: dict[str, str], paths: dict[str, str]) -> tuple[PythonSourceImport,...]:
+    def relative_target(level, module):
+        base = PurePath(source.path).parent
+        for _ in range(level - 1):
+            base = base.parent
+        target = base.joinpath(*module.split(".")) if module else base
+        return paths.get(str(target / "__init__.py"), paths.get(str(target.with_suffix(".py")), ""))
+
     imports = []
     for item in ast.walk(source._tree) if source._tree else ():
         if isinstance(item, ast.Import):
@@ -408,8 +429,15 @@ def _source_imports(source: PythonSourceFile, modules: dict[str, str]) -> tuple[
                 module = ".".join((*prefix, module)) if module else ".".join(prefix)
             for alias in item.names:
                 submodule = module + "." + alias.name if module else alias.name
-                target = modules.get(submodule,modules.get(module,""))
-                symbol = "" if submodule in modules else alias.name
+                if item.level:
+                    relative_module = item.module or ""
+                    relative_submodule = ".".join(filter(None, (relative_module, alias.name)))
+                    child = relative_target(item.level, relative_submodule)
+                    target = child or relative_target(item.level, relative_module)
+                else:
+                    child = modules.get(submodule, "")
+                    target = child or modules.get(module, "")
+                symbol = "" if child else alias.name
                 imports.append(PythonSourceImport(source.path,specifier,module,target,symbol,alias.asname or alias.name,
                     item.lineno,item.col_offset+1))
     return tuple(imports)

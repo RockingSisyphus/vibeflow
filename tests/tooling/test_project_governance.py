@@ -13,7 +13,7 @@ def workspace(tmp_path):
     root = tmp_path / "app"
     root.mkdir()
     return SimpleNamespace(root=tmp_path, roots=(SimpleNamespace(id="app", path=root,
-        project_target="python", architecture_documents=()),))
+        project_target="python", config_path=root / "vibeflow_project.jsonc", architecture_documents=()),))
 
 
 def test_governance_defaults_override_and_explicit_empty_are_independent(tmp_path):
@@ -50,7 +50,7 @@ def test_nested_root_container_does_not_hide_undeclared_sibling_directory(tmp_pa
     root.mkdir(parents=True)
     (root.parent / "dump").mkdir()
     project = SimpleNamespace(root=tmp_path, roots=(SimpleNamespace(id="desktop", path=root,
-        project_target="python", architecture_documents=()),))
+        project_target="python", config_path=root / "vibeflow_project.jsonc", architecture_documents=()),))
     context = governance_context(inventory_project(project))
     result = project_layout(context, {}, {"directories": []})
     assert len(result.findings) == 1
@@ -73,3 +73,23 @@ def test_lower_level_selection_cannot_invoke_project_rule_with_project_facts(tmp
     assert result.status == "ERROR"
     assert not executed
     assert result.results["read"].findings[0].rule_id == "RULE.LEVEL.MISMATCH"
+
+
+def test_sandbox_output_directory_exempts_only_its_own_layout(tmp_path):
+    from tests.fixtures.support.artifacts import artifact_directory
+    project = workspace(tmp_path)
+    config = tmp_path / "project_rules.jsonc"
+    config.write_text(json.dumps({"rule_params": {
+        "vibeflow.project.dependencies": {"allow_cross_root_imports": True}}}))
+    output = artifact_directory(tmp_path)
+    (output / "nested/build/generated").mkdir(parents=True)
+    assert artifact_directory(tmp_path) == output
+    (tmp_path / "undeclared").mkdir()
+    rules = load_governance_config(tmp_path, "project")
+    assert rules.rule_params["vibeflow.project.dependencies"]["allow_cross_root_imports"]
+    assert len(rules.rule_params["vibeflow.project.layout"]["directories"]) == 1
+    results = execute_governance(rules, governance_context(inventory_project(project)),
+        catalogs=load_builtin_plugins("project").catalogs, handlers=governance_handlers())
+    findings = [finding for result in results for value in result.results.values() for finding in value.findings]
+    assert [(item.rule_id, item.source_location["path"]) for item in findings] == [
+        ("PROJECT.DIRECTORY.UNDECLARED", str(tmp_path / "undeclared"))]

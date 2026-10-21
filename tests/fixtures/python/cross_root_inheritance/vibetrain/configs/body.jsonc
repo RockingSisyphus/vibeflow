@@ -1,0 +1,91 @@
+{
+  "type_key": "probe.body",
+  "display_name": "Shared body",
+  "description": "Original official example as a reusable subgraph",
+  "requires": [
+    {
+      "type": "payload.request",
+      "cardinality": "exactly_one",
+      "display_name": "Request"
+    }
+  ],
+  "provides": [
+    {
+      "key": "response",
+      "type": "payload.response",
+      "display_name": "Response"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "request",
+        "type": "payload.request",
+        "display_name": "Public request",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "definition_id": "minimal.start",
+        "display_name": "Start request workflow",
+        "description": "Starts this generic input-to-output workflow."
+      },
+      {
+        "id": "input_boundary",
+        "definition_id": "minimal.input_boundary",
+        "display_name": "Receive request",
+        "description": "Converts the public request into the internal payload."
+      },
+      {
+        "id": "process_payload",
+        "definition_id": "minimal.process_payload",
+        "display_name": "Apply business processing",
+        "description": "Runs the project-specific transformation implemented in nodes/workflow_nodes.py."
+      },
+      {
+        "id": "output_boundary",
+        "definition_id": "minimal.output_boundary",
+        "display_name": "Return response",
+        "description": "Converts the processed payload into the public response."
+      },
+      {
+        "id": "end",
+        "definition_id": "minimal.end",
+        "display_name": "End request workflow",
+        "description": "Ends after the declared public response is available.",
+        "similar_to": {
+          "node": "start",
+          "relationship": "copy",
+          "reason": "The start and end terminal implementations intentionally return no data at opposite workflow boundaries."
+        }
+      }
+    ],
+    "edges": [
+      [
+        "start",
+        "input_boundary"
+      ],
+      [
+        "input_boundary",
+        "process_payload"
+      ],
+      [
+        "process_payload",
+        "output_boundary"
+      ],
+      [
+        "output_boundary",
+        "end"
+      ]
+    ],
+    "outputs": [
+      {
+        "type": "payload.response",
+        "cardinality": "exactly_one",
+        "display_name": "Public response"
+      }
+    ]
+  }
+}

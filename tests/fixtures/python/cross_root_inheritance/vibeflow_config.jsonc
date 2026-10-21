@@ -1,0 +1,15 @@
+{
+  "purpose": "Framework privilege probe",
+  "roots": [
+    {
+      "id": "vibetrain",
+      "path": "vibetrain",
+      "purpose": "vibetrain"
+    },
+    {
+      "id": "task",
+      "path": "task",
+      "purpose": "task"
+    }
+  ]
+}

@@ -119,7 +119,6 @@ export function definePlugin(options) {
     throw new TypeError("plugin resources must be fixed SDK resource objects");
   }
   const contributions = resources.map(normalizeDirect);
-  if (contributions.some(resource=>resource.descriptor.kind === "node")) throw new TypeError("Plugins contribute NodeTypes; business Nodes belong in project/root nodes/");
   for (const [type, factory] of [["compiler", compiler], ["runtime", runtime]]) {
     if (factory !== undefined) {
       const delayed = factory && typeof factory === "object" && ["file","module","package"].includes(factory.kind) && typeof factory.ref === "string";

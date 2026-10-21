@@ -7,6 +7,7 @@ sys.dont_write_bytecode = True
 
 FIXTURE = Path(__file__).resolve().parent
 sys.path[:0] = [str(FIXTURE.parents[2]), str(FIXTURE.parents[2] / "src")]
+from tests.fixtures.support.artifacts import artifact_directory
 from tests.fixtures.support.preview import preview_directory, preview_architecture, preview_snapshot
 from tests.fixtures.support.addition_sandboxes import assert_artifacts, events, main, value, workspace
 from vibeflow.core.findings import HealthReport
@@ -58,13 +59,14 @@ def expected_order(topology, branch):
 
 def run(work, *, toolchain=None):
     loaded = load_workspace_config(workspace(FIXTURE, work))
+    output = artifact_directory(work)
     observations = []
     for topology in ("linear", "split", "join", "bypass"):
         config = work / "project/configs" / (topology + ".jsonc")
         cases = INPUTS if topology in {"split", "join"} else INPUTS[:1]
         input_keys = ("a", "b", "c", "d") if topology in {"split", "join"} else ("a", "b")
         initial = dict(zip(input_keys, cases[0][0]))
-        checked = run_workspace_checked(config, workspace=loaded, run_root=work / "checked", run_id=topology,
+        checked = run_workspace_checked(config, workspace=loaded, run_root=output / "checked", run_id=topology,
             initial=initial, runtime_options=RuntimeOptions(trace="full"))
         assert_result(checked.context, topology, cases[0])
         assert_artifacts(checked.run_dir)
@@ -89,7 +91,7 @@ def run(work, *, toolchain=None):
             if execution == "compiled":
                 assert [list(block.nodes) for block in plan.blocks] == [declared_nodes]
                 for block in plan.blocks:
-                    source_path = work / "compiled_sources" / f"{topology}-{trace_level}-{block.entry}.py"
+                    source_path = output / "compiled_sources" / f"{topology}-{trace_level}-{block.entry}.py"
                     source_path.parent.mkdir(exist_ok=True)
                     source_path.write_text(block.source)
                     source = source_path.read_text()
@@ -99,7 +101,7 @@ def run(work, *, toolchain=None):
             for case_index, case in enumerate(cases):
                 numbers, u, v, branch, w, result = case
                 initial = dict(zip(input_keys, numbers))
-                run_dir = work / "runtime" / f"{topology}-{execution}-{trace_level}-{case_index}"
+                run_dir = output / "runtime" / f"{topology}-{execution}-{trace_level}-{case_index}"
                 runtime = PipelineRuntime(prepared.graph, registry=environment.registry,
                     runtime_options=options, run_dir=run_dir)
                 context = runtime.run(initial)

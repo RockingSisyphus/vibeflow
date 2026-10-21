@@ -10,4 +10,4 @@ toolchain 使用 `sandbox/javascript/minimal/project` 的 package.json/lock 执�
 
 另一个独立副本仅在运行插件为空时跳过钩子摘要构造，与原包交错计时，检查空钩子的实际成本。该副本只用于测量候选方案，不代表已交付内核修复或异步／插件生命周期验收。
 
-当前实测与方案见[分析记录](../../../docs/maintainers/aot-preparation-analysis.md)。此专项按需运行，不把某次毫秒数设为验收门槛。
+当前实测与方案见[当前行为与维护约定](../../../docs/maintainers/project-preparation.md)。此专项按需运行，不把某次毫秒数设为验收门槛。

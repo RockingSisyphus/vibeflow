@@ -54,6 +54,7 @@ class PreparedResources:
     document: object | None = None
     graph: object | None = None
     syntax_caches: Mapping = dataclass_field(default_factory=dict, repr=False, compare=False)
+    packages: tuple = ()
 
 
 def prepare_workflow_resources(workspace, config_path, *, node_command="node", discovery_cache=None, syntax_caches=None, binding_contexts=None) -> PreparedResources:
@@ -124,7 +125,7 @@ def _prepare_workflow_resources(workspace, config_path, *, node_command, definit
     definitions.setdefault(root.project_target, []).append(builtin)
     contributions = [builtin.contributions()]
     bindings = {(builtin.id, *key): value for key, value in builtin.bindings().items()}
-    records, lifecycle, load_states = [], [], {}
+    records, lifecycle, load_states, packages = [], [], {}, []
     for index, spec in enumerate(selections):
         field = f"plugins[{index}]"
         if not isinstance(spec, Mapping):
@@ -153,8 +154,6 @@ def _prepare_workflow_resources(workspace, config_path, *, node_command, definit
             raise ResourcePreparationError("PLUGIN.SELECTION.SOURCE", "implemented plugins require a source with kind, ref and optional export", str(config_path), field + ".source")
         try:
             source = SourceLocator(**source_data)
-            if source.kind == "file" and not (owner.path / source.ref).resolve().is_relative_to(owner.path):
-                raise ValueError("plugin file must belong to its selected workspace root")
             from vibeflow.tooling.application.plugin_definitions import load_plugin_definition
             plugin = load_plugin_definition(source, owner=owner, workspace=workspace, node_command=node_command, loading_context=binding_contexts.setdefault(owner.project_target, {}))
             definitions.setdefault(owner.project_target, []).append(plugin)
@@ -170,11 +169,10 @@ def _prepare_workflow_resources(workspace, config_path, *, node_command, definit
             config = {**thaw_json(defaults), **dict(overrides)}
             _validate_plugin_config(config, schema, plugin_id=plugin_id)
             package_path = Path(plugin.source).resolve().parent
-            if source.kind == "file":
+            if source.kind == "file" and Path(plugin.source).resolve().is_relative_to(owner.path / "plugins"):
                 relative = Path(plugin.source).resolve().relative_to(owner.path / "plugins")
-                if len(relative.parts) < 2:
-                    raise ValueError("file Plugins require their own package directory under plugins/")
-                package_path = owner.path / "plugins" / relative.parts[0]
+                if len(relative.parts) >= 2:
+                    package_path = owner.path / "plugins" / relative.parts[0]
             contribution = _resolved_contributions(make_contributions(config), package_path)
             from vibeflow.tooling.application.plugin_definitions import normalize_contributions
             contribution = normalize_contributions(contribution, plugin_bindings, owner=owner, workspace=workspace)
@@ -187,12 +185,13 @@ def _prepare_workflow_resources(workspace, config_path, *, node_command, definit
                         # The selected export is the actual declaration entry.
                         implementation["source"]["export"] = export
                     contribution = replace(contribution, declaration=declaration)
-            from vibeflow.tooling.project.resources.ownership import check_plugin_package, bind_plugin_owner
+            from vibeflow.tooling.project.resources.ownership import bind_plugin_owner
             from vibeflow.tooling.application.plugin_definitions import plugin_source_paths
             sources = plugin_source_paths(plugin, contribution, owner=owner, workspace=workspace,
                                           package=package_path, node_command=node_command, syntax_cache=syntax_caches.setdefault(owner.project_target, {}))
-            check_plugin_package(contribution, package_path=package_path, source_paths=sources,
-                                 project_path=workspace.root)
+            from vibeflow.tooling.project.resource_facts import package_facts
+            packages.append(package_facts(contribution, owner=owner, package_path=package_path,
+                                          source_kind=source.kind, source_paths=sources, project_path=workspace.root, owner_scope=spec["scope"]))
             contribution = bind_plugin_owner(contribution,
                 root_id=root.id if spec.get("scope", "root") == "root" else "", package_path=package_path)
             contributions.append(contribution)
@@ -225,6 +224,16 @@ def _prepare_workflow_resources(workspace, config_path, *, node_command, definit
             node_ids=referenced_definition_ids(graph), node_command=node_command, discovery_cache=discovery_cache,
             syntax_cache=syntax_caches.setdefault(root.project_target, {}), loading_context=binding_contexts.setdefault(root.project_target, {})) if include_business else ((), {}, (), {}))
         load_states.update(discovered_states)
+        # Plugin Nodes use the same NodeType application as standalone Nodes.
+        from dataclasses import replace
+        from vibeflow.core.descriptors.node_types import resolve_node_type
+        types = {entry.descriptor.id: entry.descriptor for entry in
+                 (*resources, *(entry for contribution in contributions for entry in contribution.resources))
+                 if resource_kind(entry.descriptor) == "node_type"}
+        contributions = [replace(contribution, resources=tuple(replace(entry,
+            descriptor=resolve_node_type(entry.descriptor, types))
+            if resource_kind(entry.descriptor) == "node" else entry for entry in contribution.resources))
+            for contribution in contributions]
         catalogs = compose_contributions(tuple(contributions), resources=resources)
     except DescriptorCatalogError as exc:
         raise ResourcePreparationError(exc.code, exc.message, exc.source, details={"resource_id": exc.descriptor_id,
@@ -260,7 +269,8 @@ def _prepare_workflow_resources(workspace, config_path, *, node_command, definit
     from types import MappingProxyType
     return PreparedResources(catalogs, MappingProxyType(bindings), catalogs.plugin_records, catalogs.lifecycle_selections,
                          MappingProxyType(resource_bindings), resource_inventory, binding_contexts=binding_contexts,
-                         document=document, graph=graph, syntax_caches=syntax_caches)
+                         document=document, graph=graph, syntax_caches=syntax_caches,
+                         packages=freeze_json(packages, field_name="packages"))
 
 
 def _resolved_contributions(contribution, directory):

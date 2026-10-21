@@ -147,12 +147,6 @@ def _workspace_roots(
                 workspace_path=workspace_path,
             )
         )
-    for index, root in enumerate(roots):
-        for other in roots[:index]:
-            if root.path.is_relative_to(other.path) or other.path.is_relative_to(root.path):
-                raise WorkspaceConfigError("WORKSPACE.ROOT.OVERLAP",
-                    f"roots '{root.id}' and '{other.id}' must have separate directories",
-                    {"path": str(workspace_path)})
     return roots
 
 
@@ -166,11 +160,6 @@ def _workspace_root_from_item(
         str(item.get("path", "")).strip(),
         base=workspace_path.parent,
     )
-    project_path = workspace_path.parent.resolve()
-    if root_path == project_path or not root_path.is_relative_to(project_path):
-        raise WorkspaceConfigError("WORKSPACE.ROOT.SEPARATE_DIRECTORY",
-            "each root must be in its own subdirectory of the project; path '.' is unsupported",
-            {"path": str(workspace_path), "root": root_id})
     if not root_path.is_dir():
         raise WorkspaceConfigError(
             "WORKSPACE.ROOT.PATH",
@@ -182,9 +171,6 @@ def _workspace_root_from_item(
         or PROJECT_CONFIG_NAME
     )
     config_path = _resolve_workspace_relative(config_name, base=root_path)
-    if not config_path.is_relative_to(root_path):
-        raise WorkspaceConfigError("WORKSPACE.PROJECT_CONFIG.PATH",
-            "root configuration must be inside its root directory", {"path": str(config_path)})
     if not config_path.is_file():
         raise WorkspaceConfigError(
             "WORKSPACE.PROJECT_CONFIG.MISSING",

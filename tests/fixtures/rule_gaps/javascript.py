@@ -4,6 +4,7 @@ The current-only gap runner selects a kernel before calling run_cases. Normal
 and negative cases use actual commands, workers, records and business execution.
 """
 from __future__ import annotations
+from tests.fixtures.support.artifacts import artifact_directory
 from tests.fixtures.support.plugins import resource as resource_ref
 
 import importlib.util
@@ -173,7 +174,7 @@ def _platform_cases(s, work: Path, tools: Path | None) -> list[dict[str, Any]]:
                 "javascript.rule.platform_selection", expected, actual,
                 "迁移：Rule 不再按业务平台选实现。共享实现正常加载；重复 JS 执行族在加载前明确拒绝。"))
         for target in ("node", "browser"):
-            actual, payload = s.command(project,"build","--target",target,"--profile","single-esm","--out-dir",str(project.root/("dist-"+target)),label="build-"+target)
+            actual, payload = s.command(project,"build","--target",target,"--profile","single-esm","--out-dir",str(artifact_directory(project.root)/("dist-"+target)),label="build-"+target)
             actual["metrics"].update(s.execute_business(project,payload))
             title = "重复 JS 执行族阻止 "+target+" 构建" if split else "共享 Rule 实现构建 "+target+" 产物并执行业务"
             rows.append(_row("platform."+label+".build-"+target, title,

@@ -70,7 +70,7 @@ Node 通过 `rulesets` 选择审查约束。类型声明提供默认；调用 Co
 
 `@rule` 声明普通 `check(context, inputs, params)` 函数；`ruleset` 使用 `RuleCall/RuleRelation` 或同模型的字典组合。把函数及 Ruleset 放入插件的 `resources`。SourceContext 查询、具名 records 和覆盖关系见 [规则接口](rules-and-nodes.md)。
 
-独立 `base_lib` 从标准目录发现；`data_schema`、`capability`、NodeType、Rule 和 Ruleset 由 Plugin 整包贡献。业务 Node 不加入 Plugin 的 resources。
+独立 `base_lib` 从标准目录发现；`data_schema`、`capability`、NodeType、Rule 和 Ruleset 由 Plugin 整包贡献。默认 packages 规则要求业务 Node 不加入 Plugin 的 resources；显式替换治理规则可改变该政策。
 
 ## 多文件实现与辅助库
 

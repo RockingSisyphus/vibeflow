@@ -144,13 +144,17 @@ def create(context):
 
 
 def test_business_nodes_in_plugin_are_rejected(tmp_path):
-    workspace,config=project(tmp_path,plugin_source=SOURCE+'\nfrom vibeflow.targets.python.sdk import Plugin\nplugin=Plugin(id="demo",resources=[Demo])\n')
-    with pytest.raises(ValueError,match="business Nodes"):
-        prepare_workflow_resources(workspace,config)
+    workspace,config=project(tmp_path, source="", plugin_source=SOURCE+'\n'+PLUGIN_SOURCE.replace('resources=[shell,check,rules]', 'resources=[shell,check,rules,Demo]'))
+    from vibeflow.tooling.project.preparation import ProjectPreparation
+    prepare_workflow_resources(workspace,config)
+    (tmp_path / "root_rules.jsonc").write_text('{"rulesets":[{"rule_id":"vibeflow.root.packages"}]}')
+    assert any(item.rule_id == "PLUGIN.PACKAGE.BUSINESS_NODE" for item in ProjectPreparation(workspace).review().findings)
 
 
 def test_private_support_cannot_be_imported_outside_plugin_package(tmp_path):
     (tmp_path/"borrowed.py").write_text('VALUE=1\n')
     workspace,config=project(tmp_path,plugin_source='import borrowed\n'+PLUGIN_SOURCE)
-    with pytest.raises(ResourcePreparationError,match="outside its package"):
-        prepare_workflow_resources(workspace,config)
+    from vibeflow.tooling.project.preparation import ProjectPreparation
+    prepare_workflow_resources(workspace,config)
+    (tmp_path / "root_rules.jsonc").write_text('{"rulesets":[{"rule_id":"vibeflow.root.packages"}]}')
+    assert any(item.rule_id == "PLUGIN.PACKAGE.IMPORT" for item in ProjectPreparation(workspace).review().findings)

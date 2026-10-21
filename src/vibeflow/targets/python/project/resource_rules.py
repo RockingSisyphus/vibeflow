@@ -47,7 +47,7 @@ def review_python_resource(resource, *, base_path, registry=None, phase="import"
     files = list({file.path:file for file in files}.values())
     source_key = tuple((file.path,file.root_id,id(file._tree),file.text) for file in files)
     if source_key not in session.resource_sources:
-        session.resource_sources[source_key] = build_python_source_context((), files)
+        session.resource_sources[source_key] = build_python_source_context((), files, source_roots=getattr(registry, "source_roots", (root,)))
     sources = session.resource_sources[source_key]
     _, contributions = session.declarations(registry)
     defaults = registry.rule_defaults() if hasattr(registry,"rule_defaults") else {}
@@ -127,7 +127,7 @@ def review_reached_base_libs(registry, sources, *, rules, rulesets, handlers, ph
         source_key = session.snapshot(sources), id(descriptor), tuple(members)
         if source_key not in session.library_sources:
             library_files = {file.path:file for entry in (members or [source.path]) for file in sources.import_closure(entry)}
-            session.library_sources[source_key] = build_python_source_context((),library_files.values())
+            session.library_sources[source_key] = build_python_source_context((),library_files.values(), source_roots=getattr(registry, "source_roots", ()))
         library_sources = session.library_sources[source_key]
         symbol = next((item.source.export or "" for item in descriptor.implementations if item.language == "python"), "")
         for selected in descriptor.rulesets:
