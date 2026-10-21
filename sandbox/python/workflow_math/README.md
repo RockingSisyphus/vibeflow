@@ -18,7 +18,7 @@
 python sandbox/python/workflow_math/run_all.py --work-dir /path/outside/repository/workflow-math-python
 ```
 
-入口自动纳入 Python integration，替代 13 个旧任务。逐项对应见 [整合归档](../../../docs/maintainers/history/audits/workflow-math-20261010.md)。
+入口自动纳入 [Python integration](../integration/README.md)，每次运行的结果由 runner 生成报告。
 
 ## 目录用途与边界
 

@@ -2,6 +2,8 @@
 "use strict";
 (() => {
   const $ = id => document.getElementById(id);
+  let project = null;
+  const collapsedRoots=new Set();
   let records = new Map(), currentRecord = null, refreshGeneration = 0;
   const snapshots = new Map(), states = new Map(), modes = new Map(), entries = new Map();
   let entry="";
@@ -24,6 +26,7 @@
       const target=document.currentScript?.previewRecords||records,prior=target.get(value.id);
       if(!prior||(value.revision||0)>=(prior.revision||0))target.set(value.id,value);
     },
+    project(value) { const target=document.currentScript?.previewRecords;if(target)target.project=value;else project=value; },
     snapshot(value) { if(value.version!==3)throw new Error("不支持旧快照格式；请重新生成");snapshots.set(value.id,value); },
     // The renderer registry also permits future view kinds without changing the tab bar.
     registerRenderer(name, renderer) { renderers.set(name, renderer); }
@@ -38,6 +41,7 @@
   function empty(message) { $("empty").textContent=message; $("empty").hidden=!message; }
   const loadScript=VFModel.loadScript;
   function compareTime(a,b) {
+    a=a||"";b=b||"";
     const milliseconds=Date.parse(a)-Date.parse(b);if(milliseconds)return milliseconds;
     const fraction=value=>(value.match(/\.(\d+)/)?.[1]||"").padEnd(6,"0").slice(0,6);
     const left=fraction(a),right=fraction(b);return left<right?-1:left>right?1:0;
@@ -48,26 +52,65 @@
     select.replaceChildren(new Option(label,""), ...[...values].map(([key,text])=>new Option(text,key)));
     select.value=values.has(prior)?prior:"";
   }
+  const dateText=value=>value&&Number.isFinite(Date.parse(value))?new Date(value).toLocaleString():"未知";
+  function recordButton(r,latest=false) {
+    const button=document.createElement("button");button.className="record"+(r.id===current?" active":"");button.dataset.status=r.status;button.dataset.recordId=r.id;
+    const badge=document.createElement("span");badge.className="badge";badge.textContent=(latest?"最新 · ":"")+(categoryNames[r.category]||r.category);
+    const title=document.createElement("strong");title.textContent=r.workflow.name||r.workflow.path;
+    const info=document.createElement("small");info.textContent=(latest?r.workflow.path+"\n更新于 "+dateText(r.updated_at||r.created_at):dateText(r.created_at)+"\n"+r.workflow.root_id)+" · "+r.workflow.target+(r.entry?" · 入口 "+r.entry:"")+" · "+statusText(r)+(r.preview_error?" · 预览不可用":"");
+    button.append(badge,title,info);button.onclick=()=>navigate(r.id,"flow");return button;
+  }
+  function projectHistory() {
+    const roots=new Map((project?.roots||[]).map(root=>[root.id,{...root,workflows:new Map(root.workflows.map(w=>[w.id,{...w}]))}]));
+    // Keep historical-only workflows accessible, without inventing an unseen root inventory.
+    for(const record of sortedRecords()){
+      const w=record.workflow;
+      if(!roots.has(w.root_id))roots.set(w.root_id,{id:w.root_id,target:w.target,workflows:new Map()});
+      const root=roots.get(w.root_id);
+      if(!root.workflows.has(w.id))root.workflows.set(w.id,{...w,historical:true});
+      const item=root.workflows.get(w.id);if(!item.latest)item.latest=record;
+    }
+    const groups=[];let count=0;
+    for(const root of roots.values()){
+      const group=document.createElement("details");group.className="project-root";group.dataset.rootId=root.id;group.open=!collapsedRoots.has(root.id);
+      group.ontoggle=()=>group.open?collapsedRoots.delete(root.id):collapsedRoots.add(root.id);
+      const summary=document.createElement("summary");summary.textContent=root.id+" · "+(root.target||"")+" · "+root.workflows.size+" workflow";group.append(summary);
+      for(const w of [...root.workflows.values()].sort((a,b)=>a.path.localeCompare(b.path))){
+        count++;const button=w.latest?recordButton(w.latest,true):document.createElement("button");
+        button.dataset.workflowId=w.id;
+        if(!w.latest){button.className="record unavailable";button.disabled=true;
+          const title=document.createElement("strong");title.textContent=w.name||w.path;
+          const info=document.createElement("small");info.textContent=w.path+"\n"+(w.error?"配置有误 · "+w.error:"尚未生成审核图")+"\n源文件更新于 "+dateText(w.source_updated_at);button.append(title,info);
+        }else if(w.error){const warning=document.createElement("small");warning.className="directory-warning";warning.textContent="当前配置有误；显示已有快照";button.append(warning);}
+        group.append(button);
+      }
+      if(!root.workflows.size){const empty=document.createElement("p");empty.className="directory-empty";empty.textContent="暂无 workflow";group.append(empty);}
+      groups.push(group);
+    }
+    $("count").textContent=roots.size+" root / "+count;
+    $("project-note").textContent=project?(project.name+" · 最新已生成快照（含历史记录）"+(project.inventory_complete?"":" · 部分配置有误")):"仅显示已有记录；运行 preview --workspace 可补齐项目目录。";
+    $("records").replaceChildren(...groups);
+    if(!groups.length)$("records").textContent="尚无项目目录或预览记录。";
+  }
   function history() {
+    const directory=$("navigation").value==="project";
+    $("filters").hidden=directory;$("project-note").hidden=!directory;
+    if(directory){projectHistory();return;}
     optionList("workflow",new Map(sortedRecords().map(r=>[r.workflow.id,r.workflow.root_id+" / "+r.workflow.path])),"全部 workflow");
     optionList("status",new Map(sortedRecords().map(r=>[r.status,statusNames[r.status]||r.status])),"全部状态");
     const filtered=sortedRecords().filter(r=>(!$("category").value||r.category===$("category").value)&&
       (!$("workflow").value||r.workflow.id===$("workflow").value)&&(!$("target").value||r.workflow.target===$("target").value)&&
       (!$("status").value||r.status===$("status").value));
     $("count").textContent=filtered.length+" / "+records.size;
-    $("records").replaceChildren(...filtered.map(r=>{
-      const button=document.createElement("button");button.className="record"+(r.id===current?" active":"");button.dataset.status=r.status;button.dataset.recordId=r.id;
-      const badge=document.createElement("span");badge.className="badge";badge.textContent=categoryNames[r.category]||r.category;
-      const title=document.createElement("strong");title.textContent=r.workflow.name;
-      const info=document.createElement("small");info.textContent=new Date(r.created_at).toLocaleString()+"\n"+r.workflow.root_id+" · "+r.workflow.target+(r.entry?" · 入口 "+r.entry:"")+" · "+statusText(r)+(r.preview_error?" · 预览不可用":"");
-      button.append(badge,title,info);button.onclick=()=>navigate(r.id,"flow");return button;
-    }));
+    $("records").replaceChildren(...filtered.map(r=>recordButton(r)));
   }
+
   async function refresh(initial=false) {
     const ticket=++refreshGeneration,next=new Map();
     try {
+      await loadScript(resourceUrl("project.js"),next).catch(()=>{});
       await loadScript(resourceUrl("index.js"),next);if(ticket!==refreshGeneration)return;
-      records=next;history();notice();
+      project=next.project||null;records=next;history();notice();
       if(initial) {
         const hash=readHash();
         if(hash.snapshot)await open(hash.snapshot,hash.view||"flow",hash.call,hash.entry);
@@ -287,7 +330,7 @@
   document.addEventListener("pointerdown",event=>{if(!event.target.closest("#context-menu"))$("context-menu").hidden=true;});
   $("toggle").onclick=()=>{const path=contextPath;$("context-menu").hidden=true;toggle(path);};
   $("locate").onclick=()=>{$("context-menu").hidden=true;locate(contextPath);};
-  $("refresh").onclick=()=>refresh();for(const id of ["category","workflow","target","status"])$(id).onchange=history;
+  $("refresh").onclick=()=>refresh();for(const id of ["category","workflow","target","status","navigation"])$(id).onchange=history;
   $("mode").onchange=()=>{mode=$("mode").value;modes.set(current,mode);draw();};
   $("plus").onclick=()=>state&&zoom(state.k*1.25);$("minus").onclick=()=>state&&zoom(state.k/1.25);
   $("zoom").onchange=()=>zoom(Number($("zoom").value.replace(/%$/, ""))/100);

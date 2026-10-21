@@ -7,6 +7,7 @@ sys.dont_write_bytecode = True
 FIXTURE = Path(__file__).resolve().parent
 REPOSITORY = FIXTURE.parents[2]
 sys.path[:0] = [str(REPOSITORY), str(REPOSITORY / "src"), str(REPOSITORY / "sandbox/javascript/integration")]
+from tests.fixtures.support.artifacts import artifact_directory
 from tests.fixtures.support.addition_sandboxes import main, workspace, PLUGIN_EXPECTED
 from sandbox_support import run_node
 from vibeflow.targets.javascript.build.driver_session import check_scope
@@ -16,6 +17,7 @@ from vibeflow.tooling.application.javascript.build import ProjectBuildRequest, b
 @check_scope
 def run(work, *, toolchain=None):
     workspace_path = workspace(FIXTURE, work, toolchain)
+    output = artifact_directory(work)
     helper = work / "project/plugins/addition/math_support.ts"
     original = helper.read_text()
     observations = []
@@ -23,7 +25,7 @@ def run(work, *, toolchain=None):
         helper.write_text(code)
         phase_rows = []
         for name, expected_values in PLUGIN_EXPECTED[phase].items():
-            built = build_project_aot(ProjectBuildRequest(workspace=workspace_path, config=work / "project/configs" / (name + ".jsonc"), out_dir=work / (phase + "-" + name), target="node", profile="single-esm"))
+            built = build_project_aot(ProjectBuildRequest(workspace=workspace_path, config=work / "project/configs" / (name + ".jsonc"), out_dir=output / (phase + "-" + name), target="node", profile="single-esm"))
             manifest = json.loads(built.manifest.read_text())
             plugins = manifest["target_metadata"]["plugins"]
             assert manifest["target_metadata"]["plugin_abi_version"] == "vibeflow.plugin.v4"

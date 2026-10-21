@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass, replace
 from pathlib import Path
+from os.path import relpath
+from vibeflow.tooling.project.resource_facts import implementation_paths
 
 from vibeflow.core.descriptors.contributions import resource_kind
 from vibeflow.core.findings import HealthFinding
@@ -22,8 +24,9 @@ class GovernanceReview:
 class ProjectPreparation:
     """One command owns this state; it is neither a runtime nor a global cache."""
 
-    def __init__(self, workspace, *, root=None, workflow=None, node_command="node"):
+    def __init__(self, workspace, *, root=None, workflow=None, node_command="node", includes=()):
         self.workspace, self.root, self.node_command = workspace, root, node_command
+        self.includes, self.usage_complete = includes, root is None and workflow is None
         self.inventory = inventory_project(workspace, root_ids={root.id} if root else None)
         if workflow is not None:
             selected = Path(workflow).resolve()
@@ -37,6 +40,7 @@ class ProjectPreparation:
         self.reviews = {}
         self.root_source_facts = {}
         self.root_import_scopes = {}
+        self.root_private_imports = {}
 
     def workflow_resources(self, path):
         path = Path(path).resolve()
@@ -69,7 +73,7 @@ class ProjectPreparation:
                     getattr(error, "code", "PROJECT.RESOURCE.PREPARATION"), str(error)))
         inventory = replace(self.inventory, issues=tuple(issues))
         roots = (self.root,) if self.root else self.workspace.roots
-        configs = ([] if self.root else [(None, load_governance_config(self.workspace.root, "project"))])
+        configs = [(None, load_governance_config(self.workspace.root, "project"))]
         configs.extend((root, load_governance_config(root.path, "root")) for root in roots)
         governance = [(root, config, prepare_governance_resources(self.workspace, config,
             root=root, node_command=self.node_command, syntax_caches=self.syntax_caches, binding_contexts=self.binding_contexts)) for root, config in configs]
@@ -80,9 +84,26 @@ class ProjectPreparation:
             scoped = resources if root is None else tuple(row for row in resources
                 if row["owner"]["kind"] == "project" or row["owner"]["id"] == root.id)
             context = governance_context(inventory, root=root, resources=scoped)
+            from vibeflow.tooling.project.resource_facts import governance_resource_facts
+            level = "root" if root is not None else "project"
+            extra = governance_resource_facts(self.workspace, self.workflows, governance, scoped,
+                root=root, includes=self.includes)
+            if root is None:
+                shared = {}
+                if config.selections:
+                    for owner in roots:
+                        from vibeflow.tooling.application.project_targets import preparation_adapter
+                        imports = preparation_adapter(owner.project_target).shared_imports(self.workspace, owner,
+                            node_command=self.node_command, syntax_cache=self.syntax_caches.setdefault(owner.project_target, {}))
+                        for item in imports:
+                            if item.get("shared"):
+                                shared[(item["path"], item["imported_path"], item["line"])] = item
+                extra.update(shared_imports=tuple(shared.values()), usage_complete=self.usage_complete)
+            context = replace(context, facts={level: {**context.facts[level], **extra}})
             if root is not None and config.selections:
                 context = replace(context, facts={"root": {**context.facts["root"],
-                    "source_quality": self.source_facts(root), "source_import_scopes":self.root_import_scopes[root.id]}})
+                    "source_quality": self.source_facts(root), "source_import_scopes":self.root_import_scopes[root.id],
+                    "private_root_imports":self.root_private_imports[root.id]}})
             with governance_rule_handlers(prepared.catalogs, target_root=root or self.workspace.root,
                                           node_command=self.node_command) as handlers:
                 results.extend(execute_governance(config, context, catalogs=prepared.catalogs, handlers=handlers))
@@ -107,9 +128,10 @@ class ProjectPreparation:
     def source_facts(self, root):
         if root.id not in self.root_source_facts:
             from vibeflow.tooling.application.project_targets import preparation_adapter
-            facts,scopes = preparation_adapter(root.project_target).source_analysis(self.workspace,root,self.workflows,
+            facts,scopes,imports = preparation_adapter(root.project_target).source_analysis(self.workspace,root,self.workflows,
                 node_command=self.node_command,syntax_cache=self.syntax_caches.setdefault(root.project_target,{}))
             self.root_import_scopes[root.id] = scopes
+            self.root_private_imports[root.id] = imports
             self.root_source_facts[root.id] = facts
         return self.root_source_facts[root.id]
 
@@ -125,23 +147,29 @@ def resource_usage(workspace, workflows, governance=(), *, inventories=()):
         path = Path(origin.path)
         base = Path(origin.owner.path)
         rows.setdefault(key, {"kind": kind, "id": descriptor.id, "owner": origin.owner.to_dict(),
-            "path": str(path), "relative_path": path.relative_to(base).as_posix(), "used_by_roots": set()})
+            "path": str(path), "relative_path": Path(relpath(path, base)).as_posix(),
+            "implementation_paths": implementation_paths(descriptor), "used_by_roots": set(), "used_by_workflows": []})
         return rows[key]
 
     for entry in inventories:
         add(entry)
     # Unselected shared packages are still shared resources, with zero consumers.
     packages = workspace.root / "plugins"
-    for path in sorted(packages.iterdir()) if packages.is_dir() else ():
+    for path in sorted(packages.iterdir()) if packages.is_dir() and workspace.root_for_path(workspace.root) is None else ():
         if not path.is_dir() or path.name.startswith((".", "__")):
             continue
         key = ("package", str(path.resolve()))
         rows[key] = {"kind":"plugin_declaration", "id":path.name,
             "owner":{"kind":"project", "id":"project", "path":str(workspace.root), "root_id":""},
             "path":str(path), "relative_path":path.relative_to(workspace.root).as_posix(),
-            "used_by_roots":set(), "governance":False}
+            "used_by_roots":set(), "used_by_workflows":[], "governance":False}
     for workflow_path, prepared in workflows.items():
         root = workspace.root_for_path(workflow_path)
+        from vibeflow.core.rules.planning import graph_rule_subjects
+        references = {}
+        for subject in graph_rule_subjects(prepared.graph):
+            for node in subject.graph.nodes:
+                references.setdefault(node.definition_id, set()).add(node.status)
         libraries = set()
         for node in prepared.catalogs.nodes:
             libraries.update(node.base_libs)
@@ -158,9 +186,12 @@ def resource_usage(workspace, workflows, governance=(), *, inventories=()):
             row = add(entry)
             if row["kind"] == "node" and prepared.catalogs.nodes.get(row["id"]) or row["kind"] == "base_lib" and row["id"] in libraries:
                 row["used_by_roots"].add(root.id)
+                row["used_by_workflows"].append({"path":Path(relpath(workflow_path, workspace.root)).as_posix(),
+                    "root":root.id, "statuses":sorted(references.get(row["id"], {"implemented"})),
+                    "relation":"declaration" if row["kind"] == "node" else "dependency"})
     workflow_packages={record["package_path"] for prepared in workflows.values() for record in prepared.records if record.get("status")!="planned"}
     for root, level, prepared in (
-        *((workspace.root_for_path(path), "workflow", value) for path, value in workflows.items()),
+        *((workspace.root_for_path(path), path, value) for path, value in workflows.items()),
         *((root, config.level, value) for root, config, value in governance),
     ):
         for record in prepared.records:
@@ -173,7 +204,7 @@ def resource_usage(workspace, workflows, governance=(), *, inventories=()):
             row = rows.setdefault(key, {"kind": "plugin_declaration", "id": record["id"], "owner": owner,
                 "path": record["package_path"], "relative_path": (Path(record["package_path"]).relative_to(Path(owner["path"])).as_posix()
                     if Path(record["package_path"]).is_relative_to(owner["path"]) else record["source"]["ref"]),
-                "used_by_roots": set(), "governance": False})
+                "used_by_roots": set(), "used_by_workflows": [], "governance": False})
             row["id"] = record["id"]
             own_rules = [rule for rule in prepared.catalogs.rules
                 if prepared.catalogs.origins[("rules",rule.id)].owner.plugin_id == record["id"]]
@@ -193,4 +224,7 @@ def resource_usage(workspace, workflows, governance=(), *, inventories=()):
                 row["governance"] = record["package_path"] not in workflow_packages and bool(levels) and levels <= {"root", "project"}
             if root is not None:
                 row["used_by_roots"].add(root.id)
+            if isinstance(level, Path):
+                row["used_by_workflows"].append({"path":Path(relpath(level, workspace.root)).as_posix(),
+                    "root":root.id, "statuses":["implemented"], "relation":"selection"})
     return tuple({**row, "used_by_roots": sorted(row["used_by_roots"])} for _, row in sorted(rows.items(), key=lambda item: str(item[0])))

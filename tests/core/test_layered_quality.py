@@ -1,6 +1,8 @@
 """Contracts for the layered, user-project quality implementation."""
 
 from __future__ import annotations
+from vibeflow.tooling.application.python.project.source_files import collect_root_source_facts, DEFAULT_EXCLUDED_DIRS
+from vibeflow.targets.shared.quality_support import QualityPolicy
 
 from tests.fixtures.support.project_rules import evaluate_standard_project_quality
 
@@ -16,7 +18,7 @@ from vibeflow.targets.shared.quality_support import (
     validate_workflow_quality,
 )
 from vibeflow.targets.python.quality import PythonSource, analyze_python_source
-from vibeflow.tooling.application.python.project.quality_scan import scan_code_quality
+
 
 
 def test_health_and_source_quality_share_plain_finding_base() -> None:
@@ -116,10 +118,7 @@ def test_tooling_only_reads_files_and_adapts_target_facts(tmp_path: Path) -> Non
         encoding="utf-8",
     )
 
-    report = scan_code_quality(
-        tmp_path,
-        thresholds=QualityThresholds(max_function_params=1),
-    )
+    report = evaluate_standard_project_quality(collect_root_source_facts(tmp_path), QualityPolicy(thresholds=QualityThresholds(max_function_params=1)))
 
     assert [file.path for file in report.files] == ["module.py"]
     assert [finding.rule_id for finding in report.findings] == [
@@ -127,51 +126,8 @@ def test_tooling_only_reads_files_and_adapts_target_facts(tmp_path: Path) -> Non
     ]
 
 
-def test_source_scan_contributes_once_and_reuses_syntax_for_selected_effects(tmp_path, monkeypatch):
-    from collections import Counter
-    from vibeflow.targets.shared.rule_support.plugin import BuiltinPlugin
-    contributions, parses = [], Counter()
-    contribute, parse = BuiltinPlugin.contributions, ast.parse
-    def counted_contribution(self, config=None):
-        contributions.append(self.id)
-        return contribute(self, config)
-    def counted_parse(text, *args, **kwargs):
-        path = str(kwargs.get("filename", ""))
-        if path.startswith(str(tmp_path)):
-            parses[path] += 1
-        return parse(text, *args, **kwargs)
-    monkeypatch.setattr(BuiltinPlugin, "contributions", counted_contribution)
-    monkeypatch.setattr(ast, "parse", counted_parse)
-    paths = (tmp_path / "first.py", tmp_path / "second.py")
-    for path in paths:
-        path.write_text("import requests\nrequests.get('ignored')\n")
-    report = scan_code_quality(tmp_path, check_side_effects=True)
-    assert contributions == ["vibeflow.core"]
-    assert parses == {str(path):1 for path in paths}
-    effects = [item for item in report.findings if item.code.startswith("QUALITY.SIDE_EFFECT.")]
-    assert len(effects) == 4
-    assert {item.object_id for item in effects} == {path.name for path in paths}
-    assert {item.definition_id for item in effects} == {"vibeflow.no_side_effects"}
-    assert report.checked_rulesets == ("vibeflow.quality.source", "rule:vibeflow.no_side_effects")
-    assert len(report.rule_executions) == 2
-    ordinary = scan_code_quality(tmp_path)
-    assert contributions == ["vibeflow.core", "vibeflow.core"]
-    assert not any(item.code.startswith("QUALITY.SIDE_EFFECT.") for item in ordinary.findings)
-    assert ordinary.checked_rulesets == ("vibeflow.quality.source",)
 
 
-def test_selected_source_effects_keep_syntax_diagnostics_and_valid_file_scope(tmp_path):
-    broken, valid = tmp_path / "broken.py", tmp_path / "valid.py"
-    broken.write_text("def broken(:\n")
-    valid.write_text("import requests\nrequests.get('ignored')\n")
-    report = scan_code_quality(tmp_path, check_side_effects=True)
-    syntax = next(item for item in report.findings if item.code == "QUALITY.SYNTAX.PYTHON")
-    assert syntax.source_location["path"] == str(broken)
-    assert syntax.source_location["line"] == 1
-    effects = [item for item in report.findings if item.code.startswith("QUALITY.SIDE_EFFECT.")]
-    assert len(effects) == 2
-    assert all(item.object_id == valid.name for item in effects)
-    assert report.status == "FAIL"
 
 
 def test_shared_quality_support_does_not_import_concrete_targets_or_tooling() -> None:

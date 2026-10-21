@@ -27,7 +27,31 @@ def source_analysis(workspace, root, workflows, *, node_command, syntax_cache):
     facts = SourceQualityFacts(str(root.path), tuple(_file_fact(item) for item in measured.files),
                               tuple(_finding_fact(item) for item in measured.findings))
     scopes = root_resource_scopes(workspace, root, workflows, facts.files)
-    return facts, implementation_import_scopes(scopes, measured.implementations)
+    from vibeflow.tooling.project.source_governance import private_root_imports
+    imports = []
+    for file in measured.files:
+        path = root.path / file["path"]
+        for site in file["import_sites"]:
+            if site.get("resolved_path"):
+                imports.append((path, Path(site["resolved_path"]), site["line"]))
+    return facts, implementation_import_scopes(scopes, measured.implementations), private_root_imports(workspace, root, imports)
+
+
+def shared_imports(workspace, root, *, node_command, syntax_cache):
+    from vibeflow.targets.javascript.build.quality_source import collect_javascript_quality_facts
+    from vibeflow.tooling.project.source_governance import private_root_imports
+    imports = []
+    for name in ("nodes", "base_lib", "plugins"):
+        directory = workspace.root / name
+        if not directory.is_dir():
+            continue
+        shared = collect_javascript_quality_facts(directory, package_root=root.path,
+            node_command=node_command)
+        for file in shared.files:
+            for site in file["import_sites"]:
+                if site.get("resolved_path"):
+                    imports.append((directory / file["path"], Path(site["resolved_path"]), site["line"]))
+    return private_root_imports(workspace, root, imports)
 
 
 def review_workflow(workspace, path, *, preparation, governance):

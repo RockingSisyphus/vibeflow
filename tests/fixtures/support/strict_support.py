@@ -38,7 +38,6 @@ from vibeflow.tooling.presentation.mermaid import (
 )
 from vibeflow.tooling.project.config_loader import ConfigLoadError, load_config_document
 from vibeflow.tooling.project.config_schema import collect_config_schema_findings
-from vibeflow.tooling.application.python.project.quality_scan import scan_code_quality
 from vibeflow.tooling.project.schema_resources import schema_text
 
 from .strict_support_boundaries import *

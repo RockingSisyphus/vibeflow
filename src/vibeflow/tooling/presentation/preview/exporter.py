@@ -1,5 +1,6 @@
 """Publish portable architecture facts without any graphics dependency."""
 from pathlib import Path
+from datetime import datetime, timezone
 import json
 from .catalog import atomic_write, new_record, script_call
 from ..architecture_facts import render_architecture_payload
@@ -31,8 +32,35 @@ def workflow_links(workspace):
             for link in root.project_config.get("preview", {}).get("workflow_links", [])]
 
 
-def publish_preview(*, root, workflow, category, status, architecture, links=(), check_status=None, target_graphs=None):
+def publish_project(root, workspace):
+    """Export directory facts only; unreviewed workflows never execute here."""
+    from vibeflow.tooling.project.inventory import inventory_root
+    from os.path import relpath
+    import os
+    epoch = os.environ.get("SOURCE_DATE_EPOCH")
+    roots, complete = [], True
+    for owner in workspace.roots:
+        found, issues = inventory_root(owner)
+        complete = complete and not issues
+        documents = {item.path: "" for item in found}
+        documents.update({item.path: item.message for item in issues})
+        workflows = []
+        for path, error in sorted(documents.items()):
+            item = workflow_identity(path, workspace, target=owner.project_target)
+            item["source_updated_at"] = datetime.fromtimestamp(int(epoch) if epoch is not None else path.stat().st_mtime, timezone.utc).isoformat() if path.exists() else None
+            if error:
+                item["error"] = error
+            workflows.append(item)
+        roots.append({"id": owner.id, "path": Path(relpath(owner.path, workspace.root)).as_posix(),
+                      "target": owner.project_target, "workflows": workflows})
+    atomic_write(Path(root) / "vibeflow-preview/project.js", script_call("project", {
+        "name": workspace.root.name, "roots": roots, "inventory_complete": complete}))
+
+
+def publish_preview(*, root, workflow, category, status, architecture, links=(), check_status=None, target_graphs=None, workspace=None):
     root = Path(root).resolve()
+    if workspace is not None:
+        publish_project(root, workspace)
     record = new_record(root, workflow, category, status)
     if check_status is not None:
         record.metadata["check_status"] = check_status

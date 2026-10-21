@@ -41,7 +41,10 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
 
     workspace = request.workspace if hasattr(request.workspace,'roots') else load_workspace_config(request.workspace)
     config = Path(request.config).resolve()
-    environment = _environment_or_report(workspace,config)
+    from vibeflow.tooling.project.preparation import ProjectPreparation
+    preparation = ProjectPreparation(workspace, root=workspace.root_for_path(config),
+        workflow=config, includes=request.include)
+    environment = _environment_or_report(workspace,config,preparation=preparation)
     if isinstance(environment,HealthReport):
         raise ValueError(json.dumps(environment.to_dict(),ensure_ascii=False))
     with python_check_scope(environment.registry):
@@ -63,8 +66,10 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
         native_plan = bind_python_workflow(prepared,registry=environment.registry,runtime_options=options,instantiate=False,select_entry=False)
         framework = Path(__file__).resolve().parents[3]
         owner = workspace.root_for_path(config)
-        roots = (owner,)
-        destinations = {owner.path.resolve(): 'roots/' + owner.id, workspace.root.resolve(): 'shared'}
+        # Preserve the project tree: root-local and project-qualified imports
+        # must refer to the same files after relocation.
+        destinations = {owner.path.resolve(): str(Path('shared') / owner.path.resolve().relative_to(workspace.root.resolve())),
+                        workspace.root.resolve(): 'shared'}
         used = {call.definition_id for block in prepared.workflow.blocks for call in block.nodes
             if not(call.is_nodeset or call.is_loop or call.status == 'planned')}
         from vibeflow.tooling.application.python.build_dependencies import implementation_packages, copy_implementation_packages
@@ -109,6 +114,11 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
         for key in sorted(used):
             descriptor = registry.descriptor(key)
             path, symbol, _, load_root = registry.source_locations[key]
+            implementation = registry.direct_bindings.get(("node", key))
+            # Plugin exports retain the namespace that loaded the class, which
+            # need not be the plugin owner's source-analysis directory.
+            load_root = next((root for root, namespace in registry.source_namespaces.items()
+                if getattr(implementation, '__module__', '').startswith(namespace.name + '.')), load_root)
             binding = {'path':relative(path),'export':symbol,'load_root':relative(load_root)}
             info = registry.source_info(key)
             nodes.append({'descriptor':descriptor_value(descriptor),'binding':binding,

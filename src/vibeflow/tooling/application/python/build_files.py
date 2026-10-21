@@ -5,8 +5,8 @@ _EXCLUDED = {'.git', '.venv', 'node_modules', 'runs', 'build', 'dist', '__pycach
 
 
 def python_bundle_files(workspace, registry, config, *, out_dir, include):
-    owner = workspace.root_for_path(config)
-    roots = (owner.path.resolve(), workspace.root.resolve())
+    workflow_root = workspace.root_for_path(config)
+    roots = (workflow_root.path.resolve(), workspace.root.resolve())
     shared = tuple(workspace.root / name for name in ('nodes', 'base_lib', 'plugins'))
 
     def eligible(path):
@@ -18,9 +18,30 @@ def python_bundle_files(workspace, registry, config, *, out_dir, include):
     files = {Path(config).resolve()}
     for root in (roots[0], *shared):
         files.update(path for path in root.rglob('*.py') if path.is_file() and eligible(path))
+    # The checked source closure includes explicitly permitted cross-root
+    # imports. Preserve their workspace-relative module paths in the bundle.
+    context = registry.source_context_snapshot
+    files.update(Path(source.path) for source in context.files
+                 if Path(source.path).is_relative_to(workspace.root))
+    # Imported private libraries are not members of the workflow's visible
+    # catalog. Read declarations only in its checked dependency files, without
+    # activating unrelated resources from the foreign root.
+    from vibeflow.targets.python.sdk.discovery import discover_file_resources
+    from vibeflow.targets.python.sdk.source_namespace import source_namespace
+    from vibeflow.targets.python.sdk.loading import source_paths
+    from vibeflow.tooling.application.python.project.declarations import _implementation_path
+    namespace = source_namespace(workspace.root, namespaces=registry.source_namespaces)
+    with source_paths(roots):
+        for path in sorted(files):
+            owner = workspace.root_for_path(path)
+            if owner is None or owner == workflow_root or path.suffix != ".py":
+                continue
+            for resource in discover_file_resources(path, namespace):
+                for implementation in getattr(resource.descriptor, "implementations", ()):
+                    for source in implementation.implementation_files:
+                        files.add(_implementation_path(source.kind, source.ref, owner.path, roots))
     # Explicit declaration support files may include data as well as code.
     loaded = registry.prepared_resources
-    from vibeflow.tooling.application.python.project.declarations import _implementation_path
     for group in ('nodes', 'base_libs', 'plugins'):
         for descriptor in getattr(loaded.catalogs, group).available():
             descriptor = getattr(loaded.catalogs, group).require(descriptor)
@@ -43,14 +64,15 @@ def python_bundle_files(workspace, registry, config, *, out_dir, include):
                 break
             package = package.parent
     for package in packages:
-        files.update(path for path in package.rglob('*') if path.is_file() and eligible(path))
+        files.update(path for path in package.rglob('*') if path.is_file() and not path.is_relative_to(out_dir)
+            and not any(part in _EXCLUDED for part in path.relative_to(package).parts) and path.suffix != '.pyc')
     for entry in include:
-        path = (owner.path / entry).resolve()
-        if not (path.is_relative_to(owner.path) or any(path.is_relative_to(group) for group in shared)):
-            raise ValueError(f'--include must belong to this root or project shared resources: {entry}')
+        path = (workflow_root.path / entry).resolve()
         if not path.exists():
             raise ValueError(f'--include does not exist: {entry}')
-        files.update(item for item in path.rglob('*') if item.is_file() and eligible(item)) if path.is_dir() else files.add(path)
+        files.update(item for item in path.rglob('*') if item.is_file() and not item.is_relative_to(out_dir)
+            and not any(part in _EXCLUDED for part in item.relative_to(path).parts)
+            and item.suffix != '.pyc') if path.is_dir() else files.add(path)
     return tuple(sorted(files))
 
 

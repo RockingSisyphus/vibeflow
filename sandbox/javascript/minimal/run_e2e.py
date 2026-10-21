@@ -29,7 +29,8 @@ def _find_repository_root(start: Path) -> Path:
 
 
 REPOSITORY_ROOT = _find_repository_root(SOURCE_SANDBOX_ROOT)
-sys.path.insert(0, str(REPOSITORY_ROOT / "src"))
+sys.path[:0] = [str(REPOSITORY_ROOT), str(REPOSITORY_ROOT / "src")]
+from tests.fixtures.support.artifacts import artifact_directory
 
 from vibeflow.tooling.application.javascript.build import (  # noqa: E402
     ProjectBuildRequest,
@@ -189,10 +190,11 @@ def main() -> int:
 
 def _run(root: Path, *, args: argparse.Namespace) -> int:
     _prepare_runtime_project(root)
-    module = _build(root / "module", target="node", profile="esm-module")
-    single_a = _build(root / "single-a", target="node", profile="single-esm")
-    single_b = _build(root / "single-b", target="node", profile="single-esm")
-    web = _build(root / "web", target="browser", profile="web-app")
+    output = artifact_directory(root)
+    module = _build(output / "module", target="node", profile="esm-module")
+    single_a = _build(output / "single-a", target="node", profile="single-esm")
+    single_b = _build(output / "single-b", target="node", profile="single-esm")
+    web = _build(output / "web", target="browser", profile="web-app")
 
     _run_node(module.entry)
     _run_node(single_a.entry)
@@ -208,7 +210,7 @@ def _run(root: Path, *, args: argparse.Namespace) -> int:
         puppeteer_root = (
             args.puppeteer_root.resolve()
             if args.puppeteer_root is not None
-            else _prepare_temporary_puppeteer(root / "puppeteer")
+            else _prepare_temporary_puppeteer(output / "puppeteer")
         )
         _run_browser(web.out_dir, puppeteer_root=puppeteer_root)
 

@@ -2,8 +2,6 @@
 
 独立组默认最多并发 12 个 worker，使用 `--workers N` 或 `VIBEFLOW_TEST_WORKERS=N` 调整，命令行优先。五个接口组使用同一个有上限的任务队列；每个夹具的修改、验证、恢复保持顺序。`--workers 1` 可串行重跑。
 
-这组测试将 [第二轮审计](../../../docs/design/history/baseline-rule-coverage-second-audit.md) 的临时探针变为可重复验收，并补齐正常组合。它检查当前实现，保留 [基线对照](../rule_parity/README.md) 的案例 ID 和历史观察。当前声明按已确认的完整 Node 和通用 Rule 接口迁移，理由见 [迁移说明](../../../distribution/docs/user/rule-system-migration.md)。两组真实沙箱都已接入完整门禁。
-
 测试复制仓库中的正常项目，在临时副本中修改声明或源码，执行真实命令、Target handler、worker 和数值业务。Core finding 案例单独验证语言无关结果契约；其余场景保留实际 Target 资料。用人工指标调用内核，不能替代这里的公开 implementation Rule 组合测试。
 
 ## 测试组
@@ -15,8 +13,6 @@
 | `graph` | 不同默认值和新增参数的实现替换及来源；显式 includes；未绑定/冲突输入、参数 schema；源码 consumer 的 typed inputs/有效参数缓存和新 session；直接选择公开 implementation leaf 的真实正常/超限源码；合法和非法 findings 的 Core/Python/JS 边界 |
 | `tooling` | 完整 Node shape、已移除分类资源的明确诊断、Rule 端口类型；正式单个 JSON、资源位置和实现尚未执行；混合语言同 ID、项目共享包与双方冲突来源；预览选择一致 |
 | `composition` | 领域 Bundle 的模型 Node 在分支、Nodeset、Loop 中实际计算；参数化 tags 归属、非法 helper 模型定义、完整调用路径；Node 自己声明浅蓝色，验证 Architecture、Mermaid 和真实 SVG |
-
-旧 resources 六族矩阵及依赖 Host Extension 的整体装配用例已退役。有效覆盖和退役原因见[项目治理实施记录](../../../docs/maintainers/project-governance-refactor.md)。14 种形状、颜色、离线 HTML 及包级资源投影由 `test_local_preview.py` 的真实浏览器验收负责；生命周期由 `test_explicit_lifecycle.py` 验收。冻结历史报告保留原数量，不计作当前通过。
 
 ## 运行
 
@@ -42,9 +38,7 @@ npm_config_cache=/tmp/vibeflow-npm-cache python tools/run_tests.py -- \
   tests/integration/test_rule_parity_reporting.py
 ```
 
-结果与修复边界见 [本轮结果](RESULTS.md)。本次补测保持各命令的既有扫描范围，生产实现、规则权限和工作流机制不在测试中替换。
-
-历史生成报告和截图已移出夹具目录，原始位置与恢复方法见 [证据索引](../../../docs/maintainers/evidence/index.md)。上文历史成绩不代替当前运行。
+各命令的检查范围见[产品检查边界](../../../distribution/docs/user/product-check-boundaries.md)。测试保留生产实现、规则权限和工作流机制；实际结果由上述运行报告记录。
 
 ## 目录用途与边界
 
@@ -55,5 +49,3 @@ npm_config_cache=/tmp/vibeflow-npm-cache python tools/run_tests.py -- \
 - 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
 
 完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。
-
-项目治理重构删除了旧 resources 六族矩阵及含 Host 的原生整体装配用例；有效覆盖迁移对照见[项目治理实施记录](../../../docs/maintainers/project-governance-refactor.md)。历史 RESULTS 的数量不改写为当前通过数量。

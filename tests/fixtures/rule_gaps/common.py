@@ -82,10 +82,13 @@ def normalize(process, *, metrics=None):
 
 
 def command(project, arguments, *, name, executable=None, timeout=120):
+    from tests.fixtures.support.artifacts import artifact_directory
+    arguments = list(arguments)
+    workspace = Path(arguments[arguments.index("--workspace") + 1]).parent if "--workspace" in arguments else project.parent
+    logs = artifact_directory(workspace) / "observations"
     cmd = [*(executable or [sys.executable, "-m", "vibeflow"]), *map(str, arguments)]
     process = subprocess.run(cmd, cwd=project, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
                              text=True, capture_output=True, check=False, timeout=timeout)
-    logs = project.parent / "observations"
     logs.mkdir(exist_ok=True)
     write(logs / (name + ".json"), {"command": cmd, "exit_code": process.returncode,
                                     "stdout": process.stdout, "stderr": process.stderr})

@@ -35,6 +35,8 @@ def write_project(root, schema_type, value):
     (root / "plugins/schemas").mkdir(parents=True, exist_ok=True)
     (root / "plugins/schemas/plugin.py").write_text('from vibeflow.targets.python.sdk import Plugin,data_schema\ninspection=data_schema(type_key="probe.inspection",schema={"type":"object"})\nplugin=Plugin(id="probe.defaults",resources=[inspection])\n')
     (root.parent / "vibeflow_config.jsonc").write_text(json.dumps({"roots": [{"id": "probe", "path": root.name}]}))
+    # Each probe owns its root; sibling probe directories are not a layout subject.
+    (root.parent / "project_rules.jsonc").write_text('{"rulesets":[]}')
     (root / "root_rules.jsonc").write_text('{"rulesets":[]}')
     (root / "vibeflow_project.jsonc").write_text('{"project_target":"python"}')
     (root / "input.json").write_text("{}")

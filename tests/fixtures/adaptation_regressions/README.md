@@ -31,8 +31,6 @@ python -B tests/fixtures/adaptation_regressions/timings.py \
   --report /tmp/vibeflow-adaptation-timings.json
 ```
 
-时间用于定位和比较；自动回归通过确定性计数判断是否仍有重复工作，不设置跨机器的墙钟门槛。`verify_project.py --full` 已包含这组沙箱。历史证据与修复结果记录在 [维护说明](../../../docs/maintainers/history/adaptation-repair-20261005.md)。
-
 完整分发包的隔离代表性验收使用：
 
 ```bash
@@ -46,8 +44,6 @@ python -B tests/fixtures/adaptation_regressions/release_probe.py \
 `--package` 也接受完整分发 ZIP。脚本复制完整包并从 `kernel/vibeflow-kernel.zip` 解压内核；各观察进程的 `PYTHONPATH` 只包含该内核。夹具和计数观察器复制到新目录，报告保存内核 SHA、实际模块位置、案例、计数、原始产物及包内使用手册和 AI 提示词的核对结果。
 
 该代表组覆盖 SDK 来源一致性、Rule records、compiler 产物、多文件 Host 实例和分析复用。检查旧包以验证脚本流程时传入 `--purpose script-validation`；这类报告始终标记 `acceptance: false`，不作为新版发行验收。新分发包的报告仅在全部期待通过且没有观察错误时标记验收通过。
-
-历史生成报告和截图已移出夹具目录，原始位置与恢复方法见 [证据索引](../../../docs/maintainers/evidence/index.md)。上文历史成绩不代替当前运行。
 
 ## 目录用途与边界
 

@@ -15,8 +15,10 @@
 <script defer src="views.js"></script>
 <script defer src="viewer.js"></script>
 </head><body>
-<header><strong>VibeFlow</strong><span id="identity">本地预览</span><button id="refresh">刷新历史</button><span id="notice" role="status"></span></header>
-<main><aside id="history"><div class="section-label">历史记录 <span id="count"></span></div>
+<header><strong>VibeFlow</strong><span id="identity">本地预览</span><button id="refresh">刷新列表</button><span id="notice" role="status"></span></header>
+<main><aside id="history"><div class="section-label">浏览 workflow <span id="count"></span></div>
+<select id="navigation" aria-label="浏览方式"><option value="history">历史记录</option><option value="project">项目目录 · 最新快照</option></select>
+<div id="project-note" hidden></div>
 <div id="filters"><select id="category" aria-label="操作类别"><option value="">全部操作</option><option value="review">审查</option><option value="build">构建</option><option value="run">运行</option></select>
 <select id="workflow" aria-label="workflow 筛选"><option value="">全部 workflow</option></select>
 <select id="target" aria-label="Target"><option value="">全部 Target</option><option>python</option><option>javascript</option></select>

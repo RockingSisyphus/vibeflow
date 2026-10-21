@@ -132,21 +132,25 @@ def test_loader_reports_duplicate_and_conflicting_ids(
     assert captured.value.previous_source == "a.py"
 
 
-def test_selected_plugin_rejects_file_escape_and_symlink(tmp_path: Path) -> None:
+def test_selected_plugin_path_and_symlink_are_checked_by_rules(tmp_path: Path) -> None:
     from vibeflow.tooling.project.resources import prepare_workflow_resources
     from vibeflow.tooling.project.workspace_loader import load_workspace_config
     root, outside = tmp_path / "root", tmp_path / "outside"
     root.mkdir(); outside.mkdir()
     (root / "vibeflow_project.jsonc").write_text('{"project_target":"python"}')
     (tmp_path / "vibeflow_config.jsonc").write_text('{"roots":[{"id":"p","path":"root"}]}')
-    (outside / "plugin.py").write_text('raise RuntimeError("escaped plugin was loaded")')
+    (outside / "plugin.py").write_text('from vibeflow.targets.python.sdk import Plugin\nplugin=Plugin(id="outside")\n')
     (root / "linked.py").symlink_to(outside / "plugin.py")
     workspace = load_workspace_config(tmp_path / "vibeflow_config.jsonc")
     for ref in ("../outside/plugin.py", "linked.py"):
         config = root / "workflow.jsonc"
         config.write_text(json.dumps({"plugins":[{"source":{"kind":"file","ref":ref}}],"pipeline":{"nodes":[{"id":"future","definition_id":"future","display_name":"Future","description":"Planned","status":"planned","flow_kind":"process","requires":[],"provides":[]}]}}))
-        with pytest.raises(ResourcePreparationError, match="selected workspace root"):
-            prepare_workflow_resources(workspace, config)
+        from vibeflow.tooling.project.preparation import ProjectPreparation
+        prepare_workflow_resources(workspace, config)
+        (root / "root_rules.jsonc").write_text('{"rulesets":[{"rule_id":"vibeflow.root.packages"}]}')
+        assert any(item.rule_id == "PLUGIN.PACKAGE.LOCATION" for item in ProjectPreparation(workspace).review().findings)
+        (root / "root_rules.jsonc").write_text('{"rulesets":[]}')
+        assert not any(item.rule_id == "PLUGIN.PACKAGE.LOCATION" for item in ProjectPreparation(workspace).review().findings)
 
 
 def test_catalogs_sort_ids_and_preserve_source_diagnostics() -> None:

@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, replace
 from pathlib import Path
+from os.path import relpath
 from typing import Mapping
 
 from vibeflow.core.rules import RuleContext, compile_ruleset, execute_rule_plan
@@ -45,9 +46,10 @@ def governance_context(inventory, *, root=None, resources=()):
         "entries": inventory.entries["roots"][root.id] if root is not None else inventory.entries["project"]}
     level = "root" if root is not None else "project"
     if root is None:
-        facts.update(roots=tuple({"id": item.id, "path": item.path.relative_to(workspace.root).as_posix(),
+        facts.update(roots=tuple({"id": item.id, "path": Path(relpath(item.path, workspace.root)).as_posix(),
+                                 "absolute_path": str(item.path), "config_path": str(item.config_path),
                                  "target": item.project_target, "purpose": getattr(item, "purpose", ""),
-                                 "directories": inventory.directories["roots"][item.id],
+                                 "directories": inventory.directories["roots"].get(item.id, ()),
                                  "workflows": tuple({"path": workflow.path.relative_to(item.path).as_posix(), "declaration": workflow.data}
                                       for workflow in inventory.for_root(item.id))} for item in workspace.roots),
                      inventory_complete=inventory.complete)

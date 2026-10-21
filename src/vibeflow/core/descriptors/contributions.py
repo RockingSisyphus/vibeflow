@@ -114,8 +114,6 @@ class ContributionBuilder:
         if self._closed:
             raise DescriptorModelError("plugin contributions are already frozen")
         kind = resource_kind(descriptor)
-        if kind == "node":
-            raise DescriptorModelError("Plugins contribute NodeTypes; business Nodes belong in project/root nodes/")
         if kind not in RESOURCE_GROUPS:
             raise DescriptorModelError(f"unsupported plugin resource kind: {kind}")
         location = origin or ResourceOrigin(ResourceOwner("plugin", self.id), self.source)

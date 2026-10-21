@@ -1,6 +1,6 @@
 # Rule 机制：设计理念与维护边界
 
-本文描述当前设计及维护时应坚持的原因。面向插件作者的写法见 [用户规则手册](../../distribution/docs/user/rules-and-nodes.md)；迁移工作与当时的全量验证见 [实施计划](../maintainers/history/rule-mechanism-refactor.md)和 [验收记录](../maintainers/history/rule-mechanism-refactor-results.md)。历史方案不能替代本文的当前契约。
+本文描述当前设计及维护时应坚持的原因。面向插件作者的写法见 [用户规则手册](../../distribution/docs/user/rules-and-nodes.md)；声明迁移见[迁移手册](../../distribution/docs/user/rule-system-migration.md)。
 
 ## 目标与基本区分
 
@@ -37,7 +37,7 @@ Rule.level 为 project、root、graph、node。level 决定可读信息边界，
 
 project_rules.jsonc 和 root_rules.jsonc 分别选择治理 Plugin、Rule/Ruleset 与参数。未提供选择使用本层默认，显式列表整表替代，[] 只取消可选规则。项目规则读取全项目清单、所有 root 的声明引用和目录用途；root 规则读取本 root 及其可见资源，不能读取其他 root 的私有源码事实。
 
-完整 review 与 quality-check 执行所有治理对象，局部构建和源码运行只检查所属 root、当前 workflow 与资源。项目共享统计以真实不同 root 引用计数，损坏配置必须报告分析不完整。AOT 运行只使用已准备的计划和授权结果。
+完整 review 与 quality-check 执行所有治理对象，局部构建和源码运行检查项目政策、所属 root、当前 workflow 与资源；局部清单标记 usage_complete=false，不执行默认全项目共享次数判定。项目共享统计以真实不同 root 引用计数，损坏配置必须报告分析不完整。AOT 运行只使用已准备的计划和授权结果。
 
 ## 为什么分开局部资料与图资料
 

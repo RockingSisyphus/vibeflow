@@ -7,6 +7,7 @@ import sys
 sys.dont_write_bytecode = True
 FIXTURE = Path(__file__).resolve().parent
 sys.path[:0] = [str(FIXTURE.parents[2]), str(FIXTURE.parents[2] / "src")]
+from tests.fixtures.support.artifacts import artifact_directory
 from tests.fixtures.support.preview import preview_directory, preview_architecture
 from tests.fixtures.support.addition_sandboxes import main, workspace, value, events, assert_artifacts
 from vibeflow.core.findings import HealthReport
@@ -71,6 +72,7 @@ def check(context, trace, row):
 
 def run(work, *, toolchain=None):
     loaded = load_workspace_config(workspace(FIXTURE, work))
+    output = artifact_directory(work)
     rows = json.loads((FIXTURE / "expectations.json").read_text())
     # The same nested formula (4+6)*2+5=25 observes all execution/trace settings.
     for execution in ("plan", "block", "compiled"):
@@ -84,7 +86,7 @@ def run(work, *, toolchain=None):
         if name not in prepared_cases:
             config = work / "project/configs" / (name + ".jsonc")
             checked = run_workspace_checked(config, workspace=loaded, initial=row["initial"],
-                run_root=work / "checked", run_id=name, runtime_options=RuntimeOptions(trace="full"))
+                run_root=output / "checked", run_id=name, runtime_options=RuntimeOptions(trace="full"))
             for key, expected in row["expected_outputs"].items():
                 assert value(checked.context,key) == expected
             assert_artifacts(checked.run_dir)
@@ -118,7 +120,7 @@ def run(work, *, toolchain=None):
         hooks = Hooks()
         plugins = PluginRegistry()
         plugins.register(hooks, plugin_type="runtime")
-        run_dir = work / "runtime" / str(index)
+        run_dir = output / "runtime" / str(index)
         context = PipelineRuntime(prepared.graph, registry=env.registry, plugin_registry=plugins,
             runtime_options=options, run_dir=run_dir).run(dict(row["initial"]))
         trace = events(run_dir / "runtime_trace.jsonl")

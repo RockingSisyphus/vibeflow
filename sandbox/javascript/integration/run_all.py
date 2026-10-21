@@ -17,6 +17,8 @@ from xml.etree import ElementTree
 _SOURCE_SANDBOX_ROOT = Path(__file__).resolve().parent
 _REPOSITORY_ROOT = _SOURCE_SANDBOX_ROOT.parents[2]
 _RUNTIME_TEMP: tempfile.TemporaryDirectory[str] | None = None
+sys.path[:0] = [str(_REPOSITORY_ROOT), str(_REPOSITORY_ROOT / "src")]
+from tests.fixtures.support.artifacts import artifact_directory
 
 
 def _prepare_runtime_workspace() -> Path:
@@ -73,6 +75,7 @@ def _prepare_runtime_workspace() -> Path:
 
 
 _RUNTIME_ROOT = _prepare_runtime_workspace()
+_OUTPUT_ROOT = artifact_directory(_RUNTIME_ROOT)
 
 from sandbox_support import (
     BuildCache,
@@ -254,7 +257,7 @@ def _source_map_case(result: Any) -> dict[str, Any]:
 
 def _review_case(puppeteer_root: Path) -> dict[str, Any]:
     # Full review owns a positive project; negative workflows are separate inputs.
-    subject = _RUNTIME_ROOT / "review_subject"
+    subject = _OUTPUT_ROOT / "review_subject"
     subject.mkdir()
     project = subject / "project"
     shutil.copytree(PROJECT_ROOT, project, ignore=shutil.ignore_patterns("node_modules", "review_artifacts"))
@@ -279,7 +282,7 @@ def _review_case(puppeteer_root: Path) -> dict[str, Any]:
     )
     reviewed: dict[str, Any] = {}
     for config_name, architecture_name, expected_targets in specs:
-        output = _RUNTIME_ROOT / "reports" / f"{Path(config_name).stem}.expanded.svg"
+        output = _OUTPUT_ROOT / "reports" / f"{Path(config_name).stem}.expanded.svg"
         completed = subprocess.run(
             [
                 sys.executable,
@@ -620,7 +623,7 @@ def _source_marker_location(path: Path, marker: str) -> tuple[int, int]:
 
 
 def _addition_case(name):
-    work = _RUNTIME_ROOT / name
+    work = _OUTPUT_ROOT / name
     command = [sys.executable, str(_SOURCE_SANDBOX_ROOT.parent / name / "run_all.py"),
                "--work-dir", str(work), "--toolchain-root", str(PROJECT_ROOT)]
     completed = subprocess.run(command, capture_output=True, text=True,
@@ -633,7 +636,7 @@ def _addition_case(name):
 
 
 def _rule_selection_case():
-    work = _RUNTIME_ROOT / "rule_selection"
+    work = _OUTPUT_ROOT / "rule_selection"
     command = [sys.executable, str(_SOURCE_SANDBOX_ROOT.parent / "rule_selection/run_all.py"),
                "--work-dir", str(work), "--toolchain-root", str(PROJECT_ROOT)]
     completed = subprocess.run(command, capture_output=True, text=True,
@@ -644,7 +647,7 @@ def _rule_selection_case():
 
 
 def _graph_concurrency_case(puppeteer_root):
-    work = _RUNTIME_ROOT / "graph_concurrency"
+    work = _OUTPUT_ROOT / "graph_concurrency"
     command = [sys.executable, str(_SOURCE_SANDBOX_ROOT.parent / "graph_concurrency/run_all.py"),
                "--work-dir", str(work), "--toolchain-root", str(PROJECT_ROOT),
                "--puppeteer-root", str(puppeteer_root)]
@@ -658,7 +661,7 @@ def _graph_concurrency_case(puppeteer_root):
 
 
 def _comprehensive_math_case(puppeteer_root: Path, *, skip_browser: bool):
-    work = _RUNTIME_ROOT / "comprehensive_math"
+    work = _OUTPUT_ROOT / "comprehensive_math"
     command = [sys.executable, str(_SOURCE_SANDBOX_ROOT.parent / "comprehensive_math/run_all.py"),
                "--work-dir", str(work), "--toolchain-root", str(PROJECT_ROOT),
                "--puppeteer-root", str(puppeteer_root)]
@@ -695,7 +698,7 @@ def main() -> int:
             else (
                 DEFAULT_PUPPETEER_ROOT
                 if args.skip_browser
-                else prepare_temporary_puppeteer(_RUNTIME_ROOT / "puppeteer")
+                else prepare_temporary_puppeteer(_OUTPUT_ROOT / "puppeteer")
             )
         )
         validate_environment(
@@ -707,7 +710,7 @@ def main() -> int:
         return 2
 
     if args.keep_artifacts:
-        build_root = _RUNTIME_ROOT / "builds"
+        build_root = _OUTPUT_ROOT / "builds"
         build_root.mkdir(parents=True)
         build_context = nullcontext(str(build_root))
     else:

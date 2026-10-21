@@ -68,7 +68,7 @@ window.VFInspector=(()=>{
     const rules=facts.selected_rulesets??facts.rulesets??nodeDefinition?.rulesets;
     if(rules?.length){const part=section(parent,"规则声明");notes(part,rules);}
     if(info.plannedBehavior){const part=section(parent,"计划节点行为");table(part,Object.entries(info.plannedBehavior));}
-    const p=facts.presentation?.values?facts.presentation:facts.effective_presentation;
+    const p=facts.preview_presentation||(facts.presentation?.values?facts.presentation:facts.effective_presentation);
     if(p){const part=section(parent,"展示样式");table(part,[["最终样式",p.values],["样式来源",p.sources]]);}
     raw(parent,{call:facts,...(nodeDefinition?{node_definition:nodeDefinition}:{}),...(info.nodeType?{node_type:info.nodeType}:{}),...(definition?{nodeset:definition}:{}),...(info.resource?{resource:info.resource}:{})});
   }

@@ -25,7 +25,7 @@ python sandbox/python/piecewise_math/run_all.py
 python sandbox/python/piecewise_math/run_all.py --work-dir /path/outside/repository/vibeflow-piecewise-review
 ```
 
-Python integration 自动执行此入口。11 个旧任务及断言迁移位置见 [替代归档](../../../docs/maintainers/history/audits/piecewise-math-20261010.md)。异常调度、循环边界、异步清理等专项继续独立保留。
+[Python integration](../integration/README.md) 自动执行此入口。异常调度、循环边界、异步清理等专项继续独立保留。
 
 ## 目录用途与边界
 

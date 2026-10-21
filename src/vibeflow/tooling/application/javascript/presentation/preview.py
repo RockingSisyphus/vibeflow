@@ -10,7 +10,7 @@ def _publish(result, architecture, *, preview_root, category, status):
     record=publish_preview(root=preview_root or result.workspace.root,
         workflow=workflow_identity(result.config_path,result.workspace,target="javascript"),
         category=category,status=status,architecture=architecture,links=workflow_links(result.workspace),
-        check_status="CONCERNS" if result.warnings else "PASS", target_graphs=targets)
+        check_status="CONCERNS" if result.warnings else "PASS", target_graphs=targets, workspace=result.workspace)
     install_for_record(record)
     return record
 

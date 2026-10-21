@@ -2,9 +2,7 @@
 
 独立 Target/版本观察默认最多并发 12 个 worker。使用 `--workers N` 或 `VIBEFLOW_TEST_WORKERS=N` 调整，命令行优先；`--workers 1` 可串行重跑。Target 内共享资料的场景仍按原顺序执行。
 
-这组测试保留 `f169429` 和修复前 `15adf51` 的冻结观察，检查当前工作区是否漏掉旧规则或错误拒绝合法输入。它与领域插件、规则图及图形沙箱互补，已接入 `verify_project.py --full`。
-
-规则清单见 [基线盘点](../../../docs/design/history/baseline-rule-inventory.md)。这里按能力组织场景，不把一个诊断码等同于一条独立 Rule。测试夹具在临时目录生成；Python 的基线使用旧类声明，当前版本使用独立业务 Node／BaseLib 声明及整包 Plugin 贡献。历史输入的适配只发生在测试中。
+产品检查范围见 [产品检查边界](../../../distribution/docs/user/product-check-boundaries.md)。这里按能力组织场景，不把一个诊断码等同于一条独立 Rule。测试夹具在临时目录生成；Python 的基线使用旧类声明，当前版本使用独立业务 Node／BaseLib 声明及整包 Plugin 贡献。历史输入的适配只发生在测试中。
 
 ```bash
 python tests/fixtures/rule_parity/run_all.py \
@@ -38,10 +36,6 @@ python tests/fixtures/rule_parity/run_all.py \
 npm_config_cache=/tmp/vibeflow-npm-cache python tools/run_tests.py -- \
   tests/integration/test_rule_parity_reporting.py
 ```
-
-报告机制的 pytest 通过不能替代真实沙箱。完整门禁实际运行 current-only 全组，不匹配或观察错误使门禁失败。空组、重复 ID、残缺记录和丢失历史 ID 均不能算通过。修复前事实见 [历史检查](RESULTS.md)，最新验收见完整修复结果。
-
-历史生成报告和截图已移出夹具目录，原始位置与恢复方法见 [证据索引](../../../docs/maintainers/evidence/index.md)。上文历史成绩不代替当前运行。
 
 ## 目录用途与边界
 

@@ -19,6 +19,7 @@ FIXTURE = Path(__file__).resolve().parent
 REPOSITORY = FIXTURE.parents[2]
 sys.path[:0] = [str(REPOSITORY), str(REPOSITORY / "src")]
 
+from tests.fixtures.support.artifacts import artifact_directory
 from tests.fixtures.support.comprehensive_math import SCENARIOS, assert_warning_feedback
 from vibeflow.targets.javascript.build.driver_session import check_scope
 from vibeflow.tooling.application.javascript.build import ProjectBuildRequest, build_project_aot
@@ -31,7 +32,7 @@ class QuietHandler(SimpleHTTPRequestHandler):
 
 def _node_script(path, script):
     path.write_text(script)
-    completed = subprocess.run(["node", str(path)], capture_output=True, text=True)
+    completed = subprocess.run(["node", str(path)], cwd=path.parent, capture_output=True, text=True)
     assert completed.returncode == 0, completed.stdout + completed.stderr
     return json.loads(completed.stdout)
 
@@ -50,19 +51,20 @@ def run(work, *, toolchain, renderer, skip_browser=False):
         (project / "node_modules").symlink_to(toolchain.resolve() / "node_modules", target_is_directory=True)
     else:
         subprocess.run(["npm", "ci"], cwd=project, check=True)
+    output = artifact_directory(work)
     workspace = work / "vibeflow_config.jsonc"
     config = project / "configs/formula.jsonc"
 
     def build(target, name):
         return build_project_aot(ProjectBuildRequest(workspace=workspace, config=config,
-            out_dir=work / name, target=target, profile="single-esm"))
+            out_dir=output / name, target=target, profile="single-esm"))
 
     module = build("node", "node-build")
     warning_counts = assert_warning_feedback(_report(module))
     assert module.prepared.used_base_libs == ("math.helpers",), module.prepared.used_base_libs
     assert module.prepared.used_capabilities == ("vibeflow.port",), module.prepared.used_capabilities
     driver = FIXTURE / "scenario_driver.mjs"
-    node_result = _node_script(work / "verify-node.mjs", f'''
+    node_result = _node_script(output / "verify-node.mjs", f'''
 import {{verify}} from {json.dumps(driver.as_uri())};
 const workflow = await import({json.dumps(module.entry.as_uri())});
 const result = await verify(workflow, {json.dumps(SCENARIOS)});
@@ -79,7 +81,7 @@ process.stdout.write(JSON.stringify(result));
         thread.start()
         try:
             url = f"http://127.0.0.1:{server.server_address[1]}/index.html"
-            browser_result = _node_script(work / "verify-browser.mjs", f'''
+            browser_result = _node_script(output / "verify-browser.mjs", f'''
 import {{createRequire}} from "node:module";
 const require = createRequire({json.dumps(str(renderer / "package.json"))});
 const puppeteer = require("puppeteer");

@@ -76,6 +76,38 @@ def test_offline_browser_selects_entries_and_expands_a_workflow(tmp_path):
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_offline_project_directory_and_workflow_operation_styles(tmp_path):
+    import pytest
+    from vibeflow.tooling.presentation.mermaid import _find_mmdc, is_mermaid_svg_renderer_available
+    from vibeflow.tooling.presentation.preview.exporter import publish_preview, publish_project
+    from vibeflow.tooling.presentation.preview.catalog import new_record
+    if not is_mermaid_svg_renderer_available():
+        pytest.skip("browser dependencies are supplied by the preview test environment")
+    record = preview_project(tmp_path)
+    payload = json.loads((record.directory / "snapshot.js").read_text()[len("VibeFlowPreview.snapshot("):-3])
+    target = payload["workflow_graphs"]["worker:workflow.jsonc"]
+    worker = publish_preview(root=tmp_path, workflow=target["workflow"], architecture=target["architecture"], category="review", status="passed")
+    worker.metadata["created_at"] = "2001-01-01T00:00:00Z"
+    worker.update("passed")
+    old = new_record(tmp_path, record.metadata["workflow"], "run", "succeeded")
+    old.metadata.update(created_at="2000-01-01T00:00:00Z", updated_at="2099-01-01T00:00:00Z")
+    from vibeflow.tooling.presentation.preview.catalog import append_record
+    append_record(tmp_path, old.metadata)
+    (tmp_path / "worker/future.jsonc").write_text('{"pipeline":{"nodes":[]}}')
+    (tmp_path / "worker/broken.jsonc").write_text('{"pipeline":')
+    (tmp_path / "empty").mkdir()
+    (tmp_path / "empty/vibeflow_project.jsonc").write_text('{"project_target":"python"}')
+    path = tmp_path / "vibeflow_config.jsonc"
+    config = json.loads(path.read_text())
+    config["roots"].append({"id":"empty", "path":"empty"})
+    path.write_text(json.dumps(config))
+    publish_project(tmp_path, load_workspace_config(path))
+    browser = Path(__file__).resolve().parents[1] / "fixtures/preview/project-navigation.cjs"
+    result = subprocess.run(["node", str(browser), str(_find_mmdc().resolve()), str(tmp_path / "vibeflow-preview.html"), record.metadata["id"], worker.metadata["id"]],
+        text=True, capture_output=True, timeout=60)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_foreign_target_facts_cross_the_cli_boundary_and_missing_targets_are_local(tmp_path):
     from tests.targets.javascript.test_code_plugins import project as javascript_project
     from vibeflow.tooling.application.presentation_targets import prepare_targets

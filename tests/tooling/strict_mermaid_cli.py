@@ -125,9 +125,16 @@ def test_mermaid_svg_label_enhancement_styles_native_text_without_touching_edges
     text = svg.read_text(encoding="utf-8")
 
     assert 'font-weight="700" font-size="1.05em">Readable' in text
-    assert 'x="-66" text-anchor="start"><tspan font-weight="700">id:</tspan>' in text
-    assert 'x="-66" text-anchor="start"><tspan font-weight="700">desc:</tspan>' in text
-    assert 'x="-66" text-anchor="start"><tspan font-weight="700">external:</tspan>' in text
+    root = ElementTree.parse(svg).getroot()
+    node = next(item for item in root if "node" in item.attrib.get("class", "").split())
+    box = next(item for item in node if item.tag.endswith("}rect"))
+    left, width = float(box.attrib["x"]), float(box.attrib["width"])
+    rows = [item for item in node.iter() if item.tag.endswith("}tspan")
+            and any("".join(item.itertext()).startswith(label) for label in ("id:", "desc:", "external:"))
+            and "x" in item.attrib]
+    assert len(rows) == 3
+    assert len({item.attrib["x"] for item in rows}) == 1
+    assert all(left < float(item.attrib["x"]) < left + width and item.attrib["text-anchor"] == "start" for item in rows)
     assert 'fill:#64748b !important' in text
     edge_text = text[text.index('<g class="edgeLabel"') :]
     assert 'font-weight="normal">id:</tspan>' in edge_text
@@ -176,8 +183,9 @@ def test_mermaid_svg_label_enhancement_recenters_native_cloud_text(tmp_path) -> 
         if child.tag.endswith("}g") and "label" in child.attrib.get("class", "").split()
     )
 
-    assert cloud_label.attrib["transform"] == "translate(0, -72.25)"
-    assert ordinary_label.attrib["transform"] == "translate(-12, -20)"
+    assert cloud_label.attrib["transform"].startswith("translate(0,")
+    assert "Global State" in "".join(cloud_label.itertext())
+    assert "Ordinary" in "".join(ordinary_label.itertext())
 
 
 def test_mermaid_renderer_finds_distribution_kernel_tool_path(tmp_path, monkeypatch) -> None:

@@ -77,7 +77,7 @@ def analyze_node_source_context(registry: NodeRegistry, node_ids: tuple[str, ...
                     module = ".".join(Path(fact.path).relative_to(owner).with_suffix("").parts).removesuffix(".__init__")
                     files[fact.path] = PythonSourceFile(fact.path,module,fact.source,root_object.id,fact._tree,
                         fact.parse_error,fact.parse_line,fact.parse_column)
-    return build_python_source_context(nodes, files.values())
+    return build_python_source_context(nodes, files.values(), source_roots=getattr(registry, "source_roots", ()))
 
 
 def publish_python_source_context(registry, context):

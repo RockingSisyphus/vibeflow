@@ -1,4 +1,7 @@
 from __future__ import annotations
+from vibeflow.tooling.application.python.project.source_files import collect_root_source_facts, DEFAULT_EXCLUDED_DIRS
+from vibeflow.targets.shared.quality_support import QualityPolicy
+from tests.fixtures.support.project_rules import evaluate_standard_project_quality
 
 import json
 from pathlib import Path
@@ -8,10 +11,7 @@ from vibeflow.targets.shared.quality_support import (
     QualityStructureLimits,
     QualityThresholds,
 )
-from vibeflow.tooling.application.python.project.quality_scan import (
-    DEFAULT_EXCLUDED_DIRS,
-    scan_code_quality,
-)
+
 
 
 def _write_quality_fixture(root: Path) -> None:
@@ -35,10 +35,11 @@ def test_root_exclusions_do_not_hide_same_named_canonical_packages(
     tmp_path: Path,
 ) -> None:
     _write_quality_fixture(tmp_path)
-    report = scan_code_quality(
-        tmp_path,
-        thresholds=QualityThresholds(warn_file_lines=5),
-        structure_limits=QualityStructureLimits(
+    report = evaluate_standard_project_quality(collect_root_source_facts(tmp_path, excluded_dirs={
+            *DEFAULT_EXCLUDED_DIRS,
+            "./purity",
+            "./portable",
+        }), QualityPolicy(thresholds=QualityThresholds(warn_file_lines=5), structure_limits=QualityStructureLimits(
             warn_root_code_files=20,
             max_root_code_files=30,
             warn_code_dirs=20,
@@ -52,13 +53,7 @@ def test_root_exclusions_do_not_hide_same_named_canonical_packages(
             warn_root_level_code_files=10,
             max_root_level_code_files=20,
             enforce_role_imports=False,
-        ),
-        excluded_dirs={
-            *DEFAULT_EXCLUDED_DIRS,
-            "./purity",
-            "./portable",
-        },
-    )
+        )))
 
     assert {item.path for item in report.files} == {
         "block_compiler/canonical.py",
@@ -95,7 +90,7 @@ def test_source_scan_exact_paths_exclude_files_and_directories_only_at_root(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(source, encoding="utf-8")
 
-    report = scan_code_quality(tmp_path, structure_limits=QualityStructureLimits(enforce_role_imports=False,warn_root_code_files=20,max_root_code_files=30), excluded_dirs=(*DEFAULT_EXCLUDED_DIRS,"./legacy.py","./compat"))
+    report = evaluate_standard_project_quality(collect_root_source_facts(tmp_path, excluded_dirs=(*DEFAULT_EXCLUDED_DIRS,"./legacy.py","./compat")), QualityPolicy(structure_limits=QualityStructureLimits(enforce_role_imports=False,warn_root_code_files=20,max_root_code_files=30)))
     assert {item.path for item in report.files} == {"nested/compat/visible.py", "nested/legacy.py"}
     root_layout = report.structure_summary["root_layout"]
     assert root_layout["code_files"] == 2

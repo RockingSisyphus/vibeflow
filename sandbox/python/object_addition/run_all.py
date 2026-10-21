@@ -5,6 +5,7 @@ sys.dont_write_bytecode = True
 
 FIXTURE = Path(__file__).resolve().parent
 sys.path[:0] = [str(FIXTURE.parents[2]), str(FIXTURE.parents[2] / "src")]
+from tests.fixtures.support.artifacts import artifact_directory
 from tests.fixtures.support.addition_sandboxes import events, main, value, workspace, assert_artifacts
 from vibeflow.core.findings import HealthReport
 from vibeflow.targets.python.runtime import PipelineRuntime, RuntimeOptions
@@ -37,6 +38,7 @@ def assert_result(context, box, counter, expected, steps):
 
 def run(work, *, toolchain=None):
     workspace_path = workspace(FIXTURE, work)
+    output = artifact_directory(work)
     loaded = load_workspace_config(workspace_path)
     observations = []
     cases = [("single", "plan", 5, 1, None), ("override", "plan", 10, 1, None),
@@ -47,7 +49,7 @@ def run(work, *, toolchain=None):
         config = work / "project/configs" / (name + ".jsonc")
         if name not in prepared_cases:
             box, counter = Box(), Counter()
-            checked = run_workspace_checked(config, workspace=loaded, run_root=work / "checked", run_id=name,
+            checked = run_workspace_checked(config, workspace=loaded, run_root=output / "checked", run_id=name,
                 initial={"object.box": box, "object.counter": counter}, runtime_options=RuntimeOptions(trace="full"))
             assert_result(checked.context, box, counter, expected, steps)
             assert_artifacts(checked.run_dir)
@@ -66,7 +68,7 @@ def run(work, *, toolchain=None):
         if history is None or name == "conditional":
             assert [provider.key for provider in frame.exports] == ["object.box_after", "object.counter_after", "object.snapshot", "object.metadata", "object.value", "object.done"]
         box, counter = Box(), Counter()
-        run_dir = work / "runtime" / (name + "-" + execution)
+        run_dir = output / "runtime" / (name + "-" + execution)
         runtime = PipelineRuntime(prepared.graph, registry=environment.registry, runtime_options=options, run_dir=run_dir)
         context = runtime.run({"object.box": box, "object.counter": counter})
         assert_result(context, box, counter, expected, steps)

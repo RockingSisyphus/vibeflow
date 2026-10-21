@@ -38,6 +38,9 @@ def test_shared_usage_counts_distinct_roots_and_writes_project_architecture(tmp_
     assert document["purpose"] == "Shared resource regression"
     assert document["roots"][0]["purpose"] == "desktop application"
     assert document["inventory_complete"]
+    assert row["used_by_workflows"] == [
+        {"path":"desktop/configs/workflow.jsonc", "root":"desktop", "statuses":["implemented"], "relation":"declaration"},
+        {"path":"backend/configs/workflow.jsonc", "root":"backend", "statuses":["implemented"], "relation":"declaration"}]
 
 
 def test_two_workflows_in_one_root_do_not_qualify_as_project_shared(tmp_path):
@@ -55,6 +58,37 @@ def test_incomplete_inventory_does_not_report_false_resource_usage(tmp_path):
     assert not report.inventory.complete
     assert "PROJECT.USAGE.INCOMPLETE" in {item.rule_id for item in report.findings}
     assert "PROJECT.RESOURCE.NOT_SHARED" not in {item.rule_id for item in report.findings}
+
+
+def test_architecture_tracks_planned_real_references_and_survives_project_move(tmp_path):
+    import shutil
+    source = tmp_path / "source"
+    source.mkdir()
+    workspace = project(source, ["desktop", "backend"])
+    shared = source / "nodes/shared.py"
+    shared.write_text(shared.read_text().replace('contract={}', 'flow_kind="terminal", contract={}'))
+    path = workspace.roots[0].path / "configs/planned.jsonc"
+    path.write_text(json.dumps({"rulesets":[], "pipeline":{"nodes":[
+        {"id":"future", "definition_id":"shared.step", "display_name":"Future", "description":"Planned real declaration",
+         "status":"planned", "flow_kind":"terminal", "requires":[], "provides":[]},
+        {"id":"missing", "definition_id":"not.implemented", "display_name":"Missing", "description":"Placeholder only",
+         "status":"planned", "flow_kind":"terminal", "requires":[], "provides":[]} ]}}))
+    report = ProjectPreparation(workspace).review(write_architecture=True)
+    assert report.inventory.complete, report.inventory.issues
+    resource = next(item for item in report.resources if item["id"] == "shared.step")
+    assert {item["path"] for item in resource["used_by_workflows"]} == {
+        "desktop/configs/workflow.jsonc", "desktop/configs/planned.jsonc", "backend/configs/workflow.jsonc"}
+    assert next(item for item in resource["used_by_workflows"] if "planned" in item["path"])["statuses"] == ["planned"]
+    assert not any(item["id"] == "not.implemented" for item in report.resources)
+    original = report.architecture_path.read_text()
+    from vibeflow.tooling.application.python.build import PythonBuildRequest, build_python_aot
+    build_python_aot(PythonBuildRequest(workspace,workspace.roots[0].path/"configs/workflow.jsonc",tmp_path/"bundle",preview_root=tmp_path/"preview"))
+    assert report.architecture_path.read_text() == original
+    shutil.move(source, tmp_path / "moved")
+    document = json.loads("\n".join((tmp_path/"moved/PROJECT_ARCHITECTURE.jsonc").read_text().splitlines()[2:]))
+    row = next(item for item in document["resources"] if item["id"] == "shared.step")
+    assert (tmp_path/"moved"/row["path"]).is_file()
+    assert all((tmp_path/"moved"/item["path"]).is_file() for item in row["used_by_workflows"])
 
 
 def test_project_custom_rule_is_loaded_atomically_without_activating_business_plugin(tmp_path):
@@ -90,6 +124,11 @@ def test_quality_command_uses_shared_preparation_and_writes_complete_project_doc
     assert [item["config"] for item in payload["reports"]] == [str(workflow)]
     assert (tmp_path / "PROJECT_ARCHITECTURE.jsonc").is_file()
     assert not (tmp_path / "vibeflow-preview").exists()
+    review = ProjectPreparation(workspace).review()
+    package = next(item for item in review.resources if item["kind"] == "plugin_declaration")
+    assert package["used_by_workflows"] == [{"path":"app/configs/workflow.jsonc", "root":"app",
+        "statuses":["implemented"], "relation":"selection"}]
+    assert not any(item["owner"]["kind"] == "plugin" for item in review.resources)
 
 
 def test_root_quality_rules_receive_all_root_source_facts(tmp_path):

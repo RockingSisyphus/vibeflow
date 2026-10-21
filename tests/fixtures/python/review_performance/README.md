@@ -19,8 +19,6 @@ python -B tests/fixtures/python/review_performance/run_all.py \
 
 源码规则的参数、输入 records、插件配置、加载状态、handler、共享 helper 权限及 AST 隔离回归见 `tests/targets/python/test_check_session.py`、`test_rule_sessions.py`、`test_source_ast_reuse.py`；跨 Workflow 的语法复用与权限隔离见 `test_quality_parse_reuse.py`。展示快照回归见 `tests/tooling/test_prepared_presentation.py`。
 
-修复前观察使用 `--baseline`，记录当时的重复工作与延迟加载状态；当前验收启用确定性计数断言。固定机器的三次中位数用于分析改善，完整门禁不把墙钟耗时作为跨机器阈值。
-
 `--baseline` 只关闭性能和延迟加载的新断言，保留健康审查与 records 正确性期待；冻结旧源码重跑新增案例时可能返回失败。机器报告逐项保存实际结果。
 
 比较两批观察：
@@ -32,8 +30,6 @@ python -B tests/fixtures/python/review_performance/compare.py \
 ```
 
 阶段耗时包含嵌套调用，不能相加当作总时间。AST 计数观察 Target 公开视图的完整复制；局部指纹及类外壳复制继续保留。
-
-历史生成报告和截图已移出夹具目录，原始位置与恢复方法见 [证据索引](../../../../docs/maintainers/evidence/index.md)。上文历史成绩不代替当前运行。
 
 ## 目录用途与边界
 

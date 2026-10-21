@@ -38,4 +38,4 @@ Trace 的事件、计数和子图摘要在共用锁内更新；协调器维护�
 
 Config 解析、schema、调用配置覆写、便携计划及两 Target 的源码/AOT 必须保留相同额度。`max_concurrency` 是调度字段，不进入业务参数，不从父级 global_config 继承；同额度的不同分发也不能合并计数。相关回归位于 `tests/core/test_dispatch_config.py`、`tests/conformance/test_dispatch_concurrency.py` 与 `test_dispatch_shared_target.py`。
 
-发布前执行两个 [graph_concurrency 沙箱](../../sandbox/README.md)：非法图必须在公开 CLI 返回错误并停止构建，不能仅检查内部 finding 是否存在；正常案例必须检查真实启动、清理、补位与收集次序，不能仅依赖最终输出。两 Target 的集成入口自动包含这些沙箱，JavaScript 同时运行 Node 和 Chromium。发行 ABI、迁移与本次验证范围见 [1.0.1 发布说明](../maintainers/history/release-1.0.1.md)。
+发布前执行两个 [graph_concurrency 沙箱](../../sandbox/README.md)：非法图必须在公开 CLI 返回错误并停止构建，不能仅检查内部 finding 是否存在；正常案例必须检查真实启动、清理、补位与收集次序，不能仅依赖最终输出。两 Target 的集成入口自动包含这些沙箱，JavaScript 同时运行 Node 和 Chromium。发行身份与构建流程见[发行装配](../maintainers/release.md)。

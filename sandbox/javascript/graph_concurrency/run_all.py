@@ -15,6 +15,7 @@ FIXTURE = Path(__file__).resolve().parent
 ROOT = FIXTURE.parents[2]
 sys.path[:0] = [str(ROOT), str(ROOT / "src")]
 
+from tests.fixtures.support.artifacts import artifact_directory
 from tests.fixtures.support.addition_sandboxes import cli, workspace
 from tests.fixtures.support.graph_concurrency import (
     SUCCESS_CASES, assert_worker_trace, check_topology_cases, write_cases,
@@ -29,13 +30,14 @@ def summarize(work, name, execution, rounds, capacity):
 
 def run(work, toolchain, puppeteer=None):
     workspace(FIXTURE, work, toolchain)
+    output = artifact_directory(work)
     write_cases(work)
     observations = check_topology_cases(work)
     browser_cases = []
     for name, scenario, capacity in SUCCESS_CASES:
         def build(target):
             result = json.loads(cli(["build", "--workspace", work / "vibeflow_config.jsonc",
-                "--config", work / f"project/configs/{name}.jsonc", "--out-dir", work / f"{name}-{target}",
+                "--config", work / f"project/configs/{name}.jsonc", "--out-dir", output / f"{name}-{target}",
                 "--target", target, "--profile", "single-esm"]).stdout)
             entry = Path(result["entry"])
             assert entry.is_file(), entry

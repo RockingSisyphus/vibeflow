@@ -1,0 +1,14 @@
+{
+  "plugins": [
+    {
+      "scope": "project",
+      "source": {
+        "kind": "file",
+        "ref": "plugins/framework_access/plugin.py"
+      }
+    }
+  ],
+  "rulesets": [
+    "vibetrain.root"
+  ]
+}

@@ -41,11 +41,13 @@ python sandbox/python/rule_selection/run_all.py
 python sandbox/javascript/rule_selection/run_all.py
 ```
 
+沙箱的构建、运行记录和嵌套测试工程统一放入工作区的 `artifacts/`。共享辅助函数 `tests/fixtures/support/artifacts.py` 通过 `project_rules.jsonc` 的 `vibeflow.project.layout.directories` 声明该目录用途，豁免这棵产物目录树的布局报错；其余目录和业务源码继续按原规则检查，不在加载层增加特例。
+
 默认运行自动清理临时工作区。需要检查产物时使用 runner 的显式工作目录或 --keep-artifacts，目录放在仓库外，检查后及时清理。
 
-覆盖入口见 [TEST_COVERAGE](TEST_COVERAGE.md)，目录职责见 [开发说明](../docs/maintainers/directory-layout.md)，历史原始观察见 [证据索引](../docs/maintainers/evidence/index.md)。
+覆盖入口见 [TEST_COVERAGE](TEST_COVERAGE.md)，目录职责见 [开发说明](../docs/maintainers/directory-layout.md)。
 
-当前两个 integration runner 登记 153 项（Python 103、JavaScript 50）。其中两项是新增的规则选择综合案例；此前 150 项的完整分类与原名见 [任务清单](../docs/maintainers/history/audits/sandbox-task-inventory-workflow-20261010.md)。
+各 Target 的现行入口与判定见 [Python integration](python/integration/README.md) 和 [JavaScript integration](javascript/integration/README.md)。实际案例数量与结果由每次运行的报告记录。
 
 JavaScript workflow_math 内含[同一起终点的多条条件边回归](javascript/workflow_math/README.md)：模拟 `done`、`failed` 都进入同一收尾节点，覆盖顺序交换、完全重复与条件重叠。它随 integration 自动执行，无需另行启用。
 

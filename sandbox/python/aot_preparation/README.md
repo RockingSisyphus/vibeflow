@@ -7,4 +7,4 @@
 
 Bundle 只加载一次，先预热，再分别进行五次 cProfile 计数与无 profiler 的计时。报告给出装载、Runtime 准备、执行和总耗时，以及固定描述/绑定工作次数。没有历史类方法替换或重复缓存方案。它不是监工业务的移植，不能把 Python 与 JS 数字相除作为语言性能倍率。
 
-[原交接分析](../../../docs/maintainers/aot-preparation-analysis.md)保留当时结果；其中 ABI v8 交接 Bundle 不能直接用于当前加载器。长期回归位于 tests/targets/python/test_aot_preparation.py，覆盖固定资料复用及实例、参数、插件隔离。
+[当前行为与维护约定](../../../docs/maintainers/project-preparation.md)保留当时结果；其中 ABI v8 交接 Bundle 不能直接用于当前加载器。长期回归位于 tests/targets/python/test_aot_preparation.py，覆盖固定资料复用及实例、参数、插件隔离。

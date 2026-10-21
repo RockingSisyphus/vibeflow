@@ -265,9 +265,7 @@ def _command(root, variant, spec):
     entrypoint = spec.get("entrypoints", {}).get(variant, spec.get("entrypoint", "cli.inspect-node"))
     if entrypoint == "cli.quality-check":
         if variant=="current":
-            options={}
-            args=spec.get('cli_args',[])
-            if '--max-function-params' in args:options['max_function_params']=int(args[args.index('--max-function-params')+1])
+            options=spec.get('root_file_params',{})
             (root/'root_rules.jsonc').write_text(json.dumps({'rulesets':[{'rule_id':'vibeflow.root.files','params':options},{'rule_id':'vibeflow.root.duplicates'}]}))
             return [sys.executable,'-m','vibeflow','quality-check','--path',str(root),'--json']
         return [sys.executable, "-m", "vibeflow", "quality-check", "--path", str(root / "source.py"), "--json", *spec.get("cli_args", [])]
@@ -356,12 +354,16 @@ def _source_script(variant):
         return '''import json,sys
 from pathlib import Path
 from vibeflow.targets.python.quality import PythonSource,analyze_python_source
-from vibeflow.tooling.application.python.project.quality_scan import scan_code_quality
+from vibeflow.core.rules import RuleContext
+from vibeflow.targets.python.quality.source_context import PythonSourceFile
+from vibeflow.targets.python.rules.node.effects import no_side_effects
 root=Path(sys.argv[1]); options=json.loads(sys.argv[2]); path=root/'source.py'
 result=analyze_python_source(PythonSource(module=options.get('module','pkg.source'),relative_path='source.py',source_path=str(path),text=path.read_text()))
 findings=list(result.findings)
 if options.get('check_side_effects',False):
-    review=scan_code_quality(path,check_side_effects=True)
+    source=PythonSource(module='source',relative_path='source.py',source_path=str(path),text=path.read_text())
+    parsed=PythonSourceFile.parse(str(path),'source',source.text)
+    review=no_side_effects(RuleContext(subject={'kind':'python_source'},facts={'python_source':source,'source_file':parsed}),{}, {'effect_scope':'none','policy':{}})
     findings.extend(item for item in review.findings if item.code.startswith('QUALITY.SIDE_EFFECT.'))
 file=result.file; functions=file.functions
 metrics={'file':file.to_dict(),'fingerprints_equal':len(functions)==2 and functions[0].ast_fingerprint==functions[1].ast_fingerprint,

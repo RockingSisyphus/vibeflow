@@ -20,6 +20,7 @@ FIXTURE = Path(__file__).resolve().parent
 REPOSITORY = FIXTURE.parents[2]
 sys.path[:0] = [str(REPOSITORY), str(REPOSITORY / "src")]
 
+from tests.fixtures.support.artifacts import artifact_directory
 from tests.fixtures.support.preview import preview_directory, preview_architecture, preview_snapshot
 from tests.fixtures.support.comprehensive_math import SCENARIOS, assert_warning_feedback, assert_execution_order
 from vibeflow.core.findings import HealthReport
@@ -72,12 +73,13 @@ def run(work):
     started = perf_counter()
     shutil.copytree(FIXTURE / "project", work / "project", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     shutil.copy2(FIXTURE / "vibeflow_config.jsonc", work / "vibeflow_config.jsonc")
+    output = artifact_directory(work)
     workspace_path = work / "vibeflow_config.jsonc"
     config = work / "project/configs/formula.jsonc"
     workspace = load_workspace_config(workspace_path)
     checked_case = SCENARIOS[0]
     received, sent = [], []
-    checked = run_workspace_checked(config, workspace=workspace, run_root=work / "checked", run_id="positive",
+    checked = run_workspace_checked(config, workspace=workspace, run_root=output / "checked", run_id="positive",
         runtime_options=RuntimeOptions(trace="full"), capabilities=_capabilities(checked_case, received, sent))
     warning_counts = assert_warning_feedback(checked.health.to_dict())
     observations = [_assert_result(checked_case, checked.context, checked.run_dir / "runtime_trace.jsonl", received, sent)]
@@ -108,7 +110,7 @@ def run(work):
     def execute(case, execution="plan", *, driver=None):
         if driver is None:
             received, sent, port_input = [], [], dict(case)
-            run_dir = work / "runtime" / (case["name"] + "-" + execution)
+            run_dir = output / "runtime" / (case["name"] + "-" + execution)
             runtime = PipelineRuntime(prepared.graph, registry=environment.registry,
                 runtime_options=RuntimeOptions(trace="full", execution=execution), run_dir=run_dir,
                 capabilities=_capabilities(port_input, received, sent))

@@ -62,6 +62,6 @@ def observe(work:Path,kernel:Path,toolchain:Path|None,renderer:Path|None):
     for variant in ('foreign_node','base_upward','declaration_lifecycle_use'):
         identifier=f'js.A05.structure.{variant}';root=project(work/identifier,toolchain);minimal(root,variant)
         observed=cli_summary(run_cli(root,cli_args(root,'validate'),kernel,name='validate',toolchain=toolchain))
-        code={'foreign_node':'VF_IMPORT_NODE_TO_NODE','base_upward':'VF_IMPORT_LAYER','declaration_lifecycle_use':'DESCRIPTOR.INVALID'}[variant]
+        code={'foreign_node':'VF_IMPORT_NODE_TO_NODE','base_upward':'VF_IMPORT_LAYER','declaration_lifecycle_use':'VF_PLUGIN_IMPORT_POLICY'}[variant]
         rows.append(row(identifier,'A05','Ownership cannot grant cross-business or package-boundary imports',{'exit_code':1,'target_code':code},observed,check_cli(observed,accepted=False,code=code),root))
     return rows

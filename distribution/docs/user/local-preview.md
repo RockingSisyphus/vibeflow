@@ -102,3 +102,11 @@ window.VibeFlowViewerConfig = {
 快照正文只含 Architecture、视图、关联和可选附件引用，不内嵌 SVG 或重复节点图元。
 
 Python 源码运行记录显示实际命名入口，首次打开时默认选择该入口；查看其他入口不会改变原运行记录。旧历史没有入口字段时继续默认显示全部入口。
+
+## 项目目录与 workflow 操作
+
+左侧“浏览方式”可切换为“项目目录 · 最新快照”，按 root 列出 workflow；点击已有快照的 workflow 即可换图。每个 workflow 标注最新操作、结果和更新时间；未生成审核图的条目显示源文件更新时间，空 root 仍可见。最新快照按生成时间选择，旧运行后来结束不会挤掉新审核图。历史记录模式保留全部快照及原有筛选。
+
+项目目录在 review/build 时随预览导出。已有项目可运行 `python -m vibeflow preview --workspace /path/to/vibeflow_config.jsonc` 更新页面资源和目录，不必重新审查全部 workflow；然后重新打开或刷新 HTML。页面的“刷新列表”只重读已导出的数据，不执行 workflow，也不扫描本机目录。缺少项目目录数据的旧预览仍能浏览已有历史。
+
+HTML 结构化视图中，启动、等待、发送、接收、停止和身份查询操作具有各自的形状与配色；包含多种 workflow 操作的节点使用青色文档形。已有显式样式和 planned 状态颜色继续优先。

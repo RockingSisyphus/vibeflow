@@ -123,8 +123,13 @@ def test_plugin_cannot_contribute_implementation_from_outside_its_package(tmp_pa
     workspace, workflow, root = project(tmp_path)
     (root / "outside.py").write_text('from vibeflow.targets.python.sdk import rule\n@rule(id="outside")\ndef check(*args): pass\n')
     (root / "plugins" / "layout" / "plugin.py").write_text('from outside import check\nfrom vibeflow.targets.python.sdk import Plugin\nplugin=Plugin(id="layout",resources=[check])\n')
-    with pytest.raises(ValueError, match="outside its package"):
-        prepare_workflow_resources(workspace, workflow)
+    # Retain the type required by the workflow so governance can inspect it.
+    plugin = root / "plugins/layout/plugin.py"
+    plugin.write_text(plugin.read_text().replace('resources=[check]', 'resources=[check, shell]').replace(
+        'plugin=Plugin', 'from vibeflow.targets.python.sdk import node_type\nshell=node_type(id="layout.step")\nplugin=Plugin'))
+    from vibeflow.tooling.project.preparation import ProjectPreparation
+    prepare_workflow_resources(workspace, workflow)
+    assert any(item.rule_id == "PLUGIN.PACKAGE.OWNERSHIP" for item in ProjectPreparation(workspace).review().findings)
 
 
 def test_javascript_discovers_nodes_separately_and_uses_type_presentation(tmp_path):
@@ -177,8 +182,11 @@ def test_plugin_private_imports_cannot_borrow_business_code_even_without_rules(t
     (root / "utility.py").write_text("color = '#123456'\n")
     plugin = root / "plugins/layout/plugin.py"
     plugin.write_text('from utility import color\n' + plugin.read_text())
-    with pytest.raises(ValueError, match="imports project code outside its package"):
-        prepare_workflow_resources(workspace, workflow)
+    from vibeflow.tooling.project.preparation import ProjectPreparation
+    prepare_workflow_resources(workspace, workflow)
+    assert any(item.rule_id == "PLUGIN.PACKAGE.IMPORT" for item in ProjectPreparation(workspace).review().findings)
+    (root / "root_rules.jsonc").write_text('{"rulesets":[]}')
+    assert not any(item.rule_id == "PLUGIN.PACKAGE.IMPORT" for item in ProjectPreparation(workspace).review().findings)
 
 
 def test_plain_implementation_files_are_not_executed_during_discovery(tmp_path):

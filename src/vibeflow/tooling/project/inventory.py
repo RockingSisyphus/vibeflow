@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 from typing import Mapping
 from vibeflow.core.rules.models import readonly
 
@@ -55,23 +56,32 @@ def workflow_candidates(root):
 
 def inventory_root(root):
     workflows, issues = [], []
+    declared = {item.workflow_path.resolve() for item in root.architecture_documents}
     for path in workflow_candidates(root):
+        intended = path in declared or path.is_relative_to(root.path / "configs")
+        text = ""
         try:
-            if is_architecture_document_text(path.read_text(encoding="utf-8")):
+            text = path.read_text(encoding="utf-8")
+            if path not in declared and is_architecture_document_text(text):
                 continue
             document = load_raw_config_document(path)
             if isinstance(document.data.get("pipeline"), Mapping) and "type_key" not in document.data:
                 workflows.append(WorkflowDocument(root.id, path, document.data))
-            elif "type_key" not in document.data and path.is_relative_to(root.path / "configs"):
+            elif path in declared or "type_key" not in document.data and (intended or "pipeline" in document.data):
                 issues.append(InventoryIssue(root.id, path, "PROJECT.INVENTORY.DOCUMENT",
-                    "configs documents must declare a workflow pipeline or a NodesetType"))
+                    "workflow documents must declare an object pipeline without type_key; registered workflows cannot be NodesetTypes"))
         except (OSError, ValueError) as error:
             code = error.rule_id if isinstance(error, ConfigLoadError) else "PROJECT.INVENTORY.READ"
+            # A textual hint recovers malformed workflows only. Valid input
+            # objects/arrays may contain nested keys named pipeline.
+            if not intended and (code == "CONFIG.ROOT_OBJECT" or not re.search(r'"pipeline"\s*:', text)):
+                continue
             issues.append(InventoryIssue(root.id, path, code, str(error)))
     return tuple(workflows), tuple(issues)
 
 
 def inventory_project(workspace, *, root_ids=None):
+    from vibeflow.tooling.project.workspace_model import WorkspaceConfig
     workflows, issues = [], []
     directories = {"project": tuple(sorted(path.name for path in workspace.root.iterdir() if path.is_dir())), "roots": {}}
     for root in workspace.roots:
@@ -79,8 +89,8 @@ def inventory_project(workspace, *, root_ids=None):
             continue
         directories["roots"][root.id] = tuple(sorted(path.name for path in root.path.iterdir() if path.is_dir()))
         found, failed = inventory_root(root)
-        workflows.extend(found)
-        issues.extend(failed)
+        workflows.extend(item for item in found if WorkspaceConfig.root_for_path(workspace, item.path) == root)
+        issues.extend(item for item in failed if WorkspaceConfig.root_for_path(workspace, item.path) == root)
     entries = {"project": directory_entries(workspace.root, excluded=tuple(root.path for root in workspace.roots)),
                "roots": {root.id: directory_entries(root.path) for root in workspace.roots
                          if root_ids is None or root.id in root_ids}}

@@ -16,30 +16,6 @@ SOURCE_ROOT = PROJECT_ROOT / "src"
 TARGET_ROOT = SOURCE_ROOT / "vibeflow" / "targets" / "javascript"
 FRONTEND_ROOT = TARGET_ROOT / "frontend"
 
-# Plugin ABI v3 ships the code SDK and its binding loader.
-RESOURCE_NAMES = (
-    'analysis_program.mjs',
-    'node_observation.mjs',
-    'plugin_abi.d.ts',
-    'plugin_worker.mjs',
-    'rule_abi.d.ts',
-    'runtime_helpers.mjs',
-    'capability_helpers.mjs',
-    'plugin_helpers.mjs',
-    'root_helpers.mjs',
-    'coordination/workflow_client.mjs',
-    'coordination/workflow_host.mjs',
-    'coordination/workflow_node.mjs',
-    'sdk.d.ts',
-    'sdk.mjs', 'node_declarations.mjs', 'node_contracts.d.ts',
-    'sdk_loader.mjs',
-    'source_ownership.mjs',
-    'status_helpers.mjs',
-    'execution_helpers.mjs',
-    'toolchain_driver.mjs',
-)
-
-
 def _run_isolated(source: str) -> None:
     environment = os.environ.copy()
     existing = environment.get("PYTHONPATH", "")
@@ -74,20 +50,12 @@ loaded = sorted(
     if any(name == prefix or name.startswith(prefix + ".") for prefix in forbidden)
 )
 assert loaded == [], loaded
-assert "vibeflow.targets.javascript.frontend.codegen_generator" in sys.modules
-assert "vibeflow.targets.javascript.frontend.templates" in sys.modules
 """
     )
 
 
-def test_target_resource_api_is_closed_and_templates_use_canonical_runtime() -> None:
+def test_target_resource_api_rejects_unknown_resource_paths() -> None:
     from vibeflow.targets.javascript import resources
-    from vibeflow.targets.javascript.frontend.templates import RUNTIME_SOURCE
-
-    assert resources.RESOURCE_NAMES == frozenset(RESOURCE_NAMES)
-    assert RUNTIME_SOURCE == "\n".join(resources.read_text(name) for name in (
-        "runtime_helpers.mjs", "capability_helpers.mjs", "plugin_helpers.mjs",
-        "root_helpers.mjs", "status_helpers.mjs", "execution_helpers.mjs"))
     with pytest.raises(ValueError, match="unknown JavaScript Target resource"):
         resources.resource("../runtime_helpers.mjs")
 
@@ -155,7 +123,7 @@ assert.deepEqual(node.run({{value: 4}}), {{value: 5}});
 assert.equal(node.descriptor.flow_kind, "process");
 assert.equal(node.descriptor.display_name, "sample");
 assert.equal(node.descriptor.implementations[0].source.export, "sample.run");
-assert.throws(()=>definePlugin({{id:"bad",resources:[node]}}),/business Nodes/);
+assert.equal(definePlugin({{id:"with-node",resources:[node]}}).resources.length,1);
 const plugin=definePlugin({{id:"example",resources:[defineNodeType({{id:"shell"}})]}});
 assert.equal(plugin.resources[0].descriptor.kind,"node_type");
 '''

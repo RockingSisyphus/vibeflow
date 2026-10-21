@@ -497,7 +497,7 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
       ));
       continue;
     }
-    // Package ownership is already validated at loading. Private support code
+    // Package ownership is evaluated by project/root Rules. Private support code
     // is part of that atomic Plugin, rather than a separate business resource.
     if (sourceOwner.pluginId && sourceOwner.packagePath && isWithinPath(sourceOwner.packagePath, resolvedFile)) continue;
     const destination = importDestinationOwner(ts, resolvedFile, policy, sourceOwner, imported);

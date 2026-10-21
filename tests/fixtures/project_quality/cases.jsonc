@@ -276,32 +276,18 @@
     {
       "name": "too_many_function_params",
       "expected_rule_id": "QUALITY.FUNCTION.TOO_MANY_PARAMS",
-      "args": [
-        "--max-function-params",
-        "2"
-      ],
+      "root_rules": {
+        "rulesets": [
+          {
+            "rule_id": "vibeflow.root.files",
+            "params": {
+              "max_function_params": 2
+            }
+          }
+        ]
+      },
       "files": {
-        "wide.py": "def too_wide(a, b, c):\n    return a + b + c\n"
-      }
-    },
-    {
-      "name": "aliased_side_effect_call",
-      "expected_rule_id": "QUALITY.SIDE_EFFECT.CALL",
-      "args": [
-        "--check-side-effects"
-      ],
-      "files": {
-        "side_effect.py": "from subprocess import run as r\n\ndef call():\n    return r(['true'])\n"
-      }
-    },
-    {
-      "name": "skips_sensitive_file",
-      "expected_absent_rule_id": "QUALITY.SIDE_EFFECT.CALL",
-      "args": [
-        "--check-side-effects"
-      ],
-      "files": {
-        "secrets.py": "def leak():\n    return open('secret.txt').read()\n"
+        "wide.py": "def too_wide(a,b,c):\n    return a+b+c\n"
       }
     }
   ],

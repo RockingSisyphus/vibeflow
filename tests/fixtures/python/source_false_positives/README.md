@@ -18,16 +18,6 @@ PYTHONPATH=src:. python -B -m tests.fixtures.python.source_false_positives.probe
 | `decision_*` | flow.backend 可表达路由输出；普通结果字段仍触发路由声明诊断 |
 | `missing_output_branch`、`file_over_limit` | 保留缺失输出和默认逐文件大小限制 |
 
-`before.json` 在修复前源码快照上观察，21/33 案例不符合预期；`after.json` 保存修复后的完整 CLI 结果，33/33 符合预期，四个实际运行均通过。`--kernel` 可以指定含 src/vibeflow 的源码树，`--validate-only` 用于历史静态观察。
-
-`mnist-observation.json` 与 `mnist-report.json` 保存原 VibeTrain MNIST 配置的正式复查结果。观察时使用本仓库源码内核，没有修改该项目的源码、配置或安装内核，没有执行训练。报告中的项目 FAIL 与观察脚本是否完成分别记录。
-
-实际配置约 127 秒返回完整报告，错误从 52 条减少到 31 条，警告仍为 91 条。已确认的误报及连带诊断消除 21 条。剩余报告包括文件超限、一个返回分支缺失输出、ExecutionScope 的副作用及其连带诊断、自定义规则 deepcopy 冻结资料失败；这些不能由最小复现通过推定为已解决。`verification.json` 记录验证命令、计数与边界。
-
-Core 与 Python 回归为 770 passed / 5 skipped；跳过项为既有的 SVG 渲染器测试，本轮 33 个沙箱案例全部执行。仓库独立质量为 0 errors / 0 warnings，其自身测试为 46 passed。本轮未重建发行包，也未执行完整跨 Target、浏览器及发行验证。
-
-历史生成报告和截图已移出夹具目录，原始位置与恢复方法见 [证据索引](../../../../docs/maintainers/evidence/index.md)。上文历史成绩不代替当前运行。
-
 ## 目录用途与边界
 
 仅用于：source_false_positives 专项实现回归的固定输入、预期及 runner；只保留有当前加载方的材料，运行产物写入临时工作区。

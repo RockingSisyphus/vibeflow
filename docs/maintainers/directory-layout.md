@@ -6,14 +6,14 @@
 | .github | GitHub Actions、Issue 和 Pull Request 模板 |
 | src/vibeflow | Core、BlockCompiler、Python/JavaScript Target、Target 共用支持、Coordination 与 Tooling 的核心源码及运行资源 |
 | distribution | 构建器、profile 配置、提示词、项目模板、最小项目和 distribution/docs 用户文档原稿 |
-| dist | 最新正式发行目录、对应 ZIP 和校验清单 |
+| dist | 版本明确的发行 ZIP 和校验清单；展开目录只用于当前构建/验证，用完清理 |
 | archive | 被替换的历史发行 ZIP；同版本不同构建可保存在 history 下 |
 | sandbox/python、sandbox/javascript | 公开 SDK/CLI 与真实宿主环境中的使用项目，直接加载工作区 src |
 | tests | 非沙盒功能、代码、集成、一致性和实现回归；fixtures 保存输入、基线和独立回归 runner |
 | repo_check | 独立的仓库质检工具及其自身测试，不进入产品发行包 |
 | references | 外来参考项目，不作为生成产物仓库 |
 | tools | 开发、验证、清理和辅助工具，以及独立只读 workflow-viewer 源码；浏览工具由发行构建显式打包 |
-| docs | 当前设计、维护说明、执行计划、历史结论与证据索引；图片及长期阅读工作簿等正文资源放在 assets |
+| docs | 当前设计、维护说明及待执行计划；图片及长期阅读工作簿等正文资源放在 assets |
 
 ## Rule 与 Node 的源码边界
 
@@ -39,11 +39,9 @@ CLI 的结果范围与内置检查说明由 `tooling/application/result_scope.py
 
 - 仓库内 Markdown 文件链接以所在文档目录为基准使用相对路径，保留需要的锚点或行号；不写维护者电脑的绝对路径。
 - 运行时代码和工具参数以各自所属的项目根目录、配置文件目录或资源目录为基准解析路径；只在同一模块或工具边界内复用路径计算，不建立所有组件都依赖的全局路径表。
-- 外部工作区、依赖缓存及证据原件的根位置由对应工具的参数或配置提供。历史原件的定位与可访问状态记录在[证据索引](evidence/index.md)；链接到索引不表示原件已随仓库提供。
+- 外部工作区、依赖缓存由工具参数提供，不以本机绝对路径作为运行或测试依赖。
 
-测试、依赖安装和临时构建默认使用自动清理的仓库外工作区。显式保留的工作目录由调用者负责结束后清理，不能放在 dist、archive 或案例源码目录中。
-
-历史审核材料保存于仓库旁的 `VibeFlow-evidence/directory-remediation-20261009`；[索引](evidence/index.md) 记录原位置、大小、SHA-256 和恢复方法。该索引说明上次整改保留的历史材料。本轮用户确认：已过时且不再使用的材料直接删除，不默认建立副本或归档；旧版已由 Git 保存时直接通过提交追溯。只有仍有明确用途的资料才继续保留。
+测试、依赖安装和临时构建使用自动清理的仓库外工作区。已退役的代码、文档、计划、报告、测试和展开的旧发行副本直接删除；仍有效的知识先并入当前规范。历史溯源使用 Git，唯一归档例外为版本明确的压缩分发包及其校验清单。不能将旧文档压缩成包规避删除。业务输出、用户日志和 trace 不属于代码文档清债范围。
 
 测试使用的 `tests/fixtures/rule_parity/reference.json` 是输入基线，必须随代码保留；它与一次运行生成的报告有不同用途。不能只根据扩展名认定文件可删。
 
@@ -53,9 +51,7 @@ CLI 的结果范围与内置检查说明由 `tooling/application/result_scope.py
 
 版本号以 pyproject.toml 和发行包元数据为准。目录维护不自动更新正式产物；候选包在仓库外构建，正式更新使用 distribution/build.py。
 
-源码全文摘录、pytest 收集输出和重复机器盘点使用仓库外临时工作区，完成用途后删除；中文结论及有阅读价值的工作簿保留在 history 和 assets。outputs 与 output 都不是根目录的持久资料位置。
-
-本轮原则和验收见 [目录清理记录](directory-cleanup-20261010.md)。
+源码全文摘录、pytest 收集输出和一次运行的盘点使用仓库外临时目录，完成用途后删除。当前失败必须如实说明，不能用定向成功或后续通过改写此前批次；有效复现迁入现有测试后，删除退役任务材料。
 
 ## 各层目录说明
 

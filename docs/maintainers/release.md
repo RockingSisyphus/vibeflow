@@ -1,74 +1,12 @@
-# 当前本地构建：VibeFlow 1.2.1
-
-当前开发源码使用 Workflow ABI v10、AOT v4 与快照 v3；项目治理重构的实际状态见[实施记录](project-governance-refactor.md)。
-
-1.2.1 构建时，命名入口、调用级 Capability 授权、本机通信协议和普通端口节点使用 Workflow ABI v9；旧 AOT 需重建，旧原生 IO 配置须迁移。1.2.1 本地分发包包含上述功能、先前 AOT 准备优化及本轮测试提效与职责清理。构建范围见[1.2.1 构建说明](history/release-1.2.1.md)，功能实施见[工作记录](workflow-communication.md)。以下段落记录各次历史发行，不代表当前源码协议。
-
-# VibeFlow 1.1.2
-
-两个分发 profile 预装根目录 HTML、配置、离线资源和空历史索引，解压即可双击打开。构建器调用包内现有 preview 安装入口，不生成审查、构建或运行历史；使用者执行 review 后再查看真实快照。ABI 和格式不变，已发布历史资产保持原样。详见 [1.1.2 发布说明](history/release-1.1.2.md)。
-
-# VibeFlow 1.1.1
-
-修复 planned Nodeset / Loop 的有效状态与计划行为展示，无内部定义时明确提示并禁用展开；JavaScript 与 Python 复用同一计划行为规则。提示词和用户手册明确交付当次 HTML 快照定位链接、查看对应 workflow 后再按协同协议批准；SVG 仅作可选对照。格式与 ABI 不变，1.1.0 的旧快照缺失事实通过重新 review 补齐。详见 [1.1.1 发布说明](history/release-1.1.1.md)。
-
-# VibeFlow 1.1.0
-
-独立离线 HTML 浏览器使用 v2 架构快照自主绘制，支持分类历史、五类视图、调用展开和 workflow 关联；SVG 为显式生成的对照附件。默认事实导出不启动 Mermaid，AOT 执行不生成报告。共享事实、存储、安装与两端编排分离，网页唯一源码位于 `tools/workflow-viewer`。Workflow ABI v8 与 AOT manifest v3 保持不变，旧预览须重新生成。变更和验收范围见 [1.1.0 发布说明](history/release-1.1.0.md)。
-
-# VibeFlow 1.0.2
-
-恢复普通 process 分发与多前驱 all 回收节点的双圆默认图形。识别只读取正常调度边，在共享展示级联中实现，保留 Node 和调用级形状覆盖；没有恢复旧任务管理类型。Python、JavaScript 的 Architecture、Mermaid 及真实 SVG 回归验证这两种图形。此修复进入 1.0.2；1.0.1 历史资产保持原样。ABI、运行和并发容量规则不变，从 1.0.1 升级只需重新生成 Architecture 和 SVG。详见 [1.0.2 发布说明](history/release-1.0.2.md)。
-
-# VibeFlow 1.0.1
-
-普通图调度统一承载并发，分发与 all 汇合分离，取消与真实清理由运行器持有。删除独立任务图、控制器及旧全局线程池配置；分发节点使用 `config.max_concurrency` 设置局部容量，默认 8，结束一个补入一个。Workflow ABI v8，旧配置与构建产物须迁移重建。详见[普通图并发](../../distribution/docs/user/graph-concurrency.md)。
-
-沙箱验收同时发现并修复 CLI 标准流的收尾竞争：读取轮询超时与最终 flush 之间到达的数据，在收到结束标志后仍须排空。确定性回归覆盖最后一批 stdout/stderr 的转发与业务日志记录。
-
-回收兼分发的禁止规则现由两 Target 共用的 join 检查报告错误，公开验证和构建均拒绝，原 mainline review 警告路径已删除。两端沙箱固定验证该错误、断路拒绝、默认 8 与容量 4 的实际峰值、清理后即时补位和 AOT 重复执行；JS 覆盖真实 Chromium。本版亦包含 HTTP 渲染资源边界、子进程收尾及部分观察记录保存的修复。完整变更、迁移和发行验收见 [1.0.1 发布说明](history/release-1.0.1.md)。
-
 # 发行与文档装配
 
-此处记录的 1.1.2 发行提供 collaborative 与 autonomous 两个开发包。两者共享 Core、机器 policy、最小 Python/JavaScript 项目、Workflow ABI v8 和 AOT manifest v3。并发升级见[普通图并发迁移](../../distribution/docs/user/graph-concurrency.md#从旧任务接口迁移)，更早资源接口迁移见 [统一资源迁移](../../distribution/docs/user/rule-system-migration.md)。完整仓库验收的双 profile smoke 在隔离目录构建，不自动覆盖历史发行包。
-
-此前 1.0.0 统一 Block Compiler，并新增 Python 目录 AOT：计划 ABI v7、构建 manifest v3。旧计划需重新构建；历史发行资产保持原字节。实施与完整验收见[双语言 AOT 与维护整理记录](history/aot-unification-implementation.md)，历史变更与发行验证见[1.0.0 发布说明](history/release-1.0.0.md)。
-
-0.20.0 将任务等待改为一次结果交付：接收后任务卡自动回收，结果由父流程保存和转交；旧重复等待和停止已消费引用的代码须迁移。Workflow ABI 仍为 v6，配置形状不变。该接口现已删除，迁移见[普通图并发](../../distribution/docs/user/graph-concurrency.md)，开发、全量验收与构建见[本轮记录](history/task-result-delivery-20261014.md)。
-
-GitHub 0.20.0 更新日志以此前正式分发版本 v0.18.3 为基线，覆盖本地 0.19.x 与 0.20.0 的 Git 历史，见[中英文发布说明](history/release-0.20.0.md)。
-
-0.19.1 修复跨 root 独立 Nodeset 源码审查遗漏 BaseLib 归属的问题，保持 planned 调用与真正未登记导入的检查行为。修复与验证见[复现及修复记录](history/task-ownership-reproduction-20261014.md)。
-
-0.19.0 引入原生任务管理与 Workflow ABI v6：管理 Node 使用声明目标启动任务，普通 TaskRef 数组可沿数据连边传递，停止请求与实际退出分开，workflow 在所属执行与清理完成后才退出。JS 使用事件循环，Python 使用线程与完成通知。旧 `async/result_key/detached` 入口须显式迁移，没有自动转换层；迁移后重新生成 Architecture、计划与构建产物。当前迁移见[普通图并发](../../distribution/docs/user/graph-concurrency.md)，开发和全量验收见[实施记录](history/task-management-implementation-20261014.md)。
-
-0.19.0 两种本地发布包及实际 ZIP 解压验证见[构建记录](history/release-0.19.0.md)。
-
-0.18.3 汇总条件边保留、嵌套插件配置导出及相关规则修复，并加入永久沙箱与运行回归。只读 JSON 的冻结与副本转换统一由独立公共模块提供；配置语法与 Workflow ABI 保持不变。具体修复见下文。
-
-GitHub 发布说明按上一正式 Release v0.13.2 的 Git 历史整理，见 [0.18.3 中英文更新说明](history/release-0.18.3.md)。
-
-0.18.2 将内置 Rule、Ruleset 与 Node 声明按语言归入 `targets/<language>/rules/`、`rulesets/` 和 `nodetypes/`；图检查与节点源码检查分开保存。Core 保留通用规则机制，共享检查算法归入 Target 共享支持层，现有规则标识、默认选择和公共 SDK 行为保持不变。仓库独立自检工具迁至 `repo_check/`，与产品质量检查入口区分；同步更新构建器对独立 JavaScript SDK 的 Node 声明资源装配。
-
-0.18.2 修复包按节点首次引用顺序构造规则检查的 Nodeset 边界，消除跨进程哈希随机化造成的 planned 诊断与 events 排列变化，避免未修改的 Architecture 被误报过期。两种 profile 的 ZIP 回归覆盖不同 `PYTHONHASHSEED` 下立即检查通过、完整文档逐字节一致，以及真实 workflow 改动仍能检出。
-
-同版本修复 JavaScript `python_io` 动态宿主槽读取的误报，并统一数据规则对初始输入的资格判断：按调度边识别空起点，不再遗漏纯控制边。多来源数据与混合 `safe_any` 汇合共用完整调度路径的互斥判断；中间节点不再丢失祖先条件，存在旁路、重叠条件或无法证明的跨字段关系时仍保留冲突诊断。拓扑、汇合、运行输入和路径条件算法按职责拆分，公开 Rule 标识与选择方式不变，未修改 Core 调度语义。
-
-后续条件边修复将 Core 去重收窄为完整 `EdgeSpec` 相等：不合成条件、不合并角色、不推断条件等价。同端点的不同声明完整进入计划，各自保留调度与传输权限；Python 数据投递直接遍历传输路线，不再借用同端点调度路线的条件或权限。供数与汇合按前驱节点统计，重复声明诊断与 Core 精确去重保持一致，不再把不同条件诊断为 `GRAPH.EDGE.CONFLICTING_DUPLICATE`，不同角色也不再触发旧的合并冲突。公开配置语法和 ABI 不变。
-
-嵌套插件配置修复将只读 JSON 与普通 JSON 副本的双向转换归入独立公共模块 `vibeflow.core.descriptors.json_values`，所有声明与插件配置调用统一入口。Python 资源导出递归转换配置、选择和展示字段，避免内层 mappingproxy 泄漏到 `compiled_graph.json`，导致公开运行入口在业务 Node 执行前失败。转换保留配置结构和值，运行时仍保持只读，原 `DescriptorModelError` 公开入口及校验规则保留。回归覆盖 plan/compiled/block、默认与覆盖值、空对象、对象数组及副本隔离。
-
-0.18.1 将 Python 与 JavaScript 的事实视图身份管理抽为共享模块，拆分语言事实适配、分析服务和检查会话职责，移除规则调用中的重复身份计算。Python 固定输入验证显示耗时改善；JavaScript 已消除重复摘要，但尚未证明稳定的端到端提速。同步完善仓库目录说明与文档导航；构建时排除带维护者标记的目录 README，保留发行用户指南。
-
-0.15.2 包含用户项目 SVG 展示边界修正：资源目录只展示当前 workflow 使用的 Plugin、BaseLib、Host 等条目，恢复旧版横竖布局，移除内部定义、源码文件和 reference 的 SVG 投影。变更与源码回归见 [展示边界记录](history/user-svg-boundary-20261006.md)，本版归档与隔离验收见 [0.15.2 构建记录](evidence/index.md#artifact-89ba4710b187715e)。
-
-[0.15.1 修复构建记录](evidence/index.md#artifact-31e3261df1859ff8)与[首次构建验收](evidence/index.md#artifact-4a550cca6daaf3aa)保留历史哈希，初始包位于 `archive/history/0.15.1-initial-20261006/`。
+当前分发版本为 1.3.2，Workflow/AOT/Plugin ABI 为 10/4/4。此版修复跨 root 复用 Node 时继承方法的源码解析，以及 Python AOT 的项目目录关系与插件导出类加载来源；包含此前 project/root 治理政策统一迁移。既有 1.3.0、1.3.1 ZIP 保留原始字节，ABI 不变。两个 profile 使用下述工具构建；正式发布需验证解压运行、wheel、sdist 与完整门禁，禁止同名覆盖既有 ZIP。
 
 ## Profile 配置
 
 `distribution/profiles.jsonc` 是 profile 的唯一配置源，schema 为 `vibeflow.distribution-profiles.v1`。路径使用仓库相对形式：prompt 来自 `distribution/prompts/`，发行正文来自 `distribution/docs/overview.md` 与 `distribution/docs/user/`。
 
-公共文档集进入两个包，每个包选择自己的 profile 协议。发行正文面向业务项目开发者和 AI；内核设计、仓库验证及历史证据保留在开发目录。
+公共文档集进入两个包，每个包选择自己的 profile 协议。发行正文面向业务项目开发者和 AI；内核设计、仓库验证及当前维护规范保留在开发目录。
 
 ## 构建
 
@@ -101,6 +39,6 @@ python distribution/build.py --profile autonomous --output-dir /tmp/vf-autonomou
 
 运行观测接口的业务用法集中在 `distribution/docs/user/runtime-observation.md`，Python 与 JS/TS 开发手册在完整 Node 示例中展示更新调用。公共提示词交代调用位置、完整数组替换和发布时机，两个 profile 共用该片段。修订后从生成 ZIP 解压包运行这些示例，确认公开 SDK、业务输出与最终状态资料一致；结果保留在对应开发验收记录。
 
-修改 canonical 文档及 prompt fragments 后重新构建两个 profile，发布目录和 ZIP 中的文档、AGENTS 与清单随构建更新。验收报告中的归档哈希对应当次构建；后续文档修订产生新的归档哈希，历史报告保留原构建记录。
+修改 canonical 文档及 prompt fragments 后重新构建两个 profile，发布目录和 ZIP 中的文档、AGENTS 与清单随构建更新。验收报告中的归档哈希对应当次构建；后续文档修订产生新的归档哈希，历史字节保存在版本 ZIP 中，代码和文档变化由 Git 追溯。
 
 目录与证据保留约定见 [目录职责](directory-layout.md)。

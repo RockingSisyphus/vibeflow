@@ -31,34 +31,36 @@ def discover_resources(directory, *, source_roots=(), syntax_cache=None, namespa
     return _discover(directory, source_namespace(directory, namespaces=namespaces, source_roots=source_roots), source_roots, syntax_cache)
 
 
+def discover_file_resources(path, namespace, *, syntax_cache=None):
+    """Read one declaration file in its existing operation-owned namespace."""
+    if not declares_resources(path, syntax_cache=syntax_cache):
+        return ()
+    try:
+        module = namespace.load(path)
+    except (ValueError, TypeError) as error:
+        if not getattr(error, "location", None):
+            import traceback
+            frames = [frame for frame in traceback.extract_tb(error.__traceback__)
+                      if Path(frame.filename).resolve() == path]
+            error.location = {"path": str(path), **({"line":frames[-1].lineno} if frames else {})}
+        raise
+    seen, found = set(), []
+    for value in vars(module).values():
+        resource = value if isinstance(value, ResourceDefinition) else getattr(value, "__vibeflow_resource__", None)
+        if not isinstance(resource, ResourceDefinition) or id(resource) in seen:
+            continue
+        seen.add(id(resource))
+        if Path(resource.path).resolve() == path:
+            found.append(resource)
+    return tuple(found)
+
+
 def _discover(directory, namespace, source_roots, syntax_cache):
     found = []
     with source_paths(source_roots):
         for group, kind in (("nodes", "node"), ("base_lib", "base_lib")):
             for path in sorted((directory / group).rglob("*.py")):
-                if not declares_resources(path, syntax_cache=syntax_cache):
-                    continue
-                try:
-                    module = namespace.load(path)
-                except (ValueError, TypeError) as error:
-                    if not getattr(error, "location", None):
-                        import traceback
-                        frames = [frame for frame in traceback.extract_tb(error.__traceback__)
-                                  if Path(frame.filename).resolve() == path]
-                        error.location = {"path": str(path), **({"line":frames[-1].lineno} if frames else {})}
-                    raise
-                seen = set()
-                for value in vars(module).values():
-                    resource = value if isinstance(value, ResourceDefinition) else getattr(value, "__vibeflow_resource__", None)
-                    if not isinstance(resource, ResourceDefinition) or id(resource) in seen:
-                        continue
-                    seen.add(id(resource))
-                    if Path(resource.path).resolve() != path:
-                        continue
-                    from vibeflow.core.descriptors.contributions import resource_kind
-                    actual = resource_kind(resource.descriptor)
-                    if actual != kind:
-                        raise ValueError(f"{path}: {actual} declarations cannot be placed in {group}/")
+                for resource in discover_file_resources(path, namespace, syntax_cache=syntax_cache):
                     found.append(resource)
     import sys
     from vibeflow.core.descriptors.declarations import ResourceDiscovery

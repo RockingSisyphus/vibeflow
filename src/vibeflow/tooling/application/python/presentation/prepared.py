@@ -158,7 +158,7 @@ def _implementation_source_records(registry, graph, sources, *, source_config_av
                 if fact.path not in collected:
                     collected[fact.path] = PythonSourceFile(fact.path, fact.module_name, fact.source, "",
                         fact._tree, fact.parse_error, fact.parse_line, fact.parse_column)
-    resolved = sources if len(collected) == len(sources.files) else build_python_source_context((), collected.values())
+    resolved = sources if len(collected) == len(sources.files) else build_python_source_context((), collected.values(), source_roots=registry.source_roots)
     import sys
     loaded_paths = {str(Path(filename).resolve()) for module in tuple(sys.modules.values())
                     if isinstance(filename := getattr(module, "__file__", None), str)}

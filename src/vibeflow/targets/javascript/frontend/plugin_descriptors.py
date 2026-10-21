@@ -340,15 +340,6 @@ def _javascript_source_ref(
             if candidate.is_absolute()
             else (root / candidate).resolve()
         )
-        try:
-            if not any(resolved.is_relative_to(Path(value)) for value in (str(root), *source_roots)):
-                raise ValueError("outside selected roots")
-        except ValueError as exc:
-            raise JavascriptPluginError(
-                "VF_AOT_PLUGIN_SOURCE",
-                f"plugin '{plugin_id}' source escapes project root: {ref}",
-                plugin_id,
-            ) from exc
         ref = str(resolved)
     return SourceRef(kind=source.kind, ref=ref, export=source.export or "")
 

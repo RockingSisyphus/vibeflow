@@ -314,8 +314,6 @@ def _observe(case: Case, root: Path, workspace: Path, config: Path, source: Path
     from vibeflow.targets.javascript.build.plugin_session import JavascriptPluginSession
     if variant == "baseline":
         from vibeflow.targets.javascript.quality.source import scan_javascript_quality
-    else:
-        from vibeflow.tooling.application.javascript.quality_scan import scan_javascript_quality
     worker_metrics: dict[str, Any] = {}
     try:
         if case.entrypoint == 'quality-cli':
@@ -338,12 +336,26 @@ def _observe(case: Case, root: Path, workspace: Path, config: Path, source: Path
                 session.open('parity', plugin={'id': 'parity.plugin', 'type': 'runtime', 'module': str(source), 'export': 'createPlugin', 'completion': case.completion, 'config': {}, **({'rulesets': ['vibeflow.plugin']} if 'rulesets' in json.loads(definition(root, variant, 'plugin', 'parity.plugin', 'plugins/runtime.jsonc').read_text()) else {})}, package_root=root, target='node', workflow_id='parity')
             return _actual('PASS', [], metrics=worker_metrics)
         if case.entrypoint == 'quality':
-            report = scan_javascript_quality(source, package_root=root)
-            rows = [item.to_dict() for item in report.findings]
-            file = report.files[0] if report.files else None
-            metrics = {'files': len(report.files), **({'lines': file.lines, 'bytes': file.bytes, 'function_count': file.function_count, 'branch_count': file.branch_count,
+            if variant == 'baseline':
+                report = scan_javascript_quality(source, package_root=root)
+                rows = [item.to_dict() for item in report.findings]
+                files, status = report.files, report.status
+            else:
+                from vibeflow.tooling.project.preparation import ProjectPreparation
+                from vibeflow.tooling.project.workspace_loader import load_workspace_config
+                # Numeric/source cases select ordinary root Rules explicitly.
+                (root/'root_rules.jsonc').write_text(json.dumps({'rulesets':[
+                    {'rule_id':'vibeflow.root.files'}, {'rule_id':'vibeflow.root.duplicates'}]}))
+                preparation = ProjectPreparation(load_workspace_config(workspace))
+                report = preparation.review()
+                rows = [item.to_dict() for item in report.findings]
+                files = tuple(item for item in preparation.source_facts(preparation.workspace.root_for_path(source)).files
+                              if (root/item.path).resolve() == source.resolve())
+                status = 'FAIL' if any(item['severity']=='error' for item in rows) else 'CONCERNS' if rows else 'PASS'
+            file = files[0] if files else None
+            metrics = {'files': len(files), **({'lines': file.lines, 'bytes': file.bytes, 'function_count': file.function_count, 'branch_count': file.branch_count,
                         'first_function_params': file.functions[0].param_count if file.functions else 0} if file is not None else {})}
-            return _actual(report.status, rows, metrics=metrics)
+            return _actual(status, rows, metrics=metrics)
         if case.entrypoint == 'audit':
             result = audit_javascript_project(JavascriptAuditRequest(workspace=workspace, config=config))
             return _actual('CONCERNS' if result.warnings else 'PASS', list(result.warnings), metrics={'source_files': len(result.source_files)})
@@ -378,7 +390,6 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         actual = _observe(case, root, workspace, config, source, variant=variant)
         code = case.current_code if variant == 'current' and case.current_code is not None else case.code
         if variant=='current' and case.id=='js.node.package-root':code='VF_IMPORT_OWNER'
-        if variant=='current' and case.id=='js.plugin.node-import':code='DESCRIPTOR.INVALID'
         if variant == 'current' and case.id in {'js.node.recursive-helper', 'js.base.nondeterministic', 'js.node.dynamic-code'}:
             code = ''  # B04/B06/B07: preserve the baseline, retire current default inference.
         severity = 'warning' if case.id == 'js.quality.function-duplicate' else 'error'
