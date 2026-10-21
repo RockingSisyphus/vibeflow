@@ -22,7 +22,7 @@ def _provides(key, type_key=None):
 
 
 def _call(node_id, type_key, **options):
-    return {"id": node_id, "type_used": type_key, "display_name": node_id,
+    return {"id": node_id, "definition_id": type_key, "display_name": node_id,
             "description": "A real scheduled workflow call.", **options}
 
 
@@ -57,7 +57,7 @@ export function increment(inputs) { return {"loop.next": inputs["loop.current"].
         ("fixture.mainline", "process", [_requires("number.in")], [_provides("mainline.answer", "number.mainline")], "mainline"),
         ("fixture.increment", "process", [_requires("loop.current")], [_provides("loop.next")], "increment"),
     ):
-        resources.append({"kind": "node", "type_key": key, "display_name": key,
+        resources.append({'node_type': 'vibeflow.node', "kind": "node", 'id': key, "display_name": key,
             "description": "A declared immediate JavaScript implementation.", "version": "1", "flow_kind": flow,
             "rulesets": [], "contract": {"requires": requires, "provides": provides,
                 "input_semantics": {item["type"]: ["Numeric input."] for item in requires},
@@ -67,7 +67,7 @@ export function increment(inputs) { return {"loop.next": inputs["loop.current"].
     input_type, output_type = ("number.in", "number.out") if kind=="nodeset" else ("loop.current", "loop.final")
     selection = write_plugin(project, resources, target="javascript")
     project_config = project / "vibeflow_project.jsonc"
-    project_config.write_text(json.dumps({"project_target": "javascript", "quality_enabled": False,
+    project_config.write_text(json.dumps({"project_target": "javascript",
                                         "javascript": {"package_root": "."}}))
     workspace = tmp_path / "vibeflow_config.jsonc"
     workspace.write_text(json.dumps({"roots": [{"id": "project", "path": "project"}]}))

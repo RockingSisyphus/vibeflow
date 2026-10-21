@@ -10,8 +10,8 @@ def audit(project, *, hidden=False):
     nodes = browser["nodes"]
     titles = [item["title"] for item in browser["fragments"]]
     failures = []
-    expected = ["main pipeline", "plugins", "base_lib", "host_extensions", "capabilities"]
-    if titles[:5] != expected:
+    expected = ["main pipeline", "plugins", "base_lib"]
+    if titles[:3] != expected:
         failures.append("browser resource columns lost their declared order")
     if browser["root"] != "flowchart-review-columns" or not nodes:
         failures.append("browser did not render the formal SVG")
@@ -19,7 +19,6 @@ def audit(project, *, hidden=False):
         failures.append("browser observed invisible node geometry")
     for title, identity, fill, shape in (
         ("base_lib", "id: demo.math", "rgb(200, 228, 255)", "path"),
-        ("host_extensions", "id: demo.host", "rgb(255, 217, 187)", "polygon"),
         ("plugins", "id: demo", "rgb(236, 212, 255)", "path"),
     ):
         matches = [item for item in nodes if item["fragments"] == [title] and identity in item["text"] ]

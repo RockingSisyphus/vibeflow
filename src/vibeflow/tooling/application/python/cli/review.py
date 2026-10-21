@@ -48,6 +48,8 @@ class _ReviewRunner:
         self.preview_record = None
         self.preview_root = preview_root
         self.result = _review_result(config_path=config_path, output_path=output_path)
+        self.preparation = None
+        self.governance = None
         self.workspace = None
         self.root = None
         self.spec = None
@@ -82,6 +84,15 @@ class _ReviewRunner:
 
         try:
             self.workspace = load_workspace_config(self.workspace_path)
+            selected_root = self.workspace.root_for_path(self.config_path)
+            if selected_root is not None and selected_root.project_target != "python":
+                raise WorkspaceConfigError("CLI.PROJECT_TARGET.MISMATCH",
+                    f"Python review requires project_target='python'; root '{selected_root.id}' declares '{selected_root.project_target}'",
+                    {"path": str(self.config_path)})
+            from vibeflow.tooling.project.preparation import ProjectPreparation
+            self.preparation = ProjectPreparation(self.workspace)
+            self.governance = self.preparation.review(write_architecture=True)
+            self.result["project_architecture"] = str(self.governance.architecture_path)
             if self.output_path is None:
                 self.output_path = Path(self.preview_root or self.workspace.root).resolve() / "vibeflow-preview.html"
                 self.result.update(output=str(self.output_path), svg=None)
@@ -172,6 +183,7 @@ class _ReviewRunner:
                 workspace=self.workspace,
                 validate_health=True,
                 _include_presentation=True,
+                preparation=self.preparation, governance=self.governance,
             )
         except Exception as exc:
             finding = _review_finding(

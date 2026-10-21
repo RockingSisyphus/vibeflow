@@ -14,7 +14,7 @@ from vibeflow.targets.javascript.frontend.errors import AotPlanError
 
 def _plan(schema: object) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "schema-fail-closed",
         "schemas": {"value.in": schema},
         "inputs": [
@@ -68,7 +68,7 @@ def test_low_level_builder_rejects_lossy_integer_params_before_toolchain(
     plan["nodes"] = [
         {
             "id": "value",
-            "type_used": "example.value",
+            "definition_id": "example.value",
             "params": {"value": 9_007_199_254_740_992},
             "requires": [],
             "provides": [],

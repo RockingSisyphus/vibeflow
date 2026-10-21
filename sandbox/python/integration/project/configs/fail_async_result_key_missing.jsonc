@@ -3,13 +3,13 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.start",
+        "definition_id": "sandbox.start",
         "display_name": "Start",
         "description": "Starts the invalid result_key fixture."
       },
       {
         "id": "invalid",
-        "type_used": "sandbox.constant",
+        "definition_id": "sandbox.constant",
         "display_name": "Invalid async result key",
         "description": "Declares a result_key that is absent from provides.",
         "async": "result_key",
@@ -20,7 +20,7 @@
       },
       {
         "id": "end",
-        "type_used": "sandbox.final_value_end",
+        "definition_id": "sandbox.final_value_end",
         "display_name": "End",
         "description": "Would end the invalid result_key fixture."
       }
@@ -40,7 +40,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

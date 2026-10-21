@@ -12,38 +12,38 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts both the data source and control-delay branches."
       },
       {
         "id": "seed",
-        "type_used": "sandbox.fanout_add",
+        "definition_id": "sandbox.fanout_add",
         "display_name": "Seed payload",
         "description": "Adds one to x and transfers the result without scheduling the consumer."
       },
       {
         "id": "delay",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Control delay",
         "description": "Keeps the consumer off the schedule until the poison node runs."
       },
       {
         "id": "poison",
-        "type_used": "sandbox.edge_poison",
+        "definition_id": "sandbox.edge_poison",
         "display_name": "Produce sentinel",
         "description": "Produces a same-typed sentinel that must not reach the consumer.",
         "value": 999
       },
       {
         "id": "consume",
-        "type_used": "sandbox.edge_consume",
+        "definition_id": "sandbox.edge_consume",
         "display_name": "Consume transferred payload",
         "description": "Runs only after poison schedules it, then doubles the seed payload."
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends after the consumer result is available."
       }
@@ -89,7 +89,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

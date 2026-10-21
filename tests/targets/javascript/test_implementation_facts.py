@@ -8,7 +8,7 @@ from vibeflow.block_compiler import compile_graph_plan
 from vibeflow.core.compiler import compile_core
 from vibeflow.core.contracts import DataProvider
 from vibeflow.core.descriptors import NodeCatalog, NodeDescriptor
-from vibeflow.core.flow import GraphConfig, NodeSpec, EdgeSpec
+from vibeflow.core.flow import GraphConfig, NodeCallSpec, EdgeSpec
 from vibeflow.core.models import CoreCompileRequest, ImplementationFact, ImplementationFacts, TargetFeatureSet
 from vibeflow.targets.javascript.frontend.facts import (
     implementation_facts_from_catalog,
@@ -22,9 +22,9 @@ from vibeflow.core.descriptors.decode import decode_resource as parse_descriptor
 
 def _descriptor(*, completion: str = "immediate") -> NodeDescriptor:
     parsed = parse_descriptor_manifest(
-        {
+        {'node_type': 'vibeflow.node',
             "kind": "node",
-            "type_key": "demo.fetch",
+            'id': "demo.fetch",
             "display_name": "Fetch",
 
             "description": "Fetch one value.",
@@ -61,7 +61,7 @@ def test_javascript_descriptors_supply_core_execution_facts() -> None:
 
     assert facts.strict is True
     assert facts.get("demo.fetch").to_dict() == {
-        "type_key": "demo.fetch",
+        "definition_id": "demo.fetch",
         "flow_kind": "terminal",
         "effect_scope": "unconstrained",
         "completion": "suspend",
@@ -94,7 +94,7 @@ def test_javascript_ordinary_call_scheduling_uses_target_facts(suspend, neutral)
     catalog = NodeCatalog((descriptor,))
     facts = (target_neutral_implementation_facts_from_catalog(catalog) if neutral
              else implementation_facts_from_catalog(catalog,target="browser"))
-    graph = GraphConfig(nodes=(NodeSpec("fetch","demo.fetch"),),entry_mode="async" if suspend else "sync")
+    graph = GraphConfig(nodes=(NodeCallSpec("fetch","demo.fetch"),),entry_mode="async" if suspend else "sync")
     features = TargetFeatureSet(target="browser")
     compilation = compile_core(CoreCompileRequest(graph=graph,implementation_facts=facts,target_features=features))
     plan = compile_graph_plan(compilation.workflow.graph,compilation.compiled_graph,

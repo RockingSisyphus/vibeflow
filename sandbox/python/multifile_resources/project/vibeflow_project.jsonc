@@ -1,0 +1,11 @@
+{
+  "project_target": "python",
+  "architecture": {
+    "documents": [
+      {
+        "workflow": "configs/workflow.jsonc",
+        "document": "ARCHITECTURE.jsonc"
+      }
+    ]
+  }
+}

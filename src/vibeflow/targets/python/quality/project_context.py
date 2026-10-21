@@ -4,7 +4,7 @@ from dataclasses import replace
 import os
 from pathlib import PurePath
 
-from vibeflow.targets.shared.quality_support import ImportSite, ProjectQualityFacts, QualityPolicy, QualityThresholds
+from vibeflow.targets.shared.quality_support import ImportSite, SourceQualityFacts, QualityPolicy, QualityThresholds
 from vibeflow.targets.python.quality.source import PythonSource, analyze_python_source_tree, _syntax_error
 
 
@@ -26,7 +26,7 @@ def source_context_quality_facts(source_context):
             relative,import_.line,import_.column) for import_ in source_context.imports if import_.path == item.path)
         files.append(replace(result.file,imports=tuple(sorted({site.imported for site in sites})),import_sites=sites))
         findings.extend(result.findings)
-    return ProjectQualityFacts(str(root),tuple(files),tuple(findings))
+    return SourceQualityFacts(str(root),tuple(files),tuple(findings))
 
 
 def source_quality_policy(purity_policy=None):
@@ -45,8 +45,8 @@ def source_quality_policy(purity_policy=None):
 
 def project_rule_facts(plan,source_context,cache, *, handlers):
     from inspect import unwrap
-    from vibeflow.targets.python.rules.project import project_quality_handlers
-    native = tuple(project_quality_handlers().values())
+    from vibeflow.targets.python.rules.source_quality import source_quality_handlers
+    native = tuple(source_quality_handlers().values())
     def needs_facts(invocation):
         handler = handlers.get(invocation.rule.handler or invocation.rule.id, handlers.get(invocation.rule.id))
         return callable(handler) and any(unwrap(handler) is check for check in native)
@@ -56,7 +56,7 @@ def project_rule_facts(plan,source_context,cache, *, handlers):
     key = fact_key(tuple((item.path, item.text) for item in source_context.files))
     if key not in cache:
         cache[key] = source_context_quality_facts(source_context)
-    return {"project_facts":cache[key]}
+    return {"source_quality":cache[key]}
 
 
 __all__ = ["source_context_quality_facts","source_quality_policy"]

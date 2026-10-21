@@ -82,7 +82,7 @@ def test_implemented_static_plugin_architecture_uses_only_review_facts(
     assert resource["targets"] == ["python"]
     assert resource["config"] == {"label": "selected", "mode": "audit"}
     assert "implementation" not in resource
-    assert resource["module"] == "plugins.runtime_audit"
+    assert resource["module"] == "plugin"
     assert resource["class"] == "runtime"
 
     document = build_architecture_document(
@@ -95,8 +95,8 @@ def test_implemented_static_plugin_architecture_uses_only_review_facts(
     assert plugin["targets"] == ["python"]
     assert plugin["config"] == {"label": "selected", "mode": "audit"}
     assert plugin["priority"] == 20
-    assert plugin["module"] == "plugins.runtime_audit" and plugin["class"] == "runtime"
-    assert "plugins/runtime_audit.py" in json.dumps(document)
+    assert plugin["module"] == "plugin" and plugin["class"] == "runtime"
+    assert "plugins/runtime_audit/plugin.py" in json.dumps(document)
 
 
 def test_planned_static_plugin_marks_workspace_and_payload_not_production_ready(
@@ -172,16 +172,16 @@ def _write_plugin_workspace(
     configs.mkdir(parents=True)
     workspace_path = repository / "vibeflow_config.jsonc"
     workflow_path = configs / "main.jsonc"
-    workspace_path.write_text(json.dumps({"policy": {}, "roots": [{"id": "project", "path": "project"}]}))
-    (project / "vibeflow_project.jsonc").write_text(json.dumps({"project_target": "python", "quality_enabled": False}))
+    workspace_path.write_text(json.dumps({"roots": [{"id": "project", "path": "project"}]}))
+    (project / "vibeflow_project.jsonc").write_text(json.dumps({"project_target": "python"}))
     node_selection = write_node_plugin(project, [("test.start", "StartNode", {}, {}),
         ("test.seed", "SeedNode", {"value": {"type": "number"}}, {"value": 1}),
         ("test.add", "AddNode", {"delta": {"type": "number"}}, {"delta": 1}),
         ("test.out_end", "OutEndNode", {}, {})])
-    source_path = project / "plugins/runtime_audit.py"
-    source_path.parent.mkdir()
+    source_path = project / "plugins/runtime_audit/plugin.py"
+    source_path.parent.mkdir(parents=True,exist_ok=True)
     source_path.write_text('from vibeflow.targets.python.sdk import Plugin\ndef runtime(context):\n    raise AssertionError("runtime factory invoked during review")\nplugin = Plugin(id="demo.runtime_audit", runtime=runtime, priority=20, display_name="Runtime Audit", description="Audits one invocation", config_schema={"type":"object","properties":{"mode":{"type":"string"},"label":{"type":"string"}}},config_defaults={"mode":"audit"})\n')
-    plugins = [node_selection, {"source": {"kind": "file", "ref": "plugins/runtime_audit.py", "export": "plugin"}, "config": {"label": "selected"}}]
+    plugins = [node_selection, {"source": {"kind": "file", "ref": "plugins/runtime_audit/plugin.py", "export": "plugin"}, "config": {"label": "selected"}}]
     if include_planned:
         plugins.append({"id": "demo.future_compiler", "status": "planned", "type": "compiler",
             "targets": ["browser"], "config": {"phase": "future"}, "display_name": "Future Compiler",

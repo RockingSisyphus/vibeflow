@@ -11,13 +11,13 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts the controlled output failure workflow."
       },
       {
         "id": "invalid",
-        "type_used": "sandbox.runtime_failure",
+        "definition_id": "sandbox.runtime_failure",
         "display_name": "Return invalid output",
         "description": "Returns a value that violates the declared numeric Schema.",
         "config": {
@@ -26,7 +26,7 @@
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Must not run after output validation fails."
       }
@@ -54,7 +54,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

@@ -82,8 +82,8 @@ def test_aot_selects_saved_entry_without_compilation(tmp_path, monkeypatch, exec
     data = json.loads(config.read_text())
     pipeline = data["pipeline"]
     pipeline["nodes"].extend([
-        {"id": "gui", "type_used": "demo.start", "display_name": "GUI", "description": "GUI entry"},
-        {"id": "end", "type_used": "demo.start", "display_name": "End", "description": "Finish"}])
+        {"id": "gui", "definition_id": "demo.start", "display_name": "GUI", "description": "GUI entry"},
+        {"id": "end", "definition_id": "demo.start", "display_name": "End", "description": "Finish"}])
     pipeline["edges"].extend([["gui", "demo"], ["demo", "end"]])
     pipeline["entries"] = {"cli": {"start": "start"}, "gui": {"start": "gui"}}
     config.write_text(json.dumps(data))
@@ -109,24 +109,25 @@ def test_entry_specific_contracts_and_duplicate_preprocessing_provider(tmp_path,
     from tests.targets.python.test_code_plugins import project
     from vibeflow.tooling.application.python.workspace_service import run_workspace_checked
     source = '''from vibeflow.targets.python.sdk import Plugin,node,data_schema
-@node(type_key="boundary",flow_kind="terminal",contract={},rulesets=["vibeflow.process"])
+@node(node_type='vibeflow.node', id="boundary",flow_kind="terminal",contract={},rulesets=["vibeflow.process"])
 class Boundary:
     def run_pure(self,inputs,params):return {}
-@node(type_key="cli",rulesets=["vibeflow.process"],contract={"requires":[{"type":"cli.text","cardinality":"exactly_one","display_name":"Text"}],"provides":[{"key":"seed","type":"seed.value","display_name":"Seed"}],"input_semantics":{"cli.text":["CLI number"]},"output_semantics":{"seed":["Parsed value"]}})
+@node(node_type='vibeflow.node', id="cli",rulesets=["vibeflow.process"],contract={"requires":[{"type":"cli.text","cardinality":"exactly_one","display_name":"Text"}],"provides":[{"key":"seed","type":"seed.value","display_name":"Seed"}],"input_semantics":{"cli.text":["CLI number"]},"output_semantics":{"seed":["Parsed value"]}})
 class Cli:
     def run_pure(self,inputs,params):return {"seed":int(inputs["cli.text"]["value"])}
-@node(type_key="gui",rulesets=["vibeflow.process"],contract={"requires":[{"type":"gui.number","cardinality":"exactly_one","display_name":"Value"}],"provides":[{"key":"seed","type":"seed.value","display_name":"Seed"}],"input_semantics":{"gui.number":["GUI number"]},"output_semantics":{"seed":["Numeric value"]}})
+@node(node_type='vibeflow.node', id="gui",rulesets=["vibeflow.process"],contract={"requires":[{"type":"gui.number","cardinality":"exactly_one","display_name":"Value"}],"provides":[{"key":"seed","type":"seed.value","display_name":"Seed"}],"input_semantics":{"gui.number":["GUI number"]},"output_semantics":{"seed":["Numeric value"]}})
 class Gui:
     def run_pure(self,inputs,params):return {"seed":inputs["gui.number"]["value"]}
-@node(type_key="core",rulesets=["vibeflow.process"],contract={"requires":[{"type":"seed.value","cardinality":"exactly_one","display_name":"Seed"}],"provides":[{"key":"answer","type":"number","display_name":"Answer"}],"input_semantics":{"seed.value":["Preprocessed value"]},"output_semantics":{"answer":["Doubled value"]}})
+@node(node_type='vibeflow.node', id="core",rulesets=["vibeflow.process"],contract={"requires":[{"type":"seed.value","cardinality":"exactly_one","display_name":"Seed"}],"provides":[{"key":"answer","type":"number","display_name":"Answer"}],"input_semantics":{"seed.value":["Preprocessed value"]},"output_semantics":{"answer":["Doubled value"]}})
 class Core:
     def run_pure(self,inputs,params):return {"answer":inputs["seed.value"]["value"]*2}
-plugin=Plugin(id="contracts",resources=[Boundary,Cli,Gui,Core,*[data_schema(type_key=k,schema={"type":t}) for k,t in [("cli.text","string"),("gui.number","number"),("seed.value","number"),("number","number")]]])
+plugin=Plugin(id="contracts",resources=[*[data_schema(type_key=k,schema={"type":t}) for k,t in [("cli.text","string"),("gui.number","number"),("seed.value","number"),("number","number")]]])
 '''
-    workspace, config = project(tmp_path, source)
+    nodes, resources = source.split("plugin=", 1)
+    workspace, config = project(tmp_path, nodes, plugin_source="from vibeflow.targets.python.sdk import Plugin,data_schema\nplugin=" + resources)
     data = json.loads(config.read_text())
     data["rulesets"] = ["vibeflow.workflow"]
-    data["pipeline"] = {"nodes": [{"id": key, "type_used": kind, "display_name": key, "description": key}
+    data["pipeline"] = {"nodes": [{"id": key, "definition_id": kind, "display_name": key, "description": key}
         for key,kind in [("cli_start","boundary"),("gui_start","boundary"),("cli","cli"),("gui","gui"),("core","core"),("end","boundary")]],
         "edges": [["cli_start","cli"],["gui_start","gui"],["cli","core"],["gui","core"],["core","end"]],
         "entries": {name: {"start":name+"_start",
@@ -148,25 +149,24 @@ plugin=Plugin(id="contracts",resources=[Boundary,Cli,Gui,Core,*[data_schema(type
 def _partly_planned_project(root, kind):
     from tests.targets.python.test_code_plugins import project
     source = '''from vibeflow.targets.python.sdk import Plugin,node
-@node(type_key="boundary",flow_kind="terminal",contract={},rulesets=["vibeflow.process"])
+@node(node_type='vibeflow.node', id="boundary",flow_kind="terminal",contract={},rulesets=["vibeflow.process"])
 class Boundary:
     def run_pure(self,inputs,params):return {}
-@node(type_key="work",contract={},rulesets=["vibeflow.process"])
+@node(node_type='vibeflow.node', id="work",contract={},rulesets=["vibeflow.process"])
 class Work:
     def run_pure(self,inputs,params):return {}
-plugin=Plugin(id="entries",resources=[Boundary,Work])
 '''
     workspace, config = project(root, source)
     data = json.loads(config.read_text())
     data["rulesets"] = ["vibeflow.workflow"]
-    nodes = [{"id": name, "type_used": node_type, "display_name": name, "description": name}
+    nodes = [{"id": name, "definition_id": node_type, "display_name": name, "description": name}
              for name, node_type in [("a", "boundary"), ("work", "work"), ("end_a", "boundary"),
                                      ("b", "boundary"), ("end_b", "boundary")]]
-    draft = {"id": "draft", "type_used": "draft.work", "display_name": "Draft", "description": "Future branch"}
+    draft = {"id": "draft", "definition_id": "draft.work", "display_name": "Draft", "description": "Future branch"}
     if kind == "node":
         draft.update(status="planned", flow_kind="process", requires=[], provides=[])
     else:
-        draft["type_used"] = "draftset"
+        draft["definition_id"] = "draftset"
         (root / "draftset.jsonc").write_text(json.dumps({"type_key": "draftset", "display_name": "Draft set",
             "description": "Future body", "status": "planned", "requires": [], "provides": []}))
         data["nodeset_imports"] = ["draftset.jsonc"]
@@ -188,7 +188,7 @@ def test_unselected_planned_branch_does_not_block_runtime_or_checked_run(tmp_pat
     runtime = PipelineRuntime(graph, registry=registry, run_dir=tmp_path / "direct", runtime_options={"execution": execution})
     runtime.run({})
     assert runtime._plan.order == ("a", "work", "end_a")
-    with pytest.raises(PipelineRuntimeError, match="planned nodes/nodesets cannot run"):
+    with pytest.raises(PipelineRuntimeError, match="planned nodes/nodeset_types cannot run"):
         PipelineRuntime(graph, registry=registry, entry="future", run_dir=tmp_path / "blocked")
     result = run_workspace_checked(config, workspace=workspace, run_root=tmp_path / "runs",
         preview_root=tmp_path / "preview", runtime_options={"execution": execution})

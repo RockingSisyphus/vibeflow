@@ -1,5 +1,5 @@
-export const VIBEFLOW_WORKFLOW_ABI = "vibeflow.workflow.v9";
-export const VIBEFLOW_PLUGIN_ABI = "vibeflow.plugin.v3";
+export const VIBEFLOW_WORKFLOW_ABI = "vibeflow.workflow.v10";
+export const VIBEFLOW_PLUGIN_ABI = "vibeflow.plugin.v4";
 
 export class VibeFlowWorkflowError extends Error {
   constructor(code, message, details = {}) {
@@ -565,7 +565,7 @@ function prepareStaticNode(node, state) {
     nodeId: node.id,
     nodePath: nodePath(state, node.id),
     blockPath: formatBlockPath(state.path),
-    type: node.type_used,
+    type: node.definition_id,
   });
   return inputs;
 }
@@ -575,7 +575,7 @@ function finishStaticNode(node, state) {
     nodeId: node.id,
     nodePath: nodePath(state, node.id),
     blockPath: formatBlockPath(state.path),
-    type: node.type_used,
+    type: node.definition_id,
   });
 }
 

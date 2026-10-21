@@ -107,48 +107,48 @@ def _compile_generated_graph_block(plan: "ExecutionPlan") -> CompiledBlock:
 
 
 def _compile_loop_block(frame: "NodeFrame") -> CompiledBlock:
-    block_name = f"loop:{frame.name}"
+    block_name = f"loop:{frame.id}"
 
     def compiled_loop_block(runtime: "PipelineRuntime", inputs: object) -> CompiledBlockResult:
-        outputs = runtime._execute_loop_block(frame.name, inputs)
-        return CompiledBlockResult(last_node=frame.name, outputs=outputs)
+        outputs = runtime._execute_loop_block(frame.id, inputs)
+        return CompiledBlockResult(last_node=frame.id, outputs=outputs)
 
     return CompiledBlock(
         name=block_name,
-        entry=frame.name,
-        exits=(frame.name,),
-        nodes=(frame.name,),
-        edge_routes={frame.name: ()},
+        entry=frame.id,
+        exits=(frame.id,),
+        nodes=(frame.id,),
+        edge_routes={frame.id: ()},
         callable=compiled_loop_block,
         source=_loop_block_source(frame),
         supports_full_trace=True,
         supports_node_hooks=True,
         kind="loop",
         mode="generated",
-        path=(frame.name,),
+        path=(frame.id,),
     )
 
 
 def _compile_nodeset_block(frame: "NodeFrame") -> CompiledBlock:
-    block_name = f"nodeset:{frame.name}"
+    block_name = f"nodeset:{frame.id}"
 
     def compiled_nodeset_block(runtime: "PipelineRuntime", inputs: object) -> CompiledBlockResult:
-        outputs = runtime._execute_nodeset_block(frame.name, inputs)
-        return CompiledBlockResult(last_node=frame.name, outputs=outputs)
+        outputs = runtime._execute_nodeset_block(frame.id, inputs)
+        return CompiledBlockResult(last_node=frame.id, outputs=outputs)
 
     return CompiledBlock(
         name=block_name,
-        entry=frame.name,
-        exits=(frame.name,),
-        nodes=(frame.name,),
-        edge_routes={frame.name: ()},
+        entry=frame.id,
+        exits=(frame.id,),
+        nodes=(frame.id,),
+        edge_routes={frame.id: ()},
         callable=compiled_nodeset_block,
         source=_nodeset_block_source(frame),
         supports_full_trace=True,
         supports_node_hooks=True,
         kind="nodeset",
         mode="generated",
-        path=(frame.name,),
+        path=(frame.id,),
     )
 
 
@@ -187,12 +187,12 @@ def _loop_block_source(frame: "NodeFrame") -> str:
     return "\n".join(
         [
             "def compiled_loop_block(runtime, inputs):",
-            f"    # structured LoopBlock for {frame.name!r}",
+            f"    # structured LoopBlock for {frame.id!r}",
             f"    # body: {frame.loop_spec.body!r}",
             f"    # max_iterations: {frame.loop_spec.max_iterations!r}",
             f"    # stop: {_loop_stop_text(frame)!r}",
-            f"    outputs = runtime._execute_loop_block({frame.name!r}, inputs)",
-            f"    return CompiledBlockResult(last_node={frame.name!r}, outputs=outputs)",
+            f"    outputs = runtime._execute_loop_block({frame.id!r}, inputs)",
+            f"    return CompiledBlockResult(last_node={frame.id!r}, outputs=outputs)",
             "# runtime trace and hooks are selected per invocation",
         ]
     )
@@ -202,10 +202,10 @@ def _nodeset_block_source(frame: "NodeFrame") -> str:
     return "\n".join(
         [
             "def compiled_nodeset_block(runtime, inputs):",
-            f"    # generated nodeset block for {frame.name!r}",
-            f"    # body: {frame.nodeset_type_key!r}",
-            f"    outputs = runtime._execute_nodeset_block({frame.name!r}, inputs)",
-            f"    return CompiledBlockResult(last_node={frame.name!r}, outputs=outputs)",
+            f"    # generated nodeset block for {frame.id!r}",
+            f"    # body: {frame.nodeset_type_id!r}",
+            f"    outputs = runtime._execute_nodeset_block({frame.id!r}, inputs)",
+            f"    return CompiledBlockResult(last_node={frame.id!r}, outputs=outputs)",
             "# runtime trace and hooks are selected per invocation",
         ]
     )
@@ -214,7 +214,7 @@ def _nodeset_block_source(frame: "NodeFrame") -> str:
 def _graph_block_compilable(plan: "ExecutionPlan") -> bool:
     if not plan.order:
         return False
-    nodes_by_name = {node.name: node for node in plan.graph.nodes}
+    nodes_by_name = {node.id: node for node in plan.graph.nodes}
     if explicit_flow_cycles(nodes_by_name, plan.compiled.resolved_schedule_edges):
         return False
     for name in plan.order:
@@ -280,7 +280,7 @@ def _collect_block_compile_findings(plan: "ExecutionPlan", *, findings: list[dic
 def _graph_block_reason(plan: "ExecutionPlan") -> str:
     if not plan.order:
         return "empty_graph"
-    nodes_by_name = {node.name: node for node in plan.graph.nodes}
+    nodes_by_name = {node.id: node for node in plan.graph.nodes}
     cycles = explicit_flow_cycles(nodes_by_name, plan.compiled.resolved_schedule_edges)
     if cycles:
         return "explicit_flow_cycle"

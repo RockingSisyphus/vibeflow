@@ -5,7 +5,7 @@ from dataclasses import replace
 
 from vibeflow.core.findings import HealthFinding
 from vibeflow.core.rules import RuleGraphError, compile_ruleset, execute_rule_plan
-from vibeflow.targets.python.quality.policy_parameters import complete_source_policy_plan, native_rule_bindings, native_rule_origins, bound_python_workflow_defaults
+from vibeflow.targets.python.quality.policy_parameters import complete_source_policy_plan, native_rule_bindings, native_rule_origins
 from vibeflow.core.descriptors.contributions import contribution_facts
 from vibeflow.targets.python.quality.project_context import project_rule_facts
 from vibeflow.targets.python.quality.rule_adapter import rule_resources, graph_error_finding
@@ -19,7 +19,7 @@ def workflow_invocations(graph):
 
 
 def execute_workflow_rules(graph, state, *, registry=None, source_context=None,
-    phase="static", purity_policy=None, quality_policy=None, nodeset_max_depth=4,
+    phase="static", purity_policy=None, quality_policy=None,
     global_config=None, compiled=None, compilation_findings=(), source_report=None):
     """Import has declaration/source facts; compiled facts exist only afterwards."""
     from vibeflow.targets.python.project.compiler import GraphCompiler, GraphCompileError
@@ -33,10 +33,6 @@ def execute_workflow_rules(graph, state, *, registry=None, source_context=None,
     except RuleGraphError as exc:
         _append_findings(state, (graph_error_finding(registry,exc,object_type="workflow",object_id="pipeline",fallback_path=graph.source_path),))
         return
-    for rule_id, defaults in bound_python_workflow_defaults(native_rule_bindings(resources, rules),
-        nodeset_max_depth, rules=rules, origins=native_rule_origins(resources)).items():
-        descriptor = rules[rule_id]
-        rules[rule_id] = replace(descriptor, params_defaults={**descriptor.params_defaults, **defaults})
     handlers, project_fact_cache = {}, {}
     from vibeflow.targets.python.project.check_session import current_python_check
     from vibeflow.targets.shared.facts import FactStore
@@ -77,9 +73,9 @@ def execute_workflow_rules(graph, state, *, registry=None, source_context=None,
             and (item.owner, "/".join((*item.call_path, spec.id))) in source_report.call_node_metrics}
         return {"graph": current, "owner":item.owner, "call_path":item.call_path,
             "declaration_graph":item.graph, "definition":item.definition, "global_config":item.global_config,
-            "overrides":item.overrides, "node_types":{spec.id:spec.type_used for spec in current.nodes},
-            "runtime_flow_kinds":{spec.id:registry.descriptor(spec.type_used).flow_kind for spec in current.nodes
-                if registry is not None and spec.type_used in registry.available()},
+            "overrides":item.overrides, "call_definitions":{spec.id:spec.definition_id for spec in current.nodes},
+            "runtime_flow_kinds":{spec.id:registry.descriptor(spec.definition_id).flow_kind for spec in current.nodes
+                if registry is not None and spec.definition_id in registry.available()},
             "node_similarities":{spec.id:spec.similar_to.to_dict() for spec in current.nodes if spec.similar_to.node},
             "node_metrics":measured, "fingerprints":{key:str(value["run_pure_fingerprint"])
                 for key,value in measured.items() if value.get("run_pure_fingerprint")},
@@ -106,7 +102,7 @@ def execute_workflow_rules(graph, state, *, registry=None, source_context=None,
             if callable(custom):
                 handlers.update(custom(plan))
             plan = complete_source_policy_plan(plan, purity_policy, handlers=handlers)
-            contributions = contribution_facts(registry.loaded_plugins.catalogs) if hasattr(registry, "loaded_plugins") else {}
+            contributions = contribution_facts(registry.prepared_resources.catalogs) if hasattr(registry, "prepared_resources") else {}
             from vibeflow.targets.python.quality.node_context import graph_sources
             responsible_sources = graph_sources(source_context, task.subjects)
             facts = {**contributions, **project_rule_facts(plan, responsible_sources, project_fact_cache,handlers=handlers), "graph": current, "global_graph": graph,
@@ -114,12 +110,12 @@ def execute_workflow_rules(graph, state, *, registry=None, source_context=None,
                 **graph_facts(task, invocation),
                 "source_load_states": getattr(registry, "source_load_states", {}),
                 "registry": registry_queries, "source_context": responsible_sources, "global_source_context":source_context,
-                "node_catalog": tuple(registry.descriptor(key) for key in registry.available()) if registry is not None else (),
+                "node_definitions": tuple(registry.descriptor(key) for key in registry.available()) if registry is not None else (),
                 "rule_invocations": {item.id: item.rule for item in plan.invocations},
                 "global_config": global_config, "owner": owner,
-                "node_types": {spec.id: spec.type_used for spec in current.nodes},
-                "runtime_flow_kinds": {spec.id: registry.descriptor(spec.type_used).flow_kind for spec in current.nodes
-                    if registry is not None and spec.type_used in registry.available()},
+                "call_definitions": {spec.id: spec.definition_id for spec in current.nodes},
+                "runtime_flow_kinds": {spec.id: registry.descriptor(spec.definition_id).flow_kind for spec in current.nodes
+                    if registry is not None and spec.definition_id in registry.available()},
                 "node_similarities": {spec.id: spec.similar_to.to_dict() for spec in current.nodes if spec.similar_to.node},
                 }
             if not invocation.declaration_only:
@@ -134,7 +130,7 @@ def execute_workflow_rules(graph, state, *, registry=None, source_context=None,
                 session.implementation_identity(plan,handlers) if session is not None else tuple((key,id(value)) for key,value in handlers.items()))
             result = execute_rule_plan(plan, view.context(phase,
                 subject=subject,
-                scope={"workflow": owner, "workflows": tuple(item.owner for item in invocations),
+                scope={"level": "graph", "workflow": owner, "workflows": tuple(item.owner for item in invocations),
                     "files": tuple(item.path for item in source_context.files) if source_context is not None else (),
                     "call_path":path, "graph_scope":task.graph_scope, "graph_paths":tuple(item.call_path for item in task.subjects),
                     "boundaries":task.boundaries},

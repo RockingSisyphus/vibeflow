@@ -1,6 +1,6 @@
 # 第二轮 Rule、Node 与插件接口补测
 
-独立组默认最多并发 12 个 worker，使用 `--workers N` 或 `VIBEFLOW_TEST_WORKERS=N` 调整，命令行优先。资源子组与其他接口组使用同一个调度队列；display/edits 按资源类别及额外案例拆分，共享同一个有上限的任务队列；每个夹具的修改、验证、恢复保持顺序。`--workers 1` 可串行重跑。
+独立组默认最多并发 12 个 worker，使用 `--workers N` 或 `VIBEFLOW_TEST_WORKERS=N` 调整，命令行优先。五个接口组使用同一个有上限的任务队列；每个夹具的修改、验证、恢复保持顺序。`--workers 1` 可串行重跑。
 
 这组测试将 [第二轮审计](../../../docs/design/history/baseline-rule-coverage-second-audit.md) 的临时探针变为可重复验收，并补齐正常组合。它检查当前实现，保留 [基线对照](../rule_parity/README.md) 的案例 ID 和历史观察。当前声明按已确认的完整 Node 和通用 Rule 接口迁移，理由见 [迁移说明](../../../distribution/docs/user/rule-system-migration.md)。两组真实沙箱都已接入完整门禁。
 
@@ -11,17 +11,12 @@
 | 组 | 覆盖与实际证据 |
 | --- | --- |
 | `python` | 独立文件的明确空 Ruleset 与启用规则的邻居；同模块自身规则；实际共享/非共享 helper 与调用归属；planned stub 主文件和 helper 的真实导入及 marker |
-| `javascript` | typed records 的合法数组、空值、对象和 async；非法 Map/Date/undefined/非有限数字/bigint/循环值；provider 状态和 requires consumer；静态、动态、require 导入；双平台实现的 validate/quality/review/build；Bundle 的五类原生资源、冲突与悬空引用 |
+| `javascript` | typed records 的合法数组、空值、对象和 async；非法 Map/Date/undefined/非有限数字/bigint/循环值；provider 状态和 requires consumer；静态、动态、require 导入；双平台实现的 validate/quality/review/build；普通资源与 Plugin 包冲突由资源准备专项覆盖 |
 | `graph` | 不同默认值和新增参数的实现替换及来源；显式 includes；未绑定/冲突输入、参数 schema；源码 consumer 的 typed inputs/有效参数缓存和新 session；直接选择公开 implementation leaf 的真实正常/超限源码；合法和非法 findings 的 Core/Python/JS 边界 |
-| `tooling` | 完整 Node shape、已移除分类资源的明确诊断、Rule 端口类型；正式单个 JSON、资源位置和实现尚未执行；混合语言同 ID、跨 root 引用及双方冲突来源；预览选择一致 |
+| `tooling` | 完整 Node shape、已移除分类资源的明确诊断、Rule 端口类型；正式单个 JSON、资源位置和实现尚未执行；混合语言同 ID、项目共享包与双方冲突来源；预览选择一致 |
 | `composition` | 领域 Bundle 的模型 Node 在分支、Nodeset、Loop 中实际计算；参数化 tags 归属、非法 helper 模型定义、完整调用路径；Node 自己声明浅蓝色，验证 Architecture、Mermaid 和真实 SVG |
-| `resources` | 475 个真实 CLI 案例：四类资源登记、源码归属、规则、连续修改、全部公开形状，以及 Python/Node.js/浏览器执行；离线 HTML 与可选 SVG 的真实计算颜色、几何、单 Host 和实例隔离 |
 
-插件贡献正常例将 BaseLib、DataSchema、Capability、Host Extension、Runtime Plugin 全部经选中插件装配，检查数值结果及完整生命周期。历史案例 ID 保留 bundle 名称，产品接入仍只使用语言 SDK。两平台纯数值构建产物在 Node 中实际执行；资源专项组另外运行真正的浏览器产物。
-
-多文件资源的 [案例对应表](../../../docs/design/history/multifile-resource-cases.md) 和 [正式示例](../../../docs/maintainers/history/multifile-resource-sandbox.md) 记录专项检查及 SVG/Architecture 证据。此前 205 项接口场景保留原 ID，与新资源组分别统计。
-
-资源展示组保留全部 103 个案例及 47 个连续修改案例的 ID。当前观察通过公开 `review` 与 `export-mermaid --mermaid-layout review-columns` 取得真实用户图，定位实际 Node 调用或所选 Plugin/BaseLib/Host 目录条目；同一浏览器进程同时验收可选 SVG，以及离线 HTML 快照的流程、BaseLib、Plugin 和 Host Extension 四种视图；用公开调用/资源身份定位卡片，检查 14 种形状、颜色、文字、图标、状态与覆盖来源，拦截并报告 HTML 的联网请求。连续样式修改同时检查 HTML 更新和恢复。插件条目按配置选中的包 ID 定位，包内生命周期的源码健康诊断另在 Architecture 中核对。原来的独立 Node 类型卡、源码文件卡和 reference 图断言已撤销，历史机器报告不覆盖。
+旧 resources 六族矩阵及依赖 Host Extension 的整体装配用例已退役。有效覆盖和退役原因见[项目治理实施记录](../../../docs/maintainers/project-governance-refactor.md)。14 种形状、颜色、离线 HTML 及包级资源投影由 `test_local_preview.py` 的真实浏览器验收负责；生命周期由 `test_explicit_lifecycle.py` 验收。冻结历史报告保留原数量，不计作当前通过。
 
 ## 运行
 
@@ -60,3 +55,5 @@ npm_config_cache=/tmp/vibeflow-npm-cache python tools/run_tests.py -- \
 - 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
 
 完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。
+
+项目治理重构删除了旧 resources 六族矩阵及含 Host 的原生整体装配用例；有效覆盖迁移对照见[项目治理实施记录](../../../docs/maintainers/project-governance-refactor.md)。历史 RESULTS 的数量不改写为当前通过数量。

@@ -12,7 +12,7 @@
     "nodes": [
       {
         "id": "greet",
-        "type_used": "example.greet",
+        "definition_id": "example.greet",
         "display_name": "Build greeting",
         "description": "Formats a greeting with an injected clock.",
         "config": {
@@ -34,7 +34,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

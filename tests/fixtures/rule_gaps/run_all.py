@@ -20,8 +20,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 sys.path.insert(0, str(ROOT))
 from tools.test_parallel import DEFAULT_WORKERS, WORKER_ENVIRONMENT, add_worker_argument
-from tests.fixtures.rule_gaps.resources import resource_jobs, validate_counts
-GROUPS = ("python", "javascript", "graph", "tooling", "composition", "resources")
+GROUPS = ("python", "javascript", "graph", "tooling", "composition")
 spec = importlib.util.spec_from_file_location("parity_results", HERE.parent / "rule_parity/results.py")
 _results = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(_results)
@@ -39,7 +38,7 @@ def environment(toolchain=None, renderer=None):
            "PYTHONDONTWRITEBYTECODE": "1", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"}
     env.pop("PYTEST_ADDOPTS", None)
     env.pop("PYTEST_PLUGINS", None)
-    env.setdefault("npm_config_cache", "/tmp/vibeflow-npm-cache")
+    env.setdefault("npm_config_cache", str(Path(os.environ.get("TMPDIR",tempfile.gettempdir())) / "vibeflow-npm-cache"))
     if toolchain:
         env["VIBEFLOW_TEST_TOOLCHAIN_ROOT"] = str(toolchain)
     if renderer:
@@ -58,22 +57,16 @@ def install(work, name, source):
     return destination
 
 
-def observe(group, work, toolchain, renderer, resource_family=None, resource_part=None, *, workers=DEFAULT_WORKERS):
+def observe(group, work, toolchain, renderer, *, workers=DEFAULT_WORKERS):
     directory = work / group
     directory.mkdir(exist_ok=True)
-    prefix = "-".join(filter(None, (resource_family, resource_part)))
-    prefix = prefix + "-" if prefix else ""
-    output = directory / (prefix + "observations.json")
+    output = directory / "observations.json"
     cmd = [sys.executable, str(HERE / "worker.py"), "--group", group,
            "--work", str(directory / "projects"), "--output", str(output)]
     if toolchain:
         cmd.extend(("--toolchain", str(toolchain)))
     env = {**environment(toolchain, renderer), WORKER_ENVIRONMENT: str(workers)}
-    if resource_family:
-        cmd.extend(("--resource-family", resource_family))
-    if resource_part:
-        cmd.extend(("--resource-part", resource_part))
-    process_log = directory / (prefix + "process.log")
+    process_log = directory / "process.log"
     with process_log.open("w") as log:
         process = subprocess.run(cmd, cwd=directory, env=env,
                                  stdout=log, stderr=subprocess.STDOUT, check=False)
@@ -94,14 +87,11 @@ def run(work, groups, report, *, toolchain=None, renderer=None, workers=DEFAULT_
     needs_js = any(group != "python" for group in groups)
     if needs_js and toolchain is None:
         toolchain = install(work, "javascript-toolchain", ROOT / "sandbox/javascript/minimal/project")
-    if any(group in {"javascript", "composition", "resources"} for group in groups) and renderer is None:
+    if any(group in {"javascript", "composition"} for group in groups) and renderer is None:
         renderer = install(work, "mermaid-renderer", ROOT / "tools/mermaid-renderer")
     rows, errors = [], []
-    tasks = [(group, family, part) for group in groups
-             for family, part in (resource_jobs() if group == "resources" else ((None, None),))]
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        jobs = {pool.submit(observe, group, work, toolchain, renderer, family, part, workers=workers):
-                "/".join(filter(None, (group, family, part))) for group, family, part in tasks}
+        jobs = {pool.submit(observe, group, work, toolchain, renderer, workers=workers):group for group in groups}
         for future in as_completed(jobs):
             group = jobs[future]
             try:
@@ -111,8 +101,6 @@ def run(work, groups, report, *, toolchain=None, renderer=None, workers=DEFAULT_
             except (OSError, RuntimeError, subprocess.CalledProcessError, ValueError) as exc:
                 errors.append({"group": group, "error": str(exc)})
                 print(f"{group}: {exc}", flush=True)
-    if "resources" in groups and not errors:
-        validate_counts(rows)
     cases = assess(rows)
     cases.sort(key=lambda value: value["id"])
     summary = {"cases": len(cases), "matched": sum(not row["mismatches"] for row in cases),

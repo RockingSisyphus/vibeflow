@@ -1,6 +1,6 @@
 from vibeflow.targets.python.sdk import Plugin, node
 
-invalid = node(**{'type_key': 'bad.missing_semantics',
+invalid = node(**{'node_type': 'vibeflow.node', 'id': 'bad.missing_semantics',
  'display_name': 'Bad',
  'description': 'Bad node with missing semantics.',
  'version': '0.1.0',
@@ -28,4 +28,3 @@ invalid = node(**{'type_key': 'bad.missing_semantics',
  'source': {'kind': 'file',
             'ref': 'illegal_nodes/metadata_contract_cases.py',
             'export': 'MissingSemanticsNode'}})
-plugin = Plugin(id='invalid.MissingSemanticsNode', resources=[invalid])

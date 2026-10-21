@@ -58,7 +58,7 @@ def test_local_source_cache_uses_effective_params_and_handler_without_global_fac
     from functools import wraps
     @wraps(registry.direct_bindings[("rule","vibeflow.maintainability")])
     def check(context,inputs,params):
-        assert not {"plugins", "node_catalog", "source_load_states", "extra"} & context.facts.keys()
+        assert not {"plugins", "node_definitions", "source_load_states", "extra"} & context.facts.keys()
         seen.append(params["policy"]["node_source"]["max_lines"])
         return RuleResult()
     handlers["test.review"] = check
@@ -186,7 +186,7 @@ def test_prepared_implementation_facts_compile_child_without_registry_queries(tm
     facts = compiler.prepare_implementation_facts(graph,registry=registry)
     monkeypatch.setattr(registry,"descriptor",lambda *_: (_ for _ in ()).throw(AssertionError("facts were adapted twice")))
     root = compiler.compile_with_findings(graph,registry=registry,implementation_facts=facts)
-    child = compiler.compile(graph.nodesets["test.inner"].graph,registry=registry,implementation_facts=facts)
+    child = compiler.compile(graph.nodeset_types["test.inner"].graph,registry=registry,implementation_facts=facts)
     assert root.workflow.implementation_facts is facts
     assert child.order == ("leaf",)
     end_python_check(registry)
@@ -251,7 +251,7 @@ def test_unknown_primitive_subclass_is_not_stable_by_its_base_value(tmp_path):
 
 
 def test_changed_provider_records_invalidate_source_consumer_only(tmp_path):
-    from vibeflow.core.flow import GraphConfig,NodeSpec
+    from vibeflow.core.flow import GraphConfig,NodeCallSpec
     registry,_,handlers = _case(tmp_path)
     provider = RuleDescriptor("test.provide",scope="call",outputs={"data":"test.data.v1"})
     consumer = replace(registry.rule_catalogs[-1].rules[0],inputs={"data":"test.data.v1"})
@@ -259,7 +259,7 @@ def test_changed_provider_records_invalidate_source_consumer_only(tmp_path):
         relations=(RuleRelation("consume","provide","requires",bindings={"data":"data"}),),entrypoints={"import":("consume",)})
     registry.rule_catalogs[-1].rules = (provider,consumer)
     registry.rule_catalogs[-1].rulesets = (selection,)
-    graph = GraphConfig(nodes=tuple(NodeSpec(name,"test.leaf",params={"marker":value})
+    graph = GraphConfig(nodes=tuple(NodeCallSpec(name,"test.leaf",params={"marker":value})
         for name,value in (("first",1),("second",2),("third",2))),rulesets=())
     sources = collect_workflow_source_context(registry,graph)
     produced, consumed = [], []
@@ -295,7 +295,7 @@ def test_native_identity_captures_loading_after_handler_preparation_and_only_sel
     handlers['test.review']=check
     bindings={**handlers,**{f'unselected.{i}':lambda *_:RuleResult() for i in range(26)}}
     monkeypatch.setattr(adapter,'native_rule_bindings',lambda *_:bindings)
-    monkeypatch.setattr(adapter,'native_rule_origins',lambda *_:{('rules',key):SimpleNamespace(plugin_id='vibeflow.core') for key in bindings})
+    monkeypatch.setattr(adapter,'native_rule_origins',lambda *_:{('rules',key):SimpleNamespace(owner=SimpleNamespace(plugin_id='vibeflow.core')) for key in bindings})
     state={'value':'first'}
     registry.source_load_states={path:'before_loading'}
     def load(_):
@@ -321,12 +321,12 @@ def test_native_alias_uses_the_implementation_background_without_exposing_it_to_
     registry,sources,handlers = _case(tmp_path)
     seen=[]
     def check(context,*_):
-        seen.append('node_catalog' in context.facts)
+        seen.append('node_definitions' in context.facts)
         return RuleResult()
     handlers['test.review']=check
     monkeypatch.setattr(adapter,'native_rule_bindings',lambda *_: {'core.original':check,'test.review':check})
-    monkeypatch.setattr(adapter,'native_rule_origins',lambda *_:{('rules','core.original'):SimpleNamespace(plugin_id='vibeflow.core'),
-        ('rules','test.review'):SimpleNamespace(plugin_id='custom')})
+    monkeypatch.setattr(adapter,'native_rule_origins',lambda *_:{('rules','core.original'):SimpleNamespace(owner=SimpleNamespace(plugin_id='vibeflow.core')),
+        ('rules','test.review'):SimpleNamespace(owner=SimpleNamespace(plugin_id='custom'))})
     adapter.execute_python_node_rules(registry,sources,phase='import')
     assert seen==[True]
     end_python_check(registry)

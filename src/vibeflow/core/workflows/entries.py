@@ -99,17 +99,17 @@ def execution_graph(graph):
     """Keep a named entry's referenced definitions, without interpreting code."""
     if not graph.selected_entry:
         return graph
-    from vibeflow.core.flow import LOOP_NODE_TYPES
+    from vibeflow.core.flow import LOOP_DEFINITION_IDS
 
     def visit(current, inherited, active=()):
-        available = {**inherited, **current.nodesets}
-        keys = {node.loop.body if node.type_used in LOOP_NODE_TYPES else node.type_used
+        available = {**inherited, **current.nodeset_types}
+        keys = {node.loop.body if node.definition_id in LOOP_DEFINITION_IDS else node.definition_id
                 for node in current.nodes}
         definitions = {}
         for key in keys & available.keys():
             definition = available[key]
             definitions[key] = (definition if key in active else replace(definition,
                 graph=visit(definition.graph, available, (*active, key))))
-        return replace(current, nodesets=definitions)
+        return replace(current, nodeset_types=definitions)
 
     return visit(graph, {})

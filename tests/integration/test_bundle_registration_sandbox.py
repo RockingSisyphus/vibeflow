@@ -1,7 +1,7 @@
 """Both Targets register contributed declarations through the public CLI."""
 
 from __future__ import annotations
-from tests.fixtures.support.plugins import resource as resource_ref, copy_sdk_inputs, write_plugin, resources
+from tests.fixtures.support.plugins import resource as resource_ref, write_plugin, resources
 
 import json
 import os
@@ -12,7 +12,7 @@ import sys
 import pytest
 
 from vibeflow.tooling.application.cli import main
-from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
+from vibeflow.tooling.project.resources import prepare_workflow_catalogs
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -29,7 +29,6 @@ def registered_project(tmp_path, request):
     example = tmp_path / target
     shutil.copytree(ROOT / f"sandbox/{target}/domain_rules", example,
         ignore=shutil.ignore_patterns("node_modules", "__pycache__", "*.pyc", ".artifacts"))
-    copy_sdk_inputs(ROOT / f"sandbox/{target}/domain_rules", example)
     project = example / "project"
     if target == "javascript":
         toolchain = Path(os.environ.get("VIBEFLOW_TEST_TOOLCHAIN_ROOT", ROOT / "sandbox/javascript/minimal/project"))
@@ -48,7 +47,7 @@ def registered_project(tmp_path, request):
     if target == "python":
         source = project / "registration_node.py"
         source.write_text(f"from pathlib import Path\nPath({str(imported)!r}).write_text('imported')\n" +
-            (project / "domain_nodes.py").read_text().replace('return {"feature": self.model_forward(value, params["gain"])}',
+            (project / "nodes/domain_nodes.py").read_text().replace('return {"feature": self.model_forward(value, params["gain"])}',
                 f"Path({str(executed)!r}).write_text('executed')\n"
                 '        return {"feature": self.model_forward(value, params["gain"])}'))
         manifest = resource_ref(project, 'node', 'example.model')
@@ -97,8 +96,8 @@ def test_different_declaration_files_with_same_id_are_rejected_before_node_impor
     assert code == 1, payload
     diagnostic = json.dumps(payload)
     prefix = "RULE.RESOURCE" if resource == "rules" else "DESCRIPTOR"
-    assert (prefix + (".CONFLICT" if different else ".DUPLICATE")) in diagnostic
-    assert str(project / ("code_plugin.py" if target == "python" else "code_plugin.ts")) in diagnostic
+    assert (prefix + (".CONFLICT" if different or resource == "rules" else ".DUPLICATE")) in diagnostic
+    assert str(project / (("plugins/code_plugin/plugin" if resource == "rules" else "nodes/code_plugin_declarations") + (".py" if target == "python" else ".ts"))) in diagnostic
     origins = payload.get("diagnostics",payload.get("errors",[]))[0]["details"]["origins"]
     assert origins["current"]["path"] != origins["previous"]["path"]
     assert ("example.model" if resource == "nodes" else "example.model_definition") in diagnostic
@@ -173,8 +172,8 @@ def test_selected_rule_binding_failure_never_imports_the_business_node(registere
     data = json.loads(rule_manifest.read_text())
     source = data["implementations"][0]["source"]
     if failure == "source":
-        missing = project / ("rules/missing_rule.py" if target == "python" else "rules/missing_rule.ts")
-        source["ref"] = str(missing.relative_to(project))
+        missing = project / "plugins/code_plugin" / ("rules/missing_rule.py" if target == "python" else "rules/missing_rule.ts")
+        source["ref"] = str(missing.relative_to(project / "plugins/code_plugin"))
     else:
         source["export"] = "missing_rule_export"
     _write(rule_manifest, data)

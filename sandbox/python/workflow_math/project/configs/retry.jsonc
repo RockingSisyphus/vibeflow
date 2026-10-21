@@ -14,7 +14,7 @@
         "display_name": "Start",
         "description": "Starts the first-class while loop example.",
         "id": "start",
-        "type_used": "sandbox.start"
+        "definition_id": "sandbox.start"
       },
       {
         "display_name": "Retry Loop",
@@ -73,13 +73,13 @@
           }
         },
         "id": "retry_loop",
-        "type_used": "vibeflow.loop.while"
+        "definition_id": "vibeflow.loop.while"
       },
       {
         "display_name": "End",
         "description": "Ends after the while loop produces loop.next.",
         "id": "end",
-        "type_used": "semantic.loop_end"
+        "definition_id": "semantic.loop_end"
       }
     ],
     "edges": [
@@ -112,14 +112,14 @@
   },
   "nodeset_imports": [
     {
-      "path": "nodesets/pass_loop_while_nodeset_retry/loop_retry_step.jsonc"
+      "path": "nodeset_types/pass_loop_while_nodeset_retry/loop_retry_step.jsonc"
     }
   ],
   "plugins": [
     {
       "source": {
         "kind": "file",
-        "ref": "plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

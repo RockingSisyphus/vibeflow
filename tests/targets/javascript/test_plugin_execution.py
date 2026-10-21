@@ -90,8 +90,6 @@ def javascript_project(
         root,
         ignore=shutil.ignore_patterns("node_modules", "__pycache__", "*.pyc"),
     )
-    from tests.fixtures.support.plugins import copy_sdk_inputs
-    copy_sdk_inputs(SANDBOX_PROJECT, root)
     (root / "node_modules").symlink_to(
         javascript_toolchain_root / "node_modules",
         target_is_directory=True,
@@ -293,7 +291,8 @@ def _install_project_plugin(
     completion: str = "immediate",
 ) -> None:
     short_name = plugin_id.replace(".", "-")
-    source_relative = f"plugins/{short_name}.ts"
+    source_relative = f"plugins/code_lifecycle_{short_name}/implementation.ts"
+    (project.root / source_relative).parent.mkdir(parents=True, exist_ok=True)
     (project.root / source_relative).write_text(source, encoding="utf-8")
     write_plugin(
         project.root,
@@ -310,7 +309,7 @@ def _install_project_plugin(
                     "completion": completion,
                     "source": {
                         "kind": "file",
-                        "ref": source_relative,
+                        "ref": "implementation.ts",
                         "export": "createPlugin",
                     },
                 }
@@ -329,7 +328,7 @@ def _select_plugins(
 ) -> Path:
     source = project.root / "configs" / config_name
     payload = _read_json(source)
-    payload["plugins"] = [{"source": {"kind": "file", "ref": "code_plugin.ts", "export": "plugin"}}]
+    payload["plugins"] = [{"source": {"kind": "file", "ref": "plugins/code_plugin/plugin.ts", "export": "plugin"}}]
     for selected in plugin_ids:
         fields = dict(selected) if isinstance(selected, dict) else {"id": selected}
         plugin_id = str(fields.pop("id"))
@@ -337,7 +336,7 @@ def _select_plugins(
             payload["plugins"].append({"id": plugin_id, **fields})
         else:
             payload["plugins"].append({"source": {"kind": "file",
-                "ref": f"code_lifecycle_{plugin_id.replace('.', '-')}.ts", "export": "plugin"}, **fields})
+                "ref": f"plugins/code_lifecycle_{plugin_id.replace('.', '-')}/plugin.ts", "export": "plugin"}, **fields})
     target = project.root / "configs" / f"test-{config_name}"
     _write_json(target, payload)
     return target
@@ -625,7 +624,7 @@ def _write_failing_nodeset_config(
     project: _Project,
     plugin_id: str,
 ) -> Path:
-    nodeset_path = project.root / "configs/nodesets/plugin_failure.jsonc"
+    nodeset_path = project.root / "configs/nodeset_types/plugin_failure.jsonc"
     _write_json(
         nodeset_path,
         {
@@ -656,15 +655,15 @@ def _write_failing_nodeset_config(
                     }
                 ],
                 "nodes": [
-                    {"id": "start", "type_used": "sandbox.terminal", "display_name": "Nested start", "description": "Starts the failing nested block."},
+                    {"id": "start", "definition_id": "sandbox.terminal", "display_name": "Nested start", "description": "Starts the failing nested block."},
                     {
                         "id": "fail",
-                        "type_used": "sandbox.runtime_failure",
+                        "definition_id": "sandbox.runtime_failure",
                         "display_name": "Raise nested failure",
                         "description": "Raises the controlled failure observed by runtime hooks.",
                         "config": {"mode": "throw"},
                     },
-                    {"id": "end", "type_used": "sandbox.terminal", "display_name": "Nested end", "description": "Would end the nested block if the failure node completed."},
+                    {"id": "end", "definition_id": "sandbox.terminal", "display_name": "Nested end", "description": "Would end the nested block if the failure node completed."},
                 ],
                 "edges": [
                     {"from": "start", "to": "fail"},
@@ -685,9 +684,9 @@ def _write_failing_nodeset_config(
     _write_json(
         config,
         {
-            "nodeset_imports": [{"path": "nodesets/plugin_failure.jsonc"}],
-            "plugins": [{"source": {"kind": "file", "ref": "code_plugin.ts", "export": "plugin"}},
-                        {"source": {"kind": "file", "ref": f"code_lifecycle_{plugin_id.replace('.', '-')}.ts", "export": "plugin"}}],
+            "nodeset_imports": [{"path": "nodeset_types/plugin_failure.jsonc"}],
+            "plugins": [{"source": {"kind": "file", "ref": "plugins/code_plugin/plugin.ts", "export": "plugin"}},
+                        {"source": {"kind": "file", "ref": f"plugins/code_lifecycle_{plugin_id.replace('.', '-')}/plugin.ts", "export": "plugin"}}],
             "pipeline": {
                 "inputs": [
                     {
@@ -698,14 +697,14 @@ def _write_failing_nodeset_config(
                     }
                 ],
                 "nodes": [
-                    {"id": "start", "type_used": "sandbox.terminal", "display_name": "Workflow start", "description": "Starts the plugin failure workflow."},
+                    {"id": "start", "definition_id": "sandbox.terminal", "display_name": "Workflow start", "description": "Starts the plugin failure workflow."},
                     {
                         "id": "broken",
-                        "type_used": "test.plugin_failure_nodeset",
+                        "definition_id": "test.plugin_failure_nodeset",
                         "display_name": "Run failing nodeset",
                         "description": "Invokes the nested block whose controlled failure is observed.",
                     },
-                    {"id": "after", "type_used": "sandbox.terminal", "display_name": "After failure", "description": "Must remain unreachable after the nested failure."},
+                    {"id": "after", "definition_id": "sandbox.terminal", "display_name": "After failure", "description": "Must remain unreachable after the nested failure."},
                 ],
                 "edges": [
                     {"from": "start", "to": "broken"},
@@ -1052,50 +1051,6 @@ process.stdout.write(JSON.stringify({
     assert output["values"] == [2, 21, 2]
 
 
-def test_runtime_plugin_and_host_extension_share_lifecycle_without_coupling(
-    javascript_project: _Project,
-) -> None:
-    _install_project_plugin(
-        javascript_project,
-        "test.host_runtime",
-        _successful_runtime_audit_plugin(
-            expected_nodes=("start", "double", "end"),
-        ),
-    )
-    config = _select_plugins(
-        javascript_project,
-        "host_extension.jsonc",
-        ["test.host_runtime"],
-    )
-    result = _build_project(
-        javascript_project,
-        config,
-        key="host-and-runtime",
-        host=True,
-    )
-
-    payload = _run_node(
-        result.entry,
-        """
-const afterImport = {
-  host: [...globalThis.__vibeflowSandboxHostCalls],
-};
-const host = workflow.createWorkflowHost();
-await host.start();
-const value = host.runWorkflow({ x: 5 });
-await host.stop();
-process.stdout.write(JSON.stringify({
-  afterImport,
-  value,
-  hostCalls: globalThis.__vibeflowSandboxHostCalls,
-}));
-""",
-        before_import="globalThis.__vibeflowSandboxHostCalls = [];",
-    )
-
-    assert payload["afterImport"] == {"host": []}
-    assert payload["value"] == {"result": 10}
-    assert payload["hostCalls"] == ["create", "start", "stop"]
 
 
 # Publish controlled case inputs as fixed SDK plugins before formal entrypoints.

@@ -13,19 +13,19 @@
         "display_name": "Start",
         "description": "Starts the nested loop nodeset fixture.",
         "id": "start",
-        "type_used": "sandbox.start"
+        "definition_id": "sandbox.start"
       },
       {
         "display_name": "Wrapper",
         "description": "Calls a nodeset that contains a first-class while loop node.",
         "id": "wrapper",
-        "type_used": "loop.wrapper"
+        "definition_id": "loop.wrapper"
       },
       {
         "display_name": "End",
         "description": "Ends after the wrapper nodeset produces loop outputs.",
         "id": "end",
-        "type_used": "sandbox.start"
+        "definition_id": "sandbox.start"
       }
     ],
     "edges": [
@@ -58,17 +58,17 @@
   },
   "nodeset_imports": [
     {
-      "path": "nodesets/pass_loop_while_inside_nodeset/loop_retry_step.jsonc"
+      "path": "nodeset_types/pass_loop_while_inside_nodeset/loop_retry_step.jsonc"
     },
     {
-      "path": "nodesets/pass_loop_while_inside_nodeset/loop_wrapper.jsonc"
+      "path": "nodeset_types/pass_loop_while_inside_nodeset/loop_wrapper.jsonc"
     }
   ],
   "plugins": [
     {
       "source": {
         "kind": "file",
-        "ref": "plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

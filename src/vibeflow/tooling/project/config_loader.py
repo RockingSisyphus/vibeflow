@@ -129,7 +129,7 @@ def _load_config_document(
     document = ConfigDocument(path=path, data=data, format=config_format, nodeset_imports=nodeset_imports)
     cache[path] = document
     _trace_config_load(
-        f"loaded path={path} format={config_format} nodesets={len(data.get('nodesets', [])) if isinstance(data.get('nodesets'), list) else 0} "
+        f"loaded path={path} format={config_format} nodeset_types={len(data.get('nodeset_types', [])) if isinstance(data.get('nodeset_types'), list) else 0} "
         f"imports={len(nodeset_imports)} elapsed={_elapsed_ms(started)}ms"
     )
     return document
@@ -140,9 +140,9 @@ def _is_architecture_document(text: str) -> bool:
 
 
 def _is_architecture_document_payload(data: Mapping[str, Any]) -> bool:
-    return set(data) == {"workflow", "nodesets", "node_types", "resources"} and all(
+    return {"project_target", "workflow", "nodeset_types", "node_definitions", "node_types", "resources"} <= set(data) and all(
         isinstance(data.get(field), Mapping)
-        for field in ("workflow", "nodesets", "node_types", "resources")
+        for field in ("workflow", "nodeset_types", "node_definitions", "node_types", "resources")
     )
 
 
@@ -179,8 +179,8 @@ def _expand_nodeset_imports(
     workspace: object | None,
 ) -> tuple[Mapping[str, Any], tuple[Mapping[str, Any], ...]]:
     imports = data.get("nodeset_imports")
-    if "nodesets" in data:
-        raise _nodeset_import_error("CONFIG.NODESETS.INLINE_REMOVED", "inline nodesets are removed; import one nodeset JSONC file per type_key with nodeset_imports", path)
+    if "nodeset_types" in data:
+        raise _nodeset_import_error("CONFIG.NODESETS.INLINE_REMOVED", "inline nodeset_types are removed; import one nodeset JSONC file per type_key with nodeset_imports", path)
     if imports is None:
         if _is_nodeset_definition(data):
             return {str(key): deepcopy(value) for key, value in data.items()}, ()
@@ -218,7 +218,7 @@ def _expand_nodeset_imports(
     expanded_nodesets = [*imported_nodesets]
     _validate_unique_nodeset_type_keys(expanded_nodesets, path)
     expanded = {str(key): deepcopy(value) for key, value in data.items() if key != "nodeset_imports"}
-    expanded["nodesets"] = expanded_nodesets
+    expanded["nodeset_types"] = expanded_nodesets
     expanded["__vibeflow_expanded_nodesets__"] = True
     return expanded, tuple(import_records)
 
@@ -287,25 +287,20 @@ def _validate_nodeset_import_target(
         getattr(imported_owner_root, "project_target", "")
     ) or (imported_location.target if imported_location is not None else "")
 
-    # A workspace import which resolves outside every declared root must not
-    # become a target-isolation escape hatch.  Use the imported project's own
-    # metadata when it exists; otherwise reject the unowned import because its
-    # Target cannot be established.
     if workspace is not None and actual_import_root is None:
-        if imported_location is None:
-            raise ConfigLoadError(
-                rule_id="WORKSPACE.NODESET.OUTSIDE_ROOT",
-                message=(
-                    f"nodeset_imports[{index}] is outside every workspace root "
-                    "and has no owning project_target"
-                ),
-                failure_layer="workspace",
-                source_location={
-                    "path": str(source_path),
-                    "field": f"nodeset_imports[{index}]",
-                    "import_path": str(import_path),
-                },
-            )
+        raise ConfigLoadError(rule_id="WORKSPACE.NODESET.OUTSIDE_ROOT",
+            message="NodesetType definitions must belong to the importing root",
+            failure_layer="workspace", source_location={"path":str(source_path),
+                "field":f"nodeset_imports[{index}]", "import_path":str(import_path)})
+    if workspace is not None and source_root is not None and actual_import_root != source_root:
+        raise ConfigLoadError(rule_id="WORKSPACE.NODESET.PRIVATE",
+            message="another root's private NodesetType cannot be imported; share project resources or call its workflow",
+            failure_layer="workspace", source_location={"path":str(source_path),
+                "field":f"nodeset_imports[{index}]", "import_path":str(import_path)})
+    if actual_import_root is not None and import_path.is_relative_to(actual_import_root.path / "plugins"):
+        raise ConfigLoadError(rule_id="WORKSPACE.NODESET.PLUGIN_PRIVATE",
+            message="Plugin private files cannot be selected independently with nodeset_imports; declare root NodesetTypes under configs/",
+            failure_layer="workspace", source_location={"path":str(source_path), "import_path":str(import_path)})
     if not source_target or not imported_target or source_target == imported_target:
         return
 
@@ -408,8 +403,8 @@ def _root_record(root: object) -> dict[str, object]:
     }
 
 
-def _nodesets_with_source(nodesets: list[object], *, path: Path, root: object | None) -> list[object]:
-    copied = deepcopy(nodesets)
+def _nodesets_with_source(nodeset_types: list[object], *, path: Path, root: object | None) -> list[object]:
+    copied = deepcopy(nodeset_types)
     for item in copied:
         if not isinstance(item, dict):
             continue
@@ -422,11 +417,11 @@ def _nodesets_with_source(nodesets: list[object], *, path: Path, root: object | 
 
 def _nodeset_definitions_from_document(data: Mapping[str, Any], path: Path) -> list[object]:
     definitions: list[object] = []
-    nested = data.get("nodesets", ())
+    nested = data.get("nodeset_types", ())
     if isinstance(nested, list):
         definitions.extend(deepcopy(nested))
     if _is_nodeset_definition(data):
-        definitions.append({str(key): deepcopy(value) for key, value in data.items() if key not in {"nodesets", "__vibeflow_expanded_nodesets__"}})
+        definitions.append({str(key): deepcopy(value) for key, value in data.items() if key not in {"nodeset_types", "__vibeflow_expanded_nodesets__"}})
     if not definitions:
         raise _nodeset_import_error("CONFIG.NODESET_IMPORT.EMPTY", f"nodeset import must point to a nodeset definition file: {path}", path)
     return definitions
@@ -436,8 +431,8 @@ def _is_nodeset_definition(data: Mapping[str, Any]) -> bool:
     return isinstance(data.get("type_key"), str)
 
 
-def _nodesets_with_file_global_config(nodesets: list[object], global_config: object) -> list[object]:
-    copied = deepcopy(nodesets)
+def _nodesets_with_file_global_config(nodeset_types: list[object], global_config: object) -> list[object]:
+    copied = deepcopy(nodeset_types)
     if not isinstance(global_config, Mapping) or not global_config:
         return copied
     for item in copied:
@@ -446,10 +441,10 @@ def _nodesets_with_file_global_config(nodesets: list[object], global_config: obj
     return copied
 
 
-def _validate_unique_nodeset_type_keys(nodesets: list[object], path: Path) -> None:
+def _validate_unique_nodeset_type_keys(nodeset_types: list[object], path: Path) -> None:
     seen: set[str] = set()
     duplicates: set[str] = set()
-    for item in nodesets:
+    for item in nodeset_types:
         if not isinstance(item, Mapping):
             continue
         type_key = str(item.get("type_key", "")).strip()

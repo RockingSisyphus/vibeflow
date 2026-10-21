@@ -1,1 +1,0 @@
-export function createSession(){let active=false;let count=0;return {start(){active=true;},next(value:number){if(!active)throw Error("session stopped");count+=1;return value+count;},stop(){active=false;}};}

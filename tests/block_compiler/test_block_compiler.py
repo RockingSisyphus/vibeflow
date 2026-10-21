@@ -33,8 +33,8 @@ from vibeflow.core.flow import (
     ExecutionLockSpec,
     GraphConfig,
     LoopSpec,
-    NodeSpec,
-    NodesetSpec,
+    NodeCallSpec,
+    NodesetTypeSpec,
 )
 from vibeflow.core.models import (
     CoreCompileRequest,
@@ -72,9 +72,9 @@ def _facts() -> ImplementationFacts:
 def _linear_graph(*, params: dict[str, object] | None = None) -> GraphConfig:
     return GraphConfig(
         nodes=(
-            NodeSpec("start", "fixture.terminal"),
-            NodeSpec("step", "fixture.step", params=params or {}),
-            NodeSpec("end", "fixture.terminal"),
+            NodeCallSpec("start", "fixture.terminal"),
+            NodeCallSpec("step", "fixture.step", params=params or {}),
+            NodeCallSpec("end", "fixture.terminal"),
         ),
         edges=(EdgeSpec("start", "step"), EdgeSpec("step", "end")),
         root_id="fixture.workflow",
@@ -87,7 +87,7 @@ def _compile(graph: GraphConfig) -> WorkflowPlan:
         CoreCompileRequest(
             graph=graph,
             implementation_facts=facts,
-            known_nodesets=frozenset(graph.nodesets),
+            known_nodeset_types=frozenset(graph.nodeset_types),
         )
     ).workflow
     return compile_workflow(validated, facts)
@@ -110,7 +110,7 @@ def _compile_global(
         CoreCompileRequest(
             graph=graph,
             implementation_facts=facts,
-            known_nodesets=frozenset(graph.nodesets),
+            known_nodeset_types=frozenset(graph.nodeset_types),
             target_features=target_features,
         )
     ).workflow
@@ -160,7 +160,7 @@ def test_canonical_ir_identity_and_compilation_are_deterministic() -> None:
 
 def test_compile_workflow_compiles_nested_nodesets_without_target_objects() -> None:
     child = _linear_graph(params={"amount": 2})
-    nodeset = NodesetSpec(
+    nodeset = NodesetTypeSpec(
         type_key="fixture.group",
         display_name="Group",
         description="A nested portable calculation.",
@@ -170,12 +170,12 @@ def test_compile_workflow_compiles_nested_nodesets_without_target_objects() -> N
     )
     graph = GraphConfig(
         nodes=(
-            NodeSpec("start", "fixture.terminal"),
-            NodeSpec("group", "fixture.group"),
-            NodeSpec("end", "fixture.terminal"),
+            NodeCallSpec("start", "fixture.terminal"),
+            NodeCallSpec("group", "fixture.group"),
+            NodeCallSpec("end", "fixture.terminal"),
         ),
         edges=(EdgeSpec("start", "group"), EdgeSpec("group", "end")),
-        nodesets={nodeset.type_key: nodeset},
+        nodeset_types={nodeset.type_key: nodeset},
         root_id="fixture.nested",
     )
 
@@ -210,7 +210,7 @@ def test_source_override_rejects_language_bindings() -> None:
         compile_graph_plan(
             graph,
             compilation.compiled_graph,
-            source_by_type={"fixture.step": lambda: None},  # type: ignore[dict-item]
+            source_by_definition={"fixture.step": lambda: None},  # type: ignore[dict-item]
         )
 
 
@@ -269,8 +269,8 @@ def test_abi_v5_serializes_global_state_and_locks_without_dispatch() -> None:
     )
     graph = GraphConfig(
         nodes=(
-            NodeSpec("state", "fixture.state"),
-            NodeSpec(
+            NodeCallSpec("state", "fixture.state"),
+            NodeCallSpec(
                 "step",
                 "fixture.step",
                 execution_lock=ExecutionLockSpec("trainer"),
@@ -284,7 +284,7 @@ def test_abi_v5_serializes_global_state_and_locks_without_dispatch() -> None:
     payload = plan.to_dict()
     root = plan.block(plan.entry_block)
 
-    assert plan.abi_version == WORKFLOW_ABI_VERSION == "vibeflow.workflow.v9"
+    assert plan.abi_version == WORKFLOW_ABI_VERSION == "vibeflow.workflow.v10"
     assert plan.contains_global_state is True
     assert "root_exclusive" not in payload
     assert payload["execution_lock"] == {"key": "trainer", "scope": "root"}
@@ -308,10 +308,10 @@ def test_abi_v5_serializes_global_state_and_locks_without_dispatch() -> None:
 def test_nested_global_state_and_ordinary_calls_have_independent_plan_facts():
     facts = ImplementationFacts((ImplementationFact("fixture.state",flow_kind=FLOW_KIND_GLOBAL_STATE),
         ImplementationFact("fixture.side",flow_kind="process")),strict=True)
-    child = GraphConfig(nodes=(NodeSpec("state","fixture.state"),))
-    group = NodesetSpec("fixture.group","Group","Contains process-global work",(),(),child)
-    graph = GraphConfig(nodes=(NodeSpec("group","fixture.group"),NodeSpec("side","fixture.side")),
-        nodesets={group.type_key:group})
+    child = GraphConfig(nodes=(NodeCallSpec("state","fixture.state"),))
+    group = NodesetTypeSpec("fixture.group","Group","Contains process-global work",(),(),child)
+    graph = GraphConfig(nodes=(NodeCallSpec("group","fixture.group"),NodeCallSpec("side","fixture.side")),
+        nodeset_types={group.type_key:group})
     plan = _compile_global(graph,facts)
     root = plan.block(plan.entry_block)
     assert plan.contains_global_state and root.node("group").contains_global_state
@@ -326,9 +326,9 @@ def test_planned_nodeset_subtree_is_visible_but_never_compiled_for_execution(
     planned_definition: bool,
 ) -> None:
     child = GraphConfig(
-        nodes=(NodeSpec("state", "fixture.unavailable_global"),)
+        nodes=(NodeCallSpec("state", "fixture.unavailable_global"),)
     )
-    nodeset = NodesetSpec(
+    nodeset = NodesetTypeSpec(
         type_key="fixture.future_group",
         display_name="Future Group",
         description="A planned subtree that is architecture-only.",
@@ -337,7 +337,7 @@ def test_planned_nodeset_subtree_is_visible_but_never_compiled_for_execution(
         graph=child,
         status="planned" if planned_definition else "implemented",
     )
-    invocation = NodeSpec(
+    invocation = NodeCallSpec(
         "future",
         nodeset.type_key,
         status="implemented" if planned_definition else "planned",
@@ -346,7 +346,7 @@ def test_planned_nodeset_subtree_is_visible_but_never_compiled_for_execution(
     )
     graph = GraphConfig(
         nodes=(invocation,),
-        nodesets={nodeset.type_key: nodeset},
+        nodeset_types={nodeset.type_key: nodeset},
     )
 
     # No global-state/lock Target features and no implementation fact for the
@@ -371,10 +371,10 @@ def test_nested_execution_locks_must_reuse_same_key() -> None:
         strict=True,
     )
     child = GraphConfig(
-        nodes=(NodeSpec("step", "fixture.step"),),
+        nodes=(NodeCallSpec("step", "fixture.step"),),
         execution_lock=ExecutionLockSpec("child"),
     )
-    nodeset = NodesetSpec(
+    nodeset = NodesetTypeSpec(
         type_key="fixture.group",
         display_name="Group",
         description="Nested lock fixture.",
@@ -383,8 +383,8 @@ def test_nested_execution_locks_must_reuse_same_key() -> None:
         graph=child,
     )
     graph = GraphConfig(
-        nodes=(NodeSpec("group", "fixture.group"),),
-        nodesets={nodeset.type_key: nodeset},
+        nodes=(NodeCallSpec("group", "fixture.group"),),
+        nodeset_types={nodeset.type_key: nodeset},
         execution_lock=ExecutionLockSpec("root"),
     )
 
@@ -398,7 +398,7 @@ def test_nested_execution_locks_must_reuse_same_key() -> None:
 def test_composite_invocation_locks_use_block_scope() -> None:
     facts = _facts()
     child = _linear_graph()
-    nodeset = NodesetSpec(
+    nodeset = NodesetTypeSpec(
         type_key="fixture.group",
         display_name="Group",
         description="Composite lock scope fixture.",
@@ -408,19 +408,19 @@ def test_composite_invocation_locks_use_block_scope() -> None:
     )
     graph = GraphConfig(
         nodes=(
-            NodeSpec(
+            NodeCallSpec(
                 "group",
                 "fixture.group",
                 execution_lock=ExecutionLockSpec("project.group"),
             ),
-            NodeSpec(
+            NodeCallSpec(
                 "loop",
                 "vibeflow.loop.while",
                 loop=LoopSpec(body="fixture.group", stop_after=1),
                 execution_lock=ExecutionLockSpec("project.loop"),
             ),
         ),
-        nodesets={nodeset.type_key: nodeset},
+        nodeset_types={nodeset.type_key: nodeset},
     )
 
     root = _compile_global(graph, facts).block("block:/")
@@ -433,7 +433,7 @@ def test_portable_plan_has_no_hidden_task_execution_protocol():
     from vibeflow.core.config.graph import parse_graph_config_data
     from vibeflow.core.flow import GraphConfigError
     with pytest.raises(GraphConfigError,match="GRAPH.TASK.MIGRATION"):
-        parse_graph_config_data({"pipeline":{"nodes":[{"id":"dispatch","type_used":"fixture.work",
-            "task_targets":{"work":{"type_used":"fixture.work"}}}]}})
+        parse_graph_config_data({"pipeline":{"nodes":[{"id":"dispatch","definition_id":"fixture.work",
+            "task_targets":{"work":{"definition_id":"fixture.work"}}}]}})
     with pytest.raises(TypeError,match="task_targets"):
-        NodeSpec("dispatch","fixture.work",task_targets={})
+        NodeCallSpec("dispatch","fixture.work",task_targets={})

@@ -1,9 +1,5 @@
 {
   "project_target": "python",
-  "quality_enabled": true,
-  "runtime": {
-    "nodeset_max_depth": 4
-  },
   "architecture": {
     "documents": [
       {

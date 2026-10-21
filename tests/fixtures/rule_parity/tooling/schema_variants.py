@@ -4,7 +4,7 @@ from copy import deepcopy
 from pathlib import Path
 
 
-NODE = {"id": "work", "type_used": "parity.work", "display_name": "Work", "description": "One work unit."}
+NODE = {"id": "work", "definition_id": "parity.work", "display_name": "Work", "description": "One work unit."}
 REQUIREMENT = {"type": "parity.input", "cardinality": "exactly_one", "display_name": "Input"}
 PROVIDER = {"key": "value", "type": "parity.output", "display_name": "Output"}
 
@@ -98,7 +98,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
              ("CONFIG.LOOPS.REMOVED" if field == "loop" else "CONFIG.LOOP_LIMITS.REMOVED",))
     emit("edge.alias.normal", pipeline(edges=[{"source": "work", "target": "work"}]))
     emit("max_steps.one", pipeline(max_steps=1))
-    loop = {**NODE, "type_used": "vibeflow.loop.while", "requires": [], "provides": [], "loop": {"body": "parity.body", "max_iterations": 2}}
+    loop = {**NODE, "definition_id": "vibeflow.loop.while", "requires": [], "provides": [], "loop": {"body": "parity.body", "max_iterations": 2}}
     for label, value in (("object", []), ("body", {"body": ""}), ("legacy_body", {"body": "nodeset.old"}),
                          ("unknown", {"body": "parity.body", "extra": 1}),
                          ("max_bool", {"body": "parity.body", "max_iterations": True}),
@@ -119,8 +119,8 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     nodeset = {"type_key": "parity.child", "display_name": "Child", "description": "An imported child.",
                "requires": [], "provides": [], "pipeline": pipeline()["pipeline"]}
     emit("nodeset.normal", nodeset)
-    schema("nodeset.expanded_list", {**pipeline(), "__vibeflow_expanded_nodesets__": True, "nodesets": {}}, "NODESETS_LIST")
-    schema("nodeset.expanded_item", {**pipeline(), "__vibeflow_expanded_nodesets__": True, "nodesets": [1]}, "NODESET_OBJECT")
+    schema("nodeset.expanded_list", {**pipeline(), "__vibeflow_expanded_nodesets__": True, "nodeset_types": {}}, "NODESETS_LIST")
+    schema("nodeset.expanded_item", {**pipeline(), "__vibeflow_expanded_nodesets__": True, "nodeset_types": [1]}, "NODESET_OBJECT")
     for field in ("name", "category", "version", "purity", "exports"):
         schema("nodeset.removed." + field, {**nodeset, field: "old"}, "NODESET_FIELD_REMOVED")
     schema("nodeset.type_empty", {**nodeset, "type_key": ""}, "NODESET_MISSING_TYPE_KEY")
@@ -140,7 +140,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         schema("global." + field, {**pipeline(), "global_config": {field: []}}, "GLOBAL_CONFIG_VALUES")
     for field in ("allow_config_override", "override_child_config"):
         schema("global." + field, {**pipeline(), "global_config": {field: "yes"}}, "CONFIG_OVERRIDE_FLAG")
-    for kind, key in (("plugin", "plugins"), ("host", "host_extensions"), ("base", "base_lib")):
+    for kind, key in (("plugin", "plugins"), ("base", "base_lib")):
         def resource(item):
             if kind == "plugin" and variant == "current":
                 item = {"status":"planned", **item}
@@ -169,49 +169,5 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             emit("plugin."+label,{**pipeline(),"plugins":[item]},(code,),classification="approved_change")
         else:
             schema("plugin." + label, {**pipeline(), "plugins": [item]}, suffix)
-    for field in ("config", "settings"):
-        schema("host." + field, {**pipeline(), "host_extensions": [{"id": "h", field: []}]}, "HOST_EXTENSION_CONFIG")
-    for field in ("targets", "provides", "dependencies"):
-        schema("host." + field, {**pipeline(), "host_extensions": [{"id": "h", field: [""]}]}, "HOST_EXTENSION_STRING_LIST")
-    emit("host.disabled_duplicate", {**pipeline(), "host_extensions": ["h", {"id": "h", "enabled": False}]})
-    emit("host.disabled_then_active", {**pipeline(), "host_extensions": [{"id": "h", "enabled": False}, "h"]})
-    schema("policy.root", {**pipeline(), "policy": []}, "POLICY_ROOT")
-    integer_sections = {"node_source": ("max_lines", "max_bytes", "warn_lines", "warn_bytes"),
-                        "complexity": ("max_functions", "max_branches", "max_nesting_depth", "max_params", "max_contract_keys"),
-                        "maintainability": ("warn_call_chain_length", "max_call_chain_length", "warn_dependency_chain_length", "max_dependency_chain_length")}
-    for section, fields in integer_sections.items():
-        schema("policy." + section + ".object", {**pipeline(), "policy": {section: []}}, "POLICY_SECTION")
-        for field in fields:
-            schema("policy." + section + "." + field, {**pipeline(), "policy": {section: {field: True}}}, "POLICY_POSITIVE_INT")
-        emit("policy." + section + ".one", {**pipeline(), "policy": {section: {field: 1 for field in fields}}})
-    emit("policy.complexity.disabled", {**pipeline(), "policy": {"complexity": {field: None for field in integer_sections["complexity"]}}})
-    schema("policy.source.null", {**pipeline(), "policy": {"node_source": {"max_lines": None}}}, "POLICY_POSITIVE_INT")
-    schema("policy.source.zero", {**pipeline(), "policy": {"node_source": {"max_lines": 0}}}, "POLICY_POSITIVE_INT")
-    for section, fields in (("imports", ("allowed_roots", "banned_roots", "allowed_modules", "banned_modules")),
-                            ("base_lib", ("allowed_paths", "allowed_modules", "banned_modules"))):
-        if section == "base_lib" and variant == "current":
-            removed = ("CONFIG.POLICY.BASE_LIB.REMOVED",)
-            emit("policy.base_lib.object", {**pipeline(),"policy":{"base_lib":[]}}, removed, classification="approved_change")
-            for field in fields:
-                emit("policy.base_lib."+field,{**pipeline(),"policy":{"base_lib":{field:[""]}}},removed,classification="approved_change")
-            emit("policy.base_lib.normal",{**pipeline(),"policy":{"base_lib":{field:["support"] for field in fields}}},removed,classification="approved_change")
-        else:
-            schema("policy." + section + ".object", {**pipeline(), "policy": {section: []}}, "POLICY_SECTION")
-            for field in fields:
-                schema("policy." + section + "." + field, {**pipeline(), "policy": {section: {field: [""]}}}, "POLICY_STRING_LIST")
-            emit("policy." + section + ".normal", {**pipeline(), "policy": {section: {field: ["support"] for field in fields}}})
-    legacy_entry = {"rule_id": "NODE.SOURCE.TOO_LONG", "to": "warning", "reason": "A documented migration case.", "expires": "2099-01-01"}
-    removed = ("CONFIG.POLICY.RULES.REMOVED",)
-    def legacy(name, value, baseline_codes=()):
-        emit("policy.removed." + name, {**pipeline(), "policy": {"rules": value}}, removed,
-             classification="approved_change", baseline_codes=baseline_codes)
-    legacy("normal", {"downgrades": [legacy_entry]})
-    legacy("object", [], ("CONFIG.SCHEMA.POLICY_SECTION",))
-    legacy("list", {"downgrades": {}}, ("CONFIG.SCHEMA.POLICY_RULES_LIST",))
-    legacy("item", {"downgrades": [1]}, ("CONFIG.SCHEMA.POLICY_RULE_OBJECT",))
-    for field, code in (("rule_id", "ID"), ("reason", "REASON"), ("expires", "EXPIRES")):
-        legacy("missing_" + field, {"downgrades": [{k: v for k, v in legacy_entry.items() if k != field}]}, ("CONFIG.SCHEMA.POLICY_RULE_" + code,))
-    legacy("to", {"downgrades": [{**legacy_entry, "to": "error"}]}, ("CONFIG.SCHEMA.POLICY_RULE_TO",))
-    legacy("scope", {"downgrades": [{**legacy_entry, "scope": []}]}, ("CONFIG.SCHEMA.POLICY_RULE_SCOPE",))
-    legacy("exemption", {"exemptions": [{k: v for k, v in legacy_entry.items() if k != "to"}]})
+    emit("policy.root",{**pipeline(),"policy":[]},("CONFIG.POLICY.RETIRED",),classification="approved_change")
     return rows

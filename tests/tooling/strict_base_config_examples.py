@@ -10,7 +10,7 @@ from vibeflow.core.inspection import build_architecture_report
 from vibeflow.targets.python.quality.source_analysis.ast_facts import import_aliases, import_roots, qualified_call_name
 
 
-CycleCopyNode_DECLARATION = node_declaration(NodeDescriptor('test.copy_alt', 'Cycle Copy', 'Copies value.out into a distinct value.in-compatible key.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='Value Out'),), provides=(DataProvider('value.copy', 'value.in', display_name='Value Copy'),), input_semantics={'value.out': ('value to copy around the cycle',)}, output_semantics={'value.copy': ('copied value compatible with value.in',)}), rulesets=("vibeflow.process",))
+CycleCopyNode_DECLARATION = node_declaration(NodeDescriptor('test.copy_alt', 'Cycle Copy', 'Copies value.out into a distinct value.in-compatible key.', '0.1.0', 'process', rulesets=(), contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='Value Out'),), provides=(DataProvider('value.copy', 'value.in', display_name='Value Copy'),), input_semantics={'value.out': ('value to copy around the cycle',)}, output_semantics={'value.copy': ('copied value compatible with value.in',)}), rulesets=("vibeflow.process",))
 
 class CycleCopyNode:
 
@@ -48,8 +48,11 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
         assert expected in codes
         observed.add(expected)
 
+    from tests.fixtures.support.projects import register_root
+    config_root = tmp_path / "config-cases" / "project"
+    register_root(config_root)
     for case in manifest["config_cases"]:
-        config_path = tmp_path / f"{case['name']}.json"
+        config_path = config_root / f"{case['name']}.json"
         config_path.write_text(json.dumps(case["config"]), encoding="utf-8")
         code = cli_main(["validate", "--config", str(config_path), "--json"])
         payload = json.loads(capsys.readouterr().out)
@@ -80,7 +83,7 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
             "source":{"kind":"file","ref":"base_lib/bad.py"}}]}],target="python")
         (base_dir.parent / "vibeflow_project.jsonc").write_text('{"project_target":"python"}')
         config = base_dir.parent / "workflow.jsonc"
-        data = {"plugins":[selection],"rulesets":[],"pipeline":{"nodes":[]}}
+        data = {"plugins":[selection],"rulesets":[],"base_lib":{"modules":["bad"]},"pipeline":{"nodes":[_node_call("node","demo.other","Declaration for ownership checks.")]}}
         config.write_text(json.dumps(data))
         workspace = load_project_workspace(config)
         registry = declared_python_registry(workspace,config)
@@ -121,16 +124,13 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
             path = case_dir / rel_path
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(source, encoding="utf-8")
-        args = ["quality-check", "--path", str(case_dir), "--project-target", "python", "--json", *case.get("args", [])]
-        code = cli_main(args)
-        assert code in {0, 1}
-        payload = json.loads(capsys.readouterr().out)
+        thresholds = QualityThresholds(max_function_params=2) if "--max-function-params" in case.get("args", []) else QualityThresholds()
+        payload = scan_code_quality(case_dir, thresholds=thresholds,
+            check_side_effects="--check-side-effects" in case.get("args", [])).to_dict()
         rule_ids = {finding["rule_id"] for finding in (*payload["errors"], *payload["warnings"])}
         if "expected_rule_id" in case:
             expected_rule = str(case["expected_rule_id"])
             assert expected_rule in rule_ids
-            assert payload["details_summary"]["score"] < 100
-            assert payload["top_offenders"]
             observed.add(expected_rule)
         if "expected_absent_rule_id" in case:
             assert str(case["expected_absent_rule_id"]) not in rule_ids
@@ -167,13 +167,13 @@ def test_removed_policy_downgrades_require_explicit_ruleset_migration() -> None:
         "policy": {"rules": {"downgrades": [{"rule_id": "GRAPH.DATA.UNCONSUMED_PROVIDER", "to": "warning"}]}},
         "pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.")]},
     })
-    assert "CONFIG.POLICY.RULES.REMOVED" in {item.rule_id for item in findings}
+    assert "CONFIG.POLICY.RETIRED" in {item.rule_id for item in findings}
 
 
 def test_mermaid_collapsed_and_expanded_views_share_top_level_compiled_edges() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "math.add_one",
                     requires=["value.in"],
@@ -210,7 +210,9 @@ def test_checked_run_artifact_integrity_cross_links_health_graph_trace(tmp_path)
         ),
         encoding="utf-8",
     )
-    result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="integrity")
+    from tests.fixtures.support.plugins import publish_native_fixture
+    publish_native_fixture(config_path, _registry())
+    result = run_checked(config_path, run_root=tmp_path / "runs", run_id="integrity")
     compiled = json.loads((result.run_dir / "compiled_graph.json").read_text(encoding="utf-8"))
     health = json.loads((result.run_dir / "health_report.json").read_text(encoding="utf-8"))
     facts=preview_architecture(result.run_dir)
@@ -604,54 +606,3 @@ def test_code_quality_tool_reports_python_syntax_errors(tmp_path) -> None:
 
     assert report.status == "FAIL"
     assert any(finding.rule_id == "QUALITY.SYNTAX.PYTHON" for finding in report.findings)
-
-def test_cli_quality_check_json_and_text_outputs(tmp_path, capsys) -> None:
-    (tmp_path / "bad.py").write_text(
-        "\n".join(
-            [
-                "def side_effect():",
-                "    return open('x.txt').read()",
-                "",
-                "def normalize_one(value):",
-                "    result = value + 1",
-                "    return result",
-                "",
-                "def normalize_two(item):",
-                "    result = item + 1",
-                "    return result",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    json_code = cli_main(["quality-check", "--path", str(tmp_path), "--project-target", "python", "--json", "--check-side-effects"])
-    json_payload = json.loads(capsys.readouterr().out)
-    text_code = cli_main(["quality-check", "--path", str(tmp_path), "--project-target", "python", "--check-side-effects"])
-    text_output = capsys.readouterr().out
-
-    assert json_code == 0
-    assert json_payload["status"] == "CONCERNS"
-    assert json_payload["scope_summary"]["other"]["warnings"] >= 1
-    assert "score" in json_payload["details_summary"]
-    assert json_payload["result_code"].startswith("VIBEFLOW_QUALITY_")
-    assert "top_offenders" in json_payload
-    assert "QUALITY.SIDE_EFFECT.CALL" in {item["code"] for item in json_payload["warnings"]}
-    assert text_code == 0
-    assert "scopes:" in text_output
-    assert "score=" in text_output
-    assert "QUALITY.SIDE_EFFECT.CALL" in text_output
-    assert "file:bad.py" in text_output
-    assert "details:" in text_output
-
-
-def test_cli_quality_structure_limits_are_explicit_for_path_scans(tmp_path, capsys) -> None:
-    (tmp_path / "helper.py").write_text("VALUE = 1\n", encoding="utf-8")
-
-    assert cli_main(["quality-check", "--path", str(tmp_path), "--project-target", "python", "--json"]) == 0
-    default_payload = json.loads(capsys.readouterr().out)
-    assert default_payload["errors"] == []
-    assert default_payload["warnings"] == []
-
-    assert cli_main(["quality-check", "--path", str(tmp_path), "--project-target", "python", "--json", "--enable-structure-limits"]) == 0
-    enabled_payload = json.loads(capsys.readouterr().out)
-    assert [finding["rule_id"] for finding in enabled_payload["warnings"]] == ["QUALITY.STRUCTURE.ROOT_LEVEL_CODE_FILE"]

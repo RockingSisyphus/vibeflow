@@ -13,38 +13,38 @@
         "display_name": "Start",
         "description": "Starts the forbidden decision-cycle fixture.",
         "id": "start",
-        "type_used": "sandbox.start"
+        "definition_id": "sandbox.start"
       },
       {
         "display_name": "Input",
         "description": "Reads the initial loop value.",
         "id": "input",
-        "type_used": "sandbox.value_input"
+        "definition_id": "sandbox.value_input"
       },
       {
         "display_name": "Increment",
         "description": "Advances the retry value.",
         "id": "increment",
-        "type_used": "sandbox.increment"
+        "definition_id": "sandbox.increment"
       },
       {
         "display_name": "Done Check",
         "description": "Routes to either repeat or exit.",
         "target": 2,
         "id": "done",
-        "type_used": "sandbox.done_check"
+        "definition_id": "sandbox.done_check"
       },
       {
         "display_name": "Copy Back",
         "description": "Copies value.next back to value.in for the forbidden graph edge cycle.",
         "id": "copy",
-        "type_used": "sandbox.copy_back"
+        "definition_id": "sandbox.copy_back"
       },
       {
         "display_name": "End",
         "description": "Shows that even an exit branch does not make ordinary cycles legal.",
         "id": "end",
-        "type_used": "sandbox.next_value_end"
+        "definition_id": "sandbox.next_value_end"
       }
     ],
     "edges": [
@@ -87,7 +87,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

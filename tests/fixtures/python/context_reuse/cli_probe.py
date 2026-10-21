@@ -16,8 +16,8 @@ seen = []
 def record(context, kind):
     sources = context.facts["source_context"]
     assert len(sources.nodes) == 1
-    assert sources.nodes[0].type_key == context.subject["descriptor"].type_key
-    assert "node_catalog" not in context.facts
+    assert sources.nodes[0].definition_id == context.subject["descriptor"].id
+    assert "global_graph" not in context.facts
     seen.append((sources, context.subject["descriptor"], kind))
     Path(__file__).with_name("identity.json").write_text(json.dumps({
         "checks": len(seen), "sources": len({id(item[0]) for item in seen}),
@@ -47,10 +47,10 @@ identity = ruleset(id="probe.identity", calls=[
 def observe(work):
     root = work / "project"
     write_project(root, "integer", 1)
-    path = root / "plugin.py"
+    path = root / "nodes/steps.py"
     code = path.read_text()
-    start = code.index('@node(type_key="probe.defaults"')
-    end = code.index('@node(type_key="probe.end"', start)
+    start = code.index('@node(node_type="vibeflow.node",id="probe.defaults"')
+    end = code.index('@node(node_type="vibeflow.node",id="probe.end"', start)
     template = code[start:end].replace('rulesets=["vibeflow.process"]', 'rulesets=["probe.identity"]')
     resources = []
     implementations = []
@@ -58,23 +58,23 @@ def observe(work):
         name = f"Defaults{index}"
         implementations.append(template.replace('probe.defaults', f'probe.defaults{index}').replace('class Defaults:', f'class {name}:').replace('"result"', f'"result{index}"'))
         resources.append(name)
-    code = code[:start] + CHECKS + '\n' + '\n'.join(implementations) + code[end:]
-    code = code.replace('resources=[Start, Defaults, End, inspection]',
-        'resources=[Start, ' + ', '.join(resources) + ', End, inspection, call_check, source_check, identity]')
-    code = code.replace('declaration_rulesets=["vibeflow.plugin_declaration"]', 'declaration_rulesets=[]')
-    code = code.replace('rulesets=["vibeflow.io"]', 'rulesets=[]')
-    path.write_text(code)
+    code = code[:start] + '\n'.join(implementations) + code[end:]
+    path.write_text(code.replace('rulesets=["vibeflow.io"]', 'rulesets=[]'))
+    plugin = root / "plugins/schemas/plugin.py"
+    source = plugin.read_text()
+    source = source.replace('plugin=Plugin(', CHECKS + '\nplugin=Plugin(').replace('resources=[inspection]', 'resources=[inspection,call_check,source_check,identity]')
+    plugin.write_text(source)
     config = root / "workflow.jsonc"
     workflow = json.loads(config.read_text())
     original = workflow["pipeline"]["nodes"]
-    repeated = [{**original[1], "id":f"inspect{i}", "type_used":f"probe.defaults{i}"} for i in range(12)]
+    repeated = [{**original[1], "id":f"inspect{i}", "definition_id":f"probe.defaults{i}"} for i in range(12)]
     workflow["pipeline"]["nodes"] = [original[0], *repeated, original[2]]
     ids = [item["id"] for item in workflow["pipeline"]["nodes"]]
     workflow["pipeline"]["edges"] = [ids[i:i+2] for i in range(len(ids)-1)]
     workflow["pipeline"]["outputs"] = []
     config.write_text(json.dumps(workflow))
     validation = execute(root, "validate", work)
-    identity_path = root / "identity.json"
+    identity_path = root / "plugins/schemas/identity.json"
     identity = json.loads(identity_path.read_text()) if identity_path.exists() else {}
     matched = validation["exit_code"] == 0 and identity == {
         "checks":24,"sources":12,"descriptors":12,"call_checks":12,"source_checks":12}

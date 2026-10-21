@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from tests.fixtures.adaptation_regressions.common import row, run_cli, run_probe
-from tests.fixtures.adaptation_regressions.python_runtime_fixtures import compiler_project, policy_project, scope_project
+from tests.fixtures.adaptation_regressions.python_runtime_fixtures import compiler_project, scope_project
 from tests.fixtures.python.review_performance.fixtures import write_project
 
 OBSERVER = Path(__file__).with_name("python_runtime_observer.py")
@@ -12,7 +12,7 @@ OBSERVER = Path(__file__).with_name("python_runtime_observer.py")
 def arguments(root, command, *, workspace=True, config=None):
     result = [command, "--config", str(config or root / "workflow.jsonc")]
     if workspace:
-        result += ["--workspace", str(root / "vibeflow_config.jsonc")]
+        result += ["--workspace", str(root.parent / "vibeflow_config.jsonc")]
     if command == "validate":
         result += ["--json"]
     if command == "run":
@@ -137,36 +137,7 @@ def inspect_config_cases(work, kernel):
     return rows
 
 
-def inspect_node_cases(work, kernel):
-    rows = []
-    variants = {"inline-denied":({"inline":10},True), "inline-allowed":({"inline":500},False),
-        "discovered-denied":({"discovered":10},True),
-        "explicit-wins":({"discovered":10,"explicit":40},False),
-        "inline-wins":({"discovered":50,"explicit":40,"inline":10},True),
-        "nested-discovery":({"discovered":10,"nested":True},True),
-        "rule-params-win":({"inline":10,"override":True},False),
-        "unrelated-node":({"inline":500,"unrelated":True},False)}
-    for name, (options, denied) in variants.items():
-        root, config = policy_project(work / name, **options)
-        for command in ("validate", "inspect-node"):
-            argv = arguments(root, command, workspace=False, config=config)
-            if command == "inspect-node":
-                argv += ["--type","audit.leaf"]
-            if "explicit" in options:
-                argv += ["--policy",str(root / "explicit.jsonc")]
-            raw = run_cli(root, argv, kernel, name=command)
-            actual = observed(raw, "NODE.PURITY.SOURCE_TOO_LARGE")
-            expected = {"exit_code":1 if denied else 0,"status":"FAIL" if denied else "PASS",
-                        "error_codes":["NODE.PURITY.SOURCE_TOO_LARGE"] if denied else []}
-            if denied:
-                target = actual["target"]
-                actual["target_exact"] = len(target) == 1 and target[0]["severity"] == "error" and target[0]["source_location"] == {"path":str(root / "leaf.py"),"line":1,"column":1} and "28 lines > 10" in target[0]["message"]
-                expected["target_exact"] = True
-            rows.append(row("A07.python.policy." + name + "." + command, "A07", "Inspect Node preserves workflow policy precedence and its own scope", expected, actual, project=root))
-    return rows
-
-
 def observe(work: Path, kernel: Path, toolchain: Path | None = None, renderer: Path | None = None) -> list[dict]:
     work.mkdir(parents=True, exist_ok=True)
     return [*compiler_cases(work / "compiler", kernel), *scope_cases(work / "scope", kernel),
-            *inspect_config_cases(work / "inspect-config", kernel), *inspect_node_cases(work / "inspect-node", kernel)]
+            *inspect_config_cases(work / "inspect-config", kernel)]

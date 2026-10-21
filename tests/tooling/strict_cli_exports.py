@@ -4,7 +4,7 @@ from tests.fixtures.support.declarations import node_declaration, configured_dec
 from tests.fixtures.support.strict_support import *
 
 
-CliExternalNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.cli_external', display_name='CLI External', description='Exercises workspace registry metadata during CLI export.', version='0.1.0', flow_kind='process', external=True, contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.process",))
+CliExternalNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.cli_external', display_name='CLI External', description='Exercises workspace registry metadata during CLI export.', version='0.1.0', flow_kind='process', external=True, contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(), rulesets=("vibeflow.process",))
 
 class CliExternalNode:
 
@@ -13,6 +13,8 @@ class CliExternalNode:
 
 
 def _write_export_config(path: Path) -> None:
+    from tests.fixtures.support.projects import register_root
+    register_root(path.parent)
     path.write_text(
         json.dumps(
             {
@@ -35,7 +37,7 @@ def _write_nodeset_export_config(path: Path) -> None:
     _write_config_file(
         path,
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "math.add_one",
                     requires=["value.in"],
@@ -84,10 +86,11 @@ def test_cli_export_mermaid_includes_declared_resources(tmp_path, capsys) -> Non
     base_dir.mkdir()
     (base_dir / "__init__.py").write_text("")
     (base_dir / "math_tools.py").write_text("def add(a,b):\n    return a+b\n")
-    (tmp_path / "policy_plugin.py").write_text('from vibeflow.targets.python.sdk import Plugin\ndef runtime(context):\n    return object()\nplugin=Plugin(id="policy",runtime=runtime,display_name="Config Policy",description="Config-level policy declaration.")\n')
+    (tmp_path / "plugins/policy").mkdir(parents=True)
+    (tmp_path / "plugins/policy/plugin.py").write_text('from vibeflow.targets.python.sdk import Plugin\ndef runtime(context):\n    return object()\nplugin=Plugin(id="policy",runtime=runtime,display_name="Config Policy",description="Config-level policy declaration.")\n')
     config_path = tmp_path / "workflow.jsonc"
     config_path.write_text(json.dumps({"base_lib":{"modules":["base_lib.math_tools"]},
-        "plugins":[{"source":{"kind":"file","ref":"policy_plugin.py","export":"plugin"}},
+        "plugins":[{"source":{"kind":"file","ref":"plugins/policy/plugin.py","export":"plugin"}},
             {"id":"future_policy","type":"runtime","status":"planned","display_name":"Future Policy", "description":"planned policy"}],
         "pipeline":_seed_only_pipeline()}))
     publish_native_fixture(config_path, _registry())
@@ -303,6 +306,8 @@ def test_cli_export_mermaid_writes_output_and_expands_nodesets(tmp_path, capsys)
 
 
 def test_cli_export_mermaid_reports_config_errors_as_health_report(tmp_path, capsys) -> None:
+    from tests.fixtures.support.projects import register_root
+    register_root(tmp_path)
     config_path = tmp_path / "bad.jsonc"
     config_path.write_text('{\n  "pipeline": {"nodes": []},\n  "bad": [1,]\n}', encoding="utf-8")
 

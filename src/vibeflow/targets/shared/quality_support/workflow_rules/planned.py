@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from vibeflow.core.findings import HealthFinding
 from vibeflow.core.flow import (
-    LOOP_NODE_TYPES,
+    LOOP_DEFINITION_IDS,
     STATUS_IMPLEMENTED,
     STATUS_PLANNED,
 )
@@ -33,7 +33,7 @@ def _planned_health_facts(
     events: list[HealthFinding | PlannedImplementationCheck] = []
     visited_nodesets: set[str] = set()
     _append_graph_events(graph, events, owner="pipeline")
-    for nodeset in graph.nodesets.values():
+    for nodeset in graph.nodeset_types.values():
         if nodeset.type_key in visited_nodesets:
             continue
         visited_nodesets.add(nodeset.type_key)
@@ -67,7 +67,7 @@ def current_graph_planned_events(graph, *, owner="pipeline", definition=None):
     """No recursive graph scan: this task owns only the current graph."""
     events = []
     _append_graph_events(graph, events, owner=owner)
-    for nodeset in graph.nodesets.values():
+    for nodeset in graph.nodeset_types.values():
         if nodeset.status == STATUS_PLANNED:
             events.append(_planned_nodeset_finding(nodeset))
             _append_implementation_check(nodeset.planned_behavior, events, object_type="nodeset",
@@ -90,7 +90,7 @@ def graph_has_planned(graph, *, visited_nodesets: set[str] | None = None) -> boo
     if any(node.status == STATUS_PLANNED for node in graph.nodes):
         return True
     for nodeset_name in _referenced_nodeset_names(graph):
-        nodeset = graph.nodesets.get(nodeset_name)
+        nodeset = graph.nodeset_types.get(nodeset_name)
         if nodeset is None or nodeset.type_key in visited_nodesets:
             continue
         visited_nodesets.add(nodeset.type_key)
@@ -110,7 +110,7 @@ def graph_has_blocking_planned(
     if visited_nodesets is None:
         visited_nodesets = set()
     for node in graph.nodes:
-        nodeset = graph.nodesets.get(node.type_used)
+        nodeset = graph.nodeset_types.get(node.definition_id)
         if (
             node.status == STATUS_PLANNED
             and effective_planned_behavior(node, nodeset).kind
@@ -118,7 +118,7 @@ def graph_has_blocking_planned(
         ):
             return True
     for nodeset_name in _referenced_nodeset_names(graph):
-        nodeset = graph.nodesets.get(nodeset_name)
+        nodeset = graph.nodeset_types.get(nodeset_name)
         if nodeset is None or nodeset.type_key in visited_nodesets:
             continue
         visited_nodesets.add(nodeset.type_key)
@@ -138,7 +138,7 @@ def _append_graph_events(graph, events, *, owner: str) -> None:
     for node in graph.nodes:
         if node.status != STATUS_PLANNED:
             continue
-        nodeset = graph.nodesets.get(node.type_used)
+        nodeset = graph.nodeset_types.get(node.definition_id)
         behavior = effective_planned_behavior(node, nodeset)
         events.append(_planned_node_finding(node, behavior=behavior, owner=owner))
         _append_implementation_check(
@@ -232,9 +232,9 @@ def _behavior_details(behavior) -> dict[str, object]:
 def _referenced_nodeset_names(graph) -> tuple[str, ...]:
     refs: list[str] = []
     for node in graph.nodes:
-        if node.type_used in graph.nodesets:
-            refs.append(node.type_used)
-        elif node.type_used in LOOP_NODE_TYPES and node.loop.body:
+        if node.definition_id in graph.nodeset_types:
+            refs.append(node.definition_id)
+        elif node.definition_id in LOOP_DEFINITION_IDS and node.loop.body:
             refs.append(node.loop.body)
     return tuple(sorted(set(refs)))
 

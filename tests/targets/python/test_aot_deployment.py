@@ -8,7 +8,7 @@ import sys
 
 import pytest
 
-from tests.targets.python.test_code_plugins import EXECUTABLE, executable_project
+from tests.targets.python.test_code_plugins import EXECUTABLE, PLUGIN_SOURCE, executable_project
 from vibeflow.tooling.application.python.build import PythonBuildRequest, build_python_aot
 from vibeflow.tooling.application.python.bundle import load_bundle
 from vibeflow.tooling.project.workspace_loader import load_workspace_config
@@ -36,7 +36,7 @@ def test_moved_math_bundle_covers_loop_and_nodeset_scopes(tmp_path, execution, c
 def test_moved_multifile_implementations_and_runtime_plugin(tmp_path):
     source = tmp_path/'source'
     shutil.copytree(ROOT/'sandbox/python/multifile_resources',source,ignore=shutil.ignore_patterns('__pycache__','runs'))
-    build_python_aot(PythonBuildRequest(source/'vibeflow_config.jsonc',source/'workflow.jsonc',tmp_path/'bundle'))
+    build_python_aot(PythonBuildRequest(source/'vibeflow_config.jsonc',source/'project/configs/workflow.jsonc',tmp_path/'bundle'))
     shutil.rmtree(source)
     bundle = load_bundle(tmp_path/'bundle')
     first,second = bundle.create_runtime(run_dir=tmp_path/'first'),bundle.create_runtime(run_dir=tmp_path/'second')
@@ -44,24 +44,29 @@ def test_moved_multifile_implementations_and_runtime_plugin(tmp_path):
     assert first._frames['model'].node is not second._frames['model'].node
 
 
-def test_package_data_and_explicit_include_are_relocatable(tmp_path):
+@pytest.mark.parametrize('reader', ('path', 'package'))
+def test_package_data_and_explicit_include_are_relocatable(tmp_path, reader):
     source = tmp_path/'source'
     source.mkdir()
     workspace, config = executable_project(source)
-    package = source/'implementation'
+    package = source/'nodes/implementation'
     package.mkdir()
     (package/'__init__.py').write_text('')
-    code = EXECUTABLE.replace('return {"result": 7}', 'return {"result": int(__import__("pathlib").Path(__file__).with_name("value.txt").read_text())}')
+    code = EXECUTABLE.replace('["vibeflow.process","demo.rules"]', '["vibeflow.document","demo.rules"]').replace('return {"result": 7}', 'return {"result": int(__import__("pathlib").Path(__file__).with_name("value.txt").read_text())}')
+    if reader == 'package':
+        code = 'from importlib.resources import files\n' + code.replace(
+            '__import__("pathlib").Path(__file__).with_name("value.txt")',
+            'files(__package__).joinpath("value.txt")')
     (package/'plugin.py').write_text(code)
     (package/'value.txt').write_text('23')
     (source/'extras').mkdir()
     (source/'extras/selected.txt').write_text('included')
-    config.write_text(config.read_text().replace('plugin.py','implementation/plugin.py'))
+    (source/'nodes/steps.py').unlink()
     build_python_aot(PythonBuildRequest(workspace,config,tmp_path/'bundle',include=('extras',)))
     shutil.rmtree(source)
     result = load_bundle(tmp_path/'bundle').run(run_root=tmp_path/'runs')
     assert result.context.get('result')['value'] == 23
-    assert (tmp_path/'bundle/project/p/extras/selected.txt').read_text() == 'included'
+    assert next((tmp_path/'bundle').rglob('extras/selected.txt')).read_text() == 'included'
 
 
 def test_global_object_and_config_override_bind_at_runtime(tmp_path):
@@ -83,7 +88,7 @@ def test_delegated_cli_has_business_streams_and_exit_code_after_move(tmp_path):
     code = EXECUTABLE.replace('return {"result": 7}', 'print("business:" + " ".join(inputs["cli.argv"]["value"]))\n        return {"cli.exit_code": 7}')
     code = code.replace('contract={"provides":[{"key":"result","type":"number","display_name":"Result"}],"output_semantics":{"result":["Computed value"]}}',
         'contract={"requires":[{"type":"cli.argv","display_name":"Arguments","cardinality":"exactly_one"}],"provides":[{"key":"cli.exit_code","type":"cli.exit_code","display_name":"Exit"}],"input_semantics":{"cli.argv":["Business argv"]},"output_semantics":{"cli.exit_code":["Exit status"]}}')
-    code = code.replace('@node(type_key="demo",', '@node(type_key="demo",flow_kind="io",').replace('rulesets=["vibeflow.process","demo.rules"]','rulesets=["vibeflow.io","demo.rules"]')
+    code = code.replace('rulesets=["vibeflow.process","demo.rules"]','rulesets=["vibeflow.io","demo.rules"]')
     workspace,config = executable_project(source,code)
     data = json.loads(config.read_text())
     data['pipeline']['inputs'] = [{'key':'cli.argv','type':'cli.argv','display_name':'Arguments','required':True}]
@@ -109,9 +114,9 @@ def test_bundle_planned_stub_retains_concerns_and_live_global_object(tmp_path):
     (source/'stubs/stub.py').write_text('def run_stub(inputs,params):\n    return {"result":params["model"]}\n')
     data = json.loads(config.read_text())
     data['rulesets'] = ['vibeflow.workflow']
-    data['pipeline']['nodes'].append({'id':'end','type_used':'demo.start','display_name':'End','description':'Finish'})
+    data['pipeline']['nodes'].append({'id':'end','definition_id':'demo.start','display_name':'End','description':'Finish'})
     data['pipeline']['edges'].append(['demo','end'])
-    data['pipeline']['nodes'][1].update(type_used='future',status='planned',flow_kind='process',
+    data['pipeline']['nodes'][1].update(definition_id='future',status='planned',flow_kind='process',
         requires=[],provides=[{'key':'result','type':'number','display_name':'Result'}],
         planned_behavior={'kind':'python_stub','stub_module':'stubs/stub.py'})
     config.write_text(json.dumps(data))
@@ -146,7 +151,7 @@ def test_native_subplan_projection_and_node_order_roundtrip():
     from vibeflow.targets.python.project.compiler import GraphCompiler
     from vibeflow.targets.python.runtime.planning import build_execution_plan
     from vibeflow.block_compiler import workflow_plan_from_json
-    from vibeflow.core.flow import GraphConfig, NodeSpec
+    from vibeflow.core.flow import GraphConfig, NodeCallSpec
     from vibeflow.core.models import ImplementationFact,ImplementationFacts
     graph,registry = _loop_graph(),_registry()
     compiled = GraphCompiler().compile_with_findings(graph,registry=registry)
@@ -154,7 +159,7 @@ def test_native_subplan_projection_and_node_order_roundtrip():
     child = native.frames['repeat'].subplan.to_workflow_plan()
     assert child.block(child.entry_block).path == ()
     assert child.blocks[0].order == native.frames['repeat'].subplan.order
-    graph = GraphConfig(nodes=(NodeSpec('z','worker'),NodeSpec('a','worker')))
+    graph = GraphConfig(nodes=(NodeCallSpec('z','worker'),NodeCallSpec('a','worker')))
     plan = _compile_global(graph,ImplementationFacts((ImplementationFact('worker',flow_kind='process'),)))
     restored = workflow_plan_from_json(plan.to_json())
     assert restored == plan
@@ -162,11 +167,11 @@ def test_native_subplan_projection_and_node_order_roundtrip():
 
 
 def test_installed_plugin_package_is_collected_without_its_environment(tmp_path, monkeypatch):
-    source, environment = tmp_path/'source',tmp_path/'site'
+    source, environment = tmp_path/'source',tmp_path.parent/(tmp_path.name+'-site')
     source.mkdir()
     package = environment/'selected_training_plugin'
     package.mkdir(parents=True)
-    (package/'__init__.py').write_text(EXECUTABLE)
+    (package/'__init__.py').write_text(PLUGIN_SOURCE)
     (package/'asset.txt').write_text('package data')
     monkeypatch.syspath_prepend(str(environment))
     workspace,config = executable_project(source)
@@ -210,22 +215,24 @@ def test_zip_installed_framework_can_build_a_standalone_bundle(tmp_path):
 def test_ordinary_ports_keep_host_objects_and_target_execution_metadata(tmp_path, execution):
     source = tmp_path/'source'
     source.mkdir()
-    (source/'vibeflow_project.jsonc').write_text('{"project_target":"python"}')
-    workspace = source/'vibeflow_config.jsonc'
-    workspace.write_text('{"roots":[{"id":"ports","path":"."}]}')
+    from tests.fixtures.support.projects import register_root
+    register_root(source)
+    workspace = source.parent / 'vibeflow_config.jsonc'
     config = source/'workflow.jsonc'
     from vibeflow.core.workflows.interfaces import PORT_SCHEMA_TYPES, port_capability_descriptor
     ports = (ROOT / "tests/fixtures/support/port_nodes.py").read_text()
-    (source / "port_nodes.py").write_text(ports.replace('"number"', '"value"').replace('"answer"', '"value"'))
+    (source / "nodes").mkdir()
+    (source / "nodes/ports.py").write_text(ports.replace('"number"', '"value"').replace('"answer"', '"value"'))
     descriptor = port_capability_descriptor({"receive", "send"}).to_dict()
     descriptor.pop("kind")
-    plugin = "from vibeflow.targets.python.sdk import Plugin, capability, data_schema\nfrom port_nodes import Receive, Send, Boundary\n"
+    plugin = "from vibeflow.targets.python.sdk import Plugin, capability, data_schema\n"
     plugin += "interface=capability(**" + repr(descriptor) + ")\n"
     plugin += "schemas=[data_schema(type_key=k,schema=v) for k,v in " + repr(PORT_SCHEMA_TYPES) + ".items()]\n"
-    plugin += "plugin=Plugin(id='ports',resources=[Receive,Send,Boundary,interface,*schemas,data_schema(type_key='value',schema={})])\n"
-    (source / "plugin.py").write_text(plugin)
-    config.write_text(json.dumps({'rulesets':[], 'plugins':[{'source':{'kind':'file','ref':'plugin.py'}}],
-        'pipeline':{'nodes':[{'id':name,'type_used':key,'display_name':name,'description':name}
+    plugin += "plugin=Plugin(id='ports',resources=[interface,*schemas,data_schema(type_key='value',schema={})])\n"
+    (source / "plugins/ports").mkdir(parents=True)
+    (source / "plugins/ports/plugin.py").write_text(plugin)
+    config.write_text(json.dumps({'rulesets':[], 'plugins':[{'source':{'kind':'file','ref':'plugins/ports/plugin.py'}}],
+        'pipeline':{'nodes':[{'id':name,'definition_id':key,'display_name':name,'description':name}
             for name,key in [('start','fixture.port.boundary'),('receive','fixture.port.receive'),
                              ('send','fixture.port.send'),('end','fixture.port.boundary')]],
             'edges':[['start','receive'],['receive','send'],['send','end']]}}))
@@ -251,13 +258,13 @@ def test_bundle_locators_are_relocated_and_publication_handles_python_caches(tmp
     assert Path(descriptor.implementations[0].source.ref).is_relative_to(path)
     assert Path(runtime.registry.source_info('demo').path).is_relative_to(path)
     assert Path(bundle.workflow.source.ref).is_relative_to(path)
-    cache = path/'project/p/__pycache__'
-    cache.mkdir()
+    cache = path/'roots/source/__pycache__'
+    cache.mkdir(parents=True, exist_ok=True)
     (cache/'plugin.cpython-313.pyc').write_bytes(b'generated cache')
-    validate_owned_build_directory(path,manifest_format='vibeflow.aot-build.v3')
+    validate_owned_build_directory(path,manifest_format='vibeflow.aot-build.v4')
     (cache/'personal.txt').write_text('must preserve')
     with pytest.raises(AotPublishError,match='untracked'):
-        validate_owned_build_directory(path,manifest_format='vibeflow.aot-build.v3')
+        validate_owned_build_directory(path,manifest_format='vibeflow.aot-build.v4')
 
 
 def test_business_path_strings_are_not_relocated(tmp_path):
@@ -302,13 +309,13 @@ def test_separately_installed_runtime_factory_is_packaged(tmp_path, monkeypatch)
 def test_installed_namespace_package_across_two_roots_is_relocatable(tmp_path, monkeypatch):
     source = tmp_path / 'source'
     source.mkdir()
-    roots = [tmp_path / 'site-a', tmp_path / 'site-b']
+    roots = [tmp_path.parent / (tmp_path.name+'-site-a'), tmp_path.parent / (tmp_path.name+'-site-b')]
     for root in roots:
         (root / 'training_namespace').mkdir(parents=True)
         monkeypatch.syspath_prepend(str(root))
     (roots[0] / 'training_namespace/entry.py').write_text(
         'from training_namespace.implementation import plugin\n')
-    (roots[1] / 'training_namespace/implementation.py').write_text(EXECUTABLE)
+    (roots[1] / 'training_namespace/implementation.py').write_text(PLUGIN_SOURCE)
     (roots[0] / 'training_namespace/asset-a.txt').write_text('first')
     (roots[1] / 'training_namespace/asset-b.txt').write_text('second')
     workspace, config = executable_project(source)
@@ -357,12 +364,13 @@ def test_runtime_factory_failure_has_source_error_model_and_releases_created_plu
         '        raise RuntimeError("dispose failure")\n'
         'def create(context): return Runtime()\n'
         'plugin=Plugin(runtime=create,')
-    workspace, config = executable_project(source, EXECUTABLE.replace('plugin=Plugin(', factory))
-    (source / 'broken.py').write_text('from vibeflow.targets.python.sdk import Plugin\n'
+    workspace, config = executable_project(source, plugin_source=PLUGIN_SOURCE.replace('plugin=Plugin(', factory))
+    (source / 'plugins/broken').mkdir()
+    (source / 'plugins/broken/plugin.py').write_text('from vibeflow.targets.python.sdk import Plugin\n'
         'def create(context): raise RuntimeError("factory root cause")\n'
         'plugin=Plugin(id="broken",runtime=create)\n')
     data = json.loads(config.read_text())
-    data['plugins'].append({'source': {'kind': 'file', 'ref': 'broken.py'}})
+    data['plugins'].append({'source': {'kind': 'file', 'ref': 'plugins/broken/plugin.py'}})
     config.write_text(json.dumps(data))
     build_python_aot(PythonBuildRequest(workspace, config, tmp_path / 'bundle'))
     runners = [lambda: run_workspace_checked(config, workspace=workspace, run_root=tmp_path / 'native-runs'),
@@ -381,10 +389,10 @@ def test_runtime_factory_failure_has_source_error_model_and_releases_created_plu
 
 def test_runtime_disposal_failure_marks_low_level_bundle_runtime_failed(tmp_path):
     from tests.targets.python.test_aot_bundle import build
-    code = EXECUTABLE.replace('plugin=Plugin(',
+    code = PLUGIN_SOURCE.replace('plugin=Plugin(',
         'class Runtime:\n    def dispose(self): raise RuntimeError("dispose failure")\n'
         'def create(context): return Runtime()\nplugin=Plugin(runtime=create,')
-    path = build(tmp_path, code)
+    path = build(tmp_path, plugin_source=code)
     runtime = load_bundle(path).create_runtime(run_dir=tmp_path / 'run')
     with pytest.raises(RuntimeError, match='dispose failure'):
         runtime.run({})
@@ -397,7 +405,7 @@ def test_build_cli_preserves_checked_run_concerns(tmp_path, capsys):
     shutil.copytree(ROOT / 'sandbox/python/minimal', source,
                     ignore=shutil.ignore_patterns('runs', '__pycache__'))
     status = main(['build', '--workspace', str(source / 'vibeflow_config.jsonc'),
-                   '--config', str(source / 'config.jsonc'), '--out-dir', str(tmp_path / 'bundle')])
+                   '--config', str(source / 'project/configs/config.jsonc'), '--out-dir', str(tmp_path / 'bundle')])
     assert status == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload['status'] == 'CONCERNS'
@@ -410,13 +418,12 @@ def test_plugin_initialization_precedes_node_construction_without_changing_insta
     from vibeflow.tooling.application.python import run_workspace_checked
     source = tmp_path / 'source'
     source.mkdir()
-    code = 'ready=False\n' + EXECUTABLE.replace('class Demo:',
-        'class Demo:\n    def __init__(self):\n        assert ready, "plugin must precede Node construction"')
-    code = code.replace('plugin=Plugin(',
-        'class Runtime:\n    def dispose(self):\n        global ready\n        ready=False\n'
-        'def create(context):\n    global ready\n    ready=True\n'
-        '    return Runtime()\nplugin=Plugin(runtime=create,')
-    workspace, config = executable_project(source, code)
+    marker = tmp_path / "ready"
+    code = EXECUTABLE.replace('class Demo:',
+        'class Demo:\n    def __init__(self):\n        from pathlib import Path\n        assert Path('+repr(str(marker))+').exists(), "plugin must precede Node construction"')
+    lifecycle = ('class Runtime:\n    def dispose(self):\n        from pathlib import Path\n        Path('+repr(str(marker))+').unlink()\n'
+        'def create(context):\n    from pathlib import Path\n    Path('+repr(str(marker))+').touch()\n    return Runtime()\nplugin=Plugin(runtime=create,')
+    workspace, config = executable_project(source, code.replace('["vibeflow.process","demo.rules"]', '[]'), plugin_source=PLUGIN_SOURCE.replace('plugin=Plugin(', lifecycle))
     assert run_workspace_checked(config, workspace=workspace, run_root=tmp_path / 'native').context.get('result')['value'] == 7
     build_python_aot(PythonBuildRequest(workspace, config, tmp_path / 'bundle'))
     shutil.rmtree(source)
@@ -437,11 +444,13 @@ def test_delayed_node_module_binds_after_runtime_plugin_and_is_not_imported_at_b
     from vibeflow.tooling.application.python import run_workspace_checked
     source = tmp_path / 'source'
     source.mkdir()
-    (source / 'state.py').write_text('ready=False\n')
-    (source / 'delayed.py').write_text('import state\nassert state.ready, "runtime plugin must initialize first"\n'
+    marker = tmp_path / "ready"
+    (source / 'delayed.py').write_text('from pathlib import Path\nassert Path('+repr(str(marker))+').exists(), "runtime plugin must initialize first"\n'
         'class Demo:\n    def run_pure(self,inputs,params): return {"result":7}\n')
-    code = 'from vibeflow.targets.python.sdk import Plugin,node,SourceLocator\nimport state\nstate.ready=False\n@node(type_key="demo.start",flow_kind="terminal",contract={},rulesets=[])\nclass Start:\n    def run_pure(self,inputs,params): return {}\nlate=node(type_key="demo",rulesets=[],contract={"provides":[{"key":"result","type":"number","display_name":"Result"}],"output_semantics":{"result":["Result"]}},source=SourceLocator(kind="file",ref="delayed.py",export="Demo"))\ndef create(context):\n    state.ready=True\n    return type("Runtime",(),{})()\nplugin=Plugin(id="demo",resources=[Start,late],runtime=create)\n'
-    workspace, config = executable_project(source, code)
+    code = (EXECUTABLE[:EXECUTABLE.index('@node(node_type="demo.shell", id="demo",')] +
+        'from vibeflow.targets.python.sdk import SourceLocator\nlate=node(id="demo",node_type="demo.shell",rulesets=[],contract={"provides":[{"key":"result","type":"number","display_name":"Result"}],"output_semantics":{"result":["Result"]}},source=SourceLocator(kind="file",ref="delayed.py",export="Demo"))\n')
+    lifecycle = ('class Runtime: pass\ndef create(context):\n    from pathlib import Path\n    Path('+repr(str(marker))+').touch()\n    return Runtime()\nplugin=Plugin(runtime=create,')
+    workspace, config = executable_project(source, code.replace('["vibeflow.process","demo.rules"]', '[]'), plugin_source=PLUGIN_SOURCE.replace('plugin=Plugin(', lifecycle))
     assert run_workspace_checked(config, workspace=workspace, run_root=tmp_path / 'native').context.get('result')['value'] == 7
     original = NodeRegistry.get
     def forbidden(registry, key):

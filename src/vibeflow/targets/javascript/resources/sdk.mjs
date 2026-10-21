@@ -1,6 +1,6 @@
-import {nodeDefinition} from "../nodetypes/declarations.mjs";
+import {nodeDefinition} from "./node_declarations.mjs";
 /** Pure declarations: importing a resource does not register it. */
-const ABI = "vibeflow.plugin.v3";
+const ABI = "vibeflow.plugin.v4";
 const directBindings = new WeakMap();
 // Source references are literal filesystem paths, including %, # and spaces.
 function resolveFileReference(ref, base) {
@@ -20,7 +20,7 @@ function define(kind, options, member) {
   if (member && typeof callable !== "function" && !source && !data.implementations && !(kind === "rule" && data.handler)) throw new TypeError(`${kind}.${member} must be a function or use an explicit source`);
   const locator = source || {kind: "file", ref: __origin.path, ...(member ? {export: __origin.symbol + "." + member} : {})};
   const descriptor = {kind, ...data};
-  if (["node", "rule", "base_lib", "host_extension", "plugin"].includes(kind) && !(kind === "rule" && data.handler && !source && !callable && !data.implementations)) {
+  if (["node", "rule", "base_lib", "plugin"].includes(kind) && !(kind === "rule" && data.handler && !source && !callable && !data.implementations)) {
     descriptor.implementations ??= [{language: __origin.language || "javascript", source: locator,
       ...(kind === "rule" ? {} : {targets: data.targets || ["node", "browser"], completion: data.completion || "immediate",
         ...(files.length ? {implementation_files: files} : {})})}];
@@ -93,12 +93,17 @@ function implementationFiles(values, origin) {
   });
 }
 export const defineNode = options => nodeDefinition(define, options);
+export const defineNodeType = options => define("node_type", options);
+export function __discoverResources(namespace, filename) {
+  return [...new Set(Object.values(namespace))]
+    .filter(value => value?.descriptor && value.origin?.path === filename)
+    .map(normalizeDirect);
+}
 export const defineRule = options => define("rule", options, "check");
 export const defineRuleset = options => define("ruleset", options);
 export const defineDataSchema = options => define("data_schema", options);
 export const defineCapability = options => define("capability", options);
 export const defineBaseLib = options => define("base_lib", options, typeof options.implementation === "function" ? "implementation" : undefined);
-export const defineHostExtension = options => define("host_extension", options, "createHost");
 /** Low-level fixed Descriptor contribution; callable declarations use defineNode/Rule. */
 export const defineResource = options => {
   const {__origin = {}, __resolveExport, __sourceRoot, ...descriptor} = options;
@@ -114,6 +119,7 @@ export function definePlugin(options) {
     throw new TypeError("plugin resources must be fixed SDK resource objects");
   }
   const contributions = resources.map(normalizeDirect);
+  if (contributions.some(resource=>resource.descriptor.kind === "node")) throw new TypeError("Plugins contribute NodeTypes; business Nodes belong in project/root nodes/");
   for (const [type, factory] of [["compiler", compiler], ["runtime", runtime]]) {
     if (factory !== undefined) {
       const delayed = factory && typeof factory === "object" && ["file","module","package"].includes(factory.kind) && typeof factory.ref === "string";

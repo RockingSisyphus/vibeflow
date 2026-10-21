@@ -8,20 +8,20 @@ import sys
 
 import pytest
 
-from tests.targets.python.test_code_plugins import executable_project, EXECUTABLE
+from tests.targets.python.test_code_plugins import executable_project, EXECUTABLE, PLUGIN_SOURCE
 from vibeflow.tooling.application.python.build import PythonBuildRequest, build_python_aot
 from vibeflow.tooling.application.python.bundle import load_bundle
 
 
-def build(tmp_path, source=EXECUTABLE):
+def build(tmp_path, source=EXECUTABLE, *, plugin_source=PLUGIN_SOURCE):
     project = tmp_path / 'source'
     project.mkdir()
-    workspace, config = executable_project(project, source)
+    workspace, config = executable_project(project, source, plugin_source=plugin_source)
     data = json.loads(config.read_text())
-    data['pipeline']['nodes'].append({'id':'end','type_used':'demo.start','display_name':'End','description':'Finish'})
+    data['pipeline']['nodes'].append({'id':'end','definition_id':'demo.start','display_name':'End','description':'Finish'})
     data['pipeline']['edges'].append(['demo','end'])
     config.write_text(json.dumps(data))
-    result = build_python_aot(PythonBuildRequest(workspace, config, tmp_path / 'built'))
+    result = build_python_aot(PythonBuildRequest(workspace, config, tmp_path / 'built', preview_root=project / 'preview'))
     relocated = tmp_path / 'relocated'
     result.out_dir.rename(relocated)
     shutil.rmtree(project)
@@ -81,13 +81,13 @@ def test_standalone_cli_uses_shipped_framework(tmp_path):
 
 
 def test_snapshot_handles_recursive_graph_definition_tables(tmp_path):
-    from vibeflow.core.flow import GraphConfig, NodesetSpec
+    from vibeflow.core.flow import GraphConfig, NodesetTypeSpec
     from vibeflow.targets.python.runtime.support.snapshot import encode_snapshot, decode_snapshot
     graph = GraphConfig(nodes=())
-    definition = NodesetSpec('self','Self','Recursive declaration',(),(),graph)
-    graph.nodesets['self'] = definition
+    definition = NodesetTypeSpec('self','Self','Recursive declaration',(),(),graph)
+    graph.nodeset_types['self'] = definition
     restored = decode_snapshot(json.loads(json.dumps(encode_snapshot(graph))))
-    assert restored.nodesets['self'].graph is restored
+    assert restored.nodeset_types['self'].graph is restored
 
 
 def test_same_bundle_has_independent_runs_and_preserves_input_objects(tmp_path):
@@ -98,9 +98,9 @@ def test_same_bundle_has_independent_runs_and_preserves_input_objects(tmp_path):
     data = json.loads(config.read_text())
     data['pipeline']['inputs'] = [{'key':'payload','type':'payload','required':True,'display_name':'Payload'}]
     # The SDK declaration is authoritative, including the new input contract.
-    code = (project/'plugin.py').read_text().replace('contract={"provides":',
+    code = (project/'nodes/steps.py').read_text().replace('contract={"provides":',
         'contract={"requires":[{"type":"payload","display_name":"Payload","cardinality":"exactly_one"}],"input_semantics":{"payload":["Input object"]},"provides":')
-    (project/'plugin.py').write_text(code)
+    (project/'nodes/steps.py').write_text(code)
     config.write_text(json.dumps(data))
     build_python_aot(PythonBuildRequest(workspace,config,tmp_path/'bundle'))
     bundle = load_bundle(tmp_path/'bundle')
@@ -153,8 +153,8 @@ def create(context):
     with open({str(marker)!r},'a') as stream: stream.write('create\\n')
     return Runtime()
 '''
-    source = EXECUTABLE.replace('plugin=Plugin(',plugin_code+'\nplugin=Plugin(runtime=create,')
-    path = build(tmp_path,source)
+    plugin = PLUGIN_SOURCE.replace('plugin=Plugin(',plugin_code+'\nplugin=Plugin(runtime=create,')
+    path = build(tmp_path,plugin_source=plugin)
     assert not marker.exists()
     bundle = load_bundle(path)
     runtime = bundle.create_runtime(run_dir=tmp_path/'run')

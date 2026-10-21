@@ -4,7 +4,7 @@
 
 这组测试保留 `f169429` 和修复前 `15adf51` 的冻结观察，检查当前工作区是否漏掉旧规则或错误拒绝合法输入。它与领域插件、规则图及图形沙箱互补，已接入 `verify_project.py --full`。
 
-规则清单见 [基线盘点](../../../docs/design/history/baseline-rule-inventory.md)。这里按能力组织场景，不把一个诊断码等同于一条独立 Rule。测试夹具在临时目录生成；Python 的基线使用旧类声明，当前版本使用选中插件的代码声明及显式源码登记。历史输入的适配只发生在测试中。
+规则清单见 [基线盘点](../../../docs/design/history/baseline-rule-inventory.md)。这里按能力组织场景，不把一个诊断码等同于一条独立 Rule。测试夹具在临时目录生成；Python 的基线使用旧类声明，当前版本使用独立业务 Node／BaseLib 声明及整包 Plugin 贡献。历史输入的适配只发生在测试中。
 
 ```bash
 python tests/fixtures/rule_parity/run_all.py \
@@ -22,7 +22,7 @@ python tests/fixtures/rule_parity/run_all.py \
 | 分组 | 实际入口与证据 |
 | --- | --- |
 | `core` | 公共通用事实评估、真实原生图编译、工作流/Nodeset 检查，以及默认规则选择和子图编排 |
-| `tooling` | 公共配置检查和声明模型解析：声明形状、契约、图字段、资源选择、系统 IO 与 planned 规则；解析异常另外标注 |
+| `tooling` | 公共配置检查和声明模型解析：声明形状、契约、图字段、资源选择、旧 IO 拒绝与 planned 规则；解析异常另外标注 |
 | `python` | 正式 `inspect-node`、工作流检查、公开 BaseLib 和源码分析；保留诊断、位置、指标及导入标记 |
 | `javascript` | 正式 audit/build、真实 Plugin worker、TS 质量分析和成功产物的数值运行 |
 
@@ -52,3 +52,5 @@ npm_config_cache=/tmp/vibeflow-npm-cache python tools/run_tests.py -- \
 - 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
 
 完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。
+
+项目治理改动退役 Host 模型细节、全局 policy 旧字段细节及旧原生 IO 生成场景；`retirements.py` 显式列出冻结参考中的旧 ID。代表性旧格式拒绝保留，参数与资源契约由当前 Rule/SDK 验收覆盖。Node 缺失标识现为 `missing_id`，同包 Plugin 复用为 `package-private-dependency`。

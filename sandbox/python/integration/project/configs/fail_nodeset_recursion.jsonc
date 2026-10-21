@@ -11,7 +11,7 @@
     "nodes": [
       {
         "id": "self",
-        "type_used": "bad.self",
+        "definition_id": "bad.self",
         "display_name": "Self",
         "description": "Runs self."
       }
@@ -26,14 +26,14 @@
   },
   "nodeset_imports": [
     {
-      "path": "nodesets/fail_nodeset_recursion/bad_self.jsonc"
+      "path": "nodeset_types/fail_nodeset_recursion/bad_self.jsonc"
     }
   ],
   "plugins": [
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

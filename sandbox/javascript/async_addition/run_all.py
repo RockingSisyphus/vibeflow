@@ -1,4 +1,4 @@
-"""Hold independent Capability calls, then exercise a permanent Port Host."""
+"""Hold independent Capability calls, then open and close an explicit port session."""
 from pathlib import Path
 import json
 import sys
@@ -25,7 +25,7 @@ def run(work, *, toolchain=None):
     browser = build("stream", "browser", "esm-module")
     assert browser.files and browser.entry.is_file()
     manifest = json.loads(stream.manifest.read_text())
-    assert manifest["target_metadata"]["host_extensions"] == ["addition.port_host"]
+    assert "host_extensions" not in manifest["target_metadata"]
     second = run_node(stream.entry, f'import {{stream}} from {driver}; const result=await stream(workflow,globalThis.__vibeflowSandboxPortState); process.stdout.write(JSON.stringify(result));', before_import='''
 let waiting;
 globalThis.__vibeflowSandboxPortState={inputs:[{a:2,b:3},{a:10,b:20}],received:[],sent:[],calls:[],waitingReady:new Promise(resolve=>{waiting=resolve;}),resolveWaiting:()=>waiting()};

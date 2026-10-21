@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 @dataclass
 class AsciiNode:
-    name: str
+    id: str
     flow_kind: str
     label: tuple[str, ...]
     index: int

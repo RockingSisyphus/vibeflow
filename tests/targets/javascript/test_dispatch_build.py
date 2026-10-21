@@ -16,7 +16,7 @@ def test_public_typescript_build_runs_with_four_dispatch_slots(tmp_path):
     data = json.loads(config.read_text())
     data["pipeline"]["nodes"][0]["config"] = {"max_concurrency": 4}
     config.write_text(json.dumps(data))
-    nodes = tmp_path / "project/nodes.ts"
+    nodes = tmp_path / "project/nodes/steps.ts"
     nodes.write_text(nodes.read_text().replace("++started===12", "++started===4"))
     result = json.loads(cli(["build", "--workspace", config_workspace, "--config", config,
         "--out-dir", tmp_path / "built", "--target", "node", "--profile", "single-esm"]).stdout)

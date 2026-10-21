@@ -30,7 +30,7 @@ def observe(work):
     for case_id, imports, inputs, returns, allowed in CASES:
         root = work / case_id
         write_project(root, "integer", 1)
-        source = root / "plugin.py"
+        source = root / "nodes/steps.py"
         original = source.read_text()
         code = imports + "\n" + original.replace("run_pure(self, inputs, params):", f"run_pure(self, {inputs}, params){returns}:")
         statements = {
@@ -42,17 +42,17 @@ def observe(work):
         if case_id in statements:
             code = code.replace('        value = params["cleanup_record_roots"]', statements[case_id])
         if case_id.startswith("helper"):
-            (root / "helper.py").write_text("""from typing import Iterable
+            (root / "base_lib").mkdir()
+            (root / "base_lib/helper.py").write_text("""from typing import Iterable
 import typing
 from vibeflow.targets.python.sdk import base_lib
 
 @base_lib(id="probe.helper", rulesets=["vibeflow.base_lib"])
 def helper(inputs: Iterable[object]):
 """ + ('    key = "Iterable"\n    namespace = typing.__dict__[key]\n' if not allowed else '') + '    return 1\n')
-            code = 'from helper import helper\n' + code
+            code = 'from ..base_lib.helper import helper\n' + code
             code = code.replace('rulesets=["vibeflow.process"])', 'rulesets=["vibeflow.process"], base_libs=["probe.helper"])')
             code = code.replace('        value = params["cleanup_record_roots"]', '        value = helper(inputs)')
-            code = code.replace('resources=[Start, Defaults, End, inspection]', 'resources=[Start, Defaults, End, inspection, helper]')
         source.write_text(code)
         result = execute(root, "validate", work)
         errors = result.get("diagnostics", [])

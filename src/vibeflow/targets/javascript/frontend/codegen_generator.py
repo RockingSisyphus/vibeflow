@@ -179,7 +179,7 @@ class StaticWorkflowEmitter(
             node_metadata: dict[str, Any] = {
                 "id": node.id,
                 "flow_kind": node.flow_kind,
-                "type_used": node.type_used,
+                "definition_id": node.definition_id,
                 "source": node.implementation.to_dict() if node.implementation else {},
                 "requires": [item.to_dict() for item in node.requires],
                 "provides": [item.to_dict() for item in node.provides],

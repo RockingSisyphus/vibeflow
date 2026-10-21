@@ -189,97 +189,6 @@
         }
       }
     },
-    "host_extensions": {
-      "type": "array",
-      "items": {
-        "anyOf": [
-          {
-            "type": "string",
-            "minLength": 1
-          },
-          {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "minLength": 1
-              },
-              "name": {
-                "type": "string",
-                "minLength": 1
-              },
-              "status": {
-                "enum": [
-                  "planned",
-                  "implemented"
-                ]
-              },
-              "enabled": {
-                "type": "boolean"
-              },
-              "display_name": {
-                "type": "string"
-              },
-              "category": {
-                "type": "string"
-              },
-              "description": {
-                "type": "string"
-              },
-              "version": {
-                "type": "string"
-              },
-              "targets": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "uniqueItems": true
-              },
-              "provides": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "uniqueItems": true
-              },
-              "dependencies": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "uniqueItems": true
-              },
-              "config": {
-                "type": "object"
-              },
-              "settings": {
-                "type": "object"
-              },
-              "style": {
-                "$ref": "#/$defs/nodeStyle"
-              }
-            },
-            "anyOf": [
-              {
-                "required": [
-                  "id"
-                ]
-              },
-              {
-                "required": [
-                  "name"
-                ]
-              }
-            ],
-            "additionalProperties": false
-          }
-        ]
-      }
-    },
     "rulesets": {
       "type": "array",
       "items": {
@@ -541,7 +450,7 @@
             "type": "string",
             "minLength": 1
           },
-          "type_used": {
+          "definition_id": {
             "type": "string",
             "minLength": 1
           },
@@ -660,7 +569,7 @@
         "anyOf": [
           {
             "required": [
-              "type_used"
+              "definition_id"
             ]
           },
           {
@@ -704,14 +613,14 @@
           {
             "if": {
               "properties": {
-                "type_used": {
+                "definition_id": {
                   "enum": [
                     "vibeflow.loop.while"
                   ]
                 }
               },
               "required": [
-                "type_used"
+                "definition_id"
               ]
             },
             "then": {
@@ -1057,7 +966,7 @@
           "type": "string",
           "minLength": 1
         },
-        "type_used": {
+        "definition_id": {
           "type": "string",
           "minLength": 1
         },
@@ -1176,7 +1085,7 @@
       "anyOf": [
         {
           "required": [
-            "type_used"
+            "definition_id"
           ]
         },
         {
@@ -1220,14 +1129,14 @@
         {
           "if": {
             "properties": {
-              "type_used": {
+              "definition_id": {
                 "enum": [
                   "vibeflow.loop.while"
                 ]
               }
             },
             "required": [
-              "type_used"
+              "definition_id"
             ]
           },
           "then": {

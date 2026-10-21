@@ -5,7 +5,7 @@ from copy import copy
 
 def node_source_slices(context, node, symbol):
     sources = context.require("source_context")
-    helpers = sources.helpers(node.type_key)
+    helpers = sources.helpers(node.definition_id)
     methods = sources.class_members(symbol)
     by_path = {}
     for member in methods.values():
@@ -23,7 +23,7 @@ def node_source_slices(context, node, symbol):
         yield source, ast.Module(body=[*imports, *globals_, shell], type_ignores=[])
     method_ids = {member.id for member in methods.values()}
     for source in sources.files:
-        support = any(item["kind"] == "node" and item["id"] == node.type_key
+        support = any(item["kind"] == "node" and item["id"] == node.definition_id
             and item["role"] == "support" and item["path"] == source.path
             for item in context.facts.get("source_owners", ()))
         if support:

@@ -3,23 +3,23 @@ import inspect
 import sys
 from pathlib import Path
 
-from vibeflow.core.flow import STATUS_PLANNED, LOOP_NODE_TYPES
+from vibeflow.core.flow import STATUS_PLANNED, LOOP_DEFINITION_IDS
 from vibeflow.targets.python.project.registry import NodeRegistry, NodeRegistryError
 from vibeflow.targets.python.project.source_closure import collect_python_source_facts
 from vibeflow.targets.python.quality.source_context import PythonSourceFile, PythonSourceNode, PythonSourceCall, build_python_source_context
 
 
-def workflow_node_types(graph):
+def workflow_node_ids(graph):
     from vibeflow.core.rules.planning import graph_rule_subjects
     selected = set()
     for subject in graph_rule_subjects(graph):
         for node in subject.graph.nodes:
-            if node.status != STATUS_PLANNED and node.type_used not in LOOP_NODE_TYPES and node.type_used not in subject.graph.nodesets:
-                selected.add(node.type_used)
+            if node.status != STATUS_PLANNED and node.definition_id not in LOOP_DEFINITION_IDS and node.definition_id not in subject.graph.nodeset_types:
+                selected.add(node.definition_id)
     return tuple(sorted(selected))
 
 
-def analyze_node_source_context(registry: NodeRegistry, type_keys: tuple[str, ...], *, calls=None):
+def analyze_node_source_context(registry: NodeRegistry, node_ids: tuple[str, ...], *, calls=None):
     """Return the requested implementation closure without changing active facts."""
     from vibeflow.targets.python.project.source_membership import resource_paths
     from vibeflow.targets.python.project.check_session import current_python_check
@@ -30,7 +30,7 @@ def analyze_node_source_context(registry: NodeRegistry, type_keys: tuple[str, ..
     nodes: list[PythonSourceNode] = []
     files: dict[str, PythonSourceFile] = {}
     source_facts = {}
-    for key in type_keys:
+    for key in node_ids:
         if key not in registry.available():
             continue
         descriptor = registry.descriptor(key)
@@ -94,8 +94,8 @@ def publish_python_source_context(registry, context):
     return context
 
 
-def collect_node_source_context(registry: NodeRegistry, type_keys: tuple[str, ...], *, calls=None):
-    return publish_python_source_context(registry, analyze_node_source_context(registry, type_keys, calls=calls))
+def collect_node_source_context(registry: NodeRegistry, node_ids: tuple[str, ...], *, calls=None):
+    return publish_python_source_context(registry, analyze_node_source_context(registry, node_ids, calls=calls))
 
 
 def collect_workflow_source_context(registry, graph):
@@ -107,13 +107,13 @@ def collect_workflow_source_context(registry, graph):
         for spec in subject.graph.nodes:
             path = (*subject.call_path,spec.id)
             call_id = "/".join(path)
-            calls.setdefault(spec.type_used, []).append((subject.owner, call_id))
-            call_facts.append(PythonSourceCall(subject.owner,call_id,spec.type_used,spec.params,subject.graph.source_path,spec.id,path,spec.rulesets))
+            calls.setdefault(spec.definition_id, []).append((subject.owner, call_id))
+            call_facts.append(PythonSourceCall(subject.owner,call_id,spec.definition_id,spec.params,subject.graph.source_path,spec.id,path,spec.rulesets))
             if path in subjects:
                 collect(subjects[path])
     collect(subjects[()])
     from dataclasses import replace
-    context = analyze_node_source_context(registry, workflow_node_types(graph), calls=calls)
+    context = analyze_node_source_context(registry, workflow_node_ids(graph), calls=calls)
     context = replace(context,calls=tuple(call_facts))
     return publish_python_source_context(registry, context)
 

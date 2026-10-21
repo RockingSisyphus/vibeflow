@@ -18,37 +18,38 @@ def _project(root, *, owner="workflow", state="completed", error=False, needs_co
     (root / "leaf.py").write_text(f'from pathlib import Path\nPath({str(marker)!r}).write_text("executed")\nclass Leaf:\n    def run_pure(self, inputs, params):\n        return {{}}\n')
     node = node_document(type_key="test.leaf", class_name="Leaf", contract={}, rulesets=[])
     node["implementations"][0]["source"]["ref"] = "leaf.py"
-    (root / "domain.py").write_text(f'''import json
+    (root / "plugins/code_plugin").mkdir(parents=True, exist_ok=True)
+    (root / "plugins/code_plugin/domain.py").write_text(f'''import json
 from pathlib import Path
 from vibeflow.core.findings import HealthFinding
 from vibeflow.core.rules import RuleResult
 def check(context, inputs, params):
     source = context.require("source_context")
-    assert source.nodes[0].descriptor.type_key == "test.leaf"
-    assert context.require("node_catalog")[0].type_key == "test.leaf"
-    assert len(context.require("project_facts").files) == 1
+    assert source.nodes[0].descriptor.id == "test.leaf"
+    assert context.require("node_definitions")[0].id == "test.leaf"
+    assert len(context.require("source_quality").files) == 1
     assert "compiled" not in context.facts and not hasattr(context.require("registry"), "get")
     if params["needs_compiled"]:
         context.require("compiled")
     with Path({str(observations)!r}).open("a") as stream:
-        stream.write(json.dumps({{"phase":context.phase,"path":list(context.subject["call_path"]),"nodes":[item.type_key for item in source.nodes]}})+"\\n")
+        stream.write(json.dumps({{"phase":context.phase,"path":list(context.subject["call_path"]),"nodes":[item.definition_id for item in source.nodes]}})+"\\n")
     findings = ()
     if params["error"] or params["state"] != "completed":
         findings = (HealthFinding(rule_id="TEST.DOMAIN.IMPORT", severity="error" if params["error"] else "warning",
             message="Domain import result.", source_location={{"path":source.files[0].path,"line":2}}),)
     return RuleResult(state=params["state"], findings=findings)
 ''')
-    rule = {"kind":"rule", "id":"test.domain.import", "params_schema":{"state":{"type":"string"},
+    rule = {"kind":"rule", "id":"test.domain.import", "level":"graph", "params_schema":{"state":{"type":"string"},
         "error":{"type":"boolean"}, "needs_compiled":{"type":"boolean"}},
         "params_defaults":{"state":state,"error":error,"needs_compiled":needs_compiled},
         "implementations":[{"language":"python","source":{"kind":"file","ref":"domain.py","export":"check"}}]}
     selection = {"kind":"ruleset", "id":"test.before_bind", "calls":[
-        {"id":"files","rule_id":"vibeflow.quality.files","params":{"warn_file_lines":1000}},
+        {"id":"files","rule_id":"vibeflow.graph.source.files","params":{"warn_file_lines":1000}},
         {"id":"domain","rule_id":"test.domain.import"}],
         "entrypoints":{"import":["files","domain"],"static":[],"run":[]}}
-    (root / "vibeflow_project.jsonc").write_text(json.dumps({"project_target":"python", "quality_enabled":False,
+    (root / "vibeflow_project.jsonc").write_text(json.dumps({"project_target":"python",
 }))
-    leaf = {"id":"leaf", "type_used":"test.leaf", "display_name":"Leaf", "description":"One delayed implementation."}
+    leaf = {"id":"leaf", "definition_id":"test.leaf", "display_name":"Leaf", "description":"One delayed implementation."}
     plugin = write_plugin(root, [node, rule, selection], target="python")
     data = {"plugins":[plugin], "rulesets":[selection["id"]] if owner == "workflow" else [], "pipeline":{"nodes":[leaf]}}
     if owner != "workflow":
@@ -58,9 +59,9 @@ def check(context, inputs, params):
         unused = {**child,"type_key":"test.unused","rulesets":[]}
         (root / "unused.jsonc").write_text(json.dumps(unused))
         data["nodeset_imports"] = ["stage.jsonc","unused.jsonc"]
-        call = {"id":"stage", "type_used":"test.stage", "display_name":"Stage", "description":"Call the child."}
+        call = {"id":"stage", "definition_id":"test.stage", "display_name":"Stage", "description":"Call the child."}
         if owner == "loop":
-            call.update(id="loop", type_used="vibeflow.loop.while",requires=[],provides=[],
+            call.update(id="loop", definition_id="vibeflow.loop.while",requires=[],provides=[],
                 loop={"body":"test.stage","max_iterations":1,"stop_after":1})
         data["pipeline"]["nodes"] = [call]
     workflow = root / "main.jsonc"
@@ -71,12 +72,12 @@ def check(context, inputs, params):
 @pytest.mark.parametrize("owner", ["workflow", "nodeset", "loop"])
 def test_workflow_import_file_rule_rejects_actual_closure_before_node_marker(tmp_path, owner):
     config, marker, observations = _project(tmp_path, owner=owner)
-    data = json.loads(config.read_text())
-    data["policy"] = {"node_source":{"max_lines":2}}
-    config.write_text(json.dumps(data))
-    registry = build_workspace_node_registry(load_project_workspace(config), config_path=config)
+    selection = resource(tmp_path, "ruleset", "test.before_bind")
+    data = json.loads(selection.read_text())
+    data["calls"][0]["params"]["max_file_lines"] = 2
+    selection.write_text(json.dumps(data))
     with pytest.raises(CheckedRunError) as rejected:
-        run_checked(config, registry=registry, run_root=tmp_path / "runs", run_id="rejected")
+        run_checked(config, run_root=tmp_path / "runs", run_id="rejected")
     report = rejected.value.result.health
     finding = next(item for item in report.errors if item.code == "QUALITY.FILE.MAX_LINES")
     assert finding.details["limit"] == 2
@@ -90,9 +91,7 @@ def test_workflow_import_file_rule_rejects_actual_closure_before_node_marker(tmp
 @pytest.mark.parametrize("state", ["failed", "unavailable"])
 def test_workflow_import_incomplete_warning_blocks_workspace_binding(tmp_path, state):
     config, marker, _ = _project(tmp_path, state=state)
-    workspace_path = tmp_path / "vibeflow_config.jsonc"
-    workspace_path.write_text(json.dumps({"roots":[{"id":"actual", "path":"."}]}))
-    workspace = load_workspace_config(workspace_path)
+    workspace = load_project_workspace(config)
     with pytest.raises(CheckedRunError) as rejected:
         run_workspace_checked(config, workspace=workspace, run_root=tmp_path / "runs", run_id="incomplete")
     finding = next(item for item in rejected.value.result.health.errors if item.code == "RULE.EXECUTION.UNAVAILABLE")
@@ -126,8 +125,7 @@ def test_formal_cli_checks_import_entrypoint_before_publication(tmp_path, capsys
         project = json.loads(project_path.read_text())
         project["architecture"] = {"documents":[{"workflow":"main.jsonc", "document":"ARCHITECTURE.jsonc"}]}
         project_path.write_text(json.dumps(project))
-        workspace = tmp_path / "vibeflow_config.jsonc"
-        workspace.write_text(json.dumps({"roots":[{"id":"actual", "path":"."}]}))
+        workspace = tmp_path.parent / "vibeflow_config.jsonc"
         arguments.extend(["--workspace", str(workspace)])
     arguments.extend(["--json"] if command == "validate" else ["--output", str(output)])
     assert main(arguments) == 1
@@ -158,12 +156,16 @@ def test_repeated_nodeset_workflow_import_keeps_actual_call_paths_and_preview_de
     first = data["pipeline"]["nodes"][0]
     data["pipeline"]["nodes"] = [{**first,"id":name} for name in ("first","second")]
     config.write_text(json.dumps(data))
-    workspace = replace(load_project_workspace(config), policy={"node_source":{"max_lines":25}})
+    selection = resource(tmp_path, "ruleset", "test.before_bind")
+    configured = json.loads(selection.read_text())
+    configured["calls"][0]["params"]["max_file_lines"] = 25
+    selection.write_text(json.dumps(configured))
+    workspace = load_project_workspace(config)
     preview = effective_rule_plans(config, workspace=workspace, phase="import")
     plans = [plan for item in preview["scopes"] for plan in item["plans"]]
-    assert all(next(call for call in plan["calls"] if call["rule_id"] == "vibeflow.quality.files")["params"]["max_file_lines"] == 25 for plan in plans)
+    assert all(next(call for call in plan["calls"] if call["rule_id"] == "vibeflow.graph.source.files")["params"]["max_file_lines"] == 25 for plan in plans)
     assert not marker.exists() and not observations.exists()
     report = validate_workspace_config_path(config, workspace=workspace)
     assert report.status == "PASS" and not marker.exists()
     assert [json.loads(line)["path"] for line in observations.read_text().splitlines()] == [["first"],["second"]]
-    assert all(next(call for call in item["plan"]["calls"] if call["rule_id"] == "vibeflow.quality.files")["params"]["max_file_lines"] == 25 for item in report.info["rule_executions"])
+    assert all(next(call for call in item["plan"]["calls"] if call["rule_id"] == "vibeflow.graph.source.files")["params"]["max_file_lines"] == 25 for item in report.info["rule_executions"])

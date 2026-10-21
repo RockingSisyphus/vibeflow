@@ -8,13 +8,8 @@ from ..viewer import install_page
 
 
 def _default_root():
-    start = Path.cwd()
-    for directory in (start, *start.parents):
-        if (directory / "vibeflow_config.jsonc").is_file():
-            return directory
-    from vibeflow.tooling.project.workspace_loader import find_project_config
-    project = find_project_config(start)
-    return project.parent if project else start
+    from vibeflow.tooling.project.workspace_loader import load_project_workspace
+    return load_project_workspace(Path.cwd()).root
 
 
 def main(argv=None):
@@ -23,8 +18,9 @@ def main(argv=None):
     parser.add_argument("--workspace", type=Path)
     parser.add_argument("--reindex", action="store_true")
     args = parser.parse_args(argv)
-    root = args.preview_root or (args.workspace.resolve().parent if args.workspace else _default_root())
     try:
+        from vibeflow.tooling.project.workspace_loader import load_workspace_config
+        root = args.preview_root or (load_workspace_config(args.workspace).root if args.workspace else _default_root())
         install_page(root.resolve())
         if args.reindex:
             result = reindex(root)

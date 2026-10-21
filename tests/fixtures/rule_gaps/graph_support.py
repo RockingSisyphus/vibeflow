@@ -4,7 +4,7 @@ Only the child CLI imports VibeFlow.  The handlers are ordinary trusted plugin
 sources; their event files measure invocation rather than assuming it occurred.
 """
 from __future__ import annotations
-from tests.fixtures.support.plugins import resource as resource_ref, copy_sdk_inputs
+from tests.fixtures.support.plugins import resource as resource_ref
 
 from dataclasses import dataclass
 import json
@@ -58,7 +58,7 @@ class Sandbox:
         return resource_ref(self.project, "rule", "example." + rule_id)
 
     def source(self, name):
-        return self.project / "rules" / (name + (".py" if self.target == "python" else ".ts"))
+        return self.project / "plugins/code_plugin/rules" / (name + (".py" if self.target == "python" else ".ts"))
 
     def command(self, command="validate", *options):
         arguments = [sys.executable, "-m", "vibeflow", command,
@@ -79,7 +79,6 @@ class Sandbox:
 def create(work_root, target, case_id, toolchain_root=None):
     root = work_root / case_id.replace(".", "-") / target
     shutil.copytree(ROOT / "sandbox" / target / "rule_graph", root)
-    copy_sdk_inputs(ROOT / "sandbox" / target / "rule_graph", root)
     case = Sandbox(target, root)
     if target == "javascript":
         toolchain = Path(toolchain_root or os.environ.get("VIBEFLOW_TEST_TOOLCHAIN_ROOT", ""))
@@ -193,10 +192,10 @@ def javascript_states(case):
 from pathlib import Path
 from vibeflow.core.rules.models import plain
 from vibeflow.targets.javascript.quality.rules import run_javascript_rules
-from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
+from vibeflow.tooling.project.resources import prepare_workflow_catalogs
 from vibeflow.tooling.project.graph_config import parse_graph_config
 project=Path(PROJECT)
-catalogs=load_workflow_catalogs(project,workflow_config=Path(CONFIG))
+catalogs=prepare_workflow_catalogs(Path(CONFIG))
 graph=parse_graph_config(json.loads(Path(CONFIG).read_text()),project_root=project)
 report=run_javascript_rules(graph,catalogs,project_root=project,package_root=project,target="node",phase="static")
 print(json.dumps(report.to_dict()))

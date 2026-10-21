@@ -13,7 +13,7 @@ from common import cli, command, copy_project, diagnostics, row, write
 
 
 def _call(name, type_key, **fields):
-    return {"id": name, "type_used": type_key, "display_name": name.title(),
+    return {"id": name, "definition_id": type_key, "display_name": name.title(),
             "description": "Native composition of the selected domain bundle.", **fields}
 
 
@@ -52,7 +52,7 @@ def _choose(project, target):
               'export function run(inputs: Readonly<{"example.choice_input": Readonly<{value: number}>}>, params: Readonly<{branch: string}>) {\n'
               '  return {forwarded: inputs["example.choice_input"].value, "route.branch": params.branch};\n}\n')
     (project / ref).write_text(source)
-    write(resource_ref(project, 'node', 'example.choose'), {"kind": "node", "type_key": "example.choose",
+    write(resource_ref(project, 'node', 'example.choose'), {'node_type': 'vibeflow.node', "kind": "node", 'id': "example.choose",
           "display_name": "Choose",  "description": "Choose one native conditional branch.",
           "version": "0.15.0", "flow_kind": "decision", "rulesets": ["vibeflow.process"],
           "contract": {"requires": [_require("example.choice_input")],
@@ -76,7 +76,7 @@ def _branch_ports(project, target):
                   'export function run(inputs: Readonly<{"example.feature": Readonly<{value: number}>}>) {\n'
                   f'  return {{{name}_feature: inputs["example.feature"].value}};\n}}\n')
         (project / ref).write_text(source)
-        write(resource_ref(project, 'node', type_key), {"kind": "node", "type_key": type_key,
+        write(resource_ref(project, 'node', type_key), {'node_type': 'vibeflow.node', "kind": "node", 'id': type_key,
             "display_name": name.title() + " Feature",  "description": "Expose an isolated branch value.",
             "version": "0.15.0", "flow_kind": "process", "contract": {"requires": [_require("example.feature")],
                 "provides": [_provider(name + "_feature", type_key)], "input_semantics": {"example.feature": ["The model result."]},
@@ -95,7 +95,7 @@ def _branch_ports(project, target):
     declaration["contract"]["examples"] = []
     write(path, declaration)
     if target == "python":
-        path = project / "domain_nodes.py"
+        path = project / "nodes/domain_nodes.py"
         path.write_text(path.read_text().replace('value = inputs["example.feature"]["value"]',
             'packet = inputs.get("example.left_feature") or inputs.get("example.right_feature")\n        value = packet["value"]'))
     else:
@@ -123,8 +123,8 @@ def _flow(project, spec):
                               _call("rekey", "example." + name + "_feature"), _call("end", "example.boundary")],
                     "edges": [_edge("start", "model"), _edge("model", "rekey"), _edge("rekey", "end")],
                     "outputs": [{**_require("example." + name + "_feature"), "as": name + "_feature"}]}}
-            write(project / ("configs/nodesets/" + name + ".jsonc"), branch_body)
-            data["nodeset_imports"].append({"path": "nodesets/" + name + ".jsonc"})
+            write(project / ("configs/nodeset_types/" + name + ".jsonc"), branch_body)
+            data["nodeset_imports"].append({"path": "nodeset_types/" + name + ".jsonc"})
         data["pipeline"]["nodes"] = [_call("start", "example.boundary"),
             _call("choose", "example.choose", branch=spec["branch"]),
             _call("left", "example.left_model"), _call("right", "example.right_model"),
@@ -140,8 +140,8 @@ def _flow(project, spec):
                 "description": "Reusable native domain pipeline.", "rulesets": ["vibeflow.workflow"],
                 "requires": [_require("example.input")], "provides": [_provider("result", "example.output")],
                 "pipeline": original}
-        write(project / "configs/nodesets/stage.jsonc", body)
-        data["nodeset_imports"] = [{"path": "nodesets/stage.jsonc"}]
+        write(project / "configs/nodeset_types/stage.jsonc", body)
+        data["nodeset_imports"] = [{"path": "nodeset_types/stage.jsonc"}]
         if spec["form"] == "nodeset":
             middle = _call("stage", "example.domain_stage")
         else:
@@ -164,20 +164,20 @@ def _flow(project, spec):
 def _invalid(project, spec):
     target = spec["target"]
     if spec["variant"] == "missing_model":
-        path = project / ("domain_nodes.py" if target == "python" else "nodes/model.ts")
+        path = project / ("nodes/domain_nodes.py" if target == "python" else "nodes/model.ts")
         marker = "model_forward" if target == "python" else "modelForward"
         path.write_text(path.read_text().replace(marker, "_forward"))
     elif spec["variant"] == "helper_model":
         if target == "python":
-            helper = project / "domain_helpers/illegal_model.py"
+            helper = project / "base_lib/domain_helpers/illegal_model.py"
             helper.write_text('def model_forward(value):\n    return value + 1\n')
-            path = project / "domain_nodes.py"
-            source = path.read_text().replace("from domain_helpers.arithmetic import scale",
-                "from domain_helpers.arithmetic import scale\nfrom domain_helpers.illegal_model import model_forward")
+            path = project / "nodes/domain_nodes.py"
+            source = path.read_text().replace("from ..base_lib.domain_helpers.arithmetic import scale",
+                "from ..base_lib.domain_helpers.arithmetic import scale\nfrom ..base_lib.domain_helpers.illegal_model import model_forward")
             path.write_text(source.replace('value + params["offset"]', 'model_forward(value) + params["offset"]'))
             declaration = resource_ref(project, "node", "example.transform")
             data = json.loads(declaration.read_text())
-            data["implementations"][0].setdefault("implementation_files", []).append("domain_helpers/illegal_model.py")
+            data["implementations"][0].setdefault("implementation_files", []).append({"kind":"file","ref":"base_lib/domain_helpers/illegal_model.py"})
             write(declaration, data)
         else:
             (project / "nodes/transform_helper.ts").write_text('export function modelForward(value: number) { return value + 1; }\n')
@@ -258,9 +258,9 @@ def _documents(project):
                  ("export-svg", svg, ["--expand-nodesets"]))]
     architecture_text = architecture.read_text() if architecture.exists() else ""
     document = json.loads(architecture_text[architecture_text.index("{"):]) if "{" in architecture_text else {}
-    descriptor = document.get("node_types", {}).get("example.model", {})
+    descriptor = document.get("node_definitions", {}).get("example.model", {})
     tags = descriptor.get("tags", descriptor.get("info", {}).get("tags", []))
-    models = [item for item in _walk(document) if item.get("type_used") == "example.model"]
+    models = [item for item in _walk(document) if item.get("definition_id") == "example.model" and "presentation" in item]
     fills = {item.get("presentation", {}).get("values", {}).get("fill", "") for item in models}
     svg_text = svg.read_text() if svg.exists() else ""
     model_fills = []
@@ -269,7 +269,7 @@ def _documents(project):
         svg_valid = svg_root.tag == "{http://www.w3.org/2000/svg}svg"
         for group in svg_root.iter():
             text = " ".join(" ".join(group.itertext()).split())
-            if "node" not in group.attrib.get("class", "").split() or "type_used: example.model " not in text:
+            if "node" not in group.attrib.get("class", "").split() or "definition_id: example.model " not in text:
                 continue
             geometry = [child for child in group if child.tag.rsplit("}", 1)[-1] in {"rect", "polygon", "circle", "ellipse", "path"}]
             for element in geometry:
@@ -300,10 +300,10 @@ graph=parse_graph_config(document.data,project_root=root,source_path=root/'confi
 if sys.argv[2]=='python':
     registry=declared_python_registry(workspace,config_path=root/'configs/model.jsonc')
     sources=collect_workflow_source_context(registry,graph)
-    paths=[list(call.call_path) for call in sources.calls if call.type_key=='example.model']
+    paths=[list(call.call_path) for call in sources.calls if call.definition_id=='example.model']
 else:
-    from vibeflow.targets.javascript.build.rule_session import node_type_calls
-    paths=[list(path) for path in node_type_calls(graph).get('example.model',())]
+    from vibeflow.targets.javascript.build.rule_session import node_definition_calls
+    paths=[list(path) for path in node_definition_calls(graph).get('example.model',())]
 print(json.dumps({'selected_model_paths':paths}))
 '''
 

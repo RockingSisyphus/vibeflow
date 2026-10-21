@@ -1,13 +1,4 @@
 {
-  "plugins": [
-    {
-      "source": {
-        "kind": "file",
-        "ref": "plugin.py",
-        "export": "plugin"
-      }
-    }
-  ],
   "pipeline": {
     "inputs": [
       {
@@ -20,55 +11,55 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "addition.boundary",
+        "definition_id": "addition.boundary",
         "display_name": "start",
         "description": "start"
       },
       {
         "id": "parse_argv",
-        "type_used": "addition.argv",
+        "definition_id": "addition.argv",
         "display_name": "parse_argv",
         "description": "parse_argv"
       },
       {
         "id": "read_stdin",
-        "type_used": "addition.stream_input",
+        "definition_id": "addition.stream_input",
         "display_name": "read_stdin",
         "description": "read_stdin"
       },
       {
         "id": "read_left",
-        "type_used": "addition.open_left",
+        "definition_id": "addition.open_left",
         "display_name": "read_left",
         "description": "read_left"
       },
       {
         "id": "read_right",
-        "type_used": "addition.open_right",
+        "definition_id": "addition.open_right",
         "display_name": "read_right",
         "description": "read_right"
       },
       {
         "id": "sum_numbers",
-        "type_used": "addition.sum",
+        "definition_id": "addition.sum",
         "display_name": "sum_numbers",
         "description": "sum_numbers"
       },
       {
         "id": "write_file",
-        "type_used": "addition.open_write",
+        "definition_id": "addition.open_write",
         "display_name": "write_file",
         "description": "write_file"
       },
       {
         "id": "write_output",
-        "type_used": "addition.streams",
+        "definition_id": "addition.streams",
         "display_name": "write_output",
         "description": "write_output"
       },
       {
         "id": "end",
-        "type_used": "addition.boundary",
+        "definition_id": "addition.boundary",
         "display_name": "end",
         "description": "end"
       }

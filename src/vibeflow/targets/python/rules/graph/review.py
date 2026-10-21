@@ -8,7 +8,7 @@ from vibeflow.targets.shared.rule_support.workflow import graph_contexts, review
 def workflow_review(context, inputs, params):
     from vibeflow.targets.python.quality.workflow.validation import _HealthValidationState
     from vibeflow.targets.python.rules.graph.node_config import current_node_configuration_findings
-    from vibeflow.targets.python.rules.graph.nodesets import current_nodeset_declaration_findings
+    from vibeflow.targets.python.rules.graph.nodeset_types import current_nodeset_declaration_findings
     from vibeflow.targets.python.rules.graph.planned_implementation import python_stub_findings
     from vibeflow.targets.shared.quality_support.workflow_rules.planned import current_graph_planned_events, PlannedImplementationCheck
     from vibeflow.targets.python.rules.graph.mainline import append_mainline_health

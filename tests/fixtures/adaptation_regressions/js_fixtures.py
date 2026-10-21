@@ -15,18 +15,14 @@ def write(path: Path, value):
 
 
 def project(path: Path, toolchain: Path | None) -> Path:
-    shutil.copytree(ROOT / "sandbox/javascript/multifile_resources", path,
+    shutil.copytree(ROOT / "sandbox/javascript/multifile_resources/project", path,
         ignore=shutil.ignore_patterns("node_modules", "__pycache__", "ARCHITECTURE*", "*.svg", "*.png"))
     if toolchain is None:
         raise ValueError("JavaScript cases require an explicit locked toolchain")
+    from tests.fixtures.support.projects import register_root
+    register_root(path, "javascript")
     (path / "node_modules").symlink_to(toolchain / "node_modules", target_is_directory=True)
-    src = path / "src"
-    src.mkdir()
-    for member in tuple(path.glob("*.ts")):
-        member.rename(src / member.name)
-    data = json.loads((path / "workflow.jsonc").read_text())
-    data["plugins"][0]["source"]["ref"] = "src/plugin.ts"
-    write(path / "workflow.jsonc", data)
+    (path / "configs/workflow.jsonc").rename(path / "workflow.jsonc")
     settings = json.loads((path / "vibeflow_project.jsonc").read_text())
     settings.pop("architecture", None)
     write(path / "vibeflow_project.jsonc", settings)
@@ -47,7 +43,7 @@ def config(path: Path, change):
 
 
 def cli_args(project: Path, command: str, *extra, config_name="workflow.jsonc"):
-    args = [command, "--workspace", str(project / "vibeflow_config.jsonc")]
+    args = [command, "--workspace", str(project.parent / "vibeflow_config.jsonc")]
     if command != "quality-check":
         args += ["--config", str(project / config_name)]
     if command in {"validate", "quality-check", "review-rules", "inspect-resources"}:
@@ -59,8 +55,7 @@ def diagnostic_rows(payload):
     rows = []
     def visit(value):
         if isinstance(value, dict):
-            if isinstance(value.get("code", value.get("rule_id")), str) and (
-                "severity" in value or "source_location" in value or "file" in value):
+            if isinstance(value.get("code", value.get("rule_id")), str) and "severity" in value:
                 if value not in rows:
                     rows.append(value)
             for key, item in value.items():
@@ -118,23 +113,23 @@ def native_shape(project: Path, variant: str):
         "description": "Native model composition", "rulesets": ["vibeflow.workflow"],
         "requires": [], "provides": [{"key":"result", "type":"number", "display_name":"Result"}],
         "pipeline": body})
-    middle = {"id":"stage", "type_used":"audit.body", "display_name":"Stage", "description":"Native Nodeset"}
+    middle = {"id":"stage", "definition_id":"audit.body", "display_name":"Stage", "description":"Native Nodeset"}
     data["nodeset_imports"] = [{"path":"body.jsonc"}]
     if variant == "nested":
         outer = deepcopy(body)
-        outer["nodes"][1]["type_used"] = "audit.body"
+        outer["nodes"][1]["definition_id"] = "audit.body"
         write(project / "outer.jsonc", {"type_key":"audit.outer", "display_name":"Outer", "description":"Nested native composition",
             "requires":[], "provides":[{"key":"result", "type":"number", "display_name":"Result"}], "pipeline":outer})
         data["nodeset_imports"].append({"path":"outer.jsonc"})
-        middle["type_used"] = "audit.outer"
+        middle["definition_id"] = "audit.outer"
     if variant == "loop":
         body["inputs"] = [{"key":"number", "type":"number", "display_name":"Initial", "required":True}]
-        edit(project / "src/node.ts", "contract:{provides:", 'contract:{requires:[{type:"number",cardinality:"exactly_one",display_name:"Input"}],input_semantics:{number:["Incoming value"]},provides:')
-        edit(project / "src/node.ts", 'run(){return {result:multiply(library.implementation(2),2)};}', 'run(inputs){return {result:multiply(library.implementation(inputs.number.value),2)};}')
+        edit(project / "nodes/node.ts", "contract:{provides:", 'contract:{requires:[{type:"number",cardinality:"exactly_one",display_name:"Input"}],input_semantics:{number:["Incoming value"]},provides:')
+        edit(project / "nodes/node.ts", 'run(){return {result:multiply(library.implementation(2),2)};}', 'run(inputs){return {result:multiply(library.implementation(inputs.number.value),2)};}')
         write(project / "body.jsonc", {"type_key":"audit.body", "display_name":"Body", "description":"Native loop body",
             "requires":[{"type":"number", "cardinality":"exactly_one", "display_name":"Input"}],
             "provides":[{"key":"result", "type":"number", "display_name":"Result"}], "pipeline":body})
-        middle.update(type_used="vibeflow.loop.while", requires=[{"type":"number", "cardinality":"exactly_one", "display_name":"Input"}],
+        middle.update(definition_id="vibeflow.loop.while", requires=[{"type":"number", "cardinality":"exactly_one", "display_name":"Input"}],
             provides=[{"key":"result", "type":"number", "display_name":"Result"}],
             loop={"body":"audit.body", "max_iterations":1, "stop_after":1,
                 "carry":[{"from":"number", "as":"number", "update":"result"}], "outputs":[{"from":"result", "as":"result"}]})
@@ -147,7 +142,7 @@ def native_shape(project: Path, variant: str):
             "requires":[], "provides":[], "pipeline":body})
         second = {**middle, "id":"again"}
         data["pipeline"]["nodes"].insert(2, second)
-        final = {"id":"final", "type_used":"demo.model", "display_name":"Final", "description":"Exports one numerical result"}
+        final = {"id":"final", "definition_id":"demo.model", "display_name":"Final", "description":"Exports one numerical result"}
         data["pipeline"]["nodes"].insert(3, final)
         data["pipeline"]["edges"] = [["start","stage"],["stage","again"],["again","final"],["final","end"]]
     write(project / "workflow.jsonc", data)
@@ -157,8 +152,8 @@ def compiler(project: Path, variant="valid"):
     marker = json.dumps(str(project / "hooks.jsonl"))
     imports = 'import {appendFileSync} from "node:fs";\n'
     factory = f'''compiler(){{appendFileSync({marker},JSON.stringify({{event:"factory"}})+"\\n");return {{
- beforeCompile(payload){{appendFileSync({marker},JSON.stringify({{event:"before",definitions:Object.keys(payload.graph.nodesets||{{}})}})+"\\n");
-   const definitions=payload.graph.nodesets||{{}};for(const item of Object.values(definitions)){{if(!item.graph.nodeset_refs.every(id=>id in definitions))throw Error("invalid finite refs");}}
+ beforeCompile(payload){{appendFileSync({marker},JSON.stringify({{event:"before",definitions:Object.keys(payload.graph.nodeset_types||{{}})}})+"\\n");
+   const definitions=payload.graph.nodeset_types||{{}};for(const item of Object.values(definitions)){{if(!item.graph.nodeset_refs.every(id=>id in definitions))throw Error("invalid finite refs");}}
    return {{annotation:{{stage:"before",definitions:Object.keys(definitions)}}}};
  }},
  afterCompile(payload){{appendFileSync({marker},JSON.stringify({{event:"after",order:payload.compiled.order}})+"\\n");return {{annotation:{{stage:"after",order:payload.compiled.order}}}};}},
@@ -174,11 +169,11 @@ def compiler(project: Path, variant="valid"):
         factory = factory.replace('event:"dispose"})+"\\n");}', 'event:"dispose"})+"\\n");throw Error("SECONDARY_DISPOSE_FAILURE");}')
     if variant == "dispose":
         factory = factory.replace('event:"dispose"})+"\\n");}', 'event:"dispose"})+"\\n");throw Error("DISPOSE_FAILURE");}')
-    source = project / "src/plugin.ts"
+    source = project / "plugins/demo/plugin.ts"
     text = source.read_text().replace('runtime(){return lifecycle();},', factory)
     text = text.replace('import {definePlugin,defineCapability,defineDataSchema}', 'import {definePlugin,defineCapability,defineDataSchema,defineRuleset}')
     text = text.replace('export const plugin=', COMPILER_IO_RULESET_SOURCE + 'export const plugin=')
-    text = text.replace('resources:[start,model,library,host,session,number]', 'resources:[start,model,library,host,session,number,compilerIO]')
+    text = text.replace('resources:[number]', 'resources:[number,compilerIO]')
     text = text.replace('rulesets:["vibeflow.plugin"]', 'rulesets:["audit.compiler_io"]')
     source.write_text(imports + text)
 

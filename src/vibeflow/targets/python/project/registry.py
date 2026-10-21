@@ -58,6 +58,7 @@ class NodeRegistry:
         self._loaders: dict[str, Callable[[], type]] = {}
         self._registration_info: dict[str, NodeRegistrationInfo] = {}
         self._config_specs: dict[str, NodeConfigSpec] = {}
+        self.source_namespaces = {}
         self.rule_catalogs: tuple[object, ...] = ()
         self.rule_handler_loader = None
         self._effect_policies: dict[str, str] = {}
@@ -76,7 +77,7 @@ class NodeRegistry:
     def register(self, descriptor: NodeDescriptor, implementation: type | None = None, *, loader: Callable[[], type] | None = None, source: str = "", source_line: int | None = None, overwrite: bool = False) -> NodeDescriptor:
         if not isinstance(descriptor, NodeDescriptor):
             raise NodeRegistryError("registration requires a NodeDescriptor; class metadata and registry factories are not declarations")
-        key = descriptor.type_key
+        key = descriptor.id
         if key in self._descriptors and not overwrite:
             raise NodeRegistryError(f"key already registered: {key}")
         if implementation is not None and loader is not None:
@@ -102,7 +103,7 @@ class NodeRegistry:
             raise NodeRegistryError(f"unknown node key '{key}'") from exc
 
     def get(self, key: str) -> type:
-        normalized = self.descriptor(key).type_key
+        normalized = self.descriptor(key).id
         if normalized not in self._registry:
             loader = self._loaders.get(normalized)
             if loader is None:
@@ -120,7 +121,7 @@ class NodeRegistry:
         return self.descriptor(key).rulesets
 
     def source_info(self, key: str) -> NodeRegistrationInfo:
-        return self._registration_info[self.descriptor(key).type_key]
+        return self._registration_info[self.descriptor(key).id]
 
     def effect_scope(self, key: str) -> str:
         """Describe a selected rule policy; this never grants OS permissions."""
@@ -142,7 +143,7 @@ class NodeRegistry:
             self._effect_policies.pop(key,None)
 
     def get_config_spec(self, key: str) -> NodeConfigSpec:
-        return self._config_specs[self.descriptor(key).type_key]
+        return self._config_specs[self.descriptor(key).id]
 
     def merge_config(self, key: str, overrides: Mapping[str, Any] | None) -> dict[str, Any]:
         try:

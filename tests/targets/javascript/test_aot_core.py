@@ -49,12 +49,11 @@ def _build_with_selected_source_rules(request: BuildRequest):
     policy = request.javascript_bindings.import_policy.to_value()
     owners = [dict(item) for item in policy.get("owners", ())]
     for owner in owners:
-        if owner.get("kind") in {"node", "host_extension"}:
-            owner.setdefault("export", "run" if owner["kind"] == "node" else "createHostExtension")
+        if owner.get("kind") == "node":
+            owner.setdefault("export", "run")
             owner.setdefault("completion", "immediate")
     policy["owners"] = owners
-    for snake, camel in (("node_base_libs", "nodeBaseLibs"), ("base_lib_dependencies", "baseLibDependencies"),
-                         ("host_extension_dependencies", "hostExtensionDependencies")):
+    for snake, camel in (("node_base_libs", "nodeBaseLibs"), ("base_lib_dependencies", "baseLibDependencies")):
         if snake in policy:
             policy[camel] = policy.pop(snake)
     policy["allowed_external_packages"] = list({*policy.get("allowed_external_packages", ()), *request.external_packages})
@@ -89,7 +88,7 @@ def _node(
 ) -> dict[str, object]:
     return {
         "id": node_id,
-        "type_used": f"test.{export}",
+        "definition_id": f"test.{export}",
         "implementation": {"kind": "file", "ref": module, "export": export},
         "requires": requires or [],
         "provides": provides or [],
@@ -114,7 +113,7 @@ def _linear_plan(
     entry_mode: str = "sync",
 ) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "test.workflow",
         "entry_mode": entry_mode,
         "inputs": [{"key": "number", "type": "number", "required": True}],
@@ -233,7 +232,7 @@ def _real_toolchain_project(tmp_path: Path) -> Path:
 
 def _empty_real_plan(module: Path) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "test.import-policy",
         "inputs": [],
         "outputs": [],
@@ -338,7 +337,7 @@ def test_emitted_esm_json_schema_const_uses_json_deep_equality(
     tmp_path: Path,
 ) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "test.schema-const",
         "inputs": [
             {
@@ -402,7 +401,7 @@ console.log(JSON.stringify({ value, mismatch, nullInput }));
 
 def test_emitted_esm_schema_length_counts_unicode_code_points(tmp_path: Path) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "test.unicode-length",
         "inputs": [
             {
@@ -445,7 +444,7 @@ def test_emitted_esm_preserves_magic_public_output_keys(
     tmp_path: Path,
 ) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "test.magic-output-key",
         "inputs": [],
         "outputs": [
@@ -717,7 +716,7 @@ def test_emitted_esm_exposes_only_each_nodes_declared_capability_operations(
     tmp_path: Path,
 ) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "test.capability-minimum-authority",
         "inputs": [],
         "outputs": [],
@@ -796,7 +795,7 @@ def test_emitted_esm_max_steps_has_root_block_and_next_node_path(
     tmp_path: Path,
 ) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "test.max-steps-path",
         "inputs": [],
         "outputs": [],
@@ -844,7 +843,7 @@ console.log(JSON.stringify(failure));
 
 def test_emitted_esm_supports_all_join_result_key_and_detached(tmp_path: Path) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "test.parallel",
         "inputs": [],
         "outputs": [{"type": "value", "cardinality": "all", "as": "values"}],
@@ -927,7 +926,7 @@ console.log(JSON.stringify(value));
     assert async_result == {"answer": 10}
 
     conditional_async_plan = {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "test.async-condition",
         "entry_mode": "async",
         "inputs": [{"key": "number", "type": "number", "required": True}],
@@ -1005,7 +1004,7 @@ console.log(JSON.stringify({
     }
 
     detached_plan = {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "test.detached",
         "entry_mode": "async",
         "inputs": [],
@@ -1039,7 +1038,7 @@ console.log(JSON.stringify({ value, calls: globalThis.__vfCalls }));
     }
 
     failure_plan = {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "test.detached.failure",
         "entry_mode": "async",
         "inputs": [],
@@ -1095,7 +1094,7 @@ def test_canonical_blocks_expand_child_nodeset_and_require_explicit_input_requir
         ),
     ]
     portable = {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "portable",
         "entry_block": "block:/",
         "inputs": [{"key": "number", "type": "number", "required": True}],
@@ -1174,7 +1173,7 @@ def test_process_only_root_is_not_promoted_to_a_workflow_entry(
     module = tmp_path / "node.mjs"
     module.write_text("export function run() { return {}; }\n", encoding="utf-8")
     plan = {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "test.no-entry",
         "inputs": [],
         "outputs": [],
@@ -1203,7 +1202,7 @@ def test_process_only_root_is_not_promoted_to_a_workflow_entry(
 
 def test_canonical_portable_loop_accepts_stop_when_carry_and_collect() -> None:
     portable = {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "portable.loop",
         "entry_block": "block:/",
         "inputs": [],
@@ -1293,7 +1292,7 @@ def test_emitted_esm_runs_nested_nodeset_and_bounded_or_unbounded_loop(
     tmp_path: Path,
 ) -> None:
     child = {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "nested.child",
         "inputs": [{"key": "number", "type": "number", "required": True}],
         "outputs": [{"type": "answer", "cardinality": "exactly_one", "as": "answer"}],
@@ -1352,7 +1351,7 @@ console.log(JSON.stringify(value));
     assert nested == {"answer": 12}
 
     body = {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "loop.body",
         "inputs": [{"key": "current", "type": "number", "required": True}],
         "outputs": [{"type": "next", "cardinality": "exactly_one", "as": "next"}],
@@ -1472,7 +1471,7 @@ def test_build_profiles_are_atomic_and_manifest_is_deterministic(
         encoding="utf-8",
     )
     plan = {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "build",
         "inputs": [],
         "outputs": [{"type": "value", "cardinality": "exactly_one", "as": "value"}],
@@ -1512,7 +1511,7 @@ def test_build_profiles_are_atomic_and_manifest_is_deterministic(
     )
     assert second.manifest.read_bytes() == first_manifest
     manifest = json.loads(second.manifest.read_text(encoding="utf-8"))
-    assert manifest["format"] == "vibeflow.aot-build.v3"
+    assert manifest["format"] == "vibeflow.aot-build.v4"
     assert manifest["project_target"] == "javascript"
     assert "timestamp" not in manifest
     assert manifest["target_metadata"]["profile"] == profile
@@ -1594,7 +1593,7 @@ def test_real_typescript_rejects_mutable_state_and_side_effect_imports(
                 external_packages=external_packages,
                 import_policy={
                     "owners": [
-                        {"path": str(module), "kind": "node", "id": "test.run"}
+                        {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.run"}
                     ]
                 },
             )
@@ -1629,7 +1628,7 @@ def test_real_typescript_allows_recursively_frozen_module_constants(
             profile="single-esm",
             import_policy={
                 "owners": [
-                    {"path": str(module), "kind": "node", "id": "test.run"}
+                    {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.run"}
                 ]
             },
         )
@@ -1657,12 +1656,12 @@ def test_real_typescript_rejects_unowned_barrel_and_cross_node_imports(
     )
     second.write_text("export const helper = 1;\n", encoding="utf-8")
     owners = [
-        {"path": str(first), "kind": "node", "id": "test.run"},
-        {"path": str(second), "kind": "node", "id": "test.other"},
+        {'node_type': 'vibeflow.node', "path": str(first), "kind": "node", "id": "test.run"},
+        {'node_type': 'vibeflow.node', "path": str(second), "kind": "node", "id": "test.other"},
     ]
     if register_barrel:
         owners.append(
-            {"path": str(barrel), "kind": "node", "id": "test.other"}
+            {'node_type': 'vibeflow.node', "path": str(barrel), "kind": "node", "id": "test.other"}
         )
     with pytest.raises(AotBuildError) as caught:
         _build_with_selected_source_rules(
@@ -1712,7 +1711,7 @@ def test_real_typescript_rejects_base_lib_host_io(
                 profile="single-esm",
                 import_policy={
                     "owners": [
-                        {"path": str(module), "kind": "node", "id": "test.run"},
+                        {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.run"},
                         {
                             "path": str(base_lib),
                             "kind": "base_lib",
@@ -1809,7 +1808,7 @@ def test_real_typescript_allows_computation_but_retains_process_observation(
                 profile="single-esm",
                 import_policy={
                     "owners": [
-                        {"path": str(module), "kind": "node", "id": "test.run"},
+                        {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.run"},
                         {
                             "path": str(base_lib),
                             "kind": "base_lib",
@@ -1886,7 +1885,7 @@ def test_real_typescript_allows_pure_math_base_lib_and_fake_capability(
             profile="single-esm",
             import_policy={
                 "owners": [
-                    {"path": str(module), "kind": "node", "id": "test.nodes"},
+                    {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.nodes"},
                     {
                         "path": str(base_lib),
                         "kind": "base_lib",
@@ -1939,7 +1938,7 @@ def test_real_typescript_rejects_base_lib_host_io_module(
                 external_packages=("node:fs",),
                 import_policy={
                     "owners": [
-                        {"path": str(module), "kind": "node", "id": "test.run"},
+                        {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.run"},
                         {
                             "path": str(base_lib),
                             "kind": "base_lib",
@@ -1984,7 +1983,7 @@ def test_real_typescript_allows_pure_node_builtin_for_node_target(
             profile="single-esm",
             import_policy={
                 "owners": [
-                    {"path": str(module), "kind": "node", "id": "test.run"},
+                    {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.run"},
                     {
                         "path": str(base_lib),
                         "kind": "base_lib",
@@ -2022,7 +2021,7 @@ def test_browser_platform_module_failure_is_reported_by_esbuild(
                 profile="single-esm",
                 import_policy={
                     "owners": [
-                        {
+                        {'node_type': 'vibeflow.node',
                             "path": str(module),
                             "kind": "node",
                             "id": "test.run",
@@ -2066,7 +2065,7 @@ def test_real_single_esm_rejects_unbundled_worker_resources(
                 profile="single-esm",
                 import_policy={
                     "owners": [
-                        {"path": str(module), "kind": "node", "id": "test.run"}
+                        {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.run"}
                     ]
                 },
             )
@@ -2131,7 +2130,7 @@ def test_real_typescript_node_context_has_portable_abort_signal(
             profile="single-esm",
             import_policy={
                 "owners": [
-                    {"path": str(module), "kind": "node", "id": "test.run"}
+                    {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.run"}
                 ]
             },
         )
@@ -2212,7 +2211,7 @@ def test_real_typescript_leaves_platform_globals_to_project_tools(
             profile="single-esm",
             import_policy={
                 "owners": [
-                    {"path": str(module), "kind": "node", "id": "test.run"}
+                    {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.run"}
                 ]
             },
         )
@@ -2241,7 +2240,7 @@ def test_real_typescript_ordinary_type_error_is_not_a_vibeflow_error(
             profile="single-esm",
             import_policy={
                 "owners": [
-                    {"path": str(module), "kind": "node", "id": "test.run"}
+                    {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.run"}
                 ]
             },
         )
@@ -2279,7 +2278,7 @@ def test_real_typescript_still_rejects_vibeflow_node_abi_mismatch(
                 profile="single-esm",
                 import_policy={
                     "owners": [
-                        {
+                        {'node_type': 'vibeflow.node',
                             "path": str(module),
                             "kind": "node",
                             "id": "test.run",
@@ -2313,7 +2312,7 @@ def test_real_typescript_builds_runtime_string_evaluation(tmp_path: Path, body: 
     built = _build_with_selected_source_rules(fixture_build_request(
         plan=_empty_real_plan(module), project_root=project, package_root=project,
         out_dir=project / "dist", target="node", profile="single-esm",
-        import_policy={"owners": [{"path": str(module), "kind": "node", "id": "test.run"}]},
+        import_policy={"owners": [{'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.run"}]},
     ))
     assert (built.out_dir / "index.js").is_file()
 
@@ -2326,7 +2325,7 @@ def test_real_typescript_rejects_unowned_string_timer(tmp_path: Path) -> None:
         _build_with_selected_source_rules(fixture_build_request(
             plan=_empty_real_plan(module), project_root=project, package_root=project,
             out_dir=project / "dist", target="node", profile="single-esm",
-            import_policy={"owners": [{"path": str(module), "kind": "node", "id": "test.run"}]},
+            import_policy={"owners": [{'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.run"}]},
         ))
     assert "VF_NODE_RESOURCE_UNOWNED" in {item.get("code") for item in caught.value.diagnostics}
 
@@ -2369,7 +2368,7 @@ def test_real_typescript_rejects_module_binding_state_mutation(
                 profile="single-esm",
                 import_policy={
                     "owners": [
-                        {"path": str(module), "kind": "node", "id": "test.run"}
+                        {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.run"}
                     ]
                 },
             )
@@ -2410,7 +2409,7 @@ def test_real_typescript_rejects_module_scoped_stateful_regexp(
                 profile="single-esm",
                 import_policy={
                     "owners": [
-                        {"path": str(module), "kind": "node", "id": "test.run"}
+                        {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.run"}
                     ]
                 },
             )
@@ -2461,7 +2460,7 @@ def test_real_typescript_function_local_regexp_is_isolated_between_runs(
             profile="single-esm",
             import_policy={
                 "owners": [
-                    {"path": str(module), "kind": "node", "id": "test.nodes"}
+                    {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.nodes"}
                 ]
             },
         )
@@ -2530,7 +2529,7 @@ def test_real_typescript_rejects_builtin_prototype_mutation(
                 profile="single-esm",
                 import_policy={
                     "owners": [
-                        {"path": str(module), "kind": "node", "id": "test.run"}
+                        {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.run"}
                     ]
                 },
             )
@@ -2589,7 +2588,7 @@ def test_real_typescript_rejects_builtin_object_mutation(
                 profile="single-esm",
                 import_policy={
                     "owners": [
-                        {"path": str(module), "kind": "node", "id": "test.run"}
+                        {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.run"}
                     ]
                 },
             )
@@ -2643,7 +2642,7 @@ def test_real_typescript_local_builtin_name_is_isolated_between_runs(
             profile="single-esm",
             import_policy={
                 "owners": [
-                    {"path": str(module), "kind": "node", "id": "test.nodes"}
+                    {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.nodes"}
                 ]
             },
         )
@@ -2714,7 +2713,7 @@ def test_real_typescript_rejects_class_definition_side_effects(
                 profile="single-esm",
                 import_policy={
                     "owners": [
-                        {"path": str(module), "kind": "node", "id": "test.run"}
+                        {'node_type': 'vibeflow.node', "path": str(module), "kind": "node", "id": "test.run"}
                     ]
                 },
             )
@@ -2724,177 +2723,12 @@ def test_real_typescript_rejects_class_definition_side_effects(
     }
 
 
-def _host_extension_build_request(
-    project: Path,
-    *,
-    factory_source: str,
-    entry_mode: str = "sync",
-    target: str = "node",
-    profile: str = "single-esm",
-) -> BuildRequest:
-    node = project / "node.ts"
-    extension = project / "host-extension.ts"
-    node.write_text("export function run() { return {}; }\n", encoding="utf-8")
-    extension.write_text(factory_source, encoding="utf-8")
-    plan = _empty_real_plan(node)
-    plan["entry_mode"] = entry_mode
-    html_template = None
-    app_entry = None
-    if profile == "web-app":
-        html_template = project / "index.template.html"
-        html_template.write_text(
-            "<!doctype html><body><!-- VIBEFLOW_APP_ENTRY --></body>\n",
-            encoding="utf-8",
-        )
-        app_entry = project / "app.ts"
-        app_entry.write_text(
-            'import { createWorkflowHost } from "@vibeflow/workflow";\n'
-            "void createWorkflowHost;\n",
-            encoding="utf-8",
-        )
-    return fixture_build_request(
-        plan=plan,
-        project_root=project,
-        package_root=project,
-        out_dir=project / "dist",
-        target=target,
-        profile=profile,
-        host_extensions=(
-            {
-                "id": "test.host",
-                "module": str(extension),
-                "export": "createHostExtension",
-                "dependencies": [],
-                "provides": [],
-            },
-        ),
-        import_policy={
-            "owners": [
-                {
-                    "path": str(node),
-                    "kind": "node",
-                    "id": "test.run",
-                    "export": "run",
-                    "completion": "immediate",
-                },
-                {
-                    "path": str(extension),
-                    "kind": "host_extension",
-                    "id": "test.host",
-                    "export": "createHostExtension",
-                    "completion": "immediate",
-                },
-            ],
-            "host_extension_dependencies": {"test.host": []},
-        },
-        html_template=html_template,
-        app_entry=app_entry,
-    )
 
 
-@pytest.mark.parametrize(
-    "factory_source",
-    [
-        (
-            "export async function createHostExtension() {\n"
-            "  return { start() {}, stop() {} };\n"
-            "}\n"
-        ),
-        (
-            "export function createHostExtension() {\n"
-            "  return Promise.resolve({ start() {}, stop() {} });\n"
-            "}\n"
-        ),
-    ],
-)
-def test_real_typescript_rejects_async_host_extension_factory(
-    tmp_path: Path,
-    factory_source: str,
-) -> None:
-    project = _real_toolchain_project(tmp_path)
-
-    with pytest.raises(AotBuildError) as caught:
-        _build_with_selected_source_rules(
-            _host_extension_build_request(
-                project,
-                factory_source=factory_source,
-            )
-        )
-
-    assert "VF_COMPLETION_IMMEDIATE_PROMISE" in {
-        diagnostic.get("code") for diagnostic in caught.value.diagnostics
-    }
-    assert any(
-        "host_extension 'test.host' factory" in str(
-            diagnostic.get("message", "")
-        )
-        for diagnostic in caught.value.diagnostics
-    )
 
 
-def test_real_typescript_allows_async_host_extension_start_and_stop(
-    tmp_path: Path,
-) -> None:
-    project = _real_toolchain_project(tmp_path)
-
-    result = _build_with_selected_source_rules(
-        _host_extension_build_request(
-            project,
-            factory_source=(
-                "export function createHostExtension() {\n"
-                "  return {\n"
-                "    async start() { await Promise.resolve(); },\n"
-                "    stop() { return Promise.resolve(); },\n"
-                "  };\n"
-                "}\n"
-            ),
-        )
-    )
-
-    assert result.entry.is_file()
 
 
-@pytest.mark.parametrize(
-    ("target", "profile"),
-    [
-        ("node", "esm-module"),
-        ("node", "single-esm"),
-        ("browser", "esm-module"),
-        ("browser", "single-esm"),
-        ("browser", "web-app"),
-    ],
-)
-def test_real_typescript_builds_async_workflow_host_in_all_profiles(
-    tmp_path: Path,
-    target: str,
-    profile: str,
-) -> None:
-    project = _real_toolchain_project(tmp_path)
-
-    result = build_aot(
-        _host_extension_build_request(
-            project,
-            factory_source=(
-                "export function createHostExtension() {\n"
-                "  return { start() {}, stop() {} };\n"
-                "}\n"
-            ),
-            entry_mode="async",
-            target=target,
-            profile=profile,
-        )
-    )
-
-    assert result.entry.is_file()
-    declaration_files = [
-        result.out_dir / name
-        for name in result.files
-        if name.endswith(".d.ts")
-    ]
-    assert len(declaration_files) == 1
-    declaration = declaration_files[0].read_text(encoding="utf-8")
-    assert "runWorkflowAsync(" in declaration
-    assert "): Promise<WorkflowOutputs>;" in declaration
 
 
 @pytest.mark.parametrize('lock_name', (None, 'yarn.lock', 'pnpm-lock.yaml'))
@@ -2909,9 +2743,9 @@ def test_actual_aot_build_and_replace_need_no_npm_lock(tmp_path, lock_name):
     request = fixture_build_request(plan=_empty_real_plan(module), project_root=project,
         package_root=project, out_dir=project/'dist', target='node', profile='single-esm')
     built = build_aot(request)
-    manifest = validate_owned_build_directory(built.out_dir, manifest_format='vibeflow.aot-build.v3')
+    manifest = validate_owned_build_directory(built.out_dir, manifest_format='vibeflow.aot-build.v4')
     assert set(manifest['target_metadata']['toolchain']) == {'node','typescript','esbuild'}
-    assert manifest['abi_version'] == 'vibeflow.workflow.v9'
+    assert manifest['abi_version'] == 'vibeflow.workflow.v10'
     assert _run_esm(built.entry, 'await workflow.runWorkflow({}); console.log(JSON.stringify({ok:true}));') == {'ok':True}
     from dataclasses import replace
     assert build_aot(replace(request, replace=True)).entry.is_file()

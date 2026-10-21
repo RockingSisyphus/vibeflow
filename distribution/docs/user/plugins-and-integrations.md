@@ -1,74 +1,62 @@
-# 统一插件与宿主集成
+# Plugin 与宿主 API
 
-固定插件贡献自定义 Node、Rule、Ruleset、DataSchema、BaseLib、Capability 和 HostExtension。Python 用 `Plugin`，JS/TS 用 `definePlugin`；workflow 的 `plugins` 显式选择本次使用的插件及资源。
+Plugin 是一个原子资源包，贡献 NodeType、Rule、Ruleset、DataSchema、私有 BaseLib、Capability 及可选 compiler/runtime 扩展。业务 Node 在所属 `nodes/` 中独立声明，不放入 Plugin 的 `resources`。
 
-默认规则和资源由内置插件自动接入，Config 无需声明。报告记录实际声明及实现来源。插件贡献普通 Rule/Ruleset 只让其可被引用；设置 `workflow_default` 的 Ruleset 才加入 Workflow 默认。Workflow/Nodeset 的 `rulesets=[]` 取消对应图级选择，Node 调用的 `[]` 只取消自身局部选择。
+目录和可见性、四级规则配置及迁移要求见 [项目治理与资源分层](project-governance.md)。规则参数、契约与调用配置见 [Rule、Ruleset 与 Node](rules-and-nodes.md)。
 
-## 选择与配置
+## 声明与选择
+
+```python
+# plugins/layout/plugin.py
+from vibeflow.targets.python.sdk import Plugin, node_type
+
+process = node_type(
+    id="layout.process",
+    display_name="Process",
+    rulesets=["vibeflow.process"],
+    presentation={"shape": "hex", "fill": "#f2e6c5", "stroke": "#191919"},
+)
+plugin = Plugin(id="layout", resources=[process])
+```
+
+```python
+# nodes/calculate.py
+from vibeflow.targets.python.sdk import node
+
+@node(id="app.calculate", node_type="layout.process", contract={})
+class Calculate:
+    def run_pure(self, inputs, params):
+        return {}
+```
 
 ```jsonc
 {
-  "plugins": [{
-    "id": "example.model",
-    "root": "python-project",
-    "source": {"kind": "file", "ref": "plugins/model.py", "export": "plugin"},
-    "config": {"mode": "review"}
-  }]
+  "plugins": [{"source": {"kind": "file", "ref": "plugins/layout/plugin.py"}}],
+  "pipeline": {
+    "nodes": [{"id": "calculate", "definition_id": "app.calculate",
+      "display_name": "Calculate", "description": "执行计算"}]
+  }
 }
 ```
 
-`id` 可选，用来核对插件导出身份。`root` 可选，取已登记的 workspace root ID。文件相对该 root；`module/package` 显式定位 Target 已安装的模块。插件导出固定资源列表、契约和规则组合；`config` 按插件 schema/defaults 合并，提供给图级和资源 Rule 的只读 `context.facts["plugins"]` 及生命周期工厂；Node 局部 Rule 使用自身声明、Rule 参数和当前调用资料。Node 调用 `params` 和 Ruleset 参数分别配置。
+JavaScript/TypeScript 使用相同的分层：包内通过 `defineNodeType`、`defineRule` 等固定声明贡献资源；`nodes/` 通过 `defineNode({id, node_type, contract, run, ...})` 声明业务实现。用 `scope: "project"` 选择项目共享 Plugin，默认只在当前 root 的 `plugins/` 内定位文件。
 
-不同 workflow 拥有独立的资源集合、插件配置和生命周期实例。`enabled: false` 跳过加载；`status: "planned"` 保存规划记录。Nodeset 的结构由导入文件提供，所需插件统一在顶层 workflow 选择。
+Plugin 的文件入口及贡献代码必须在同一包内。包内相对导入可组织多个文件；外部标准库、第三方依赖与公开 SDK 正常使用。业务 Node 不能通过引入 Plugin 的实现代码取得其类型或权限，按类型 ID 引用即可。
 
-Python 的只读 JSON 配置转换由独立模块 `vibeflow.core.descriptors.json_values` 提供，也可从 `vibeflow.core.descriptors` 导入：
+`id` 可选，用来核对导出的 Plugin 身份。`enabled: false` 跳过该选择；`status: "planned"` 保存尚未实现的规划，不加载占位源码。`config` 与 Plugin 的 defaults/schema 合并后交给该次操作的只读上下文，不决定固定资源列表。
 
-```python
-from vibeflow.core.descriptors.json_values import freeze_json, thaw_json
+Plugin 的安装只使规则可被选择。Ruleset 的 `workflow_default` 可加入图级默认；Plugin 自身 `rulesets` 检查生命周期实现，`declaration_rulesets` 检查包声明，不能把它们当成所有 Node 的局部规则。项目/root 治理中加载的包不自动加入 workflow。
 
-settings = {"labels": {"phase": "prepare"}, "stages": [{"name": "train"}]}
-readonly_settings = freeze_json(settings)
-editable_settings = thaw_json(readonly_settings)
-editable_settings["labels"]["phase"] = "evaluate"
-assert readonly_settings["labels"]["phase"] == "prepare"
-```
+## 原生加载与生命周期
 
-`freeze_json(value, field_name="value")` 递归复制合法 JSON 数据，将对象变成只读映射、数组变成 tuple；无效值抛出 `DescriptorModelError` 并标注字段路径。`freeze_mapping(...)` 用于要求顶层为对象的配置，`None` 表示空对象。`thaw_json(value)` 递归生成普通 dict/list 副本，用于编辑或 `json.dumps`；它同时支持普通 list 内的只读对象。两个转换都保留嵌套结构和值，不改变输入对象，修改导出副本不影响原只读配置。插件的嵌套默认值和 workflow 覆盖值可直接使用，运行前 JSON 记录也保持其结构。
+准备层加载受信 SDK 声明，校验所有权、可见性、配置和冲突，再执行所选检查和实现绑定。声明加载可能执行其模块初始化；检查不是沙箱，也不能撤销已经发生的初始化。延迟实现通过显式 source 定位，所选 import 检查失败后不进入业务绑定。
 
-## Plugin 如何贡献和使用规则
+`inspect-resources` 与 `review-rules` 读取声明和选择，不调用业务 `run_pure/run`、检查函数或生命周期工厂。
 
-把 Python 的 `@rule` 函数与 `ruleset(...)` 对象，或 JS/TS 的 `defineRule(...)` 与 `defineRuleset(...)` 对象，全部放进插件 `resources`。然后在顶层 Workflow 的 `plugins` 中选择这个固定导出。
-
-规则有两种默认声明、三种动态选择：
-
-- Node 类型的 `rulesets` 声明局部默认；Ruleset 的 `workflow_default` 声明 Workflow 默认。
-- Workflow、Nodeset 定义、Node 调用 Config 的 `rulesets` 可以显式选择已贡献的 Rule/Ruleset。
-- 动态列表替代对应默认或继承列表，局部规则与所属图级规则共同生效。
-
-Plugin 自己的 `rulesets` 检查其生命周期实现，`declaration_rulesets` 检查插件包声明；这两个字段不会给 Workflow 或全部 Node 附加规则。要提供 Workflow 默认，应在贡献的 **Ruleset** 上填写 `workflow_default`。
-
-完整 Python/TypeScript 定义、配置位置和替代示例见 [Rule、Ruleset 与 Node 声明](rules-and-nodes.md)。
-
-## 加载与检查
-
-VibeFlow 按以下顺序装配当前 workflow：
-
-1. 读取插件选择，加载受信入口及其直接导入，取得固定定义。
-2. 校验资源、配置和冲突，确定本次可用资源。
-3. 解析工作流引用和有效 Ruleset，再执行对应阶段的检查。
-4. 绑定延迟实现，进入原生构建或运行；生命周期工厂在各自阶段创建实例。
-
-加载或声明失败时，报告该根因并停止后续装配。已初始化源码仍接受所选规则审查，诊断描述已经发生的行为；它不会撤销初始化。尚未加载的延迟实现及闭包在所选 import 检查失败后保持未加载。规则与插件是受信扩展代码；只读上下文保证公共分析资料的使用约定，执行进程仍具有普通代码的文件系统能力。
-
-资源查询与 `review-rules` 取得声明并展示选择，框架不调用检查函数、业务执行入口或生命周期工厂。
-
-## 生命周期
-
-一个插件可以同时贡献资源并提供 compiler/runtime 工厂。`declaration_rulesets` 检查插件声明源码，`rulesets` 检查生命周期实现；两者分别明确选择。常用选择是 `vibeflow.plugin_declaration` 与 `vibeflow.plugin`。
+Plugin 可提供 compiler/runtime 工厂，每个适用操作创建独立实例，并在结束或失败时释放。它们用于编译、观察等框架扩展。Python 工厂接收只读上下文，包括 `context["config"]`；JS 工厂使用 `context.config`。不要在模块初始化时创建运行实例。
 
 ```python
-from vibeflow.targets.python.sdk import Plugin
-
+# 仍位于 Plugin 包内
 class Audit:
     def before_run(self, payload):
         pass
@@ -76,51 +64,21 @@ class Audit:
         pass
 
 def create_runtime(context):
-    return Audit()  # context["config"] 为本次 workflow 的只读参数
+    return Audit()
 
-plugin = Plugin(id="example.audit", resources=[], runtime=create_runtime,
-                rulesets=["vibeflow.plugin"],
-                declaration_rulesets=["vibeflow.plugin_declaration"])
+# plugin = Plugin(id="audit", resources=[...], runtime=create_runtime, ...)
 ```
 
-Python 实例使用 snake_case hooks，如 `before_run(inputs)`、`after_run(result, trace)`、`before_compile(graph)` 和 `after_compile(graph, compiled)`，通过 `dispose()` 释放资源。JS/TS 采用 Plugin ABI v3，使用 camelCase hooks：
+嵌套 JSON 配置可用公开的 `freeze_json` / `thaw_json` 转换。它们复制容器，保留值与结构；修改导出副本不会修改原配置。
 
-```ts
-import {definePlugin} from "@vibeflow/plugin";
-export const plugin = definePlugin({
-  id: "example.audit", resources: [], priority: 30,
-  rulesets: ["vibeflow.plugin"], declaration_rulesets: ["vibeflow.plugin_declaration"],
-  runtime(context) {
-    return {beforeRun() {}, afterRun() {}, dispose() {}};
-  },
-});
-```
+## 宿主集成
 
-JS 工厂同步返回实例，runtime hooks 可以按原协议异步完成。每次 workflow 调用创建并释放独立实例；长期宿主职责由原生 HostExtension 承担。compiler 的 beforeCompile/afterCompile 保留原来的编译变换职责。
+宿主提供普通 Capability API，Node 显式声明所用操作，并由 Rule 授权。比如浏览器应用构造一个尚未监听消息的 API，将其注入运行；图中的“建立监听”节点调用 open，接收节点等待消息，关闭节点调用 close。宿主提供取消后的必要资源释放，图中仍可审查正常路径的关键生命周期。
 
-Plugin 可以通过 `implementation_files` 登记支撑源码，通过 `base_libs` 引用独立库，并设置默认 `presentation`。独立生命周期工厂可以各自声明这些字段。具体代码形式见[插件声明与生命周期](multifile-resources.md#插件声明与生命周期)。
+Host Extension 已删除，不再提供自动宿主工厂、隐藏监听或自动托管 workflow 生命周期。浏览器、桌面程序和后台服务保留自己的生命周期；跨程序拉起和收发使用 [workflow 协同](workflow-coordination.md)。
 
-## Capability 与 Host
+Capability 声明和有效 Rule 策略共同限定上下文提供的操作；它们不是操作系统权限隔离。节点的名字、形状、颜色和 `flow_kind` 不赋予功能。
 
-```ts
-import {defineCapability} from "@vibeflow/plugin";
-export const clock = defineCapability({
-  id: "example.clock", targets: ["browser", "node"],
-  operations: {now: {input_type: "clock.now.request", output_type: "clock.now.result", completion: "suspend"}},
-});
-```
+## 审查资源
 
-把此资源放入插件，并贡献其输入输出 DataSchema。Node 显式声明使用的 Capability，宿主通过 options 注入实现，或由启用的 JS HostExtension 提供。`defineHostExtension` 使用 `createHost` 回调或显式延迟源码；固定声明不改变原生 Host 协议。
-
-Host 在 `host_extensions` 中选择，通常明确使用 `vibeflow.host_extension` Ruleset。入口及支撑文件共同实现一个 Host；每次创建时持有独立会话状态。`implementation_files` 登记内部文件，`base_libs` 引用共享库，`dependencies` 表达其他 Host 实例依赖。多文件示例、逐文件检查和架构资源区见[一个 Host，多个实现文件](multifile-resources.md#一个-host多个实现文件)。
-
-选择统一写在 workflow.host_extensions；旧项目级 Host 字段会返回迁移错误。
-
-```bash
-python run.py inspect-resources --config <root>/configs/main.jsonc --json
-python run.py review-rules --config <root>/configs/main.jsonc --json
-```
-
-升级已有项目时，按[一次迁移说明](rule-system-migration.md)把旧登记改为代码插件与显式选择。
-
-一次 workflow 的 before_run／after_run／run_failed 生命周期只由其所属运行触发；内部 Nodeset 和受管任务使用各自的 Node／Nodeset hooks。after_run、dispose 及最终状态均在所属任务实际收尾后发生。
+默认审查生成结构化快照，通过 HTML 查看流程和资源。Plugin 视图按包显示一张卡片；BaseLib 视图仅显示独立库及其依赖。包内事实仍保存在快照详情中，但不会展开成一堆内部实现节点。需要 SVG 对照时使用 `review --with-svg` 或显式 `--output FILE.svg`。

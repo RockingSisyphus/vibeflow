@@ -1,0 +1,4 @@
+import {defineBaseLib} from "@vibeflow/plugin";
+export const resource_43 = defineBaseLib({"id": "sandbox.math", "display_name": "Sandbox math helpers", "description": "Pure add, subtract, affine, and sign helpers shared by TypeScript nodes.", "implementations": [{"language": "typescript", "targets": ["browser", "node"], "source": {"kind": "file", "ref": "base_lib/math.ts"}}], "dependencies": [], "external_packages": [], "rulesets": ["vibeflow.base_lib"]});
+
+export const resource_44 = defineBaseLib({"id": "sandbox.negative.reverse", "display_name": "Invalid reverse dependency helper", "description": "Negative fixture that imports a Node implementation.", "implementations": [{"language": "typescript", "targets": ["browser", "node"], "source": {"kind": "file", "ref": "negative/base_lib/reverse.ts"}}], "dependencies": [], "external_packages": [], "rulesets": ["vibeflow.base_lib"]});

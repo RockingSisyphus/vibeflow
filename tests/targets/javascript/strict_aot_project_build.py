@@ -28,7 +28,7 @@ from vibeflow.core.flow import (
     GraphConfig,
     GraphConfigError,
     NodeMetadata,
-    NodeSpec,
+    NodeCallSpec,
     NodeStyle,
     STATUS_PLANNED,
 )
@@ -86,9 +86,9 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
     )
     _write(
         sdk_resource(project, "node", "demo.add"),
-        {
+        {'node_type': 'vibeflow.node',
             "kind": "node",
-            "type_key": "demo.add",
+            'id': "demo.add",
             "rulesets": ["vibeflow.process"],
             "display_name": "Add",
 
@@ -122,9 +122,9 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
     )
     _write(
         sdk_resource(project, "node", "demo.start"),
-        {
+        {'node_type': 'vibeflow.node',
             "kind": "node",
-            "type_key": "demo.start",
+            'id': "demo.start",
             "rulesets": ["vibeflow.process"],
             "display_name": "Start",
 
@@ -222,7 +222,7 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
         },
     )
     _write(
-        project / "nodesets/group.jsonc",
+        project / "nodeset_types/group.jsonc",
         {
             "type_key": "demo.group",
             "rulesets": [],
@@ -243,7 +243,7 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
                 "nodes": [
                     {
                         "id": "add",
-                        "type_used": "demo.add",
+                        "definition_id": "demo.add",
                         "display_name": "Add",
                         "description": "Nested add.",
                         "config": {"delta": 2},
@@ -257,9 +257,9 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
         config,
         {
             "global_config": {"delta": 3},
-            "plugins": [{"source": {"kind": "file", "ref": "code_plugin.ts", "export": "plugin"}}],
+            "plugins": [{"source": {"kind": "file", "ref": "plugins/code_plugin/plugin.ts", "export": "plugin"}}],
             "rulesets": [],
-            "nodeset_imports": ["nodesets/group.jsonc"],
+            "nodeset_imports": ["nodeset_types/group.jsonc"],
             "pipeline": {
                 "inputs": [
                     {
@@ -276,13 +276,13 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
                 "nodes": [
                     {
                         "id": "start",
-                        "type_used": "demo.start",
+                        "definition_id": "demo.start",
                         "display_name": "Start",
                         "description": "Starts the nested workflow.",
                     },
                     {
                         "id": "group",
-                        "type_used": "demo.group",
+                        "definition_id": "demo.group",
                         "display_name": "Group",
                         "description": "Calls the group.",
                         "config": {"delta": 4},
@@ -326,55 +326,15 @@ def test_build_compiles_uncalled_empty_rule_declarations(tmp_path):
     request = _request(tmp_path)
     data = json.loads(Path(request.config).read_text())
     data["rulesets"] = []
-    declaration = Path(request.config).parent / "nodesets/unused.jsonc"
+    declaration = Path(request.config).parent / "nodeset_types/unused.jsonc"
     _write(declaration,{"type_key":"demo.unused","display_name":"Unused","description":"Native error still applies.",
-        "requires":[],"provides":[],"rulesets":[],"pipeline":{"nodes":[{"id":"unknown","display_name":"Unknown","description":"An unknown native Node type.","type_used":"unknown.node","rulesets":[]}]}})
-    data.setdefault("nodeset_imports",[]).append("nodesets/unused.jsonc")
+        "requires":[],"provides":[],"rulesets":[],"pipeline":{"nodes":[{"id":"unknown","display_name":"Unknown","description":"An unknown native Node type.","definition_id":"unknown.node","rulesets":[]}]}})
+    data.setdefault("nodeset_imports",[]).append("nodeset_types/unused.jsonc")
     _write(Path(request.config),data)
     with pytest.raises(Exception,match="unknown.node"):
         prepare_project_build(request)
 
 
-def _add_host_extension(
-    project: Path,
-    extension_id: str,
-    *,
-    dependencies: list[str] | None = None,
-    provides: list[str] | None = None,
-) -> None:
-    safe_name = extension_id.replace(".", "-")
-    source = project / f"src/{safe_name}.ts"
-    source.write_text(
-        """
-export function createHostExtension(context) {
-  globalThis.__hostConfig = context.config;
-  return { start() {}, stop() {} };
-}
-""".strip()
-        + "\n",
-        encoding="utf-8",
-    )
-    _write(
-        sdk_resource(project, "host_extension", extension_id),
-        {
-            "kind": "host_extension",
-            "id": extension_id,
-            "targets": ["browser", "node"],
-            "implementations": [
-                {
-                    "language": "typescript",
-                    "targets": ["browser", "node"],
-                    "source": {
-                        "kind": "file",
-                        "ref": f"src/{safe_name}.ts",
-                        "export": "createHostExtension",
-                    },
-                }
-            ],
-            "provides": provides or [],
-            "dependencies": dependencies or [],
-        },
-    )
 
 
 def _add_unselected_plugin(project: Path) -> Path:
@@ -437,7 +397,7 @@ def test_javascript_root_rejects_foreign_implementation_languages_even_when_unus
     if resource_kind == "plugin":
         # Resource packages are enabled solely by workflow selection.
         document = json.loads(Path(request.config).read_text())
-        document["plugins"] = [{"source": {"kind": "file", "ref": "code_plugin.ts", "export": "plugin"}}]
+        document["plugins"] = [{"source": {"kind": "file", "ref": "plugins/code_plugin/plugin.ts", "export": "plugin"}}]
         _write(Path(request.config), document)
 
     with pytest.raises(ProjectBuildError) as captured:
@@ -453,7 +413,7 @@ def test_prepare_project_build_loads_static_js_only_nested_project(
 ) -> None:
     prepared = prepare_project_build(_request(tmp_path))
 
-    assert prepared.used_node_types == ("demo.add", "demo.start")
+    assert prepared.used_node_ids == ("demo.add", "demo.start")
     assert prepared.used_base_libs == ("demo.core", "demo.math")
     assert prepared.used_capabilities == ("demo.storage",)
     assert len(prepared.plan.blocks) == 2
@@ -560,80 +520,9 @@ def test_prepare_project_build_never_imports_python_target(
     monkeypatch.setattr(builtins, "__import__", guarded_import)
     prepared = prepare_project_build(request)
 
-    assert prepared.used_node_types == ("demo.add", "demo.start")
+    assert prepared.used_node_ids == ("demo.add", "demo.start")
 
 
-def test_workflow_host_extensions_support_planned_and_instance_config(
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    request = _request(tmp_path)
-    project = Path(request.config).parent
-    _add_host_extension(
-        project,
-        "demo.browser_host",
-        provides=["demo.storage"],
-    )
-    _add_host_extension(
-        project,
-        "demo.future_host",
-        provides=["demo.storage"],
-    )
-    raw = json.loads(Path(request.config).read_text(encoding="utf-8"))
-    raw["host_extensions"] = [
-        {
-            "id": "demo.browser_host",
-            "status": "implemented",
-            "config": {"channel": "primary"},
-        },
-        {
-            "id": "demo.future_host",
-            "status": "planned",
-            "display_name": "Future Host",
-            "description": "Planned host connection.",
-        },
-    ]
-    _write(Path(request.config), raw)
-
-    prepared = prepare_project_build(request)
-
-    assert prepared.used_host_extensions == ("demo.browser_host",)
-    assert prepared.planned_host_extensions == ("demo.future_host",)
-    assert [item["status"] for item in prepared.declared_host_extensions] == [
-        "implemented",
-        "planned",
-    ]
-    assert prepared.host_extensions[0]["config"] == {
-        "channel": "primary"
-    }
-    assert all(
-        item["id"] != "demo.future_host"
-        for item in prepared.host_extensions
-    )
-    host_owner = next(
-        owner
-        for owner in prepared.import_policy["owners"]
-        if owner["kind"] == "host_extension"
-    )
-    assert host_owner["id"] == "demo.browser_host"
-    assert host_owner["export"] == "createHostExtension"
-    assert host_owner["completion"] == "immediate"
-    assert prepared.javascript_bindings is not None
-    assert [
-        item.to_value()
-        for item in prepared.javascript_bindings.host_extensions
-    ] == list(prepared.host_extensions)
-
-    from vibeflow.tooling.application.cli import main
-    arguments = ["--workspace", str(request.workspace), "--config", str(request.config), "--json"]
-    assert main(["review-rules", *arguments]) == 0
-    review = json.loads(capsys.readouterr().out)
-    assert {item["id"] for item in review["resources"] if item["kind"] == "host_extension"} == {
-        "demo.browser_host", "demo.future_host",
-    }
-    assert main(["validate", *arguments]) == 0
-    validation = json.loads(capsys.readouterr().out)
-    assert validation["status"] in {"PASS", "CONCERNS"}
 
 
 @pytest.mark.parametrize("workflow_override", [False, True])
@@ -649,78 +538,16 @@ def test_project_host_selection_is_removed_even_with_workflow_override(tmp_path,
         workflow = json.loads(Path(request.config).read_text(encoding="utf-8"))
         workflow["host_extensions"] = []
         _write(Path(request.config), workflow)
-    with pytest.raises(WorkspaceConfigError, match="javascript.host_extensions was removed") as captured:
+    with pytest.raises(WorkspaceConfigError, match="Host Extension is retired") as captured:
         prepare_project_build(request)
     assert captured.value.rule_id == "WORKSPACE.PROJECT_CONFIG.JAVASCRIPT"
     assert captured.value.source_location["field"] == "javascript.host_extensions"
 
 
-def test_implemented_host_extension_cannot_depend_on_planned_extension(
-    tmp_path: Path,
-) -> None:
-    request = _request(tmp_path)
-    project = Path(request.config).parent
-    _add_host_extension(
-        project,
-        "demo.active_host",
-        dependencies=["demo.future_host"],
-    )
-    _add_host_extension(project, "demo.future_host")
-    raw = json.loads(Path(request.config).read_text(encoding="utf-8"))
-    raw["host_extensions"] = [
-        {"id": "demo.active_host"},
-        {"id": "demo.future_host", "status": "planned"},
-    ]
-    _write(Path(request.config), raw)
-
-    with pytest.raises(ProjectBuildError) as captured:
-        prepare_project_build(request)
-
-    assert (
-        captured.value.code
-        == "VF_AOT_HOST_EXTENSION_PLANNED_DEPENDENCY"
-    )
 
 
-def test_host_extension_explicit_empty_contract_must_match_descriptor(
-    tmp_path: Path,
-) -> None:
-    request = _request(tmp_path)
-    project = Path(request.config).parent
-    _add_host_extension(
-        project,
-        "demo.browser_host",
-        provides=["demo.storage"],
-    )
-    raw = json.loads(Path(request.config).read_text(encoding="utf-8"))
-    raw["host_extensions"] = [
-        {
-            "id": "demo.browser_host",
-            "provides": [],
-        }
-    ]
-    _write(Path(request.config), raw)
-
-    with pytest.raises(ProjectBuildError) as captured:
-        prepare_project_build(request)
-
-    assert captured.value.code == "VF_AOT_HOST_EXTENSION_CONFIG"
-    assert "provides must match" in captured.value.message
 
 
-def test_host_extension_null_selection_is_not_an_empty_override(
-    tmp_path: Path,
-) -> None:
-    request = _request(tmp_path)
-    raw = json.loads(Path(request.config).read_text(encoding="utf-8"))
-    raw["host_extensions"] = None
-    _write(Path(request.config), raw)
-
-    with pytest.raises(ProjectBuildError) as captured:
-        prepare_project_build(request)
-
-    assert captured.value.code == "VF_AOT_HOST_EXTENSION_CONFIG"
-    assert "must be a list" in captured.value.message
 
 
 def test_prepare_project_build_rejects_python_registry_metadata(
@@ -758,7 +585,7 @@ def test_prepare_project_build_rejects_ambiguous_input_requiredness(
     raw["pipeline"]["inputs"][0].pop("required")
     _write(Path(request.config), raw)
 
-    with pytest.raises(GraphConfigError, match="required must be explicitly true or false"):
+    with pytest.raises(ProjectBuildError, match="required must be explicitly true or false"):
         prepare_project_build(request)
 
 
@@ -766,15 +593,15 @@ def test_prepare_project_build_rejects_graph_call_contract_duplicates(
     tmp_path: Path,
 ) -> None:
     request = _request(tmp_path)
-    nodeset = Path(request.config).parent / "nodesets/group.jsonc"
+    nodeset = Path(request.config).parent / "nodeset_types/group.jsonc"
     raw = json.loads(nodeset.read_text(encoding="utf-8"))
     raw["pipeline"]["nodes"][0]["requires"] = [_requirement("value.in", "optional_one")]
     _write(nodeset, raw)
 
-    with pytest.raises(GraphConfigError) as captured:
+    with pytest.raises(ProjectBuildError) as captured:
         prepare_project_build(request)
 
-    assert "derived from type_used" in str(captured.value)
+    assert captured.value.code == "CONFIG.SCHEMA.NODE_CONTRACT_DUPLICATE"
 
 
 def test_prepare_project_build_requires_schema_and_target_implementation(
@@ -830,7 +657,7 @@ def test_target_neutral_audit_does_not_require_a_shared_platform(
         )
     )
 
-    implementations = audited.architecture["node_types"]
+    implementations = audited.architecture["node_definitions"]
     assert implementations["demo.add"]["implementations"][0]["targets"] == [
         "node"
     ]
@@ -839,13 +666,11 @@ def test_target_neutral_audit_does_not_require_a_shared_platform(
     ] == ["browser"]
 
 
-def test_target_neutral_audit_never_loads_planned_plugin_or_host_source(
+def test_target_neutral_audit_never_loads_planned_plugin_source(
     tmp_path: Path,
 ) -> None:
     request = _request(tmp_path)
     project = Path(request.config).parent
-    _add_host_extension(project, "demo.future_host")
-    (project / "src/demo-future_host.ts").unlink()
     _write(
         sdk_resource(project, "plugin", "demo.future_plugin"),
         {
@@ -872,11 +697,8 @@ def test_target_neutral_audit_never_loads_planned_plugin_or_host_source(
     workflow = json.loads(Path(request.config).read_text(encoding="utf-8"))
     sdk_resource(project, "plugin", "demo.future_plugin").unlink()
     workflow["plugins"] = [
-        {"source": {"kind": "file", "ref": "code_plugin.ts", "export": "plugin"}},
+        {"source": {"kind": "file", "ref": "plugins/code_plugin/plugin.ts", "export": "plugin"}},
         {"id": "demo.future_plugin", "status": "planned", "type": "runtime"}
-    ]
-    workflow["host_extensions"] = [
-        {"id": "demo.future_host", "status": "planned"}
     ]
     _write(Path(request.config), workflow)
 
@@ -885,12 +707,10 @@ def test_target_neutral_audit_never_loads_planned_plugin_or_host_source(
             workspace=request.workspace,
             config=request.config,
             audit_sources=False,
-            audit_registered_resources=True,
         )
     )
 
     assert all("does-not-exist" not in item for item in audited.source_files)
-    assert all("future_host" not in item for item in audited.source_files)
 
 
 def test_target_neutral_architecture_is_location_independent(
@@ -924,22 +744,22 @@ def test_target_neutral_architecture_is_location_independent(
         "target": "demo.group",
         "target_status": "implemented",
     }
-    assert left_result.architecture["nodesets"]["demo.group"]["body"]["nodes"][0]["id"] == "add"
-    assert left_result.architecture["nodesets"]["demo.group"]["reachable_from_workflow"] is True
+    assert left_result.architecture["nodeset_types"]["demo.group"]["body"]["nodes"][0]["id"] == "add"
+    assert left_result.architecture["nodeset_types"]["demo.group"]["reachable_from_workflow"] is True
 
 
 def test_javascript_planned_global_state_renders_as_cloud_path() -> None:
     graph = GraphConfig(
         nodes=(
-            NodeSpec(
+            NodeCallSpec(
                 id="runtime_state",
-                type_used="future.runtime_state",
+                definition_id="future.runtime_state",
                 status=STATUS_PLANNED,
                 flow_kind="global_state",
             ),
-            NodeSpec(
+            NodeCallSpec(
                 id="ordinary",
-                type_used="future.ordinary",
+                definition_id="future.ordinary",
                 status=STATUS_PLANNED,
                 flow_kind="process",
             ),
@@ -975,9 +795,9 @@ def test_javascript_mermaid_composes_planned_custom_and_external_styles(
 ) -> None:
     graph = GraphConfig(
         nodes=(
-            NodeSpec(
+            NodeCallSpec(
                 id="planned",
-                type_used="future.planned",
+                definition_id="future.planned",
                 status=STATUS_PLANNED,
                 flow_kind="process",
                 metadata=NodeMetadata(
@@ -985,9 +805,9 @@ def test_javascript_mermaid_composes_planned_custom_and_external_styles(
                     description="Shows planned styling.",
                 ),
             ),
-            NodeSpec(
+            NodeCallSpec(
                 id="custom",
-                type_used="demo.custom",
+                definition_id="demo.custom",
                 metadata=NodeMetadata(
                     display_name="Custom",
                     description="Shows custom colours.",
@@ -998,17 +818,17 @@ def test_javascript_mermaid_composes_planned_custom_and_external_styles(
                     text="#172554",
                 ),
             ),
-            NodeSpec(
+            NodeCallSpec(
                 id="external",
-                type_used="demo.external",
+                definition_id="demo.external",
                 metadata=NodeMetadata(
                     display_name="External",
                     description="Shows the external boundary.",
                 ),
             ),
-            NodeSpec(
+            NodeCallSpec(
                 id="external_custom",
-                type_used="demo.external_custom",
+                definition_id="demo.external_custom",
                 metadata=NodeMetadata(
                     display_name="External Custom",
                     description="Combines custom colours and the external boundary.",
@@ -1058,7 +878,7 @@ def test_javascript_mermaid_composes_planned_custom_and_external_styles(
         architecture={"resources": {}},
         plugin_records=(),
         host_records=(),
-        compiled_nodesets={},
+        compiled_nodeset_types={},
         plan=SimpleNamespace(workflow_id="visual-test"),
         root=SimpleNamespace(id="visual-test"),
     )

@@ -30,12 +30,12 @@ def append_all_join_mutual_exclusion_finding(
     state.errors.append(
         _data_finding(
             "GRAPH.JOIN.ALL_BRANCHES_MUTUALLY_EXCLUSIVE",
-            node.name,
+            node.id,
             (
-                f"node '{node.name}' declares join_policy='all', but at least two required schedule "
+                f"node '{node.id}' declares join_policy='all', but at least two required schedule "
                 "predecessors are controlled by mutually exclusive branches of the same decision"
             ),
-            node=node.name,
+            node=node.id,
             severity="error",
             details={
                 "owner": owner,
@@ -45,7 +45,7 @@ def append_all_join_mutual_exclusion_finding(
                 "transfer_incoming": [_edge_summary(edge) for edge in transfer_incoming],
                 "candidate_providers": [
                     {
-                        "node": source.name,
+                        "node": source.id,
                         "provides": [{"key": item.key, "type": item.type} for item in source.provides],
                     }
                     for source in (nodes_by_name.get(edge.source) for edge in transfer_incoming)

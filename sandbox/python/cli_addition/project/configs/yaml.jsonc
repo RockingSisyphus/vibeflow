@@ -1,13 +1,4 @@
 {
-  "plugins": [
-    {
-      "source": {
-        "kind": "file",
-        "ref": "plugin.py",
-        "export": "plugin"
-      }
-    }
-  ],
   "pipeline": {
     "inputs": [
       {
@@ -20,49 +11,49 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "addition.boundary",
+        "definition_id": "addition.boundary",
         "display_name": "start",
         "description": "start"
       },
       {
         "id": "parse_argv",
-        "type_used": "addition.argv",
+        "definition_id": "addition.argv",
         "display_name": "parse_argv",
         "description": "parse_argv"
       },
       {
         "id": "read_stdin",
-        "type_used": "addition.input",
+        "definition_id": "addition.input",
         "display_name": "read_stdin",
         "description": "read_stdin"
       },
       {
         "id": "read_document",
-        "type_used": "addition.yaml",
+        "definition_id": "addition.yaml",
         "display_name": "read_document",
         "description": "read_document"
       },
       {
         "id": "sum_numbers",
-        "type_used": "addition.sum",
+        "definition_id": "addition.sum",
         "display_name": "sum_numbers",
         "description": "sum_numbers"
       },
       {
         "id": "write_file",
-        "type_used": "addition.path_write",
+        "definition_id": "addition.path_write",
         "display_name": "write_file",
         "description": "write_file"
       },
       {
         "id": "write_output",
-        "type_used": "addition.print",
+        "definition_id": "addition.print",
         "display_name": "write_output",
         "description": "write_output"
       },
       {
         "id": "end",
-        "type_used": "addition.boundary",
+        "definition_id": "addition.boundary",
         "display_name": "end",
         "description": "end"
       }

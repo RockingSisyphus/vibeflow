@@ -23,16 +23,16 @@ def prepared_review(tmp_path, monkeypatch):
         raise AssertionError("diagram rendering must not bind an implementation")
 
     registry.register(NodeDescriptor("fixture.work", "Work", "Work implementation", "1", "process",
-        contract=NodeContractDescriptor(), rulesets=()), loader=loader)
+        contract=NodeContractDescriptor(), rulesets=(), node_type="vibeflow.node"), loader=loader)
 
     def call(identifier, kind):
-        return {"id": identifier, "type_used": kind, "display_name": identifier, "description": identifier}
+        return {"id": identifier, "definition_id": kind, "display_name": identifier, "description": identifier}
 
     def definition(key, nodes):
         return {"type_key": key, "display_name": key, "description": key,
                 "requires": [], "provides": [], "pipeline": {"nodes": nodes}}
 
-    graph = parse_graph_config({"rulesets": [], "nodesets": [
+    graph = parse_graph_config({"rulesets": [], "nodeset_types": [
         definition("detail.shared", [call("leaf_work", "fixture.work")]),
         definition("detail.one", [call("first_child", "detail.shared"), call("second_child", "detail.shared")]),
         definition("detail.two", [call("third_child", "detail.shared")]),
@@ -41,7 +41,6 @@ def prepared_review(tmp_path, monkeypatch):
     resources = {
         "plugins": [{"id": "fixture.plugin", "name": "Fixture Plugin", "type": "runtime"}],
         "base_lib": {"modules": [{"id": "fixture.base", "module": "Fixture BaseLib"}]},
-        "host_extensions": [{"id": "fixture.host", "display_name": "Fixture Host"}],
     }
     counts = Counter()
     original = GraphCompiler.compile_with_findings
@@ -69,7 +68,7 @@ def test_review_workflow_and_nested_frames_exclude_resource_columns(prepared_rev
     review_svg.render_review_columns_svg(graph, prepared.compiled, output,
         resources=resources, expand_nodesets=True, prepared=prepared)
 
-    resource_titles = {"plugins", "base_lib", "host_extensions"}
+    resource_titles = {"plugins", "base_lib"}
     frames = [(title, text) for title, text in rendered if title not in resource_titles]
     assert rendered[0][0] == "main pipeline"
     assert sum(title == "parent flow" for title, _ in frames) == 2
@@ -87,7 +86,6 @@ def test_review_workflow_and_nested_frames_exclude_resource_columns(prepared_rev
     assert set(columns) == resource_titles
     assert "Fixture Plugin" in columns["plugins"]
     assert "Fixture BaseLib" in columns["base_lib"]
-    assert "Fixture Host" in columns["host_extensions"]
     assert output.is_file()
     assert counts["compiles"] == 4 and bindings == []
 
@@ -99,7 +97,7 @@ def test_explicit_mermaid_resources_remain_visible_with_shared_preparation(prepa
     assert "resource_plugins" not in implicit
     assert "resource_base_lib" not in implicit
     assert "resource_host_extensions" not in implicit
-    for label in ("Fixture Plugin", "Fixture BaseLib", "Fixture Host"):
+    for label in ("Fixture Plugin", "Fixture BaseLib"):
         assert label in explicit
     assert "leaf_work" in implicit and "leaf_work" in explicit
     assert counts["compiles"] == 4 and bindings == []
@@ -130,5 +128,5 @@ def test_resource_selection_is_local_to_each_export_and_preserves_architecture(p
     assert counts["compiles"] == 4 and bindings == []
     assert ("Fixture Plugin" in selected) == (selection == "subset")
     assert "Fixture BaseLib" not in selected and "Fixture Host" not in selected
-    for label in ("Fixture Plugin", "Fixture BaseLib", "Fixture Host"):
+    for label in ("Fixture Plugin", "Fixture BaseLib"):
         assert label in full

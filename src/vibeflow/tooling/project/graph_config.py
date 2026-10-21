@@ -7,7 +7,7 @@ from pathlib import Path
 import time
 from typing import Any, Mapping
 
-from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, NodeSpec
+from vibeflow.core.flow import GraphConfig, LOOP_DEFINITION_IDS, NodeCallSpec
 from vibeflow.core.config.graph import parse_graph_config_data
 from vibeflow.tooling.project.diagnostic_sink import emit_core_diagnostic
 
@@ -40,7 +40,7 @@ def parse_graph_config(
         source_path=actual_source_path,
     )
     if _trace_enabled():
-        for index, (type_key, nodeset) in enumerate(graph.nodesets.items()):
+        for index, (type_key, nodeset) in enumerate(graph.nodeset_types.items()):
             emit_core_diagnostic(
                 "[vibeflow config] "
                 f"parsed nodeset type_key={type_key} index={index} "
@@ -50,23 +50,15 @@ def parse_graph_config(
             )
         emit_core_diagnostic(
             "[vibeflow config] "
-            f"parsed nodeset registry count={len(graph.nodesets)} elapsed=0.0ms"
+            f"parsed nodeset registry count={len(graph.nodeset_types)} elapsed=0.0ms"
         )
         elapsed_ms = round((time.perf_counter() - started) * 1000, 3)
         emit_core_diagnostic(
             "[vibeflow config] "
             f"parsed graph nodes={len(graph.nodes)} "
-            f"nodesets={len(graph.nodesets)} elapsed={elapsed_ms}ms"
+            f"nodeset_types={len(graph.nodeset_types)} elapsed={elapsed_ms}ms"
         )
     return graph
-
-
-def project_root_for_config(path: Path) -> Path:
-    resolved = path.resolve()
-    for parent in (resolved.parent, *resolved.parents):
-        if parent.name == "project":
-            return parent.parent.resolve()
-    return resolved.parent.resolve()
 
 
 def _trace_enabled() -> bool:
@@ -78,16 +70,16 @@ def _trace_enabled() -> bool:
     }
 
 
-def _nodeset_reference_targets(nodes: tuple[NodeSpec, ...]) -> tuple[str, ...]:
+def _nodeset_reference_targets(nodes: tuple[NodeCallSpec, ...]) -> tuple[str, ...]:
     return tuple(
         sorted(
             {
                 node.loop.body
                 for node in nodes
-                if node.type_used in LOOP_NODE_TYPES and node.loop.body
+                if node.definition_id in LOOP_DEFINITION_IDS and node.loop.body
             }
         )
     )
 
 
-__all__ = ["parse_graph_config", "project_root_for_config"]
+__all__ = ["parse_graph_config"]

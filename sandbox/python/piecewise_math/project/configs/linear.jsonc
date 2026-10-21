@@ -17,37 +17,37 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "piecewise.boundary",
+        "definition_id": "piecewise.boundary",
         "display_name": "start",
         "description": "start"
       },
       {
         "id": "u",
-        "type_used": "piecewise.sum_u",
+        "definition_id": "piecewise.sum_u",
         "display_name": "u",
         "description": "u"
       },
       {
         "id": "left",
-        "type_used": "piecewise.left",
+        "definition_id": "piecewise.left",
         "display_name": "left",
         "description": "left"
       },
       {
         "id": "copy",
-        "type_used": "piecewise.copy",
+        "definition_id": "piecewise.copy",
         "display_name": "copy",
         "description": "copy"
       },
       {
         "id": "finish",
-        "type_used": "piecewise.linear_finish",
+        "definition_id": "piecewise.linear_finish",
         "display_name": "finish",
         "description": "finish"
       },
       {
         "id": "end",
-        "type_used": "piecewise.boundary",
+        "definition_id": "piecewise.boundary",
         "display_name": "end",
         "description": "end"
       }
@@ -96,14 +96,5 @@
         "cardinality": "exactly_one"
       }
     ]
-  },
-  "plugins": [
-    {
-      "source": {
-        "kind": "file",
-        "ref": "plugin.py",
-        "export": "plugin"
-      }
-    }
-  ]
+  }
 }

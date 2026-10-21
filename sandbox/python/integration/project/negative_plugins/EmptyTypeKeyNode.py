@@ -1,6 +1,6 @@
 from vibeflow.targets.python.sdk import Plugin, node
 
-invalid = node(**{'type_key': '',
+invalid = node(**{'node_type': 'vibeflow.node', 'id': '',
  'display_name': 'Bad',
  'description': 'Bad node with empty type key.',
  'version': '0.1.0',
@@ -26,4 +26,3 @@ invalid = node(**{'type_key': '',
  'source': {'kind': 'file',
             'ref': 'illegal_nodes/metadata_contract_cases.py',
             'export': 'EmptyTypeKeyNode'}})
-plugin = Plugin(id='invalid.EmptyTypeKeyNode', resources=[invalid])

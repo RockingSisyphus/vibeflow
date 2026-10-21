@@ -157,7 +157,7 @@ from collections import Counter
 from unittest.mock import patch
 from vibeflow.targets.python.sdk import Plugin, ruleset
 from vibeflow.core.rules import RulesetDescriptor
-from vibeflow.core.descriptors.contributions import PluginContributions, ResourceDeclaration, ResourceOrigin, compose_contributions, contribution_facts
+from vibeflow.core.descriptors.contributions import PluginContributions, ResourceDeclaration, ResourceOrigin, ResourceOwner, compose_contributions, contribution_facts
 
 resource = ruleset(id='case.fixed', calls=())
 counts = Counter()
@@ -184,10 +184,10 @@ class ForgedDescriptor:
         return {'kind':'ruleset', 'id':self.id, 'calls':[]}
 invalid = {
     'raw_entry': (object(),),
-    'wrong_origin': (ResourceDeclaration(resource.descriptor,ResourceOrigin('other.plugin','decl.py')),),
-    'wrong_descriptor': (ResourceDeclaration(ForgedDescriptor(),ResourceOrigin('case.plugin','decl.py')),),
-    'duplicate': (ResourceDeclaration(resource.descriptor,ResourceOrigin('case.plugin','first.py')),
-                  ResourceDeclaration(resource.descriptor,ResourceOrigin('case.plugin','second.py'))),
+    'wrong_origin': (ResourceDeclaration(resource.descriptor,ResourceOrigin(ResourceOwner("plugin", 'other.plugin'),'decl.py')),),
+    'wrong_descriptor': (ResourceDeclaration(ForgedDescriptor(),ResourceOrigin(ResourceOwner("plugin", 'case.plugin'),'decl.py')),),
+    'duplicate': (ResourceDeclaration(resource.descriptor,ResourceOrigin(ResourceOwner("plugin", 'case.plugin'),'first.py')),
+                  ResourceDeclaration(resource.descriptor,ResourceOrigin(ResourceOwner("plugin", 'case.plugin'),'second.py'))),
 }
 checks = {}
 for name, entries in invalid.items():
@@ -231,7 +231,7 @@ def counted(self):
     return original(self)
 stdout, stderr = io.StringIO(), io.StringIO()
 with patch.object(RuleRecord,'to_dict',counted), contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-    code = main(['validate','--workspace','vibeflow_config.jsonc','--config','workflow.jsonc','--json'])
+    code = main(['validate','--workspace','../vibeflow_config.jsonc','--config','workflow.jsonc','--json'])
 Path('validate.stdout.txt').write_text(stdout.getvalue())
 Path('validate.stderr.txt').write_text(stderr.getvalue())
 payload = json.loads(stdout.getvalue())

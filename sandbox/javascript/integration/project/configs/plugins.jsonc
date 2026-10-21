@@ -3,21 +3,21 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     },
     {
       "source": {
         "kind": "file",
-        "ref": "code_lifecycle_79.ts",
+        "ref": "plugins/compiler_audit/plugin.ts",
         "export": "plugin"
       }
     },
     {
       "source": {
         "kind": "file",
-        "ref": "code_lifecycle_80.ts",
+        "ref": "plugins/runtime_audit/plugin.ts",
         "export": "plugin"
       },
       "config": {
@@ -60,25 +60,25 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts the plugin integration workflow."
       },
       {
         "id": "add",
-        "type_used": "sandbox.add",
+        "definition_id": "sandbox.add",
         "display_name": "Add",
         "description": "Adds the configured input value in this workflow instance."
       },
       {
         "id": "subtract",
-        "type_used": "sandbox.subtract",
+        "definition_id": "sandbox.subtract",
         "display_name": "Subtract",
         "description": "Subtracts the configured input value in this workflow instance."
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends the plugin integration workflow."
       }

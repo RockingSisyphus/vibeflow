@@ -5,7 +5,7 @@ import shutil
 
 import pytest
 
-from tests.targets.python.test_code_plugins import executable_project, EXECUTABLE
+from tests.targets.python.test_code_plugins import executable_project, EXECUTABLE, PLUGIN_SOURCE
 
 
 def test_source_api_keeps_lazy_import_paths_only_during_execution(tmp_path):
@@ -57,15 +57,15 @@ def test_source_failure_keeps_primary_and_releases_every_plugin(tmp_path, monkey
 
 
 def test_planned_inventory_handles_deep_same_named_definitions_and_cycles():
-    from vibeflow.core.flow import GraphConfig, NodeSpec, NodesetSpec
+    from vibeflow.core.flow import GraphConfig, NodeCallSpec, NodesetTypeSpec
     from vibeflow.targets.python.runtime.helpers import has_planned, planned_items
-    leaf = NodeSpec("leaf", "future", status="planned")
+    leaf = NodeCallSpec("leaf", "future", status="planned")
     deep = GraphConfig(nodes=(leaf,))
-    inner = NodesetSpec("same", "Same", "Inner", (), (), deep)
-    middle = GraphConfig(nodes=(), nodesets={"same": inner})
-    outer = NodesetSpec("same", "Same", "Outer", (), (), middle)
-    root = GraphConfig(nodes=(leaf,), nodesets={"same": outer})
-    deep.nodesets["cycle"] = outer
+    inner = NodesetTypeSpec("same", "Same", "Inner", (), (), deep)
+    middle = GraphConfig(nodes=(), nodeset_types={"same": inner})
+    outer = NodesetTypeSpec("same", "Same", "Outer", (), (), middle)
+    root = GraphConfig(nodes=(leaf,), nodeset_types={"same": outer})
+    deep.nodeset_types["cycle"] = outer
     assert has_planned(root)
     assert [item["id"] for item in planned_items(root)] == [
         "leaf", "nodeset.same.nodeset.same.leaf"]
@@ -78,9 +78,8 @@ def test_dispatch_option_selection_matches_argparse_and_stops_at_delegated_argv(
 
 
 @pytest.mark.parametrize("previous_kind", ("namespace", "module"))
-def test_switching_projects_replaces_module_namespace_and_child_caches(tmp_path, previous_kind):
-    import importlib
-    from vibeflow.targets.python.sdk.loading import source_paths, _discard_foreign_project_modules
+def test_switching_projects_keeps_owned_modules_independent(tmp_path, previous_kind):
+    from vibeflow.targets.python.sdk.source_namespace import source_namespace
     previous, current = tmp_path / "previous", tmp_path / "current"
     previous.mkdir(); current.mkdir()
     name = "switching_project_nodes"
@@ -88,24 +87,20 @@ def test_switching_projects_replaces_module_namespace_and_child_caches(tmp_path,
         (previous / name).mkdir()
         (previous / name / "old.py").write_text("value = 'previous'\n")
         (current / (name + ".py")).write_text("value = 'current'\n")
+        old_import = f"from {name}.old import value\n"
+        new_import = f"from {name} import value\n"
     else:
         (previous / (name + ".py")).write_text("value = 'previous'\n")
         (current / name).mkdir()
         (current / name / "fresh.py").write_text("value = 'current'\n")
-    with source_paths((previous,)):
-        old = importlib.import_module(name)
-        if previous_kind == "namespace": importlib.import_module(name + ".old")
-    try:
-        with source_paths((current,)):
-            _discard_foreign_project_modules((current,))
-            loaded = importlib.import_module(name)
-            assert loaded is not old
-            assert name + ".old" not in sys.modules
-            if previous_kind == "namespace": assert loaded.value == "current"
-            else: assert importlib.import_module(name + ".fresh").value == "current"
-    finally:
-        for key in tuple(sys.modules):
-            if key == name or key.startswith(name + "."): sys.modules.pop(key)
+        old_import = f"from {name} import value\n"
+        new_import = f"from {name}.fresh import value\n"
+    (previous / "probe.py").write_text(old_import)
+    (current / "probe.py").write_text(new_import)
+    old = source_namespace(previous).load(previous / "probe.py")
+    loaded = source_namespace(current).load(current / "probe.py")
+    assert old.value == "previous" and loaded.value == "current"
+    assert name not in sys.modules
 
 
 @pytest.mark.parametrize("phase", ("compiler", "runtime"))
@@ -113,27 +108,32 @@ def test_partial_creation_disposes_in_creation_order_with_project_imports(tmp_pa
     from vibeflow.tooling.application.python import (
         run_workspace_checked, CheckedRunError, PythonBuildRequest, build_python_aot, load_bundle)
     source = tmp_path / "source"
-    source.mkdir()
     marker = tmp_path / "cleanup.txt"
-    (source / "lazy_cleanup.py").write_text(
-        f'def cleanup(label):\n    with open({str(marker)!r},"a") as stream: stream.write(label+"\\n")\n')
-    (source / "lifecycle.py").write_text(
-        'class Runtime:\n    def __init__(self,label): self.label=label\n'
-        '    def dispose(self):\n        from lazy_cleanup import cleanup\n        cleanup(self.label)\n'
+    plugin = 'from vibeflow.targets.python.sdk import SourceLocator\n' + PLUGIN_SOURCE.replace(
+        'plugin=Plugin(', f'plugin=Plugin(priority=300,{phase}=SourceLocator("file","lifecycle.py","first"),')
+    workspace, config = executable_project(source, plugin_source=plugin)
+    helpers = ('class Runtime:\n    def __init__(self,label): self.label=label\n'
+        '    def dispose(self):\n        from .lazy_cleanup import cleanup\n        cleanup(self.label)\n'
         'def first(context): return Runtime("first")\n'
         'def second(context): return Runtime("second")\n')
-    code = EXECUTABLE.replace('Plugin,node,rule,ruleset,base_lib',
-                              'Plugin,node,rule,ruleset,base_lib,SourceLocator')
-    code = code.replace('plugin=Plugin(',
-        f'plugin=Plugin(priority=300,{phase}=SourceLocator(kind="file",ref="lifecycle.py",export="first"),')
-    workspace, config = executable_project(source, code)
-    (source / "second.py").write_text('from vibeflow.targets.python.sdk import Plugin,SourceLocator\n'
-        f'plugin=Plugin(id="second",priority=100,{phase}=SourceLocator(kind="file",ref="lifecycle.py",export="second"))\n')
-    (source / "broken.py").write_text('from vibeflow.targets.python.sdk import Plugin\n'
+    demo = source / "plugins/demo"
+    (demo / "lifecycle.py").write_text(helpers)
+    cleanup = f'def cleanup(label):\n    with open({str(marker)!r},"a") as stream: stream.write(label+"\\n")\n'
+    (demo / "lazy_cleanup.py").write_text(cleanup)
+    second = source / "plugins/second"
+    second.mkdir()
+    (second / "lifecycle.py").write_text(helpers)
+    (second / "lazy_cleanup.py").write_text(cleanup)
+    (second / "plugin.py").write_text('from vibeflow.targets.python.sdk import Plugin,SourceLocator\n'
+        f'plugin=Plugin(id="second",priority=100,{phase}=SourceLocator("file","lifecycle.py","second"))\n')
+    broken = source / "plugins/broken"
+    broken.mkdir()
+    (broken / "plugin.py").write_text('from vibeflow.targets.python.sdk import Plugin\n'
         'def create(context): raise RuntimeError("factory failure")\n'
         f'plugin=Plugin(id="broken",priority=0,{phase}=create)\n')
     data = json.loads(config.read_text())
-    data["plugins"].extend({"source": {"kind": "file", "ref": name}} for name in ("second.py", "broken.py"))
+    data["plugins"].extend({"source": {"kind": "file", "ref": name}} for name in (
+        "plugins/second/plugin.py", "plugins/broken/plugin.py"))
     config.write_text(json.dumps(data))
     if phase == "runtime":
         build_python_aot(PythonBuildRequest(workspace, config, tmp_path / "bundle"))

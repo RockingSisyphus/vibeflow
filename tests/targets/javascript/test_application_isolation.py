@@ -212,33 +212,27 @@ def test_python_application_run_succeeds_when_javascript_target_is_blocked(
         from vibeflow.targets.python.project import NodeRegistry
         from vibeflow.tooling.application.python.runner import run_checked
 
-        root = Path(sys.argv[1])
+        root = Path(sys.argv[1]) / "project"
         root.mkdir(parents=True, exist_ok=True)
-        node_path = root / "isolation_nodes.py"
-        node_path.write_text(
-            NODE_SOURCE,
-            encoding="utf-8",
-        )
-        spec = importlib.util.spec_from_file_location("isolation_nodes", node_path)
-        assert spec is not None and spec.loader is not None
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = module
-        spec.loader.exec_module(module)
-
-        from tests.fixtures.support.declarations import native_registry
-        registry = native_registry()
-        from vibeflow.core.descriptors.decode import decode_resource as parse_descriptor_manifest
-        for data in DECLARATIONS:
-            descriptor = parse_descriptor_manifest(data)
-            registry.register(descriptor, getattr(module, data["implementations"][0]["source"]["export"]))
+        (root.parent / "vibeflow_config.jsonc").write_text(json.dumps({"roots":[{"id":"isolation","path":"project"}]}))
+        (root / "vibeflow_project.jsonc").write_text('{"project_target":"python"}')
+        (root / "nodes").mkdir()
+        (root / "nodes/isolation_nodes.py").write_text(NODE_SOURCE)
+        declarations = "from vibeflow.targets.python.sdk import node\n"
+        for index, data in enumerate(DECLARATIONS):
+            options = dict(data)
+            options.pop("kind")
+            options["source"] = options.pop("implementations")[0]["source"]
+            declarations += "item_" + str(index) + "=node(**" + repr(options) + ")\n"
+        (root / "nodes/declarations.py").write_text(declarations)
 
         config = root / "workflow.jsonc"
         config.write_text(json.dumps({
             "pipeline": {
                 "nodes": [
-                    {"id": "start", "type_used": "isolation.start", "display_name": "Start", "description": "Starts the isolation workflow."},
-                    {"id": "seed", "type_used": "isolation.seed", "display_name": "Seed", "description": "Produces the isolation result.", "value": 7},
-                    {"id": "end", "type_used": "isolation.end", "display_name": "End", "description": "Consumes the isolation result."},
+                    {"id": "start", "definition_id": "isolation.start", "display_name": "Start", "description": "Starts the isolation workflow."},
+                    {"id": "seed", "definition_id": "isolation.seed", "display_name": "Seed", "description": "Produces the isolation result.", "value": 7},
+                    {"id": "end", "definition_id": "isolation.end", "display_name": "End", "description": "Consumes the isolation result."},
                 ],
                 "edges": [["start", "seed"], ["seed", "end"]],
                 "outputs": [{"type": "value.out", "cardinality": "exactly_one", "display_name": "Result"}],
@@ -246,7 +240,6 @@ def test_python_application_run_succeeds_when_javascript_target_is_blocked(
         }), encoding="utf-8")
         result = run_checked(
             config,
-            registry=registry,
             run_root=root / "runs",
             run_id="target-isolation",
         )

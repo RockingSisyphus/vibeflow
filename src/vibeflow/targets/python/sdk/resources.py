@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import inspect
 from pathlib import Path
 from typing import Any, Mapping
@@ -10,15 +9,7 @@ from typing import Any, Mapping
 from vibeflow.core.descriptors.decode import decode_resource
 from vibeflow.core.descriptors.models import SourceLocator, DescriptorModelError
 from vibeflow.core.rules.models import RuleCall, RuleRelation, RulesetDescriptor
-
-
-@dataclass(frozen=True)
-class ResourceDefinition:
-    descriptor: Any
-    implementation: Any = None
-    path: str = ""
-    line: int | None = None
-    symbol: str = ""
+from vibeflow.core.descriptors.declarations import ResourceDefinition
 
 
 def definition(value: Any) -> ResourceDefinition:
@@ -41,7 +32,7 @@ def _location(value=None):
         return path, line, value.__qualname__
     frame = inspect.currentframe()
     while frame is not None:
-        if not frame.f_globals.get("__name__", "").startswith((__package__, "vibeflow.targets.python.nodetypes.declarations")):
+        if not frame.f_globals.get("__name__", "").startswith((__package__, "vibeflow.targets.python.sdk.nodes")):
             return frame.f_code.co_filename, frame.f_lineno, ""
         frame = frame.f_back
     return "", None, ""
@@ -68,7 +59,7 @@ def _declare(kind, options, value=None, source=None):
         error.location = {"path":declaration_path, "field":"implementation_files",
                           **({"line":declaration_line} if declaration_line is not None else {})}
         raise
-    if kind in {"node", "rule", "base_lib", "host_extension", "plugin"} and not (kind == "rule" and options.get("handler") and value is None and source is None):
+    if kind in {"node", "rule", "base_lib",  "plugin"} and not (kind == "rule" and options.get("handler") and value is None and source is None):
         locator = _json(source) if source is not None else {"kind": "file", "ref": path, "export": symbol}
         implementation = {"language": "python", "source": locator}
         if kind != "rule":
@@ -137,6 +128,11 @@ def capability(*, id: str, **options):
     return _declare("capability", {"id": id, **options})
 
 
+def node_type(*, id: str, **options):
+    """Declare an implementation-free NodeType shell owned by a Plugin."""
+    return _declare("node_type", {"id": id, **options})
+
+
 def base_lib(*, id: str, source=None, **options):
     return _decorator("base_lib", {"id": id, "display_name": id, "description": id, **options}, source)
 
@@ -146,9 +142,8 @@ def lifecycle(*, id: str, type: str, source=None, **options):
     return _decorator("plugin", {"id": id, "type": type, "targets": ["python"], **options}, source)
 
 
-def host_extension(*, id: str, **options):
-    return _declare("host_extension", {"id": id, **options})
 
 
-__all__ = ["ResourceDefinition", "rule", "ruleset", "data_schema", "capability",
-           "base_lib", "lifecycle", "host_extension", "RuleCall", "RuleRelation", "SourceLocator", "RulesetDescriptor"]
+
+__all__ = ["ResourceDefinition", "rule", "ruleset", "data_schema", "capability", "node_type",
+           "base_lib", "lifecycle",  "RuleCall", "RuleRelation", "SourceLocator", "RulesetDescriptor"]

@@ -13,7 +13,6 @@ class RuntimeOptions:
     nodeset_hooks: bool = True
     block_hooks: bool = True
     execution: str = "plan"
-    nodeset_max_depth: int = 4
     allow_planned_stub: bool = False
     status_interval: float = 60.0
     status_file: str | None = None
@@ -28,8 +27,7 @@ class RuntimeOptions:
             raise ValueError("runtime trace must be one of: full, boundary, off")
         if self.execution not in {"plan", "block", "compiled"}:
             raise ValueError("runtime execution must be one of: plan, block, compiled")
-        if not isinstance(self.nodeset_max_depth, int) or isinstance(self.nodeset_max_depth, bool) or self.nodeset_max_depth <= 0:
-            raise ValueError("runtime nodeset_max_depth must be a positive integer")
+
 
 
 RuntimeHook = tuple[str, Callable[..., object]]

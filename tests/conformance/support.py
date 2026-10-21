@@ -115,11 +115,11 @@ def run_portable_conformance(
     }
     portable_plan = runtime._plan.to_workflow_plan(
         workflow_id=case.name,
-        source_by_type=sources,
+        source_by_definition=sources,
     )
     javascript_facts = ImplementationFacts(tuple(
         ImplementationFact(
-            type_key=type_key,
+            definition_id=type_key,
             flow_kind=case.registry.descriptor(type_key).flow_kind,
             requires=case.registry.descriptor(type_key).contract.requires,
             provides=case.registry.descriptor(type_key).contract.provides,
@@ -135,11 +135,11 @@ def run_portable_conformance(
     javascript_features = TargetFeatureSet(target="javascript")
     javascript_compilation = compile_core(CoreCompileRequest(
         graph=graph, implementation_facts=javascript_facts,
-        target_features=javascript_features, known_nodesets=frozenset(graph.nodesets),
+        target_features=javascript_features, known_nodeset_types=frozenset(graph.nodeset_types),
     ))
     javascript_plan = compile_graph_plan(
         javascript_compilation.workflow.graph, javascript_compilation.compiled_graph, workflow_id=case.name,
-        source_by_type=sources, implementation_facts=javascript_facts,
+        source_by_definition=sources, implementation_facts=javascript_facts,
         target_features=javascript_features, compile_nested=True,
     )
 
@@ -368,7 +368,7 @@ def _javascript_bindings(portable_plan, case):
     """Declare ordinary node Capability requirements through the same binding sidecar."""
     from vibeflow.core.workflows.interfaces import PORT_SCHEMA_TYPES, port_capability_descriptor
     requirements = {key: tuple(item.to_dict() for item in case.registry.descriptor(key).capabilities) for key in case.registry.available()}
-    return build_javascript_binding_plan(portable_plan, capabilities_by_type=requirements,
+    return build_javascript_binding_plan(portable_plan, capabilities_by_definition=requirements,
         schemas=PORT_SCHEMA_TYPES, capabilities={"vibeflow.port":port_capability_descriptor({"receive","send"}).to_dict()})
 
 

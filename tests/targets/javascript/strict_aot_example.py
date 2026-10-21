@@ -33,7 +33,7 @@ def test_minimal_js_aot_example_prepares_without_importing_business_modules(
         )
     )
 
-    assert prepared.used_node_types == ("example.greet",)
+    assert prepared.used_node_ids == ("example.greet",)
     assert prepared.used_base_libs == ("example.text",)
     assert prepared.used_capabilities == ("example.clock",)
     assert prepared.plan.inputs[0].required is True

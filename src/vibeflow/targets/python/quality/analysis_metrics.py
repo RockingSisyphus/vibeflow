@@ -115,7 +115,7 @@ class PythonSourceAnalysis:
                     shape=counter.run_pure_shape)
             return self._cache[key]
         sources = context.require("source_context")
-        node = next(item for item in sources.nodes if item.type_key == context.subject["type_key"])
+        node = next(item for item in sources.nodes if item.definition_id == context.subject["definition_id"])
         symbol = sources.symbol(node.path, node.symbol)
         if symbol is None:
             return None
@@ -133,9 +133,9 @@ class PythonSourceAnalysis:
             visible = self._visible_text(source)
             metrics = replace(metrics,source_lines=len(visible.splitlines()),source_bytes=len(visible.encode()))
             implementation_paths = {item.path for item in sources.nodes}
-            helper_paths = {item.path for item in sources.helpers(node.type_key)}
+            helper_paths = {item.path for item in sources.helpers(node.definition_id)}
             helper_paths.update(item["path"] for item in context.facts.get("source_owners", ())
-                if item["kind"] == "node" and item["id"] == node.type_key and item["role"] == "support")
+                if item["kind"] == "node" and item["id"] == node.definition_id and item["role"] == "support")
             helpers = tuple(file for file in closure if file.path in helper_paths
                 and file.path not in implementation_paths and file._tree is not None)
             by_path = {file.path: file for file in helpers}

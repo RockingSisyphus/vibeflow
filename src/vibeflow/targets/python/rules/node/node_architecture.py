@@ -15,9 +15,9 @@ def node_architecture(context, inputs, params):
     findings = {}
     for source, tree in node_source_slices(context, node, symbol):
         authorized = _authorized_library_imports(context, source.path, node)
-        foreign = {item.path for item in sources.nodes if item.type_key != node.type_key}
+        foreign = {item.path for item in sources.nodes if item.definition_id != node.definition_id}
         foreign.update(item["path"] for item in context.facts.get("source_owners", ())
-            if item["kind"] == "node" and item["id"] != node.type_key and item["role"] == "entry")
+            if item["kind"] == "node" and item["id"] != node.definition_id and item["role"] == "entry")
         foreign_imports = {(item.line, item.module) for item in sources.imports
             if item.path == source.path and item.resolved_path in foreign} - authorized
         # A shared declaration file may import Nodes for Plugin.resources.
@@ -51,8 +51,8 @@ def _node_coupling_sites(context, node):
     """Use resolved symbols and canonical ownership, never an export's spelling."""
     sources = context.require("source_context")
     entries = {f"{item['path']}:{item['symbol']}" for item in context.facts.get("source_owners", ())
-               if item["kind"] == "node" and item["id"] != node.type_key and item["role"] == "entry" and item.get("symbol")}
-    entries.update(f"{item.path}:{item.symbol}" for item in sources.nodes if item.type_key != node.type_key)
+               if item["kind"] == "node" and item["id"] != node.definition_id and item["role"] == "entry" and item.get("symbol")}
+    entries.update(f"{item.path}:{item.symbol}" for item in sources.nodes if item.definition_id != node.definition_id)
     def foreign(target):
         return any(target == entry or target.startswith(entry + ".") for entry in entries)
     calls, reads = {}, {}
@@ -77,7 +77,7 @@ def _authorized_library_imports(context, path, node):
             continue
         token = imported.symbol.split(".")[0]
         candidates = [item for item in owners if item["path"] == imported.resolved_path]
-        foreign_node = any(item["kind"] == "node" and item["id"] != node.type_key and item.get("symbol", "").split(".")[0] == token for item in candidates)
+        foreign_node = any(item["kind"] == "node" and item["id"] != node.definition_id and item.get("symbol", "").split(".")[0] == token for item in candidates)
         allowed = bool(token and token != "*" and not foreign_node and any(
             item["kind"] == "base_lib" and item["id"] in selected and
             (not item.get("symbol") or item["symbol"].split(".")[0] == token) for item in candidates))

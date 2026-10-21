@@ -24,7 +24,7 @@ def test_formal_schema_accepts_default_true_and_explicit_booleans(options):
 
 
 def test_published_nodeset_schema_declares_boolean_and_true_default():
-    schema = json.loads(files("vibeflow.tooling.project").joinpath("schema/nodeset.schema.json").read_text())
+    schema = json.loads(files("vibeflow.tooling.project").joinpath("schema/nodeset_type.schema.json").read_text())
     assert schema["properties"]["expand"]["type"] == "boolean"
     assert schema["properties"]["expand"]["default"] is True
     assert "expand" not in schema["required"]
@@ -58,15 +58,15 @@ def test_imported_definitions_and_finite_graph_wire_keep_expand_and_full_bodies(
     document = load_config_document(path)
     assert collect_config_schema_findings(document.data) == ()
     graph = parse_graph_config_data(document.data)
-    assert graph.nodesets["test.inner"].expand is False
-    assert graph.nodesets["test.outer"].expand is False
-    assert graph.nodesets["test.inner"].graph.nodes[0].id == "inside"
-    assert graph.nodesets["test.outer"].graph.nodes[0].type_used == "test.inner"
+    assert graph.nodeset_types["test.inner"].expand is False
+    assert graph.nodeset_types["test.outer"].expand is False
+    assert graph.nodeset_types["test.inner"].graph.nodes[0].id == "inside"
+    assert graph.nodeset_types["test.outer"].graph.nodes[0].definition_id == "test.inner"
     wire = json_projection(graph)
-    assert wire["nodesets"]["test.inner"]["expand"] is False
-    assert wire["nodesets"]["test.outer"]["expand"] is False
-    assert wire["nodesets"]["test.inner"]["graph"]["nodes"][0]["id"] == "inside"
-    assert "test.inner" in wire["nodesets"]["test.outer"]["graph"]["nodeset_refs"]
+    assert wire["nodeset_types"]["test.inner"]["expand"] is False
+    assert wire["nodeset_types"]["test.outer"]["expand"] is False
+    assert wire["nodeset_types"]["test.inner"]["graph"]["nodes"][0]["id"] == "inside"
+    assert "test.inner" in wire["nodeset_types"]["test.outer"]["graph"]["nodeset_refs"]
     if call_kind == "loop":
         assert wire["nodes"][0]["loop"]["body"] == "test.outer"
     json.dumps(wire)  # Shared definitions stay finite, including a collapsed parent.

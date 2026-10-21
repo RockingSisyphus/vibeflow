@@ -236,7 +236,7 @@ _FIELD_PREFIXES = frozenset(
     {
         "id:",
         "type:",
-        "type_used:",
+        "definition_id:",
         "type_key:",
         "status:",
         "when:",

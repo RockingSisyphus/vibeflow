@@ -19,7 +19,7 @@ loaded = load_workspace_config(work / "vibeflow_config.jsonc")
 observations = []
 for config_name, expected_values in PLUGIN_EXPECTED[work.name].items():
     inputs, result = {"a": 2}, expected_values[0]
-    config = work.parent / "project/configs" / (config_name + ".jsonc")
+    config = work / "project/configs" / (config_name + ".jsonc")
     marker = work / "hooks.jsonl"
     before = len(events(marker)) if marker.exists() else 0
     checked = run_workspace_checked(config, workspace=loaded, initial=inputs, run_root=work / "runs", run_id=config_name, runtime_options=RuntimeOptions(trace="full"))

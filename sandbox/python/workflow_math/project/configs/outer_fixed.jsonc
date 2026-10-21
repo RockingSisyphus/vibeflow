@@ -5,7 +5,7 @@
         "display_name": "Start",
         "description": "Starts the nested loop accumulation fixture.",
         "id": "start",
-        "type_used": "sandbox.start"
+        "definition_id": "sandbox.start"
       },
       {
         "display_name": "Seed",
@@ -13,7 +13,7 @@
         "outer_start": 0,
         "total_start": 0,
         "id": "seed",
-        "type_used": "semantic.nested_loop_seed"
+        "definition_id": "semantic.nested_loop_seed"
       },
       {
         "display_name": "Outer Fixed Loop",
@@ -103,13 +103,13 @@
           ]
         },
         "id": "outer_loop",
-        "type_used": "vibeflow.loop.while"
+        "definition_id": "vibeflow.loop.while"
       },
       {
         "display_name": "End",
         "description": "Ends after nested loop accumulation completes.",
         "id": "end",
-        "type_used": "sandbox.start"
+        "definition_id": "sandbox.start"
       }
     ],
     "edges": [
@@ -156,17 +156,17 @@
   },
   "nodeset_imports": [
     {
-      "path": "nodesets/pass_loop_nested_outer_after_inner_when_accumulate/loop_inner_accumulate_step.jsonc"
+      "path": "nodeset_types/pass_loop_nested_outer_after_inner_when_accumulate/loop_inner_accumulate_step.jsonc"
     },
     {
-      "path": "nodesets/pass_loop_nested_outer_after_inner_when_accumulate/loop_outer_accumulate_body.jsonc"
+      "path": "nodeset_types/pass_loop_nested_outer_after_inner_when_accumulate/loop_outer_accumulate_body.jsonc"
     }
   ],
   "plugins": [
     {
       "source": {
         "kind": "file",
-        "ref": "plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

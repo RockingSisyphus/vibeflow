@@ -36,12 +36,12 @@ def _write_architecture_workspace(
     document_path = project / "ARCHITECTURE.jsonc"
 
     workspace_path.write_text(
-        json.dumps({"policy": {}, "roots": [{"id": "project", "path": "project"}]}),
+        json.dumps({"roots": [{"id": "project", "path": "project"}]}),
         encoding="utf-8",
     )
     project_config: dict[str, object] = {
         "project_target": "python",
-        "quality_enabled": False,
+
     }
     if registered:
         project_config["architecture"] = {
@@ -62,7 +62,7 @@ def _write_architecture_workspace(
     ))
     if include_resource:
         base_lib = project / "base_lib"
-        base_lib.mkdir()
+        base_lib.mkdir(exist_ok=True)
         (base_lib / "__init__.py").write_text("", encoding="utf-8")
         (base_lib / "fixture.py").write_text("def value():\n    return 1\n", encoding="utf-8")
         append_resource(project, {
@@ -75,7 +75,7 @@ def _write_architecture_workspace(
     if include_resource:
         workflow["base_lib"] = {"modules": [{"id": "fixture_lib"}]}
     if include_unused_nodeset:
-        nodeset_path = configs / "nodesets" / "unused.jsonc"
+        nodeset_path = configs / "nodeset_types" / "unused.jsonc"
         nodeset_path.parent.mkdir()
         nodeset_path.write_text(
             json.dumps(
@@ -88,7 +88,7 @@ def _write_architecture_workspace(
             ),
             encoding="utf-8",
         )
-        workflow["nodeset_imports"] = [{"path": "nodesets/unused.jsonc"}]
+        workflow["nodeset_imports"] = [{"path": "nodeset_types/unused.jsonc"}]
     workflow_path.write_text(json.dumps(workflow, indent=2), encoding="utf-8")
     return workspace_path, workflow_path, document_path
 
@@ -131,7 +131,8 @@ def test_architecture_cli_stdout_contains_canonical_document(tmp_path, capsys) -
     assert list(json.loads(output.removeprefix(ARCHITECTURE_DOCUMENT_HEADER))) == [
         "project_target",
         "workflow",
-        "nodesets",
+        "nodeset_types",
+        "node_definitions",
         "node_types",
         "resources",
         "implementation_graph",
@@ -264,7 +265,7 @@ def test_workspace_architecture_tracks_unused_imported_nodeset_changes(tmp_path)
         include_unused_nodeset=True,
     )
     assert _export_registered_document(workspace_path, workflow_path, document_path) == 0
-    nodeset_path = workflow_path.parent / "nodesets" / "unused.jsonc"
+    nodeset_path = workflow_path.parent / "nodeset_types" / "unused.jsonc"
     nodeset = json.loads(nodeset_path.read_text(encoding="utf-8"))
     nodeset["description"] = "Changed unused architecture definition."
     nodeset_path.write_text(json.dumps(nodeset, indent=2), encoding="utf-8")
@@ -276,7 +277,7 @@ def test_workspace_architecture_tracks_unused_imported_nodeset_changes(tmp_path)
 
     assert report.status == "FAIL"
     assert _architecture_error_rule(report) == "ARCHITECTURE.DOCUMENT.STALE"
-    assert "$.nodesets.fixture.unused.description" in report.errors[0].details["difference_paths"]
+    assert "$.nodeset_types.fixture.unused.description" in report.errors[0].details["difference_paths"]
 
 
 def test_workspace_architecture_tracks_registry_config_default_changes(tmp_path) -> None:
@@ -294,7 +295,7 @@ def test_workspace_architecture_tracks_registry_config_default_changes(tmp_path)
 
     assert report.status == "FAIL"
     assert _architecture_error_rule(report) == "ARCHITECTURE.DOCUMENT.STALE"
-    assert "$.node_types.test.seed.config.defaults.value" in report.errors[0].details["difference_paths"]
+    assert "$.node_definitions.test.seed.config.defaults.value" in report.errors[0].details["difference_paths"]
 
 
 def test_workspace_architecture_tracks_active_resource_registration_changes(tmp_path) -> None:
@@ -352,7 +353,7 @@ def test_workspace_architecture_gate_is_isolated_per_root(tmp_path) -> None:
         declaration.unlink()
     second_payload = json.loads(second_workflow.read_text(encoding="utf-8"))
     for node in second_payload["pipeline"]["nodes"]:
-        node["type_used"] = f"second.{node['id']}"
+        node["definition_id"] = f"second.{node['id']}"
         node["status"] = "planned"
         node["flow_kind"] = "terminal" if node["id"] in {"start", "end"} else "process"
         node["requires"] = []
@@ -361,7 +362,6 @@ def test_workspace_architecture_gate_is_isolated_per_root(tmp_path) -> None:
     workspace_path.write_text(
         json.dumps(
             {
-                "policy": {},
                 "roots": [
                     {"id": "first", "path": "project"},
                     {"id": "second", "path": "second"},
@@ -443,7 +443,8 @@ def test_workspace_run_writes_canonical_architecture_artifact(tmp_path) -> None:
     assert list(load_raw_config_document(artifact_path).data) == [
         "project_target",
         "workflow",
-        "nodesets",
+        "nodeset_types",
+        "node_definitions",
         "node_types",
         "resources",
         "implementation_graph",

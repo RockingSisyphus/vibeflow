@@ -118,7 +118,7 @@ class RuntimeExecutionLockMixin:
         mode: str,
         scope: str,
         node_name: str = "pipeline",
-        node_type: str = "pipeline",
+        definition_id: str = "pipeline",
     ) -> _HeldExecutionLock:
         lease = self._lease
         if lease is None:  # pragma: no cover - guarded by run lifecycle
@@ -135,7 +135,7 @@ class RuntimeExecutionLockMixin:
         self._record_runtime_event(
             "lock_wait",
             node_name,
-            node_type,
+            definition_id,
             details=details,
         )
         lock_stack = _CURRENT_EXECUTION_LOCK_STACK.get()
@@ -165,7 +165,7 @@ class RuntimeExecutionLockMixin:
             self._record_runtime_event(
                 "lock_acquired",
                 node_name,
-                node_type,
+                definition_id,
                 details=acquired_details,
             )
         except BaseException:
@@ -185,7 +185,7 @@ class RuntimeExecutionLockMixin:
         *,
         scope: str,
         node_name: str = "pipeline",
-        node_type: str = "pipeline",
+        definition_id: str = "pipeline",
     ) -> None:
         token = held.token
         try:
@@ -196,7 +196,7 @@ class RuntimeExecutionLockMixin:
         self._record_runtime_event(
             "lock_released",
             node_name,
-            node_type,
+            definition_id,
             details={
                 "run_id": lease.run_id if lease is not None else "",
                 "lease_id": token.lease_id,
@@ -210,8 +210,8 @@ class RuntimeExecutionLockMixin:
 
     @contextmanager
     def _frame_execution_scope(self, frame: object) -> Iterator[None]:
-        node_name = str(getattr(frame, "name", "node"))
-        node_type = str(getattr(frame, "node_type", "node"))
+        node_name = frame.id
+        definition_id = frame.definition_id
         is_planned = getattr(frame, "status", "implemented") == STATUS_PLANNED
         lock = None if is_planned else getattr(frame, "execution_lock", None)
         lock_scope = (
@@ -227,7 +227,7 @@ class RuntimeExecutionLockMixin:
                 mode="exclusive",
                 scope=lock_scope,
                 node_name=node_name,
-                node_type=node_type,
+                definition_id=definition_id,
             )
         is_global_state = (
             not is_planned
@@ -250,7 +250,7 @@ class RuntimeExecutionLockMixin:
                 self._record_runtime_event(
                     "global_state_enter",
                     node_name,
-                    node_type,
+                    definition_id,
                     details=self._lease_details(),
                 )
                 self._global_state_started = True
@@ -277,7 +277,7 @@ class RuntimeExecutionLockMixin:
                     self._record_runtime_event(
                         "global_state_exit",
                         node_name,
-                        node_type,
+                        definition_id,
                         details=details,
                     )
                 except BaseException as exc:
@@ -288,7 +288,7 @@ class RuntimeExecutionLockMixin:
                         held_lock,
                         scope=lock_scope,
                         node_name=node_name,
-                        node_type=node_type,
+                        definition_id=definition_id,
                     )
             except BaseException as exc:
                 if cleanup_error is None:

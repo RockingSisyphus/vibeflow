@@ -6,10 +6,10 @@ import time
 from xml.etree import ElementTree
 
 import vibeflow.core.compiler as core_compiler
-from vibeflow.core.flow import NodeSpec
+from vibeflow.core.flow import NodeCallSpec
 
 
-RouteNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.route', display_name='Route', description='Routes the next step.', version='0.1.0', flow_kind='decision', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='Value Out'),), provides=(DataProvider('flow.route', 'flow.route', display_name='Flow Route'),), input_semantics={'value.out': ('output value',)}, output_semantics={'flow.route': ('branch route',)}, examples=({'inputs': {'value.out': 1}, 'params': {}},)), rulesets=("vibeflow.process",))
+RouteNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.route', display_name='Route', description='Routes the next step.', version='0.1.0', flow_kind='decision', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='Value Out'),), provides=(DataProvider('flow.route', 'flow.route', display_name='Flow Route'),), input_semantics={'value.out': ('output value',)}, output_semantics={'flow.route': ('branch route',)}, examples=({'inputs': {'value.out': 1}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 class RouteNode:
 
@@ -17,7 +17,7 @@ class RouteNode:
         return {"flow.route": "done"}
 
 
-ExternalVisualNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.external_visual', display_name='External Visual', description='Exercises external review styling.', version='0.1.0', flow_kind='process', external=True, contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.process",))
+ExternalVisualNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.external_visual', display_name='External Visual', description='Exercises external review styling.', version='0.1.0', flow_kind='process', external=True, contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(), rulesets=("vibeflow.process",))
 
 class ExternalVisualNode:
 
@@ -25,7 +25,7 @@ class ExternalVisualNode:
         return {}
 
 
-ExternalResultVisualNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.external_result_visual', display_name='External Result Visual', description='Exercises an external result-key boundary.', version='0.1.0', flow_kind='process', external=True, contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('external.result', 'external.result', display_name='External Result'),), output_semantics={'external.result': ('external visual result',)}), rulesets=("vibeflow.process",))
+ExternalResultVisualNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.external_result_visual', display_name='External Result Visual', description='Exercises an external result-key boundary.', version='0.1.0', flow_kind='process', external=True, contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('external.result', 'external.result', display_name='External Result'),), output_semantics={'external.result': ('external visual result',)}), rulesets=("vibeflow.process",))
 
 class ExternalResultVisualNode(ExternalVisualNode):
 
@@ -33,7 +33,7 @@ class ExternalResultVisualNode(ExternalVisualNode):
         return {"external.result": 1}
 
 
-BackgroundVisualNode_DECLARATION = node_declaration(NodeDescriptor('test.background_visual', 'Background Visual', 'Produces a detached background value.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('background.value', 'background.value', display_name='Background Value'),), output_semantics={'background.value': ('detached background value',)}), rulesets=("vibeflow.process",))
+BackgroundVisualNode_DECLARATION = node_declaration(NodeDescriptor('test.background_visual', 'Background Visual', 'Produces a detached background value.', '0.1.0', 'process', rulesets=(), contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('background.value', 'background.value', display_name='Background Value'),), output_semantics={'background.value': ('detached background value',)}), rulesets=("vibeflow.process",))
 
 class BackgroundVisualNode:
 
@@ -41,7 +41,7 @@ class BackgroundVisualNode:
         return {"background.value": 1}
 
 
-GlobalVisualNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.global_visual', display_name='Global Visual', description='Exercises global-state cloud styling.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.global_state",))
+GlobalVisualNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.global_visual', display_name='Global Visual', description='Exercises global-state cloud styling.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(), rulesets=("vibeflow.global_state",))
 
 class GlobalVisualNode:
 
@@ -52,7 +52,7 @@ class GlobalVisualNode:
 from dataclasses import replace
 
 ExternalGlobalVisualNode_DECLARATION = replace(
-    GlobalVisualNode_DECLARATION, type_key="test.external_global_visual",
+    GlobalVisualNode_DECLARATION, id="test.external_global_visual",
     display_name="External Global Visual", description="Exercises external boundaries on a cloud shape.", external=True,
 )
 
@@ -90,7 +90,7 @@ def test_config_node_visual_metadata_and_style_are_not_runtime_params() -> None:
                 "nodes": [
                     {
                         "id": "seed",
-                        "type_used": "test.seed",
+                        "definition_id": "test.seed",
                         "display_name": "Readable Seed",
                         "description": "Produces a seed value for the visual metadata test.",
                         "style": {"fill": "#123ABC", "stroke": "#456DEF", "text": "#654321"},
@@ -133,7 +133,7 @@ def test_config_node_visual_metadata_and_style_are_not_runtime_params() -> None:
 def test_config_node_join_policy_and_loop_are_not_runtime_params() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "sum.step",
                     requires=["total.current"],
@@ -149,7 +149,7 @@ def test_config_node_join_policy_and_loop_are_not_runtime_params() -> None:
                 "nodes": [
                     {
                         "id": "loop",
-                        "type_used": "vibeflow.loop.while",
+                        "definition_id": "vibeflow.loop.while",
                         "display_name": "Loop",
                         "description": "Runs a body nodeset.",
                         "requires": [REQ_SPEC("total.current")],
@@ -177,7 +177,7 @@ def test_config_node_join_policy_and_loop_are_not_runtime_params() -> None:
 def test_nodeset_effective_graph_uses_one_dp_state_per_definition(
     monkeypatch,
 ) -> None:
-    nodesets = []
+    nodeset_types = []
     for index in range(20):
         if index == 19:
             nodes = [_node_call("seed", "test.seed", "Produces the terminal chain value.")]
@@ -190,7 +190,7 @@ def test_nodeset_effective_graph_uses_one_dp_state_per_definition(
 
                 )
             ]
-        nodesets.append(
+        nodeset_types.append(
             _nodeset_config(
                 f"perf.ns{index}",
                 provides=["value.out"],
@@ -202,7 +202,7 @@ def test_nodeset_effective_graph_uses_one_dp_state_per_definition(
     started = time.perf_counter()
     graph = parse_graph_config(
         {
-            "nodesets": nodesets,
+            "nodeset_types": nodeset_types,
             "pipeline": {
                 "nodes": [
                     _node_call("top", "perf.ns0", "Calls the first chain nodeset."),
@@ -212,11 +212,11 @@ def test_nodeset_effective_graph_uses_one_dp_state_per_definition(
     )
 
     assert time.perf_counter() - started < 1.0
-    assert len(graph.nodesets) == 20
-    assert graph.nodesets["perf.ns19"].graph.nodesets is graph.nodesets
-    assert graph.nodesets["perf.ns0"].graph.nodesets["perf.ns19"] is graph.nodesets["perf.ns19"]
+    assert len(graph.nodeset_types) == 20
+    assert graph.nodeset_types["perf.ns19"].graph.nodeset_types is graph.nodeset_types
+    assert graph.nodeset_types["perf.ns0"].graph.nodeset_types["perf.ns19"] is graph.nodeset_types["perf.ns19"]
 
-    evaluated_states: list[tuple[NodeSpec, ...]] = []
+    evaluated_states: list[tuple[NodeCallSpec, ...]] = []
     resolve_state = core_compiler._resolve_effective_nodes
 
     def count_state(nodes, **kwargs):
@@ -230,18 +230,18 @@ def test_nodeset_effective_graph_uses_one_dp_state_per_definition(
 
     assert time.perf_counter() - compile_started < 1.0
     assert len(evaluated_states) == 21
-    assert effective.nodes[0].provides == effective.nodesets["perf.ns0"].provides
-    assert effective.nodesets["perf.ns0"].graph.nodes[0].provides == effective.nodesets["perf.ns1"].provides
+    assert effective.nodes[0].provides == effective.nodeset_types["perf.ns0"].provides
+    assert effective.nodeset_types["perf.ns0"].graph.nodes[0].provides == effective.nodeset_types["perf.ns1"].provides
     assert all(
-        nodeset.graph.nodesets is effective.nodesets
-        for nodeset in effective.nodesets.values()
+        nodeset.graph.nodeset_types is effective.nodeset_types
+        for nodeset in effective.nodeset_types.values()
     )
 
 
 def test_nodeset_dp_state_is_reused_across_multiple_call_sites(monkeypatch) -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     f"reuse.ns{index}",
                     provides=[],
@@ -266,7 +266,7 @@ def test_nodeset_dp_state_is_reused_across_multiple_call_sites(monkeypatch) -> N
             },
         }
     )
-    evaluated_states: list[tuple[NodeSpec, ...]] = []
+    evaluated_states: list[tuple[NodeCallSpec, ...]] = []
     resolve_state = core_compiler._resolve_effective_nodes
 
     def count_state(nodes, **kwargs):
@@ -278,7 +278,7 @@ def test_nodeset_dp_state_is_reused_across_multiple_call_sites(monkeypatch) -> N
     compilation = GraphCompiler().compile_with_findings(graph, registry=_registry())
 
     assert len(evaluated_states) == 4
-    assert compilation.workflow.graph.nodesets["reuse.ns1"].graph.nodes[0].type_used == "test.start"
+    assert compilation.workflow.graph.nodeset_types["reuse.ns1"].graph.nodes[0].definition_id == "test.start"
 
 
 def test_parse_rejects_unknown_nodeset_call_with_reference_detail() -> None:
@@ -291,7 +291,7 @@ def test_parse_rejects_unknown_nodeset_call_with_reference_detail() -> None:
             }
         }
     )
-    with pytest.raises(GraphCompileError, match="unknown type_used"):
+    with pytest.raises(GraphCompileError, match="unknown definition_id"):
         GraphCompiler().compile(graph, registry=_registry())
 
 
@@ -300,7 +300,7 @@ def test_config_parse_trace_reports_nodeset_timing(monkeypatch, capsys) -> None:
 
     parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "trace.body",
                     pipeline={"nodes": [_node_call("seed", "test.seed", "Produces trace output.")]},
@@ -314,7 +314,7 @@ def test_config_parse_trace_reports_nodeset_timing(monkeypatch, capsys) -> None:
 
     err = capsys.readouterr().err
     assert "[vibeflow config] parsed nodeset type_key=trace.body" in err
-    assert "parsed graph nodes=1 nodesets=1" in err
+    assert "parsed graph nodes=1 nodeset_types=1" in err
 
 
 def test_config_schema_rejects_invalid_join_policy_and_loop_shape() -> None:
@@ -351,7 +351,7 @@ def test_parse_rejects_removed_for_each_loop_type_and_old_loop_fields() -> None:
     with pytest.raises(GraphConfigError, match="unsupported loop keys"):
         parse_graph_config(
             {
-                "nodesets": [_nodeset_config("body", pipeline={"nodes": [_node_call("start", "test.start", "Starts body.")]})],
+                "nodeset_types": [_nodeset_config("body", pipeline={"nodes": [_node_call("start", "test.start", "Starts body.")]})],
                 "pipeline": {
                     "nodes": [
                         _node_call(
@@ -380,7 +380,7 @@ def test_parse_accepts_flexible_while_loop_stop_conditions() -> None:
     ):
         graph = parse_graph_config(
             {
-                "nodesets": [body],
+                "nodeset_types": [body],
                 "pipeline": {
                     "nodes": [
                         _node_call(
@@ -430,7 +430,7 @@ def test_parse_rejects_invalid_while_loop_stop_condition_value() -> None:
     with pytest.raises(GraphConfigError, match="equals must be a boolean"):
         parse_graph_config(
             {
-                "nodesets": [body],
+                "nodeset_types": [body],
                 "pipeline": {
                     "nodes": [
                         _node_call(
@@ -492,7 +492,7 @@ def test_mermaid_renders_sectioned_labels_default_node_and_custom_style() -> Non
     text = export_mermaid(graph)
 
     assert "classDef defaultNode fill:#ECECFF,stroke:#9370DB,color:#333333;" in text
-    assert 'seed@{ shape: rect, label: "Readable Seed\\n\\nid: seed\\ntype_used: test.seed' in text
+    assert 'seed@{ shape: rect, label: "Readable Seed\\n\\nid: seed\\ndefinition_id: test.seed' in text
     assert "\\n---------- meta ----------\\ndesc: Produces a seed value with a long readable" in text
     assert "\\n      description that should wrap deterministically in\\n      the SVG label." in text
     assert "requires:" not in text
@@ -582,7 +582,7 @@ def test_mermaid_external_boundary_composes_with_health_and_custom_style(tmp_pat
     assert text.count("[EXTERNAL] Custom External") == 1
     assert "[EXTERNAL] [EXTERNAL]" not in text
     assert "external: true" in text
-    assert "type_used: test.external_result_visual" in text
+    assert "definition_id: test.external_result_visual" in text
 
     if not is_mermaid_svg_renderer_available():
         pytest.skip("Mermaid SVG renderer is not installed")
@@ -819,14 +819,14 @@ def test_compiler_rejects_edge_with_no_effective_role_after_inference() -> None:
 def test_python_runtime_separates_schedule_and_transfer_edges(
     execution: str,
 ) -> None:
-    GatePoisonNode_DECLARATION = node_declaration(NodeDescriptor('test.edge_gate', 'Edge Gate', 'Produces a same-typed value that must not cross a schedule-only edge.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='value.out'),), provides=(DataProvider('gate.value', 'value.in', display_name='gate.value'),), input_semantics={item.type: ('Fixture requires ' + item.type,) for item in (DataRequirement('value.out', 'exactly_one', display_name='value.out'),)}, output_semantics={item.key: ('Fixture provides ' + item.key,) for item in (DataProvider('gate.value', 'value.in', display_name='gate.value'),)}), rulesets=("vibeflow.process",))
+    GatePoisonNode_DECLARATION = node_declaration(NodeDescriptor('test.edge_gate', 'Edge Gate', 'Produces a same-typed value that must not cross a schedule-only edge.', '0.1.0', 'process', rulesets=(), contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='value.out'),), provides=(DataProvider('gate.value', 'value.in', display_name='gate.value'),), input_semantics={item.type: ('Fixture requires ' + item.type,) for item in (DataRequirement('value.out', 'exactly_one', display_name='value.out'),)}, output_semantics={item.key: ('Fixture provides ' + item.key,) for item in (DataProvider('gate.value', 'value.in', display_name='gate.value'),)}), rulesets=("vibeflow.process",))
 
     class GatePoisonNode:
 
         def run_pure(self, inputs, params):
             return {"gate.value": inputs["value.out"]["value"] + 100}
 
-    MixedEdgeConsumerNode_DECLARATION = node_declaration(NodeDescriptor('test.edge_consumer', 'Edge Consumer', 'Consumes only the transfer-only payload.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.in', 'exactly_one', display_name='value.in'),), provides=(DataProvider('result', 'mixed.result', display_name='result'),), input_semantics={item.type: ('Fixture requires ' + item.type,) for item in (DataRequirement('value.in', 'exactly_one', display_name='value.in'),)}, output_semantics={item.key: ('Fixture provides ' + item.key,) for item in (DataProvider('result', 'mixed.result', display_name='result'),)}), rulesets=("vibeflow.process",))
+    MixedEdgeConsumerNode_DECLARATION = node_declaration(NodeDescriptor('test.edge_consumer', 'Edge Consumer', 'Consumes only the transfer-only payload.', '0.1.0', 'process', rulesets=(), contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('value.in', 'exactly_one', display_name='value.in'),), provides=(DataProvider('result', 'mixed.result', display_name='result'),), input_semantics={item.type: ('Fixture requires ' + item.type,) for item in (DataRequirement('value.in', 'exactly_one', display_name='value.in'),)}, output_semantics={item.key: ('Fixture provides ' + item.key,) for item in (DataProvider('result', 'mixed.result', display_name='result'),)}), rulesets=("vibeflow.process",))
 
     class MixedEdgeConsumerNode:
 
@@ -918,14 +918,14 @@ def test_python_runtime_separates_schedule_and_transfer_edges(
 def test_terminal_records_outputs_and_transfer_before_completion(
     execution: str,
 ) -> None:
-    TerminalProducerNode_DECLARATION = node_declaration(NodeDescriptor('test.terminal_producer', 'Terminal Producer', 'Produces a final value before completing the workflow.', '0.1.0', 'terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('terminal.value', 'terminal.value', display_name='terminal.value'),), output_semantics={item.key: ('Fixture provides ' + item.key,) for item in (DataProvider('terminal.value', 'terminal.value', display_name='terminal.value'),)}), rulesets=("vibeflow.process",))
+    TerminalProducerNode_DECLARATION = node_declaration(NodeDescriptor('test.terminal_producer', 'Terminal Producer', 'Produces a final value before completing the workflow.', '0.1.0', 'terminal', rulesets=(), contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('terminal.value', 'terminal.value', display_name='terminal.value'),), output_semantics={item.key: ('Fixture provides ' + item.key,) for item in (DataProvider('terminal.value', 'terminal.value', display_name='terminal.value'),)}), rulesets=("vibeflow.process",))
 
     class TerminalProducerNode:
 
         def run_pure(self, inputs, params):
             return {"terminal.value": 9}
 
-    TransferSinkNode_DECLARATION = node_declaration(NodeDescriptor('test.transfer_sink', 'Transfer Sink', 'Accepts a transfer-only terminal value without being scheduled.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('terminal.value', 'exactly_one', display_name='terminal.value'),), input_semantics={item.type: ('Fixture requires ' + item.type,) for item in (DataRequirement('terminal.value', 'exactly_one', display_name='terminal.value'),)}), rulesets=("vibeflow.process",))
+    TransferSinkNode_DECLARATION = node_declaration(NodeDescriptor('test.transfer_sink', 'Transfer Sink', 'Accepts a transfer-only terminal value without being scheduled.', '0.1.0', 'process', rulesets=(), contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('terminal.value', 'exactly_one', display_name='terminal.value'),), input_semantics={item.type: ('Fixture requires ' + item.type,) for item in (DataRequirement('terminal.value', 'exactly_one', display_name='terminal.value'),)}), rulesets=("vibeflow.process",))
 
     class TransferSinkNode:
 
@@ -1018,13 +1018,13 @@ def test_cycle_validation_is_role_specific() -> None:
 
 
 def test_ordinary_reference_data_does_not_trigger_implicit_result_wait() -> None:
-    from vibeflow.core.flow import GraphConfig, NodeSpec, EdgeSpec
+    from vibeflow.core.flow import GraphConfig, NodeCallSpec, EdgeSpec
     from vibeflow.core.models import ImplementationFact, ImplementationFacts
     from vibeflow.core.compiler import CoreCompileRequest, compile_core
     facts = ImplementationFacts((ImplementationFact("fixture.manager",flow_kind="process",
         provides=(DataProvider("refs","fixture.refs"),)),ImplementationFact("fixture.relay",flow_kind="process",
         requires=(DataRequirement("fixture.refs","exactly_one"),))),strict=True)
-    graph = GraphConfig(nodes=(NodeSpec("manager","fixture.manager"),NodeSpec("relay","fixture.relay")),
+    graph = GraphConfig(nodes=(NodeCallSpec("manager","fixture.manager"),NodeCallSpec("relay","fixture.relay")),
                         edges=(EdgeSpec("manager","relay"),))
     result = compile_core(CoreCompileRequest(graph=graph,implementation_facts=facts))
     assert result.compiled_graph.resolved_schedule_edges[0].pair == ("manager","relay")
@@ -1034,7 +1034,7 @@ def test_ordinary_reference_data_does_not_trigger_implicit_result_wait() -> None
 def test_mermaid_renders_while_loop_shape_class_and_stop_condition() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [_nodeset_config("loop.body", pipeline={"nodes": [_node_call("start", "test.start", "Starts loop body.")]})],
+            "nodeset_types": [_nodeset_config("loop.body", pipeline={"nodes": [_node_call("start", "test.start", "Starts loop body.")]})],
             "pipeline": {
                 "nodes": [
                     _node_call("start", "test.start", "Starts loop render fixture."),
@@ -1069,14 +1069,14 @@ def test_mermaid_renders_while_loop_shape_class_and_stop_condition() -> None:
 
 
 def test_mermaid_edge_contract_labels_summarize_provider_key_type_mapping() -> None:
-    MappingProducerNode_DECLARATION = node_declaration(NodeDescriptor('test.mapping_producer', 'Mapping Producer', 'Produces three mapped values.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('value.copy', 'value.in', display_name='Value Copy'), DataProvider('other.copy', 'other.in', display_name='Other Copy'), DataProvider('extra.copy', 'extra.in', display_name='Extra Copy')), output_semantics={'value.copy': ('first mapped value',), 'other.copy': ('second mapped value',), 'extra.copy': ('third mapped value',)}), rulesets=("vibeflow.process",))
+    MappingProducerNode_DECLARATION = node_declaration(NodeDescriptor('test.mapping_producer', 'Mapping Producer', 'Produces three mapped values.', '0.1.0', 'process', rulesets=(), contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('value.copy', 'value.in', display_name='Value Copy'), DataProvider('other.copy', 'other.in', display_name='Other Copy'), DataProvider('extra.copy', 'extra.in', display_name='Extra Copy')), output_semantics={'value.copy': ('first mapped value',), 'other.copy': ('second mapped value',), 'extra.copy': ('third mapped value',)}), rulesets=("vibeflow.process",))
 
     class MappingProducerNode:
 
         def run_pure(self, inputs, params):
             return {"value.copy": 1, "other.copy": 2, "extra.copy": 3}
 
-    MappingConsumerNode_DECLARATION = node_declaration(NodeDescriptor('test.mapping_consumer', 'Mapping Consumer', 'Consumes three mapped values.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.in', 'exactly_one', display_name='Value In'), DataRequirement('other.in', 'exactly_one', display_name='Other In'), DataRequirement('extra.in', 'exactly_one', display_name='Extra In')), input_semantics={'value.in': ('first mapped value',), 'other.in': ('second mapped value',), 'extra.in': ('third mapped value',)}), rulesets=("vibeflow.process",))
+    MappingConsumerNode_DECLARATION = node_declaration(NodeDescriptor('test.mapping_consumer', 'Mapping Consumer', 'Consumes three mapped values.', '0.1.0', 'process', rulesets=(), contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('value.in', 'exactly_one', display_name='Value In'), DataRequirement('other.in', 'exactly_one', display_name='Other In'), DataRequirement('extra.in', 'exactly_one', display_name='Extra In')), input_semantics={'value.in': ('first mapped value',), 'other.in': ('second mapped value',), 'extra.in': ('third mapped value',)}), rulesets=("vibeflow.process",))
 
     class MappingConsumerNode:
 
@@ -1173,7 +1173,7 @@ def test_config_schema_rejects_invalid_node_similarity_metadata() -> None:
 def test_config_rejects_missing_instance_visual_metadata() -> None:
     with pytest.raises(GraphConfigError, match="display_name must be a non-empty string"):
         parse_graph_config(
-            {"pipeline": {"nodes": [{"id": "seed", "type_used": "test.seed"}]}}
+            {"pipeline": {"nodes": [{"id": "seed", "definition_id": "test.seed"}]}}
         )
 
 
@@ -1188,7 +1188,7 @@ def test_node_call_fixture_preserves_canonical_contract_rejection(contract_field
         },
     }
 
-    with pytest.raises(GraphConfigError, match="derived from type_used"):
+    with pytest.raises(GraphConfigError, match="derived from definition_id"):
         parse_graph_config(config)
 
 
@@ -1321,7 +1321,7 @@ def test_compiled_payload_uses_registry_flow_kind() -> None:
     compiled = GraphCompiler().compile(graph, registry=registry)
 
     assert compiled_graph_payload(graph, compiled)["nodes"][1]["flow_kind"] == "decision"
-    assert 'route@{ shape: diam, label: "Route\\n\\nid: route\\ntype_used: test.route' in export_mermaid(graph, compiled=compiled)
+    assert 'route@{ shape: diam, label: "Route\\n\\nid: route\\ndefinition_id: test.route' in export_mermaid(graph, compiled=compiled)
 
 
 def test_planned_nodes_compile_without_registry_and_render_as_architecture() -> None:
@@ -1329,7 +1329,7 @@ def test_planned_nodes_compile_without_registry_and_render_as_architecture() -> 
 
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 {"type_key": "a", "display_name": "A", "description": "Planned a.", "requires": [], "provides": [], "status": "planned"},
                 {"type_key": "b", "display_name": "B", "description": "Planned b.", "requires": [], "provides": [], "status": "planned"},
                 {"type_key": "c", "display_name": "C", "description": "Planned c.", "requires": [], "provides": [], "status": "planned"},
@@ -1350,7 +1350,7 @@ def test_planned_nodes_compile_without_registry_and_render_as_architecture() -> 
     text = export_mermaid(graph, compiled=compiled)
     assert payload["nodes"][0]["status"] == "planned"
     assert payload["nodes"][0]["flow_kind"] == "predefined"
-    assert 'a@{ shape: fr-rect, label: "A\\n\\nid: a\\ntype_used: a' in text
+    assert 'a@{ shape: fr-rect, label: "A\\n\\nid: a\\ndefinition_id: a' in text
     assert "---------- status ----------" in text
     assert "planned" in text
     assert "class a plannedNode;" in text

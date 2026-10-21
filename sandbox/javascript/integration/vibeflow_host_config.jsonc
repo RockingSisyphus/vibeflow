@@ -1,9 +1,0 @@
-{
-  "roots": [
-    {
-      "id": "typescript-host-sandbox",
-      "path": "project",
-      "config": "vibeflow_host_project.jsonc"
-    }
-  ]
-}

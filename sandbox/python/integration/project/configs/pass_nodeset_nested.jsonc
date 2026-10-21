@@ -11,13 +11,13 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.start",
+        "definition_id": "sandbox.start",
         "display_name": "Start",
         "description": "Runs start."
       },
       {
         "id": "input",
-        "type_used": "sandbox.value_input",
+        "definition_id": "sandbox.value_input",
         "display_name": "Input",
         "description": "Runs input."
       },
@@ -31,13 +31,13 @@
           }
         },
         "id": "add_two",
-        "type_used": "math.add_two",
+        "definition_id": "math.add_two",
         "display_name": "Add Two",
         "description": "Runs add_two."
       },
       {
         "id": "end",
-        "type_used": "sandbox.final_value_end",
+        "definition_id": "sandbox.final_value_end",
         "display_name": "End",
         "description": "Runs end."
       }
@@ -66,17 +66,17 @@
   },
   "nodeset_imports": [
     {
-      "path": "nodesets/pass_nodeset_nested/math_add_one.jsonc"
+      "path": "nodeset_types/pass_nodeset_nested/math_add_one.jsonc"
     },
     {
-      "path": "nodesets/pass_nodeset_nested/math_add_two.jsonc"
+      "path": "nodeset_types/pass_nodeset_nested/math_add_two.jsonc"
     }
   ],
   "plugins": [
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

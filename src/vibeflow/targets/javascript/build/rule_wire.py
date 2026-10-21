@@ -11,7 +11,7 @@ def rule_wire_facts(facts: Mapping[str, Any]) -> Mapping[str, Any]:
         if key in {"graph", "global_graph", "declaration_graph"} and value is not None:
             return graph_wire(value, plain)
         if key == "definition" and value is not None:
-            finite = replace(value, graph=replace(value.graph, nodesets={}))
+            finite = replace(value, graph=replace(value.graph, nodeset_types={}))
             return {**plain(finite), "graph": graph_wire(value.graph, plain)}
         return plain(value)
     portable = {key: plain(value) for key, value in facts.items()

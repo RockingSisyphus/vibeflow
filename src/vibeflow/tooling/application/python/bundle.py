@@ -5,6 +5,7 @@ from dataclasses import replace
 import json
 from pathlib import Path
 from uuid import uuid4
+from threading import RLock
 
 from vibeflow.block_compiler import workflow_plan_from_dict, WORKFLOW_ABI_VERSION, map_plan_sources
 from vibeflow.core.descriptors.decode import decode_resource
@@ -14,13 +15,14 @@ from vibeflow.targets.python.project.plugins import PluginRegistry, create_lifec
 from vibeflow.targets.python.runtime.preparation import PreparedPythonWorkflow, bind_python_workflow
 from vibeflow.targets.python.runtime.support.snapshot import decode_snapshot
 from vibeflow.targets.python.sdk.loading import load_plugin, source_paths, load_source_module
+from vibeflow.targets.python.sdk.source_namespace import source_namespace
 
 
 class PythonBundle:
     def __init__(self, path):
         self.path = Path(path).resolve()
         self.metadata = json.loads((self.path / 'vibeflow-build.json').read_text())
-        if self.metadata.get('format') != 'vibeflow.aot-build.v3' or self.metadata.get('abi_version') != WORKFLOW_ABI_VERSION:
+        if self.metadata.get('format') != 'vibeflow.aot-build.v4' or self.metadata.get('abi_version') != WORKFLOW_ABI_VERSION:
             raise ValueError('unsupported Python AOT format or workflow ABI; rebuild the bundle')
         if self.metadata.get('project_target') != 'python':
             raise ValueError('bundle is not a Python workflow')
@@ -38,15 +40,17 @@ class PythonBundle:
         self._plugin_records = tuple((self._descriptor(record['descriptor']),
             self._plugin_source(record['plugin']), record) for record in self.data['plugins'])
         self._plugin_bindings = {}
+        self._bindings_lock = RLock()
+        self._source_namespaces = {}
+        for root, visible in self.data["source_import_roots"].items():
+            source_namespace(self.path / root, namespaces=self._source_namespaces,
+                source_roots=tuple(self.path / value for value in visible))
         self.generated = load_source_module(self.path / 'generated_blocks.py', '_vibeflow_aot_blocks_' + uuid4().hex)
 
     def _prepare_node(self, record):
         binding = dict(record['binding'])
-        if 'plugin' in binding:
-            binding['plugin'] = self._plugin_source(binding['plugin'])
-        else:
-            binding.update(path=self.path / binding['path'], load_root=self.path / binding['load_root'],
-                members=tuple(binding['export'].split('.')))
+        binding.update(path=self.path / binding['path'], load_root=self.path / binding['load_root'],
+            members=tuple(binding['export'].split('.')))
         return self._descriptor(record['descriptor']), binding, self._path(record['source']), record['source_line']
 
     def _plugin_source(self, record):
@@ -56,21 +60,22 @@ class PythonBundle:
         return self.path / record['root'], SourceLocator(**source)
 
     def _bindings(self, source):
-        if source not in self._plugin_bindings:
-            root, locator = source
-            definition = load_plugin(locator, root=root, source_roots=self.roots)
-            self._plugin_bindings[source] = definition.bindings()
-        return self._plugin_bindings[source]
+        with self._bindings_lock:
+            if source not in self._plugin_bindings:
+                root, locator = source
+                definition = load_plugin(locator, root=root, source_roots=self.roots, namespaces=self._source_namespaces)
+                self._plugin_bindings[source] = definition.bindings()
+            return self._plugin_bindings[source]
 
     def _registry(self):
         registry = NodeRegistry()
         for descriptor, binding, source, line in self._node_records:
             def resolve(binding=binding, key=descriptor.id):
-                if 'plugin' in binding:
-                    return self._bindings(binding['plugin'])[('node',key)]
                 def load():
                     with source_paths((binding['load_root'], *self.roots)):
-                        value = load_source_module(binding['path'], binding['module'])
+                        root = binding['load_root']
+                        value = source_namespace(root, namespaces=self._source_namespaces,
+                            source_roots=self.roots).load(binding['path'])
                         for part in binding['members']:
                             value = getattr(value, part)
                         return value
@@ -86,7 +91,7 @@ class PythonBundle:
                 factory = self._bindings(source).get(('plugin',descriptor.id))
                 if factory is None:
                     locator = descriptor.implementations[0].source
-                    module = load_source_module(self.path / record['factory_path'], '_vibeflow_aot_factory_' + descriptor.id.replace('.','_'))
+                    module = source_namespace(source[0], namespaces=self._source_namespaces, source_roots=self.roots).load(self.path / record['factory_path'])
                     factory = module
                     for part in locator.export.split('.'):
                         factory = getattr(factory,part)
@@ -118,8 +123,6 @@ class PythonBundle:
                        node_config_overrides=None, global_config=None, delegate_cli=False, entry=None):
         from vibeflow.targets.python.runtime.engine import PipelineRuntime
         effective = self.effective_options(runtime_options)
-        from vibeflow.targets.python.sdk.loading import _discard_foreign_project_modules
-        _discard_foreign_project_modules(self.roots)
         registry = self._registry()
         prepared = self.prepared
         if node_config_overrides or global_config is not None:
@@ -173,9 +176,9 @@ class PythonBundle:
                 if call.status == 'planned':
                     params = {**spec.params, **subject.overrides.get(call.id, {})}
                 else:
-                    config = registry.get_config_spec(call.type_used)
+                    config = registry.get_config_spec(call.definition_id)
                     params = scoped_node_params(spec.params,scope,declared_keys=set(config.schema))
-                    params = registry.merge_config(call.type_used,{**params,**subject.overrides.get(call.id,{})})
+                    params = registry.merge_config(call.definition_id,{**params,**subject.overrides.get(call.id,{})})
                 calls.append(replace(call, params=freeze_json_object(business_config(params)),
                     max_concurrency=dispatch_limit(params)))
             blocks[key] = replace(block,nodes=tuple(calls))

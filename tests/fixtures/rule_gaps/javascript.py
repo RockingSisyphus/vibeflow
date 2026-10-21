@@ -52,10 +52,10 @@ def _check_states(s, project, payload):
     # complete execution report. Verify states through the actual public Target
     # entrance with the same JSONC scope, not reconstructed/fake handler inputs.
     from vibeflow.targets.javascript.quality.rules import run_javascript_rules
-    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
+    from vibeflow.tooling.project.resources import prepare_workflow_catalogs
     from vibeflow.tooling.project.graph_config import parse_graph_config
     graph = parse_graph_config(s.read_json(project.config), project_root=project.project)
-    catalogs = load_workflow_catalogs(project.project,workflow_config=project.config)
+    catalogs = prepare_workflow_catalogs(project.config)
     report = run_javascript_rules(graph, catalogs, project_root=project.project, package_root=project.project, target="node")
     s.write_json(project.root / "target-state-report.json", report.to_dict())
     return {**_result_states(report.to_dict()), "state_probe":"public_target_api"}
@@ -105,7 +105,7 @@ export function check(context, inputs, params) {
     import_resolved_path:edge?.resolved_path??null, import_line:edge?.line??null,
     import_column:edge?.column??null, import_column_positive:Number.isInteger(edge?.column)&&edge.column>0,
     reachable_has_helper:context.sources.reachable(file).includes(helper),
-    helper_owners:context.sources.ownership(helper).node_types,
+    helper_owners:context.sources.ownership(helper).node_definitions,
     helper_declared:context.sources.ownership(helper).declared.map(owner=>owner.id)};
   appendFileSync(params.marker,JSON.stringify(proof)+"\\n");
   return {records:{value:{type_id:"gaps.value.v1",value:proof}}};
@@ -150,7 +150,7 @@ def _platform_cases(s, work: Path, tools: Path | None) -> list[dict[str, Any]]:
             data = s.read_json(descriptor)
             data["implementations"] = []
             for target in ("node", "browser"):
-                source = project.project / ("rules/provider-"+target+".ts")
+                source = project.project / ("plugins/code_plugin/rules/provider-"+target+".ts")
                 source.write_text('export function check(){return {records:{value:{type_id:"gaps.value.v1",value:[3]}}};}\n')
                 data["implementations"].append({"language":"typescript",
                     "source":{"kind":"file","ref":source.relative_to(project.project).as_posix(),"export":"check"}})
@@ -182,55 +182,10 @@ def _platform_cases(s, work: Path, tools: Path | None) -> list[dict[str, Any]]:
     return rows
 
 
-def _sdk_cases(s, work: Path, tools: Path | None) -> list[dict[str, Any]]:
-    rows = []
-    project = s.new_project(work,"bundle-native-normal",tools)
-    s.sdk_native_resources(project)
-    actual, payload = s.command(project,"build","--target","node","--profile","single-esm","--out-dir",str(project.root/"dist"))
-    if actual["metrics"]["exit_code"]==0:
-        actual["metrics"].update(s.loaded_native_groups(project))
-    actual["metrics"].update(s.execute_business(project,payload,host=True))
-    rows.append(_row("bundle.native.normal", "SDK 所有原生资源真实 build/run 与生命周期", "javascript.bundle.native_resources",
-        {"should_accept":True,"metrics":{"exit_code":0,"native_groups_loaded":True,"sdk_only":True,"business_executed":True,
-         "runtime_exit_code":0,"business_result":7,"import_events":[],
-         "lifecycle":["host:create","host:start","plugin:create","plugin:beforeRun","capability:offset","plugin:afterRun","plugin:dispose","host:stop"]}}, actual,
-         "BaseLib、DataSchema、Capability、Host、Runtime Plugin 全部由同一 SDK 插件贡献，使用统一装配。"))
-    for group in s.NATIVE_GROUPS:
-        for failure in ("dangling", "conflict"):
-            project = s.new_project(work,"bundle-"+group+"-"+failure,tools)
-            paths = s.sdk_native_resources(project)
-            original = paths[group]
-            from tests.fixtures.support.plugins import write_plugin
-            changed = project.project / "additional_plugin.ts"
-            config = s.read_json(project.config)
-            if failure=="conflict":
-                data = s.read_json(original)
-                if group=="data_schemas":
-                    data["schema"]["minimum"] = 0
-                elif group=="capabilities":
-                    data["operations"]["offset"]["completion"] = "suspend"
-                else:
-                    data["description"] = "A conflicting contribution."
-                selection = write_plugin(project.project, [data], target="javascript", filename=changed.name, plugin_id="gaps.additional")
-            else:
-                selection = {"source": {"kind":"file", "ref":changed.name, "export":"plugin"}}
-            config["plugins"].append(selection)
-            s.write_json(project.config, config)
-            actual, _ = s.command(project,"build","--target","node","--profile","single-esm","--out-dir",str(project.root/"dist"))
-            actual["metrics"].update(business_executed=False,build_published=(project.root/"dist").exists())
-            origin_path = str(project.project / "code_plugin.ts")
-            reason = [origin_path, '"origins"', '"previous"', '"current"'] if failure == "conflict" else [changed.name]
-            rows.append(_row("bundle."+group+"."+failure, "Bundle "+group+" 的 "+failure+" 必须正式拒绝",
-                "javascript.bundle.native_resources", {"should_accept":False,"codes":["DESCRIPTOR.CONFLICT" if failure=="conflict" else "PLUGIN.DECLARATION.LOAD"],
-                 "message_contains":reason,"metrics":{"exit_code":1,"build_published":False,"business_executed":False}},actual,
-                 "SDK migration: fixed code contributions replace bundle files; conflicts retain both actual declaration origins, and a missing direct import fails trusted plugin bootstrap."))
-    return rows
-
-
 def run_cases(work_root: Path, variant: str = "current", toolchain_root: Path | None = None) -> list[dict[str, Any]]:
     if variant!="current":
         raise ValueError("new Rule/API gaps have no legacy compatibility adapter; run the current kernel")
     work_root.mkdir(parents=True,exist_ok=True)
     support = _support()
     return [*_record_cases(support,work_root,toolchain_root), *_source_cases(support,work_root,toolchain_root),
-            *_platform_cases(support,work_root,toolchain_root), *_sdk_cases(support,work_root,toolchain_root)]
+            *_platform_cases(support,work_root,toolchain_root)]

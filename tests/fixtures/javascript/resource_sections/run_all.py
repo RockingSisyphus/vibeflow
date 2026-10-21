@@ -9,6 +9,7 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "src"))
 from tests.fixtures.adaptation_regressions.common import run_cli, run_command, row, write_json
 from tests.fixtures.adaptation_regressions.js_fixtures import project, native_shape, cli_args, cli_summary, check_cli, edit
 from tests.fixtures.javascript.resource_sections.audit_browser import audit as audit_browser
@@ -43,12 +44,12 @@ def write_fixture(path, toolchain, shape, variant):
         definition["expand"] = False
         write_json(path / target, definition)
     if variant == "rejected":
-        source = path / "src/plugin.ts"
+        source = path / "plugins/demo/plugin.ts"
         text = source.read_text().replace('definePlugin,defineCapability,defineDataSchema', 'definePlugin,defineCapability,defineDataSchema,defineRule,defineRuleset')
-        code = 'export const rejection=defineRule({id:"demo.hidden_check",check(){return {findings:[{code:"CASE.HIDDEN.SOURCE",reason:"A hidden diagram body still undergoes review",severity:"error",file:'+json.dumps(str(path / "src/node.ts"))+',line:1}]};}});\nexport const reviewSet=defineRuleset({id:"demo.hidden",calls:[{id:"check",rule_id:"demo.hidden_check"}],entrypoints:{static:["check"]}});\n'
-        text = text.replace('export const plugin=', code + 'export const plugin=').replace('resources:[start,model,library,host,session,number]', 'resources:[start,model,library,host,session,number,rejection,reviewSet]')
+        code = 'export const rejection=defineRule({id:"demo.hidden_check",check(){return {findings:[{code:"CASE.HIDDEN.SOURCE",reason:"A hidden diagram body still undergoes review",severity:"error",file:'+json.dumps(str(path / "nodes/node.ts"))+',line:1}]};}});\nexport const reviewSet=defineRuleset({id:"demo.hidden",calls:[{id:"check",rule_id:"demo.hidden_check"}],entrypoints:{static:["check"]}});\n'
+        text = text.replace('export const plugin=', code + 'export const plugin=').replace('resources:[number]', 'resources:[number,rejection,reviewSet]')
         source.write_text(text)
-        edit(path / "src/node.ts", 'rulesets:["vibeflow.process"]', 'rulesets:["vibeflow.process","demo.hidden"]')
+        edit(path / "nodes/node.ts", 'rulesets:["vibeflow.process"]', 'rulesets:["vibeflow.process","demo.hidden"]')
 
 
 def observe(args, identifier, command, shape, variant):
@@ -86,8 +87,8 @@ def observe(args, identifier, command, shape, variant):
         if suffix == ".svg":
             tree = ET.fromstring(text)
             actual["titles"] = [item.text for item in tree.iter() if item.tag.rsplit("}", 1)[-1] == "text" and item.get("class") == "review-title"]
-            expected = ["main pipeline", "plugins", "base_lib", "host_extensions", "capabilities"]
-            if actual["titles"][:5] != expected:
+            expected = ["main pipeline", "plugins", "base_lib"]
+            if actual["titles"][:3] != expected:
                 failures.append(f"user resource directories must retain fixed order: {actual['titles']}")
             for forbidden in ("Node types", "引用 / reference", "Rule:", "Ruleset:", "plugin_support.ts", "math_support.ts", "host_support.ts", "owners:"):
                 if forbidden in text:
@@ -97,7 +98,7 @@ def observe(args, identifier, command, shape, variant):
         elif suffix == ".mmd":
             actual["sections"] = [line for line in text.splitlines() if line.startswith("%% resources:")]
             if variant == "columns":
-                expected = ["%% resources: plugins", "%% resources: base_lib", "%% resources: host_extensions", "%% resources: capabilities"]
+                expected = ["%% resources: plugins", "%% resources: base_lib"]
                 if actual["sections"] != expected:
                     failures.append("Mermaid resources must be the workflow's direct resource directories")
             elif shape == "serial" and actual["sections"]:
@@ -126,13 +127,13 @@ def observe(args, identifier, command, shape, variant):
             failures.extend(observed["failures"])
     if command == "review" and (work / "ARCHITECTURE.jsonc").is_file():
         document = json.loads("\n".join(line for line in (work / "ARCHITECTURE.jsonc").read_text().splitlines() if not line.strip().startswith("//")))
-        actual["architecture_expand"] = {key: value.get("expand") for key, value in document["nodesets"].items()}
+        actual["architecture_expand"] = {key: value.get("expand") for key, value in document["nodeset_types"].items()}
         expected = {"audit.body": False if variant == "body-false" else True}
         if shape == "nested":
             expected["audit.outer"] = variant != "outer-false"
         if actual["architecture_expand"] != expected:
             failures.append("Architecture must preserve both default and explicit expand values")
-        if not document["nodesets"]["audit.body"].get("body"):
+        if not document["nodeset_types"]["audit.body"].get("body"):
             failures.append("hidden diagram details must remain in the machine architecture")
     if command == "build" and actual["exit_code"] == 0:
         entry = Path(actual["payload"]["entry"])

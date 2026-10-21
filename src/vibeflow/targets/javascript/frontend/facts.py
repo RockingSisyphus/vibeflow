@@ -33,13 +33,10 @@ def validate_javascript_descriptor_catalogs(
     """
 
     groups = (
-        ("node", ((item.type_key, item) for item in catalogs.nodes)),
+        ("node", ((item.id, item) for item in catalogs.nodes)),
         ("base_lib", ((item.id, item) for item in catalogs.base_libs)),
         ("plugin", ((item.id, item) for item in catalogs.plugins)),
-        (
-            "host_extension",
-            ((item.id, item) for item in catalogs.host_extensions),
-        ),
+
     )
     for kind, resources in groups:
         for resource_id, descriptor in resources:
@@ -87,9 +84,9 @@ def implementation_facts_from_catalog(
         source = selected.source if selected is not None else None
         facts.append(
             ImplementationFact(
-                type_key=descriptor.type_key,
+                definition_id=descriptor.id,
                 flow_kind=descriptor.flow_kind,
-                effect_scope=_effect_scope((effect_policies or {}).get(descriptor.type_key)),
+                effect_scope=_effect_scope((effect_policies or {}).get(descriptor.id)),
 
                 requires=descriptor.contract.requires,
                 provides=descriptor.contract.provides,
@@ -132,16 +129,16 @@ def target_neutral_implementation_facts_from_catalog(
             raise JavascriptImplementationFactsError(
                 "VF_AOT_CONTRACT_INVALID",
                 (
-                    f"node '{descriptor.type_key}' has platform implementations "
+                    f"node '{descriptor.id}' has platform implementations "
                     f"with different completion contracts: {sorted(completions)}"
                 ),
             )
         completion = next(iter(completions))
         facts.append(
             ImplementationFact(
-                type_key=descriptor.type_key,
+                definition_id=descriptor.id,
                 flow_kind=descriptor.flow_kind,
-                effect_scope=_effect_scope((effect_policies or {}).get(descriptor.type_key)),
+                effect_scope=_effect_scope((effect_policies or {}).get(descriptor.id)),
 
                 requires=descriptor.contract.requires,
                 provides=descriptor.contract.provides,
@@ -184,5 +181,5 @@ def apply_call_effect_scopes(compiled, graph, scopes, path=()):
     """Project the evaluated call policy into compiler/runtime metadata."""
     from dataclasses import replace
     return replace(compiled, effect_scopes={**compiled.effect_scopes, **{
-        node.id: scopes[(node.type_used, *path, node.id)] for node in graph.nodes
-        if (node.type_used, *path, node.id) in scopes}})
+        node.id: scopes[(node.definition_id, *path, node.id)] for node in graph.nodes
+        if (node.definition_id, *path, node.id) in scopes}})

@@ -18,7 +18,7 @@ def test_moved_bundle_keeps_dispatch_capacity_and_local_overrides(tmp_path):
     data = json.loads(config.read_text())
     data["pipeline"]["nodes"][0]["config"] = {"max_concurrency": 4}
     config.write_text(json.dumps(data))
-    nodes = source / "project/nodes.py"
+    nodes = source / "project/nodes/implementation.py"
     nodes.write_text(nodes.read_text().replace("Barrier(12)", "Barrier(2)"))
     built = build_python_aot(PythonBuildRequest(config_workspace, config, tmp_path / "built"))
     moved = tmp_path / "moved"

@@ -4,7 +4,7 @@ import pytest
 from types import SimpleNamespace
 
 from vibeflow.core.rules import RuleCall, RuleContext, RulesetDescriptor, compile_ruleset, execute_rule_plan
-from vibeflow.tooling.project.descriptor_loader import load_builtin_plugins
+from vibeflow.tooling.project.resources import load_builtin_plugins
 from vibeflow.targets.shared.bindings import native_binding
 from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
 from vibeflow.targets.javascript.build.project_paths import javascript_options
@@ -14,7 +14,7 @@ from vibeflow.tooling.project.graph_config import parse_graph_config
 def _node(node_id: str, type_key: str) -> dict[str, object]:
     return {
         "id": node_id,
-        "type_used": type_key,
+        "definition_id": type_key,
         "display_name": node_id,
         "description": f"Runs {type_key}.",
         "status": "planned",
@@ -25,10 +25,10 @@ def _node(node_id: str, type_key: str) -> dict[str, object]:
 
 
 def _graph(depth: int, width: int = 1, *, use_chain: bool = True):
-    nodesets = []
+    nodeset_types = []
     for index in range(depth):
         child = f"example.depth.{index - 1}" if index else "example.placeholder"
-        nodesets.append(
+        nodeset_types.append(
             {
                 "type_key": f"example.depth.{index}",
                 "display_name": f"Depth {index}",
@@ -41,7 +41,7 @@ def _graph(depth: int, width: int = 1, *, use_chain: bool = True):
         )
     return parse_graph_config(
         {
-            "nodesets": nodesets,
+            "nodeset_types": nodeset_types,
             "pipeline": {"nodes": [
                 _node("top", f"example.depth.{depth - 1}")
                 if use_chain else _node("unrelated", "example.placeholder")
@@ -51,12 +51,12 @@ def _graph(depth: int, width: int = 1, *, use_chain: bool = True):
 
 
 def _mixed_graph(depth: int):
-    nodesets = []
+    nodeset_types = []
     for index in range(depth):
         child = f"example.depth.{index - 1}" if index else "example.future"
         call = _node("call", child)
         if index == 2:
-            call["type_used"] = "vibeflow.loop.while"
+            call["definition_id"] = "vibeflow.loop.while"
             call["loop"] = {
                 "body": child, "max_iterations": 10, "stop_after": 1,
                 "outputs": [],
@@ -64,7 +64,7 @@ def _mixed_graph(depth: int):
         calls = [call]
         if index == depth - 1 and index > 0:
             calls.append(_node("branch", "example.depth.0"))
-        nodesets.append({
+        nodeset_types.append({
             "type_key": f"example.depth.{index}",
             "display_name": f"Depth {index}",
             "description": "A planned mixed dependency group.",
@@ -72,18 +72,18 @@ def _mixed_graph(depth: int):
             "pipeline": {"nodes": calls},
         })
     return parse_graph_config({
-        "nodesets": nodesets,
+        "nodeset_types": nodeset_types,
         "pipeline": {"nodes": [_node("top", f"example.depth.{depth - 1}")]},
     })
 
 
 def _selected_findings(graph, *, max_depth=4, enabled=True):
     loaded = load_builtin_plugins("javascript")
-    ruleset = RulesetDescriptor("fixture.nodesets", calls=(RuleCall("nodesets", rule_id="vibeflow.graph.nodesets",
-        params={"nodeset_max_depth": max_depth}),) if enabled else (), entrypoints={"static": ("nodesets",) if enabled else ()})
+    ruleset = RulesetDescriptor("fixture.nodeset_types", calls=(RuleCall("nodeset_types", rule_id="vibeflow.graph.nodeset_types",
+        params={"nodeset_max_depth": max_depth}),) if enabled else (), entrypoints={"static": ("nodeset_types",) if enabled else ()})
     plan = compile_ruleset(ruleset.id, rules=loaded.catalogs.rules, rulesets={ruleset.id: ruleset}, entrypoint="static")
-    result = execute_rule_plan(plan, RuleContext(facts={"graph": graph}, target="javascript"),
-        handlers={"vibeflow.graph.nodesets": native_binding(loaded.catalogs, "rule", "vibeflow.graph.nodesets")})
+    result = execute_rule_plan(plan, RuleContext(facts={"graph": graph}, target="javascript", scope={"level":"graph"}),
+        handlers={"vibeflow.graph.nodeset_types": native_binding(loaded.catalogs, "rule", "vibeflow.graph.nodeset_types")})
     return result.findings
 
 
@@ -118,7 +118,7 @@ def test_selected_rule_checks_mixed_loop_async_branch_depth():
     ({"example.a": "example.b", "example.b": "example.a"}, ("example.a", "example.b", "example.a")),
 ])
 def test_selected_nodeset_rule_reports_recursion(targets, cycle):
-    graph = parse_graph_config({"nodesets": [{"type_key": owner, "display_name": owner,
+    graph = parse_graph_config({"nodeset_types": [{"type_key": owner, "display_name": owner,
         "description": "A planned recursive group.", "status": "planned", "requires": [], "provides": [],
         "pipeline": {"nodes": [_node("call", target)]}} for owner, target in targets.items()],
         "pipeline": {"nodes": [_node("unrelated", "example.future")]}})
@@ -134,9 +134,5 @@ def test_selected_rule_width_warning_includes_planned_body():
     assert warning.details == {"node_count": 11, "limit": 10}
 
 
-def test_selected_rule_depth_override_and_project_default_validation():
-    root = SimpleNamespace(project_config={"javascript": {"nodeset_max_depth": 5}})
-    assert _errors(_graph(5), max_depth=javascript_options(root)["nodeset_max_depth"]) == ()
-    root.project_config["javascript"]["nodeset_max_depth"] = True
-    with pytest.raises(ProjectBuildError, match="positive integer"):
-        javascript_options(root)
+def test_selected_rule_depth_override():
+    assert _errors(_graph(5), max_depth=5) == ()

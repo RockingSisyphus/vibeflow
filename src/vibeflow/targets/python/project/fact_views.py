@@ -7,9 +7,9 @@ from vibeflow.targets.python.quality.source_context import PythonSourceContext, 
 def catalog_key(registry):
     catalogs = tuple(getattr(registry, "rule_catalogs", ()) or ())
     resources = tuple((id(catalog), tuple((group, tuple(id(item) for item in (getattr(catalog, group, ()) or ())))
-                      for group in ("nodes", "rules", "rulesets", "base_libs", "plugins", "host_extensions")))
+                      for group in ("nodes", "rules", "rulesets", "base_libs", "plugins")))
                       for catalog in catalogs)
-    loaded = getattr(getattr(registry, "loaded_plugins", None), "catalogs", None)
+    loaded = getattr(getattr(registry, "prepared_resources", None), "catalogs", None)
     settings = (getattr(loaded, "plugin_settings", {}), getattr(loaded, "plugin_records", ()))
     available = registry.available() if callable(getattr(registry,"available",None)) else ()
     descriptors = tuple((key, id(registry.descriptor(key))) for key in available)
@@ -30,14 +30,14 @@ class PythonFacts:
         if key not in self.contributions:
             from vibeflow.core.descriptors.contributions import contribution_facts
             from vibeflow.targets.python.project.source_membership import source_ownership
-            loaded = getattr(getattr(registry, "loaded_plugins", None), "catalogs", None)
+            loaded = getattr(getattr(registry, "prepared_resources", None), "catalogs", None)
             self.catalog_snapshots[key] = tuple(tuple(getattr(catalog,group,()) or ())
                 for catalog in (getattr(registry,"rule_catalogs",()) or ())
-                for group in ("nodes","rules","rulesets","base_libs","plugins","host_extensions"))
+                for group in ("nodes","rules","rulesets","base_libs","plugins"))
             self.contributions[key] = readonly({
                 **(contribution_facts(loaded) if loaded is not None else {}),
                 **source_ownership(registry),
-                "node_catalog":tuple(registry.descriptor(item) for item in registry.available())
+                "node_definitions":tuple(registry.descriptor(item) for item in registry.available())
                     if callable(getattr(registry,"available",None)) else ()})
         return key, self.contributions[key]
 
@@ -47,7 +47,7 @@ class PythonFacts:
         if previous is None or previous[0] is not sources:
             import hashlib
             facts = {"files":[(item.path,item.module,item.root_id,item.text) for item in sources.files],
-                "calls":[(item.owner,item.node_id,item.type_key,plain(item.params),item.source_path,item.local_id,item.call_path,plain(item.rulesets)) for item in sources.calls],
+                "calls":[(item.owner,item.node_id,item.definition_id,plain(item.params),item.source_path,item.local_id,item.call_path,plain(item.rulesets)) for item in sources.calls],
                 "imports":[(item.path,item.specifier,item.module,item.resolved_path,item.symbol,item.alias,item.line,item.column) for item in sources.imports],
                 "nodes":[(item.descriptor.to_dict(),item.path,item.symbol,item.root_id,item.calls) for item in sources.nodes]}
             previous = (sources, hashlib.sha256(fact_key(facts).encode()).hexdigest())

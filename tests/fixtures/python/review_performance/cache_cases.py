@@ -15,15 +15,15 @@ from vibeflow.core.rules import RuleRecord, RuleResult
 
 def finding(context, code, message, severity="warning"):
     return HealthFinding(rule_id=code, severity=severity, object_type="node",
-        object_id=context.subject.get("type_key", context.subject.get("owner", "pipeline")), message=message,
+        object_id=context.subject.get("definition_id", context.subject.get("owner", "pipeline")), message=message,
         source_location={"path": __file__, "line": 8, "column": 1})
 
-@node(type_key="case.start", flow_kind="terminal", contract={}, rulesets=[])
+@node(node_type='vibeflow.node', id="case.start", flow_kind="terminal", contract={}, rulesets=[])
 class Start:
     def run_pure(self, inputs, params):
         return {}
 
-@node(type_key="case.end", flow_kind="terminal", contract={}, rulesets=[])
+@node(node_type='vibeflow.node', id="case.end", flow_kind="terminal", contract={}, rulesets=[])
 class End:
     def run_pure(self, inputs, params):
         return {}
@@ -31,22 +31,19 @@ class End:
 
 
 def _project(root, body, resources, selections, *, calls=1, config=None):
-    write_project(root, nodes=0, libraries=0)
-    leaf = (f'@node(type_key="case.step", contract={{}}, rulesets={selections!r})\n'
-            'class Step:\n'
-            '    def run_pure(self, inputs, params):\n'
-            '        return {}\n')
-    source = PREAMBLE + body + "\n" + leaf
-    source += (f'\nplugin = Plugin(id="case.resources", resources=[Start, End, Step, {resources}],\n'
-               '    config_defaults={"mode": 1}, declaration_rulesets=[])\n')
-    (root / "code_plugin.py").write_text(source)
-    steps = [node_call(f"step{index}", "case.step") for index in range(calls)]
-    _workflow(root, steps, config=config)
+    from tests.fixtures.adaptation_regressions.core_sdk_fixtures import write_project as author
+    helper=PREAMBLE[:PREAMBLE.index("@node")]
+    body=helper+body
+    body=body.replace('Path(__file__).with_name("consumer.marker")', 'Path('+repr(str(root/'consumer.marker'))+')')
+    leaf=(f'@node(node_type="vibeflow.node",id="case.step", contract={{}}, rulesets={selections!r})\n'
+        'class Step:\n    def run_pure(self,inputs,params):\n        return {}\n')
+    author(root,body=body,resources=[name.strip() for name in resources.split(',')],calls=calls,node_source=leaf,config=config)
+    _workflow(root,[node_call(f"step{index}","case.step") for index in range(calls)],config=config)
 
 
 def _workflow(root, steps, *, config=None, filename="workflow.jsonc"):
     nodes = [node_call("start", "case.start"), *steps, node_call("end", "case.end")]
-    data = {"plugins": [{"source": {"kind": "file", "ref": "code_plugin.py"},
+    data = {"plugins": [{"source": {"kind": "file", "ref": "plugins/case/plugin.py"},
                          "config": config or {}}], "rulesets": [],
             "pipeline": {"nodes": nodes,
                          "edges": [[left["id"], right["id"]]
@@ -55,7 +52,7 @@ def _workflow(root, steps, *, config=None, filename="workflow.jsonc"):
 
 
 def _observe(root, args, *, name="observation", config="workflow.jsonc"):
-    result = run_cli(root, ["validate", "--workspace", str(root / "vibeflow_config.jsonc"),
+    result = run_cli(root, ["validate", "--workspace", str(root.parent / "vibeflow_config.jsonc"),
                            "--config", str(root / config), "--json"], args, name)
     output = (root / (name + ".stdout.txt")).read_text()
     payload = json.loads(output)
@@ -189,9 +186,9 @@ checks = ruleset(id="case.changing_records", calls=[
     entrypoints={"static":["consume"]})
 '''
     _project(root, body, "provide, consume, checks", ["case.changing_records"], calls=3)
-    source = root / "code_plugin.py"
-    source.write_text(source.read_text().replace('type_key="case.step", contract={}',
-        'type_key="case.step", contract={"params_schema":{"record":{"type":"integer"}},"params_defaults":{"record":0}}'))
+    source = root / "nodes/steps.py"
+    source.write_text(source.read_text().replace('id="case.step", contract={}',
+        'id="case.step", contract={"params_schema":{"record":{"type":"integer"}},"params_defaults":{"record":0}}'))
     steps = [{**node_call(f"step{index}","case.step"),"config":{"record":value}}
              for index,value in enumerate((1,2,2))]
     _workflow(root, steps)
@@ -237,9 +234,9 @@ checks = ruleset(id="case.native_records", calls=[
 '''
     kinds = ("first","second","mapping") if variant == "dataclass" else ("tuple","frozenset")
     _project(root,body,"provide, consume, checks",["case.native_records"],calls=len(kinds))
-    source = root / "code_plugin.py"
-    source.write_text(source.read_text().replace('type_key="case.step", contract={}',
-        'type_key="case.step", contract={"params_schema":{"record_kind":{"type":"string"}},"params_defaults":{"record_kind":"mapping"}}'))
+    source = root / "nodes/steps.py"
+    source.write_text(source.read_text().replace('id="case.step", contract={}',
+        'id="case.step", contract={"params_schema":{"record_kind":{"type":"string"}},"params_defaults":{"record_kind":"mapping"}}'))
     steps = [{**node_call(f"step{index}","case.step"),"config":{"record_kind":kind}}
              for index,kind in enumerate(kinds)]
     _workflow(root,steps)
@@ -257,43 +254,42 @@ checks = ruleset(id="case.native_records", calls=[
     return observation,failures
 
 
-def _permissions_case(root, args):
-    write_project(root, nodes=0, libraries=0)
-    (root / "shared.py").write_text('class Shared:\n    def run_pure(self, inputs, params):\n        print("shared output")\n        return {}\n')
-    body = '''
-allowed = ruleset(id="case.allowed", calls=[{"id":"effect", "rule_id":"vibeflow.no_side_effects", "params":{"effect_scope":"terminal"}}], entrypoints={"static":["effect"]})
-restricted = ruleset(id="case.restricted", calls=[{"id":"effect", "rule_id":"vibeflow.no_side_effects", "params":{"effect_scope":"none"}}], entrypoints={"static":["effect"]})
-shared = SourceLocator("file", str(Path(__file__).with_name("shared.py")), "Shared")
-wide = node(type_key="case.wide", contract={}, source=shared, rulesets=["case.allowed"])
-narrow = node(type_key="case.narrow", contract={}, source=shared, rulesets=["case.restricted"])
-plugin = Plugin(id="case.resources", resources=[Start, End, wide, narrow, allowed, restricted], declaration_rulesets=[])
+def _permissions_case(root,args):
+    from tests.fixtures.adaptation_regressions.core_sdk_fixtures import write_project as author
+    root.mkdir(parents=True)
+    (root/'shared.py').write_text('class Shared:\n    def run_pure(self,inputs,params):\n        print("shared output")\n        return {}\n')
+    body='''from vibeflow.targets.python.sdk import ruleset
+allowed=ruleset(id="case.allowed",calls=[{"id":"effect","rule_id":"vibeflow.no_side_effects","params":{"effect_scope":"terminal"}}],entrypoints={"static":["effect"]})
+restricted=ruleset(id="case.restricted",calls=[{"id":"effect","rule_id":"vibeflow.no_side_effects","params":{"effect_scope":"none"}}],entrypoints={"static":["effect"]})
 '''
-    (root / "code_plugin.py").write_text(PREAMBLE + body)
-    _workflow(root, [node_call("wide", "case.wide"), node_call("narrow", "case.narrow")])
-    observation = _observe(root, args)
-    target = [item for item in observation["diagnostics"] if "print" in item.get("message", "")]
-    failures = _expected(observation, exit_code=1, diagnostics={"NODE.EFFECT.CALL_FORBIDDEN": 1},
-                         executions={"vibeflow.no_side_effects": 2})
-    observation["expected"]["forbidden_node"] = "case.narrow"
-    if len(target) != 1 or target[0].get("object_id") != "case.narrow":
-        failures.append("shared implementation inherited the other Node's wider permissions")
-    return observation, failures
+    nodes='from vibeflow.targets.python.sdk import node,SourceLocator\n'
+    nodes+=f'shared=SourceLocator("file",{str(root/"shared.py")!r},"Shared")\n'
+    nodes+='wide=node(id="case.wide",node_type="vibeflow.node",contract={},source=shared,rulesets=["case.allowed"])\n'
+    nodes+='narrow=node(id="case.narrow",node_type="vibeflow.node",contract={},source=shared,rulesets=["case.restricted"])\n'
+    author(root,body=body,resources=['allowed','restricted'],node_source=nodes)
+    _workflow(root,[node_call("wide","case.wide"),node_call("narrow","case.narrow")])
+    observation=_observe(root,args)
+    target=[item for item in observation['diagnostics'] if 'print' in item.get('message','')]
+    failures=_expected(observation,exit_code=1,diagnostics={'NODE.EFFECT.CALL_FORBIDDEN':1},executions={'vibeflow.no_side_effects':2})
+    if len(target)!=1 or target[0].get('object_id')!='case.narrow':failures.append('shared implementation leaked wider permissions')
+    return observation,failures
 
 
 def _configuration_case(root, args):
     body = '''
-@rule(id="case.config", scope="source")
+@rule(id="case.config",level="graph",scope="source",params_schema={"mode":{"type":"integer"}},params_defaults={"mode":1})
 def check_config(context, inputs, params):
-    value = context.facts["plugins"]["case.resources"]["mode"]
+    value = params["mode"]
     return RuleResult(findings=(finding(context, "CASE.CONFIG", f"mode {value}"),))
-checks = ruleset(id="case.config", workflow_default=True, calls=[{"id":"check", "rule_id":"case.config"}], entrypoints={"static":["check"]})
+checks = ruleset(id="case.config", calls=[{"id":"check", "rule_id":"case.config"}], entrypoints={"static":["check"]})
+second = ruleset(id="case.second", calls=[{"id":"check", "rule_id":"case.config", "params":{"mode":2}}], entrypoints={"static":["check"]})
 '''
-    _project(root, body, "check_config, checks", [])
+    _project(root, body, "check_config, checks, second", [])
     _workflow(root, [node_call("step0", "case.step")], config={"mode": 2}, filename="second.jsonc")
     for filename in ("workflow.jsonc", "second.jsonc"):
         path = root / filename
         data = json.loads(path.read_text())
-        data["rulesets"] = ["case.config"]
+        data["rulesets"] = ["case.config" if filename=="workflow.jsonc" else "case.second"]
         path.write_text(json.dumps(data))
     observations, failures = [], []
     for index, config in enumerate(("workflow.jsonc", "second.jsonc"), 1):
@@ -320,7 +316,7 @@ def observe_cases(work: Path, kernel: Path, renderer: Path | None, *, installed=
              ("cache-native-dataclass-records", lambda root,args: _native_records_case(root,args,"dataclass")),
              ("cache-native-set-records", lambda root,args: _native_records_case(root,args,"set")),
              ("cache-shared-symbol-permissions", _permissions_case),
-             ("cache-workflow-plugin-config", _configuration_case)]
+             ("cache-workflow-rule-params", _configuration_case)]
     results = []
     for identifier, observe in cases:
         root = work / identifier

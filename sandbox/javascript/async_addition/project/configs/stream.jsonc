@@ -3,20 +3,14 @@
     {
       "source": {
         "kind": "file",
-        "ref": "plugin.ts",
+        "ref": "plugins/addition/plugin.ts",
         "export": "plugin"
       }
     }
   ],
-  "host_extensions": [
-    {
-      "id": "addition.port_host",
-      "status": "implemented"
-    }
-  ],
   "nodeset_imports": [
     {
-      "path": "nodesets/port_body.jsonc"
+      "path": "nodeset_types/port_body.jsonc"
     }
   ],
   "pipeline": {
@@ -24,13 +18,13 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "addition.boundary",
+        "definition_id": "addition.boundary",
         "display_name": "start",
         "description": "start"
       },
       {
         "id": "loop",
-        "type_used": "vibeflow.loop.while",
+        "definition_id": "vibeflow.loop.while",
         "display_name": "loop",
         "description": "loop",
         "requires": [],
@@ -39,15 +33,65 @@
           "body": "addition.port_body",
           "max_iterations": null
         }
+      },
+      {
+        "id": "open",
+        "definition_id": "addition.session.open",
+        "display_name": "open",
+        "description": "Open the author-owned port API"
+      },
+      {
+        "id": "cleanup_start",
+        "definition_id": "addition.boundary",
+        "display_name": "cleanup_start",
+        "description": "Cleanup entry"
+      },
+      {
+        "id": "close",
+        "definition_id": "addition.session.close",
+        "display_name": "close",
+        "description": "Close the author-owned port API"
+      },
+      {
+        "id": "cleanup_end",
+        "definition_id": "addition.boundary",
+        "display_name": "cleanup_end",
+        "description": "Cleanup completed",
+        "similar_to": {
+          "node": "cleanup_start",
+          "relationship": "copy",
+          "reason": "Empty terminal boundary"
+        }
       }
     ],
     "edges": [
       {
         "from": "start",
+        "to": "open"
+      },
+      {
+        "from": "open",
         "to": "loop"
+      },
+      {
+        "from": "cleanup_start",
+        "to": "close"
+      },
+      {
+        "from": "close",
+        "to": "cleanup_end"
       }
     ],
     "outputs": [],
-    "entry_mode": "async"
+    "entry_mode": "async",
+    "entries": {
+      "stream": {
+        "start": "start"
+      },
+      "cleanup": {
+        "start": "cleanup_start"
+      }
+    },
+    "default_entry": "stream"
   }
 }

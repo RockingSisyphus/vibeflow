@@ -53,7 +53,7 @@ def _prepare_runtime_workspace() -> Path:
         target = runtime_root / "project" / str(spec["target"])
         link.parent.mkdir(parents=True, exist_ok=True)
         link.symlink_to(target)
-    for name in ("vibeflow_config.jsonc", "vibeflow_host_config.jsonc"):
+    for name in ("vibeflow_config.jsonc",):
         shutil.copy2(_SOURCE_SANDBOX_ROOT / name, runtime_root / name)
     try:
         completed = subprocess.run(
@@ -107,9 +107,9 @@ from declaration_cases import (
     typecheck_declarations,
     typecheck_optional_declarations,
 )
-from host_extension_cases import (
-    browser_permanent_port_host_case,
-    host_extension_case,
+from lifecycle_cases import (
+    browser_message_loop_case,
+    explicit_lifecycle_case,
 )
 from runtime_cases import (
     capability_error_case,
@@ -253,6 +253,14 @@ def _source_map_case(result: Any) -> dict[str, Any]:
 
 
 def _review_case(puppeteer_root: Path) -> dict[str, Any]:
+    # Full review owns a positive project; negative workflows are separate inputs.
+    subject = _RUNTIME_ROOT / "review_subject"
+    subject.mkdir()
+    project = subject / "project"
+    shutil.copytree(PROJECT_ROOT, project, ignore=shutil.ignore_patterns("node_modules", "review_artifacts"))
+    shutil.rmtree(project / "configs/negative")
+    (project / "node_modules").symlink_to(PROJECT_ROOT / "node_modules", target_is_directory=True)
+    shutil.copy2(_RUNTIME_ROOT / "vibeflow_config.jsonc", subject / "vibeflow_config.jsonc")
     environment = dict(os.environ)
     environment["PYTHONPATH"] = str(_REPOSITORY_ROOT / "src")
     environment["VIBEFLOW_MERMAID_RENDERER_ROOT"] = str(puppeteer_root)
@@ -264,7 +272,7 @@ def _review_case(puppeteer_root: Path) -> dict[str, Any]:
             {"sandbox.nested_async_outer", "sandbox.nested_async_inner"},
         ),
         (
-            "browser_permanent_port_host.jsonc",
+            "browser_message_loop.jsonc",
             "PERMANENT_PORT_ARCHITECTURE.jsonc",
             {"sandbox.permanent_port_body"},
         ),
@@ -279,9 +287,9 @@ def _review_case(puppeteer_root: Path) -> dict[str, Any]:
                 "vibeflow",
                 "review",
                 "--workspace",
-                str(_RUNTIME_ROOT / "vibeflow_config.jsonc"),
+                str(subject / "vibeflow_config.jsonc"),
                 "--config",
-                str(CONFIG_ROOT / config_name),
+                str(project / "configs" / config_name),
                 "--output",
                 str(output),
             ],
@@ -307,7 +315,7 @@ def _review_case(puppeteer_root: Path) -> dict[str, Any]:
             raise AssertionError(
                 f"review {config_name} is missing expanded targets: {sorted(missing)}"
             )
-        architecture = PROJECT_ROOT / "review_artifacts" / architecture_name
+        architecture = project / "review_artifacts" / architecture_name
         architecture_text = architecture.read_text(encoding="utf-8")
         for target in expected_targets:
             if target not in architecture_text:
@@ -400,10 +408,10 @@ def _browser_platform_rejection_case(cache: BuildCache) -> dict[str, Any]:
         expected_line=line,
         expected_column=column,
     )
-    plugin = PROJECT_ROOT / "code_plugin.ts"
+    plugin = PROJECT_ROOT / "nodes/code_plugin_declarations.ts"
     original = plugin.read_text(encoding="utf-8")
     lines = original.splitlines(keepends=True)
-    index = next(index for index, line in enumerate(lines) if '"type_key": "sandbox.invalid.node_builtin_browser"' in line)
+    index = next(index for index, line in enumerate(lines) if '"id": "sandbox.invalid.node_builtin_browser"' in line)
     import re
     lines[index] = re.sub(r'"rulesets": \[[^\]]*\]', '"rulesets": []', lines[index])
     plugin.write_text("".join(lines), encoding="utf-8")
@@ -434,7 +442,7 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
         "symlink_import": "VF_IMPORT_NODE_TO_NODE",
         "base_lib_reverse": "VF_IMPORT_LAYER",
         "undeclared_external": "VF_IMPORT_EXTERNAL",
-        "package_root_escape": "VF_IMPORT_PACKAGE_ROOT",
+        "package_root_escape": "VF_IMPORT_OWNER",
         # The helper itself is outside the declared Node/base_lib ownership
         # closure, so VibeFlow rejects that architectural violation before
         # esbuild reaches the platform-specific node:fs import.
@@ -740,7 +748,7 @@ def main() -> int:
                 cache, key="linear_single", profile="single-esm"
             )),
             ("profile:web-app", lambda: _web_profile_case(cache)),
-            ("host-extension:lifecycle-and-capability", lambda: host_extension_case(cache)),
+            ("workflow:explicit-lifecycle-and-capability", lambda: explicit_lifecycle_case(cache)),
             ("abi:import-no-side-effect", lambda: import_case(module().entry)),
             ("abi:input-and-trace-errors", lambda: input_error_case(
                 module().entry
@@ -793,16 +801,16 @@ def main() -> int:
                         ),
                     ),
                     (
-                        "browser:permanent-host-web-app",
-                        lambda: browser_permanent_port_host_case(
+                        "browser:explicit-message-loop-web-app",
+                        lambda: browser_message_loop_case(
                             cache,
                             puppeteer_root=puppeteer_root,
                             profile="web-app",
                         ),
                     ),
                     (
-                        "browser:permanent-host-esm-module",
-                        lambda: browser_permanent_port_host_case(
+                        "browser:explicit-message-loop-esm-module",
+                        lambda: browser_message_loop_case(
                             cache,
                             puppeteer_root=puppeteer_root,
                             profile="esm-module",
@@ -818,8 +826,8 @@ def main() -> int:
                 )
                 for name in (
                     "browser:no-auto-start",
-                    "browser:permanent-host-web-app",
-                    "browser:permanent-host-esm-module",
+                    "browser:explicit-message-loop-web-app",
+                    "browser:explicit-message-loop-esm-module",
                 )
             )
         cases.append(

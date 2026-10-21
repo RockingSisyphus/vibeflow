@@ -43,9 +43,9 @@
 | Core、Block Compiler、公共声明 | 未发现仍执行的原生 IO 专属分支；移除无调用的 schema `_provider_keys` 与编译/解析/Architecture 等模块的无用导入。共享计划、普通执行器和旧配置迁移诊断继续保留。 |
 | Python Target | 规则直接从策略所有者取得 source_policy，移除 helpers 转出口；保留节点源码/模块副作用的不同分析职责。协议模块只保留实际语言接口与公开 effect-scope 桥，不保留无消费者的 flow 常量转出口。 |
 | JavaScript Target、共享规则 | 两端内置规则装配直接使用共享 Capability handler；图审查直接使用共享算法，删除 Target 实现文件中的无用转出口及各层残余导入。SDK 导出、atexit 注册回调和 Target 自有规则声明仍有实际用途，保留。 |
-| Tooling、Coordination | Host Extension 解析由使用者直接引用实际所有者；索引、快照、安装及 Target 采集的既有边界继续沿用。Coordination 的启动握手、实例状态、邮箱与 Target 接入分工仍有效，没有新增生命周期托管或平行执行器。 |
+| Tooling、Coordination | 当轮 Host Extension 解析由使用者直接引用实际所有者（该机制现已退役，见项目治理重构）；索引、快照、安装及 Target 采集的既有边界继续沿用。Coordination 的启动握手、实例状态、邮箱与 Target 接入分工仍有效，没有新增生命周期托管或平行执行器。 |
 | 展示与测试 | 原资源矩阵只验收可选 SVG，补为同一浏览器进程验收离线快照四种主要视图；覆盖所有公开形状、有效颜色、文字、图标、覆盖与状态，样式修改/恢复也同时检查 HTML。保留 SVG 对照覆盖。新增 4 个真实 Python/JS SDK 与 CLI 案例，先确认合法多入口通过，再确认孤立 terminal/process 在 validate/build 均被准确拒绝；已有离线入口切换测试增加索引重建后继续识别入口的检验。 |
-| 目录、当前文档、历史资料 | 具体 Target/Tooling 的项目规则选择测试移到 integration，共享图规则的入口健康测试移到 targets/shared。两份已完成且仍被发行记录引用的 AOT/展示实施记录移到 maintainers/history，更新所有入链与相对出链；保持当时 ABI、成绩和失败原文。当前用户文档和发行提示词已使用 ABI v9、普通端口与 HTML 快照审核，没有据旧关键词误删有效迁移说明。 |
+| 目录、当前文档、历史资料 | 具体 Target/Tooling 的项目规则选择测试移到 integration，共享图规则的入口健康测试移到 targets/shared。两份已完成且仍被发行记录引用的 AOT/展示实施记录移到 maintainers/history，更新所有入链与相对出链；保持当时 ABI、成绩和失败原文。该轮用户文档和发行提示词已使用 ABI v9、普通端口与 HTML 快照审核，没有据旧关键词误删有效迁移说明。 |
 
 保留边界：历史规则基线中的 IoSpec 只由 baseline 分支使用；`flow_kind: io` 和 `vibeflow.io` Ruleset 仍合法；可选 SVG 仍是产品接口；公共模块的显式 SDK/模型导出并非死代码。没有发现必须改变项目结构才能处理的待决事项；不宣称整个项目绝无未来技术债。
 

@@ -135,7 +135,7 @@ class SchedulerCodegenMixin:
                 (
                     f"            {hook}(state.root, \"beforeNode\", {{ "
                     f"nodeId: {js(node.id)}, nodePath: nodePath(state, {js(node.id)}), "
-                    f"blockPath: formatBlockPath(state.path), type: {js(node.type_used)} }});"
+                    f"blockPath: formatBlockPath(state.path), type: {js(node.definition_id)} }});"
                 ),
                 "            let outputs;",
             ]
@@ -146,7 +146,7 @@ class SchedulerCodegenMixin:
                 (
                     f"            {hook}(state.root, \"afterNode\", {{ "
                     f"nodeId: {js(node.id)}, nodePath: nodePath(state, {js(node.id)}), "
-                    f"blockPath: formatBlockPath(state.path), type: {js(node.type_used)}, "
+                    f"blockPath: formatBlockPath(state.path), type: {js(node.definition_id)}, "
                     "outputKeys: Object.keys(outputs || {}).sort() });"
                 ),
                 (

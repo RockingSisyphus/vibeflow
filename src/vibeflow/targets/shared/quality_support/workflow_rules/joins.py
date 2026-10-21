@@ -6,12 +6,12 @@ from vibeflow.targets.shared.quality_support.workflow_rules.join_exclusivity imp
 from vibeflow.targets.shared.quality_support.workflow_rules.branch_paths import BranchPaths
 
 def append_join_policy_health(graph, compiled, state, *, owner: str = "pipeline") -> None:
-    nodes_by_name = {node.name: node for node in graph.nodes}
+    nodes_by_name = {node.id: node for node in graph.nodes}
     schedule_edges = tuple(compiled.resolved_schedule_edges)
     transfer_edges = tuple(compiled.resolved_transfer_edges)
-    incoming_edges: dict[str, list[object]] = {node.name: [] for node in graph.nodes}
+    incoming_edges: dict[str, list[object]] = {node.id: [] for node in graph.nodes}
     outgoing_targets: dict[str, set[str]] = {}
-    transfer_incoming: dict[str, list[object]] = {node.name: [] for node in graph.nodes}
+    transfer_incoming: dict[str, list[object]] = {node.id: [] for node in graph.nodes}
     for edge in schedule_edges:
         incoming_edges.setdefault(edge.target, []).append(edge)
         outgoing_targets.setdefault(edge.source, set()).add(edge.target)
@@ -20,27 +20,27 @@ def append_join_policy_health(graph, compiled, state, *, owner: str = "pipeline"
     paths = BranchPaths(graph, compiled)
     for node in graph.nodes:
         if node.join_policy == JOIN_POLICY_ALL:
-            successors = outgoing_targets.get(node.name, set())
-            predecessors = {edge.source for edge in incoming_edges.get(node.name, ())}
+            successors = outgoing_targets.get(node.id, set())
+            predecessors = {edge.source for edge in incoming_edges.get(node.id, ())}
             if len(predecessors) > 1 and len(successors) > 1:
                 state.errors.append(_data_finding(
-                    "GRAPH.JOIN.FORK_CONFLICT", node.name,
-                    f"node '{node.name}' cannot collect multiple branches and dispatch another fanout in the same call",
-                    node=node.name, severity="error", details={"owner": owner,
+                    "GRAPH.JOIN.FORK_CONFLICT", node.id,
+                    f"node '{node.id}' cannot collect multiple branches and dispatch another fanout in the same call",
+                    node=node.id, severity="error", details={"owner": owner,
                         "predecessors": sorted(predecessors), "successors": sorted(successors),
                         "suggestion": "Add a separate downstream dispatch node after the all-join."}))
             _append_all_join_edge_class_findings(
                 node,
-                incoming_edges.get(node.name, ()),
-                transfer_incoming.get(node.name, ()),
+                incoming_edges.get(node.id, ()),
+                transfer_incoming.get(node.id, ()),
                 nodes_by_name,
                 state,
                 owner=owner,
             )
             append_all_join_mutual_exclusion_finding(
                 node,
-                incoming_edges.get(node.name, ()),
-                transfer_incoming.get(node.name, ()),
+                incoming_edges.get(node.id, ()),
+                transfer_incoming.get(node.id, ()),
                 schedule_edges,
                 nodes_by_name,
                 getattr(compiled, "flow_kinds", {}),
@@ -48,7 +48,7 @@ def append_join_policy_health(graph, compiled, state, *, owner: str = "pipeline"
                 owner=owner,
             )
             continue
-        edges = incoming_edges.get(node.name, [])
+        edges = incoming_edges.get(node.id, [])
         if not edges or not any(edge.when for edge in edges) or not any(not edge.when for edge in edges):
             continue
         for requirement in node.requires:
@@ -64,8 +64,8 @@ def append_join_policy_health(graph, compiled, state, *, owner: str = "pipeline"
                 _data_finding(
                     "GRAPH.JOIN.AMBIGUOUS_UNCONDITIONAL",
                     requirement.type,
-                    f"node '{node.name}' mixes conditional and unconditional incoming providers for type '{requirement.type}', which can trigger safe OR join before the selected branch is ready",
-                    node=node.name,
+                    f"node '{node.id}' mixes conditional and unconditional incoming providers for type '{requirement.type}', which can trigger safe OR join before the selected branch is ready",
+                    node=node.id,
                     severity="error",
                     details={
                         "join_policy": node.join_policy,
@@ -86,7 +86,7 @@ def _append_all_join_edge_class_findings(node, schedule_incoming, transfer_incom
     transfer_details = [_edge_summary(edge) for edge in transfer_incoming]
     provider_details = [
         {
-            "node": source.name,
+            "node": source.id,
             "provides": [{"key": item.key, "type": item.type} for item in source.provides],
         }
         for source in (nodes_by_name.get(edge.source) for edge in transfer_incoming)
@@ -94,7 +94,7 @@ def _append_all_join_edge_class_findings(node, schedule_incoming, transfer_incom
     ]
     base_details = {
         "owner": owner,
-        "node": node.name,
+        "node": node.id,
         "join_policy": node.join_policy,
         "required_types": sorted({requirement.type for requirement in node.requires}),
         "schedule_incoming": schedule_details,
@@ -107,12 +107,12 @@ def _append_all_join_edge_class_findings(node, schedule_incoming, transfer_incom
         state.errors.append(
             _data_finding(
                 "GRAPH.JOIN.ALL_DEPENDS_ON_TRANSFER_ONLY",
-                node.name,
+                node.id,
                 (
-                    f"node '{node.name}' declares join_policy='all', but only {predecessor_count} "
+                    f"node '{node.id}' declares join_policy='all', but only {predecessor_count} "
                     "incoming edge participates in scheduling; transfer-only edges never activate the join"
                 ),
-                node=node.name,
+                node=node.id,
                 severity="error",
                 details={
                     **base_details,
@@ -128,9 +128,9 @@ def _append_all_join_edge_class_findings(node, schedule_incoming, transfer_incom
         state.warnings.append(
             _data_finding(
                 "GRAPH.JOIN.REDUNDANT_ALL",
-                node.name,
-                f"node '{node.name}' has join_policy='all' but only one scheduling predecessor",
-                node=node.name,
+                node.id,
+                f"node '{node.id}' has join_policy='all' but only one scheduling predecessor",
+                node=node.id,
                 details={
                     **base_details,
                     "suggestion": "Remove join_policy='all'; the default safe_any join is sufficient for one schedule incoming edge.",

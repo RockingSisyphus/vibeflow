@@ -6,15 +6,15 @@ import json
 from collections.abc import Mapping, Sequence
 
 from .models import (
-    ProjectQualityFacts,
+    SourceQualityFacts,
     QualityFinding,
     QualityPolicy,
     SourceQualityReport,
 )
 
 
-def evaluate_project_quality(
-    facts: ProjectQualityFacts,
+def evaluate_source_quality(
+    facts: SourceQualityFacts,
     policy: QualityPolicy | None = None,
     *,
     rulesets=None,
@@ -33,17 +33,17 @@ def evaluate_project_quality(
     """
     from dataclasses import replace
     from vibeflow.core.rules import RuleCall, RuleContext, RuleDescriptor, RulesetDescriptor, compile_ruleset, execute_rule_plan
-    from vibeflow.targets.shared.quality_support.rule_report import project_quality_report
+    from vibeflow.targets.shared.quality_support.rule_report import source_quality_report
 
     active = policy or QualityPolicy()
-    normalized = ProjectQualityFacts(facts.root, tuple(sorted(facts.files, key=lambda item: item.path)), facts.findings)
+    normalized = SourceQualityFacts(facts.root, tuple(sorted(facts.files, key=lambda item: item.path)), facts.findings)
     resources = _resources_by_id(rules)
     sets = _resources_by_id(ruleset_catalog)
     selected = () if rulesets is None else (rulesets,) if isinstance(rulesets, (str, RuleDescriptor, RulesetDescriptor)) else tuple(rulesets)
     implementations = dict(handlers or {})
     base_context = context or RuleContext(subject={"kind": "source", "id": facts.root},
         scope={"root": facts.root, "files": tuple(item.path for item in normalized.files)}, phase=entrypoint)
-    active_context = replace(base_context, facts={**base_context.facts, "project_facts": normalized}, phase=entrypoint)
+    active_context = replace(base_context, facts={**base_context.facts, "source_quality": normalized}, phase=entrypoint)
     executions, selected_ids = [], []
     for item in selected:
         if isinstance(item, RuleDescriptor):
@@ -54,7 +54,7 @@ def evaluate_project_quality(
         plan = compile_ruleset(item, rules=resources, rulesets=sets, entrypoint=entrypoint)
         selected_ids.append(plan.ruleset_id)
         executions.append(execute_rule_plan(plan, active_context, handlers=implementations))
-    return project_quality_report(normalized, active, tuple(executions), tuple(selected_ids))
+    return source_quality_report(normalized, active, tuple(executions), tuple(selected_ids))
 
 
 def _resources_by_id(resources):
@@ -91,4 +91,4 @@ def _dedupe_findings(
     return list(unique.values())
 
 
-__all__ = ["evaluate_project_quality"]
+__all__ = ["evaluate_source_quality"]

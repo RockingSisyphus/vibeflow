@@ -13,6 +13,9 @@ def closure_import_policy(policy: Mapping[str, Any], catalogs: Any, sources: lis
     """Classify reached sources from declarations without inspecting unused code."""
     reached = {str(Path(item["path"]).resolve()) for item in sources}
     owners = [dict(item) for item in policy.get("owners", ())]
+    def owner_key(item):
+        return tuple(item.get(name, "") for name in ("path", "kind", "id", "role", "export"))
+    known = {owner_key(item) for item in owners}
     node_base_libs = dict(policy.get("node_base_libs", {}))
     base_dependencies = dict(policy.get("base_lib_dependencies", {}))
     for kind, descriptor in source_resources(catalogs):
@@ -29,8 +32,12 @@ def closure_import_policy(policy: Mapping[str, Any], catalogs: Any, sources: lis
                 owner = {"path":path, "kind":kind, "id":resource_id, "role":role,
                          "export":(locator.export or ("run" if kind == "node" else "")) if role == "entry" else "",
                          "completion":implementation.completion, "flowKind":getattr(descriptor,"flow_kind","")}
-                if owner not in owners:
+                if owner_key(owner) not in known:
+                    origin = catalogs.origins.get(({"node":"nodes","base_lib":"base_libs","plugin":"plugins"}.get(kind, kind), resource_id))
+                    if origin is not None:
+                        owner.update(pluginId=origin.owner.plugin_id, packagePath=origin.owner.path if origin.owner.kind=="plugin" else "")
                     owners.append(owner)
+                    known.add(owner_key(owner))
             if kind == "node":
                 node_base_libs[resource_id] = list(descriptor.base_libs)
             elif kind == "base_lib":
@@ -48,7 +55,7 @@ def identity_facts(facts):
             result[name] = graph_wire(result[name],plain)
     if result.get("definition") is not None:
         value = result["definition"]
-        result["definition"] = {**plain(replace(value,graph=replace(value.graph,nodesets={}))),
+        result["definition"] = {**plain(replace(value,graph=replace(value.graph,nodeset_types={}))),
             "graph":graph_wire(value.graph,plain)}
     if "graphs" in result:
         result["graphs"] = tuple(identity_facts(value) for value in result["graphs"])

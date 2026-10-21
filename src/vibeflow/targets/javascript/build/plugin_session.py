@@ -75,6 +75,10 @@ class JavascriptPluginSession:
         return self._request({"command": "declarations", "module": str(module),
                               "packageRoot": str(package_root), "export": export})
 
+    def resource_declarations(self, *, module, package_root):
+        return self._request({"command": "declarations", "resourcesOnly": True,
+                              "module": str(module), "packageRoot": str(package_root)})
+
     def open(
         self,
         session_id: str,

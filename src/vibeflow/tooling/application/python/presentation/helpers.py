@@ -3,17 +3,17 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from vibeflow.core.compiler import CompiledGraph
-from vibeflow.core.flow import GraphConfig, NodeSpec, STATUS_PLANNED
+from vibeflow.core.flow import GraphConfig, NodeCallSpec, STATUS_PLANNED
 from vibeflow.tooling.presentation.node_presentation import registry_descriptor
 
 if TYPE_CHECKING:
     from vibeflow.targets.python.project.registry import NodeRegistry
 
 
-def node_is_external(node: NodeSpec, registry) -> bool:
+def node_is_external(node: NodeCallSpec, registry) -> bool:
     if registry is None or node.status == STATUS_PLANNED:
         return False
-    return bool(getattr(registry_descriptor(registry, node.type_used), "external", False))
+    return bool(getattr(registry_descriptor(registry, node.definition_id), "external", False))
 
 
 def compile_for_render(graph: GraphConfig, compiled: CompiledGraph | None, registry: NodeRegistry | None, *, prepared=None) -> CompiledGraph:

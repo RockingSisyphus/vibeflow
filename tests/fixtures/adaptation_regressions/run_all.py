@@ -40,6 +40,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     args.work = args.work.resolve()
     args.kernel = args.kernel.resolve()
+    sys.path.insert(0, str(args.kernel))
     if args.work.exists():
         parser.error("--work must be a new directory")
     args.work.mkdir(parents=True)

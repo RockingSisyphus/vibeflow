@@ -753,13 +753,9 @@ def _copy_javascript_sdk(output: Path) -> None:
                  "workflow_client.mjs", "workflow_host.mjs", "workflow_node.mjs"):
         origin = source / "coordination" if name.startswith("workflow_") else source
         data = (origin / name).read_text(encoding="utf-8")
-        (target / name).write_text(data.replace("../nodetypes/", "./nodetypes/"), encoding="utf-8")
-    node_source = source.parent / "nodetypes"
-    node_target = target / "nodetypes"
-    node_target.mkdir()
-    for name in ("declarations.mjs", "contracts.d.ts"):
-        data = (node_source / name).read_text(encoding="utf-8")
-        (node_target / name).write_text(data.replace("../resources/sdk", "../sdk"), encoding="utf-8")
+        (target / name).write_text(data, encoding="utf-8")
+    for name in ("node_declarations.mjs", "node_contracts.d.ts"):
+        shutil.copy2(source / name, target / name)
 
 
 def _copy_coordination_templates(output: Path) -> None:
@@ -947,7 +943,6 @@ def _ensure_standard_project_dirs(output: Path) -> None:
 
 def _write_workspace_config(output: Path) -> None:
     payload = {
-        "policy": {},
         "roots": [
             {"id": "python-project", "path": "python_project"},
             {"id": "javascript-project", "path": "javascript_project"},
@@ -957,6 +952,11 @@ def _write_workspace_config(output: Path) -> None:
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    (output / "project_rules.jsonc").write_text(json.dumps({"rule_params": {
+        "vibeflow.project.layout": {"directories": [
+            {"path": "kernel", "purpose": "Bundled VibeFlow runtime and user documentation"},
+            {"path": "tools", "purpose": "Offline workflow viewer"},
+        ]}}}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def _write_javascript_architecture(output: Path) -> None:

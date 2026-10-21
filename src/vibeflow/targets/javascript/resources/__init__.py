@@ -14,7 +14,7 @@ RESOURCE_NAMES = frozenset(
         "capability_helpers.mjs", "plugin_helpers.mjs", "root_helpers.mjs",
         "coordination/workflow_client.mjs", "coordination/workflow_host.mjs", "coordination/workflow_node.mjs",
         "runtime_helpers.mjs", "execution_helpers.mjs", "status_helpers.mjs", "node_observation.mjs",
-        "sdk.mjs", "sdk.d.ts", "sdk_loader.mjs",
+        "sdk.mjs", "sdk.d.ts", "sdk_loader.mjs", "node_declarations.mjs", "node_contracts.d.ts",
         "plugin_worker.mjs",
         "plugin_abi.d.ts",
         "rule_abi.d.ts",
@@ -47,11 +47,6 @@ def materialized_resources():
             destination = path / name
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(directory.joinpath(name).read_bytes())
-        node_directory = files("vibeflow.targets.javascript.nodetypes")
-        node_path = Path(temporary) / "nodetypes"
-        node_path.mkdir()
-        for name in ("declarations.mjs", "contracts.d.ts"):
-            (node_path / name).write_bytes(node_directory.joinpath(name).read_bytes())
         yield path
 
 

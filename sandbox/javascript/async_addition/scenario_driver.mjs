@@ -34,29 +34,46 @@ export async function finite(workflow) {
 }
 
 export async function stream(workflow, state) {
-  assert(state.calls.length === 0, "host started on import");
-  const host = workflow.createWorkflowHost();
-  assert(JSON.stringify(state.calls)==='["create"]', "wrong creation lifecycle");
-  await host.start();
-  const invocation = host.runWorkflowAsync({});
-  assert(invocation instanceof Promise, "host invocation is not a Promise");
+  assert(state.calls.length === 0, "API started on import");
+  let opened = false;
+  const controller = new AbortController();
+  const capabilities = {
+    "addition.session": {
+      open() { assert(!opened,"already open"); opened=true; state.calls.push("open"); return null; },
+      close() { if(opened){opened=false;state.calls.push("close");} return null; },
+    },
+    "vibeflow.port": {
+      receive(request,{signal}) {
+        assert(opened,"port was not opened by its Node");state.received.push(request);
+        if(state.inputs.length)return Promise.resolve({value:state.inputs.shift()});
+        state.resolveWaiting();
+        return new Promise((_resolve,reject)=>{
+          if(signal.aborted){reject(signal.reason);return;}
+          signal.addEventListener("abort",()=>reject(signal.reason),{once:true});
+        });
+      },
+      send(request){assert(opened,"port closed");state.sent.push(request);return null;},
+    },
+  };
   let failureCode;
-  const observed = invocation.then(()=>{failureCode="completed";},error=>{failureCode=error.code;});
+  const invocation=workflow.runWorkflowAsync({}, {entry:"stream",capabilities,signal:controller.signal});
+  const observed=invocation.then(()=>{failureCode="completed";},error=>{failureCode=error.code;});
   let deadline;
   try {
-    await Promise.race([state.waitingReady, new Promise((_,reject)=>{
+    await Promise.race([state.waitingReady,new Promise((_,reject)=>{
       deadline=setTimeout(()=>reject(new Error("Port did not reach pending receive")),2000);
     })]);
+    assert(JSON.stringify(state.sent)==='[{"port":"addition.out","value":5},{"port":"addition.out","value":30}]',JSON.stringify(state.sent));
+    assert(state.received.length===3,"wrong receive count");
   } finally {
     clearTimeout(deadline);
+    controller.abort();await observed;
+    // The application explicitly chooses its cleanup entry; no runtime owns it.
+    await workflow.runWorkflowAsync({}, {entry:"cleanup",capabilities});
   }
-  assert(JSON.stringify(state.sent)==='[{"port":"addition.out","value":5},{"port":"addition.out","value":30}]', JSON.stringify(state.sent));
-  assert(JSON.stringify(state.received)==='[{"port":"addition.in"},{"port":"addition.in"},{"port":"addition.in"}]', JSON.stringify(state.received));
-  await host.stop();
-  await observed;
-  await host.stop();
-  assert(failureCode==="VF_ABORTED" && host.started===false, String(failureCode));
-  assert(JSON.stringify(state.calls)==='["create","start","stop"]', JSON.stringify(state.calls));
-  return {sent:state.sent, received:state.received, lifecycle:state.calls, failureCode,
-    checks:{importWithoutStart:"PASS", lifecycle:"PASS", portTraffic:"PASS", pendingAbort:"PASS", idempotentStop:"PASS"}};
+  await workflow.runWorkflowAsync({}, {entry:"cleanup",capabilities});
+  assert(failureCode==="VF_ABORTED" && !opened,String(failureCode));
+  assert(JSON.stringify(state.calls)==='["open","close"]',JSON.stringify(state.calls));
+  return {sent:state.sent,received:state.received,lifecycle:state.calls,failureCode,
+    checks:{importWithoutStart:"PASS",explicitLifecycleEntries:"PASS",portTraffic:"PASS",pendingAbort:"PASS",idempotentClose:"PASS"}};
 }

@@ -5,18 +5,21 @@ _EXCLUDED = {'.git', '.venv', 'node_modules', 'runs', 'build', 'dist', '__pycach
 
 
 def python_bundle_files(workspace, registry, config, *, out_dir, include):
-    roots = tuple(root.path.resolve() for root in workspace.roots if root.project_target == 'python')
+    owner = workspace.root_for_path(config)
+    roots = (owner.path.resolve(), workspace.root.resolve())
+    shared = tuple(workspace.root / name for name in ('nodes', 'base_lib', 'plugins'))
 
     def eligible(path):
         owner = next((root for root in roots if path.is_relative_to(root)), None)
-        return owner is not None and not path.is_relative_to(out_dir) and not any(
+        visible = path.is_relative_to(roots[0]) or any(path.is_relative_to(group) for group in shared)
+        return owner is not None and visible and not path.is_relative_to(out_dir) and not any(
             part in _EXCLUDED for part in path.relative_to(owner).parts) and path.suffix != '.pyc'
 
     files = {Path(config).resolve()}
-    for root in roots:
+    for root in (roots[0], *shared):
         files.update(path for path in root.rglob('*.py') if path.is_file() and eligible(path))
     # Explicit declaration support files may include data as well as code.
-    loaded = registry.loaded_plugins
+    loaded = registry.prepared_resources
     from vibeflow.tooling.application.python.project.declarations import _implementation_path
     for group in ('nodes', 'base_libs', 'plugins'):
         for descriptor in getattr(loaded.catalogs, group).available():
@@ -41,11 +44,10 @@ def python_bundle_files(workspace, registry, config, *, out_dir, include):
             package = package.parent
     for package in packages:
         files.update(path for path in package.rglob('*') if path.is_file() and eligible(path))
-    owner = workspace.root_for_path(config)
     for entry in include:
         path = (owner.path / entry).resolve()
-        if not any(path.is_relative_to(root) for root in roots):
-            raise ValueError(f'--include must belong to a declared Python root: {entry}')
+        if not (path.is_relative_to(owner.path) or any(path.is_relative_to(group) for group in shared)):
+            raise ValueError(f'--include must belong to this root or project shared resources: {entry}')
         if not path.exists():
             raise ValueError(f'--include does not exist: {entry}')
         files.update(item for item in path.rglob('*') if item.is_file() and eligible(item)) if path.is_dir() else files.add(path)

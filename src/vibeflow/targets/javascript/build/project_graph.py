@@ -15,9 +15,9 @@ from vibeflow.core.descriptors import (
 )
 from vibeflow.core.flow import (
     GraphConfig,
-    LOOP_NODE_TYPES,
+    LOOP_DEFINITION_IDS,
     STATUS_PLANNED,
-    NodeSpec,
+    NodeCallSpec,
 )
 from vibeflow.core.planned import effective_planned_behavior
 from vibeflow.core.config.node import (
@@ -43,7 +43,7 @@ class PreparationState:
     compile_graph: Callable[[GraphConfig, set[str], str], CompiledGraph]
     compiled_by_path: dict[tuple[str, ...], CompiledGraph]
     params_by_path: dict[tuple[str, ...], Mapping[str, object]]
-    source_by_type: dict[str, SourceRef]
+    source_by_definition: dict[str, SourceRef]
     implementations: dict[str, object]
     used_nodes: dict[str, NodeDescriptor]
     used_types: set[str]
@@ -66,7 +66,7 @@ def prepare_graph(
         call_path = (*path, *subject.call_path)
         current = subject.graph
         if subject.call_path:
-            current_compiled = state.compile_graph(current, set(current.nodesets), subject.owner)
+            current_compiled = state.compile_graph(current, set(current.nodeset_types), subject.owner)
             state.compiled_by_path[call_path] = apply_call_effect_scopes(
                 current_compiled, current, state.call_effect_scopes or {}, call_path)
         _prepare_calls(current, state=state, path=call_path,
@@ -86,11 +86,11 @@ def _prepare_calls(graph, *, state, path, overrides, global_scope):
                 "planned nodes cannot target JavaScript",
                 call_path,
             )
-        is_loop = spec.type_used in LOOP_NODE_TYPES
-        is_nodeset = spec.type_used in graph.nodesets and not is_loop
+        is_loop = spec.definition_id in LOOP_DEFINITION_IDS
+        is_nodeset = spec.definition_id in graph.nodeset_types and not is_loop
         if is_loop or is_nodeset:
-            nodeset_key = spec.loop.body if is_loop else spec.type_used
-            nodeset = graph.nodesets.get(nodeset_key)
+            nodeset_key = spec.loop.body if is_loop else spec.definition_id
+            nodeset = graph.nodeset_types.get(nodeset_key)
             if nodeset is None:
                 raise ProjectBuildError(
                     "VF_AOT_NODESET",
@@ -110,24 +110,24 @@ def _prepare_calls(graph, *, state, path, overrides, global_scope):
             state.params_by_path[call_path] = scheduling_config({**spec.params, **overrides.get(spec.id, {})})
             continue
 
-        descriptor = state.catalog.get(spec.type_used)
+        descriptor = state.catalog.get(spec.definition_id)
         if descriptor is None:
             raise ProjectBuildError(
                 "VF_AOT_NODE_UNKNOWN",
-                f"node type '{spec.type_used}' has no descriptor",
+                f"node type '{spec.definition_id}' has no descriptor",
                 call_path,
             )
         implementation = select_implementation(
             descriptor.implementations,
             target=state.target,
-            subject=f"node '{descriptor.type_key}'",
+            subject=f"node '{descriptor.id}'",
             path=call_path,
         )
         source_ref, implementation_mapping = implementation_source(
             implementation,
             project_root=state.project_root,
             source_roots=state.catalog.source_roots,
-            subject=f"node '{descriptor.type_key}'",
+            subject=f"node '{descriptor.id}'",
             path=call_path,
         )
         implementation_mapping = {
@@ -135,16 +135,16 @@ def _prepare_calls(graph, *, state, path, overrides, global_scope):
             "params_schema": dict(descriptor.contract.params_schema),
             "params_defaults": dict(descriptor.contract.params_defaults),
         }
-        previous = state.implementations.get(descriptor.type_key)
+        previous = state.implementations.get(descriptor.id)
         if previous is not None and previous != implementation_mapping:
             raise ProjectBuildError(
                 "VF_AOT_IMPLEMENTATION_CONFLICT",
-                f"node '{descriptor.type_key}' resolved inconsistently",
+                f"node '{descriptor.id}' resolved inconsistently",
                 call_path,
             )
-        state.source_by_type[descriptor.type_key] = source_ref
-        state.implementations[descriptor.type_key] = implementation_mapping
-        state.used_nodes[descriptor.type_key] = descriptor
+        state.source_by_definition[descriptor.id] = source_ref
+        state.implementations[descriptor.id] = implementation_mapping
+        state.used_nodes[descriptor.id] = descriptor
         state.used_types.update(
             item.type for item in descriptor.contract.requires
         )
@@ -161,7 +161,7 @@ def _prepare_calls(graph, *, state, path, overrides, global_scope):
 
 
 def _effective_params(
-    spec: NodeSpec,
+    spec: NodeCallSpec,
     descriptor: NodeDescriptor,
     *,
     overrides: Mapping[str, Mapping[str, object]],
@@ -186,7 +186,7 @@ def _effective_params(
     except NodeConfigError as exc:
         raise ProjectBuildError(
             "VF_AOT_PARAMS",
-            f"invalid effective params for '{spec.type_used}': {exc}",
+            f"invalid effective params for '{spec.definition_id}': {exc}",
             path,
         ) from exc
 

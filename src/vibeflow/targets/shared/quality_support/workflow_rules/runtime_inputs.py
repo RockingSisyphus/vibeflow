@@ -37,12 +37,12 @@ def append_runtime_requirement_findings(
         if node.status == STATUS_PLANNED:
             continue
         accepts_initial = _runtime_accepts_initial_input(
-            node.name,
+            node.id,
             nodes_by_name,
             schedule_incoming,
             flow_kinds,
         )
-        incoming = transfer_incoming.get(node.name, ())
+        incoming = transfer_incoming.get(node.id, ())
         source_details = _provider_source_details(
             [nodes_by_name[edge.source] for edge in incoming if edge.source in nodes_by_name]
         )
@@ -62,10 +62,10 @@ def append_runtime_requirement_findings(
                     "GRAPH.DATA.RUNTIME_REQUIREMENT_UNREACHABLE",
                     requirement.type,
                     (
-                        f"node '{node.name}' requires type '{requirement.type}' exactly once, "
+                        f"node '{node.id}' requires type '{requirement.type}' exactly once, "
                         "but no runtime initial input or incoming transfer edge can deliver it"
                     ),
-                    node=node.name,
+                    node=node.id,
                     severity="error",
                     details={
                         "owner": owner,
@@ -73,13 +73,13 @@ def append_runtime_requirement_findings(
                         "required_cardinality": requirement.cardinality,
                         "accepts_initial_input": accepts_initial,
                         "entry_input_types": sorted(input_types),
-                        "schedule_incoming": [_edge_details(edge) for edge in schedule_incoming.get(node.name, ())],
+                        "schedule_incoming": [_edge_details(edge) for edge in schedule_incoming.get(node.id, ())],
                         "transfer_incoming": [_edge_details(edge) for edge in incoming],
                         "incoming_provider_sources": source_details,
                         "candidate_providers": candidate_providers.get(requirement.type, []),
                         "suggestion": (
                             "Add a mainline or valid data-bypass edge from a node that actually provides "
-                            f"type '{requirement.type}', or make '{node.name}' a true initial-input node."
+                            f"type '{requirement.type}', or make '{node.id}' a true initial-input node."
                         ),
                     },
                 )
@@ -164,7 +164,7 @@ def _candidate_providers_by_type(nodes_by_name) -> dict[str, list[dict[str, str]
     candidates: dict[str, list[dict[str, str]]] = {}
     for node in nodes_by_name.values():
         for provider in node.provides:
-            candidates.setdefault(provider.type, []).append({"node": node.name, "key": provider.key})
+            candidates.setdefault(provider.type, []).append({"node": node.id, "key": provider.key})
     return {key: sorted(values, key=lambda item: (item["node"], item["key"])) for key, values in candidates.items()}
 
 
@@ -188,7 +188,7 @@ def _edge_details(edge) -> dict[str, object]:
 
 
 def initial_input_nodes(graph, compiled, runtime_flow_kinds=None) -> set[str]:
-    nodes = {node.name: node for node in graph.nodes}
+    nodes = {node.id: node for node in graph.nodes}
     incoming = _edges_by_target(compiled.resolved_schedule_edges, nodes)
     kinds = _runtime_flow_kinds(compiled.flow_kinds, runtime_flow_kinds)
     return {name for name in nodes if _runtime_accepts_initial_input(name, nodes, incoming, kinds)}

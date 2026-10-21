@@ -9,7 +9,7 @@ from pathlib import Path
 
 from vibeflow.core.findings import Finding, HealthFinding
 from vibeflow.targets.shared.quality_support import (
-    ProjectQualityFacts,
+    SourceQualityFacts,
     QualityPolicy,
     QualityThresholds,
     WorkflowQualityRequest,
@@ -54,7 +54,7 @@ def test_core_quality_evaluates_only_target_extracted_facts() -> None:
         )
     )
     report = evaluate_standard_project_quality(
-        ProjectQualityFacts(root="/virtual", files=(source.file,)),
+        SourceQualityFacts(root="/virtual", files=(source.file,)),
         QualityPolicy(
             thresholds=QualityThresholds(
                 max_function_params=1,
@@ -152,12 +152,12 @@ def test_source_scan_contributes_once_and_reuses_syntax_for_selected_effects(tmp
     assert len(effects) == 4
     assert {item.object_id for item in effects} == {path.name for path in paths}
     assert {item.definition_id for item in effects} == {"vibeflow.no_side_effects"}
-    assert report.checked_rulesets == ("vibeflow.quality.project", "rule:vibeflow.no_side_effects")
+    assert report.checked_rulesets == ("vibeflow.quality.source", "rule:vibeflow.no_side_effects")
     assert len(report.rule_executions) == 2
     ordinary = scan_code_quality(tmp_path)
     assert contributions == ["vibeflow.core", "vibeflow.core"]
     assert not any(item.code.startswith("QUALITY.SIDE_EFFECT.") for item in ordinary.findings)
-    assert ordinary.checked_rulesets == ("vibeflow.quality.project",)
+    assert ordinary.checked_rulesets == ("vibeflow.quality.source",)
 
 
 def test_selected_source_effects_keep_syntax_diagnostics_and_valid_file_scope(tmp_path):

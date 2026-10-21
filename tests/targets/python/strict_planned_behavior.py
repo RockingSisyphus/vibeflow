@@ -2,13 +2,17 @@ from tests.fixtures.support.strict_support import *
 
 
 def _stub_project(tmp_path: Path, source: str) -> tuple[Path, Path]:
-    config_dir = tmp_path / "project" / "configs"
+    config_dir = tmp_path
     stub_dir = tmp_path / "project" / "stubs"
-    config_dir.mkdir(parents=True)
+    config_dir.mkdir(parents=True, exist_ok=True)
     stub_dir.mkdir(parents=True)
     stub_path = stub_dir / "runtime_control_stub.py"
     stub_path.write_text(source.strip() + "\n", encoding="utf-8")
-    return config_dir / "workflow.json", stub_path
+    from tests.fixtures.support.plugins import publish_native_fixture
+    config = config_dir / "workflow.json"
+    config.write_text(json.dumps(_planned_stub_config()))
+    publish_native_fixture(config, _registry())
+    return config, stub_path
 
 
 def _planned_stub_config(*, behavior=None, node_status: str = "planned") -> dict:
@@ -129,10 +133,11 @@ def run_stub(inputs, params):
     assert any(warning.rule_id == "GRAPH.PLANNED.PYTHON_STUB_DEV_ONLY" for warning in report.warnings)
     assert not report.errors
 
-    config_path.write_text(json.dumps(_planned_stub_config()), encoding="utf-8")
+    _write_config_file(config_path, _planned_stub_config())
+    from tests.fixtures.support.plugins import publish_native_fixture
+    publish_native_fixture(config_path, _registry())
     result = run_checked(
         config_path,
-        registry=_registry(),
         initial={"value.in": 5},
         run_root=tmp_path / "runs",
         run_id="planned_stub",
@@ -211,18 +216,20 @@ def run_stub(inputs, params):
     return {"value.out": inputs["value.in"]["value"]}
 """,
     )
-    config_path.write_text(json.dumps(_planned_stub_config()), encoding="utf-8")
+    _write_config_file(config_path, _planned_stub_config())
+    from tests.fixtures.support.plugins import publish_native_fixture
+    publish_native_fixture(config_path, _registry())
 
     with pytest.raises(CheckedRunError) as exc_info:
-        run_checked(config_path, registry=_registry(), initial={"value.in": 5}, run_root=tmp_path / "runs", run_id="default_refuse")
+        run_checked(config_path, initial={"value.in": 5}, run_root=tmp_path / "runs", run_id="default_refuse")
     assert any(error.rule_id == "GRAPH.PLANNED.NODE_IN_RUN" for error in exc_info.value.result.health.errors)
 
     transparent = _planned_stub_config(behavior="transparent")
-    config_path.write_text(json.dumps(transparent), encoding="utf-8")
+    _write_config_file(config_path, transparent)
+    publish_native_fixture(config_path, _registry())
     with pytest.raises(CheckedRunError) as transparent_exc:
         run_checked(
             config_path,
-            registry=_registry(),
             initial={"value.in": 5},
             run_root=tmp_path / "runs",
             run_id="transparent_refuse",
@@ -239,12 +246,13 @@ def run_stub(inputs, params):
     return {"value.out": inputs["value.in"]["value"], "extra.out": 1}
 """,
     )
-    config_path.write_text(json.dumps(_planned_stub_config()), encoding="utf-8")
+    _write_config_file(config_path, _planned_stub_config())
+    from tests.fixtures.support.plugins import publish_native_fixture
+    publish_native_fixture(config_path, _registry())
 
     with pytest.raises(PipelineRuntimeError, match="output keys must exactly match"):
         run_checked(
             config_path,
-            registry=_registry(),
             initial={"value.in": 5},
             run_root=tmp_path / "runs",
             run_id="bad_stub_return",
@@ -339,7 +347,7 @@ def run_stub(inputs, params):
 """,
     )
     config = {
-        "nodesets": [
+        "nodeset_types": [
             {
                 "type_key": "future.math",
                 "display_name": "Future Math",
@@ -371,10 +379,11 @@ def run_stub(inputs, params):
         },
     }
     _write_config_file(config_path, config)
+    from tests.fixtures.support.plugins import publish_native_fixture
+    publish_native_fixture(config_path, _registry())
 
     result = run_checked(
         config_path,
-        registry=_registry(),
         initial={"value.in": 2},
         run_root=tmp_path / "runs",
         run_id="planned_nodeset_stub",

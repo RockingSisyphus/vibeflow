@@ -11,38 +11,38 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts the conditional branch workflow."
       },
       {
         "id": "route",
-        "type_used": "sandbox.route",
+        "definition_id": "sandbox.route",
         "display_name": "Route by sign",
         "description": "Selects the non-negative or negative branch."
       },
       {
         "id": "positive",
-        "type_used": "sandbox.positive",
+        "definition_id": "sandbox.positive",
         "display_name": "Format non-negative",
         "description": "Formats the value only on the non-negative branch."
       },
       {
         "id": "negative",
-        "type_used": "sandbox.negative",
+        "definition_id": "sandbox.negative",
         "display_name": "Format negative",
         "description": "Formats the value only on the negative branch."
       },
       {
         "id": "join",
-        "type_used": "sandbox.branch_join",
+        "definition_id": "sandbox.branch_join",
         "display_name": "Join selected branch",
         "description": "Consumes exactly the one active branch message.",
         "join_policy": "any_active"
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends after the selected branch is joined."
       }
@@ -88,7 +88,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

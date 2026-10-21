@@ -11,19 +11,19 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts the isolated browser builtin fixture."
       },
       {
         "id": "invalid",
-        "type_used": "sandbox.invalid.node_builtin_browser",
+        "definition_id": "sandbox.invalid.node_builtin_browser",
         "display_name": "Browser Node builtin import",
         "description": "Must fail because node:fs is not portable to the browser target."
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends the isolated browser builtin fixture."
       }
@@ -51,7 +51,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

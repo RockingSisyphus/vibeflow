@@ -3,14 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Generic, Iterable, Iterator, TypeVar
 
-from vibeflow.core.descriptors.models import (
-    BaseLibDescriptor,
-    CapabilityDescriptor,
-    DataSchemaDescriptor,
-    HostExtensionDescriptor,
-    NodeDescriptor,
-    PluginDescriptor,
-)
+from vibeflow.core.descriptors.models import BaseLibDescriptor, CapabilityDescriptor, DataSchemaDescriptor, NodeDescriptor, PluginDescriptor
 
 
 DescriptorT = TypeVar(
@@ -19,7 +12,7 @@ DescriptorT = TypeVar(
     BaseLibDescriptor,
     DataSchemaDescriptor,
     CapabilityDescriptor,
-    HostExtensionDescriptor,
+
     PluginDescriptor,
 )
 
@@ -152,6 +145,12 @@ class NodeCatalog(_DescriptorCatalog[NodeDescriptor]):
     descriptor_type = NodeDescriptor
 
 
+class NodeTypeCatalog(_DescriptorCatalog):
+    from vibeflow.core.descriptors.node_types import NodeTypeDescriptor
+    descriptor_label = "node_type"
+    descriptor_type = NodeTypeDescriptor
+
+
 class BaseLibCatalog(_DescriptorCatalog[BaseLibDescriptor]):
     descriptor_label = "base_lib"
     descriptor_type = BaseLibDescriptor
@@ -167,9 +166,7 @@ class CapabilityCatalog(_DescriptorCatalog[CapabilityDescriptor]):
     descriptor_type = CapabilityDescriptor
 
 
-class HostExtensionCatalog(_DescriptorCatalog[HostExtensionDescriptor]):
-    descriptor_label = "host_extension"
-    descriptor_type = HostExtensionDescriptor
+
 
 
 class PluginCatalog(_DescriptorCatalog[PluginDescriptor]):
@@ -201,8 +198,9 @@ class DescriptorCatalogs:
     base_libs: BaseLibCatalog
     schemas: SchemaRegistry
     capabilities: CapabilityCatalog
-    host_extensions: HostExtensionCatalog
+
     plugins: PluginCatalog = field(default_factory=PluginCatalog)
+    node_types: NodeTypeCatalog = field(default_factory=NodeTypeCatalog)
     rules: RuleCatalog = field(default_factory=RuleCatalog)
     rulesets: RulesetCatalog = field(default_factory=RulesetCatalog)
     origins: object = field(default_factory=dict, repr=False, compare=False)
@@ -219,17 +217,18 @@ class DescriptorCatalogs:
             base_libs=BaseLibCatalog(),
             schemas=SchemaRegistry(),
             capabilities=CapabilityCatalog(),
-            host_extensions=HostExtensionCatalog(),
+
             plugins=PluginCatalog(),
         )
 
     def to_dict(self) -> dict[str, object]:
         return {
             "nodes": self.nodes.to_dict(),
+            "node_types": self.node_types.to_dict(),
             "base_lib": self.base_libs.to_dict(),
             "data_schemas": self.schemas.to_dict(),
             "capabilities": self.capabilities.to_dict(),
-            "host_extensions": self.host_extensions.to_dict(),
+
             "plugins": self.plugins.to_dict(),
             "rules": self.rules.to_dict(),
             "rulesets": self.rulesets.to_dict(),

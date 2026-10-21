@@ -18,13 +18,16 @@ def resource_paths(descriptor, root, roots):
 
 
 def source_ownership(registry):
-    if not hasattr(registry, "loaded_plugins"):
+    if not hasattr(registry, "prepared_resources"):
         return {}
-    catalogs = registry.loaded_plugins.catalogs
+    catalogs = registry.prepared_resources.catalogs
     owners = []
     roots = getattr(registry, "source_roots", ())
     for kind, descriptor in ownership_resources(catalogs):
         group = {"node":"nodes", "base_lib":"base_libs", "plugin":"plugins", "rule":"rules"}.get(kind)
+        origin = catalogs.origins.get((group, descriptor.id))
+        package_id = origin.owner.plugin_id if origin else descriptor.id if kind == "plugin_declaration" else ""
+        package = next((record.get("package_path", "") for record in catalogs.plugin_records if record.get("id") == package_id), "")
         root = getattr(registry, "resource_roots", {}).get((group, descriptor.id))
         if root is None:
             record = next((item for item in catalogs.plugin_records if item.get("id") == descriptor.id), {})
@@ -34,27 +37,41 @@ def source_ownership(registry):
         base = getattr(root, "path", root)
         for role, path, symbol in resource_paths(descriptor, base, roots):
             owners.append({"path":str(path), "id":descriptor.id, "kind":kind, "role":role, "symbol":symbol,
+                           "plugin_id":package_id, "package_path":package,
                            "base_libs":list(getattr(descriptor,"base_libs",())),
                            "dependencies":list(getattr(descriptor,"dependencies",()))})
             if kind == "rule":
                 origin = catalogs.origins.get(("rules",descriptor.id))
                 if origin is not None:
-                    record = next((item for item in catalogs.plugin_records if item.get("id") == origin.plugin_id), {})
+                    record = next((item for item in catalogs.plugin_records if item.get("id") == origin.owner.plugin_id), {})
                     libraries = record.get("declaration", {}).get("base_libs", ())
-                    owners.append({"path":str(path),"id":origin.plugin_id,"kind":"plugin_declaration",
-                        "role":"declaration","symbol":symbol,"base_libs":list(libraries),"dependencies":[]})
+                    owners.append({"path":str(path),"id":origin.owner.plugin_id,"kind":"plugin_declaration",
+                        "role":"declaration","symbol":symbol,"base_libs":list(libraries),"dependencies":[],
+                        "plugin_id":package_id,"package_path":package})
+    # Unused business definitions still own their implementation symbols. Their
+    # identities prevent direct calls without activating their types or rules.
+    existing = {(item["kind"],item["id"],item["role"],item["path"]) for item in owners}
+    for entry in registry.prepared_resources.resource_inventory:
+        descriptor = entry.descriptor
+        from vibeflow.core.descriptors.models import NodeDescriptor
+        if not isinstance(descriptor, NodeDescriptor):
+            continue
+        for role,path,symbol in resource_paths(descriptor, entry.origin.owner.path, roots):
+            if ("node",descriptor.id,role,str(path)) not in existing:
+                owners.append({"path":str(path),"id":descriptor.id,"kind":"node","role":role,"symbol":symbol,
+                    "plugin_id":"","package_path":"","base_libs":list(descriptor.base_libs),"dependencies":[]})
     return {"source_owners":tuple(owners)}
 
 
 def subject_files(context):
     sources = context.require("source_context")
-    resource_id = context.subject.get("type_key", context.subject.get("id", ""))
+    resource_id = context.subject.get("definition_id", context.subject.get("id", ""))
     kind = context.subject.get("kind", "node")
     entries = [item["path"] for item in context.facts.get("source_owners", ())
                if item["kind"] == kind and item["id"] == resource_id]
     if not entries:
         source = context.facts.get("resource_source_file") or context.facts.get("base_lib_file")
-        node = next((item for item in sources.nodes if item.type_key == resource_id), None)
+        node = next((item for item in sources.nodes if item.definition_id == resource_id), None)
         entries = [source.path] if source else [node.path] if node else []
     files = {file.path:file for path in entries for file in sources.import_closure(path)}
     return tuple(files.values()) if entries else sources.files

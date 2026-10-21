@@ -11,33 +11,33 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.start",
+        "definition_id": "sandbox.start",
         "display_name": "Start",
         "description": "Runs start."
       },
       {
         "id": "metrics",
-        "type_used": "sandbox.batch_metrics",
+        "definition_id": "sandbox.batch_metrics",
         "display_name": "metrics",
         "description": "Executes the declared ordinary workflow node."
       },
       {
         "value": 4,
         "id": "seed",
-        "type_used": "sandbox.constant",
+        "definition_id": "sandbox.constant",
         "display_name": "Seed",
         "description": "Runs seed."
       },
       {
         "delta": 6,
         "id": "add",
-        "type_used": "sandbox.add",
+        "definition_id": "sandbox.add",
         "display_name": "Add",
         "description": "Runs add."
       },
       {
         "id": "end",
-        "type_used": "sandbox.out_value_end",
+        "definition_id": "sandbox.out_value_end",
         "display_name": "End",
         "description": "Runs end.",
         "join_policy": "all"
@@ -77,7 +77,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

@@ -8,11 +8,11 @@ from vibeflow.core.constants import (
 )
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
 from vibeflow.core.flow import (
-    LOOP_NODE_TYPES,
+    LOOP_DEFINITION_IDS,
     EdgeSpec,
     GraphConfig,
-    NodeSpec,
-    NodesetSpec,
+    NodeCallSpec,
+    NodesetTypeSpec,
     STATUS_PLANNED,
 )
 
@@ -35,7 +35,7 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
         "rulesets": selection_data(graph.rulesets),
         "summary": {
             "nodes": len(nodes),
-            "nodesets": len(graph.nodesets),
+            "nodeset_types": len(graph.nodeset_types),
             "explicit_edges": len(graph.edges),
             "data_edges": len(compiled.data_edges) if compiled is not None else 0,
             "reported_edges": len(edges),
@@ -57,7 +57,7 @@ def build_architecture_report(graph: GraphConfig, *, compiled: CompiledGraph | N
         "nodes": [
             {
                 "id": node.id,
-                "type_used": node.type_used,
+                "definition_id": node.definition_id,
                 "flow_kind": _effective_flow_kind(node, compiled),
                 "effect_scope": _effective_effect_scope(node, compiled),
 
@@ -98,7 +98,7 @@ def _execution_lock_payload(lock: object, *, scope: str) -> dict[str, str]:
 
 def _effective_execution_lock(
     graph: GraphConfig,
-    node: NodeSpec,
+    node: NodeCallSpec,
 ) -> dict[str, object] | None:
     if node.execution_lock is not None:
         return {
@@ -116,10 +116,10 @@ def _effective_execution_lock(
     return None
 
 
-def _node_lock_scope(node: NodeSpec, graph: GraphConfig) -> str:
+def _node_lock_scope(node: NodeCallSpec, graph: GraphConfig) -> str:
     return (
         "block"
-        if _declared_nodeset_target(node, graph.nodesets)
+        if _declared_nodeset_target(node, graph.nodeset_types)
         else "node"
     )
 
@@ -151,7 +151,7 @@ def _declared_global_state_by_node(graph: GraphConfig) -> dict[str, bool]:
         node.id: _node_declares_global_state(
             node,
             graph=graph,
-            nodeset_registry=graph.nodesets,
+            nodeset_registry=graph.nodeset_types,
             active_nodesets=frozenset(),
         )
         for node in graph.nodes
@@ -159,10 +159,10 @@ def _declared_global_state_by_node(graph: GraphConfig) -> dict[str, bool]:
 
 
 def _node_declares_global_state(
-    node: NodeSpec,
+    node: NodeCallSpec,
     *,
     graph: GraphConfig,
-    nodeset_registry: dict[str, NodesetSpec],
+    nodeset_registry: dict[str, NodesetTypeSpec],
     active_nodesets: frozenset[str],
 ) -> bool:
     if node.status == STATUS_PLANNED:
@@ -170,7 +170,7 @@ def _node_declares_global_state(
     if node.flow_kind == FLOW_KIND_GLOBAL_STATE:
         return True
     local_registry = dict(nodeset_registry)
-    local_registry.update(graph.nodesets)
+    local_registry.update(graph.nodeset_types)
     target = _declared_nodeset_target(node, local_registry)
     if not target or target in active_nodesets:
         return False
@@ -189,12 +189,12 @@ def _node_declares_global_state(
 
 
 def _declared_nodeset_target(
-    node: NodeSpec,
-    nodeset_registry: dict[str, NodesetSpec],
+    node: NodeCallSpec,
+    nodeset_registry: dict[str, NodesetTypeSpec],
 ) -> str:
-    if node.type_used in nodeset_registry:
-        return node.type_used
-    if node.type_used in LOOP_NODE_TYPES:
+    if node.definition_id in nodeset_registry:
+        return node.definition_id
+    if node.definition_id in LOOP_DEFINITION_IDS:
         return node.loop.body
     return ""
 

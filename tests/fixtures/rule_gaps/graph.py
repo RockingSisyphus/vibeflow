@@ -120,7 +120,7 @@ def _invalid_graph(s, case, target, mode):
     metrics = {"handler_events": len(case.events()),
                "resource_path": next((item.get("source_location", {}).get("path") for item in positions if item.get("source_location", {}).get("path")), None)}
     return [s.row("invalid." + mode, target, "图编译错误在正式命令中保留诊断、资源位置且先于 handler", "invalid_graph",
-                  s.rejection(wanted, located=True, metrics={"handler_events": 0, "resource_path": str(case.project / ("code_plugin.py" if target == "python" else "code_plugin.ts"))}),
+                  s.rejection(wanted, located=True, metrics={"handler_events": 0, "resource_path": str(case.project / ("plugins/code_plugin/plugin.py" if target == "python" else "plugins/code_plugin/plugin.ts"))}),
                   s.observation(code, payload, metrics=metrics))]
 
 
@@ -145,7 +145,7 @@ def check(context, inputs, params):
              "single_call_visible":any(key in context.subject for key in ("owner","call_id","rule_call_id")) or "call" in context.facts}
     with Path(params["marker"]).open("a") as stream:
         stream.write(json.dumps(proof)+"\\n")
-    node = next(node for node in context.facts["source_context"].nodes if node.type_key == context.subject["type_key"])
+    node = next(node for node in context.facts["source_context"].nodes if node.definition_id == context.subject["definition_id"])
     finding = {"code":"GAPS.SOURCE.CACHE", "severity":"warning", "message":"Cached source proof remains associated with all real calls.",
                "source_location":{"path":node.path,"line":1,"column":1}, "details":{"proof":proof}}
     return {"records":{"proof":{"type_id":"example.proof.v1", "value":proof}}, "findings":[finding]}
@@ -187,7 +187,7 @@ def _cache(s, case, target, mode):
     case.write(case.node, node)
     # An audit subject may legitimately have no outputs. Both calls share one
     # real implementation and avoid a native duplicate global data-key failure.
-    node_file = case.project / ("rule_graph_nodes.py" if target == "python" else "nodes/calculation.ts")
+    node_file = case.project / ("nodes/rule_graph_nodes.py" if target == "python" else "nodes/calculation.ts")
     text = node_file.read_text()
     text = text.replace('return {"result": inputs["example.input"]["value"] * 2 + 1}', 'return {}') if target == "python" else text.replace('return {result: inputs["example.input"].value * 2 + 1}', 'return {}')
     node_file.write_text(text)
@@ -278,7 +278,7 @@ def _finding(s, case, target, kind):
 
 
 def _source_fixture(case, topic, oversized):
-    node_file = case.project / ("rule_graph_nodes.py" if case.target == "python" else "nodes/calculation.ts")
+    node_file = case.project / ("nodes/rule_graph_nodes.py" if case.target == "python" else "nodes/calculation.ts")
     if topic == "node":
         if oversized:
             text = node_file.read_text()
@@ -297,7 +297,7 @@ def _source_fixture(case, topic, oversized):
         descriptor["implementations"][0]["source"]["ref"] = "nodes/boundary.ts"
         case.write(boundary, descriptor)
     library = case.project / "base_lib"
-    library.mkdir()
+    library.mkdir(exist_ok=True)
     (library / "__init__.py").write_text("") if case.target == "python" else None
     for index in range(count):
         following = index + 1 < count

@@ -3,14 +3,14 @@
     {
       "source": {
         "kind": "file",
-        "ref": "plugin.py",
+        "ref": "plugins/addition/plugin.py",
         "export": "plugin"
       }
     }
   ],
   "nodeset_imports": [
     {
-      "path": "nodesets/step.jsonc"
+      "path": "nodeset_types/step.jsonc"
     }
   ],
   "pipeline": {
@@ -25,13 +25,13 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "addition.boundary",
+        "definition_id": "addition.boundary",
         "display_name": "start",
         "description": "start"
       },
       {
         "id": "step",
-        "type_used": "addition.step",
+        "definition_id": "addition.step",
         "display_name": "step",
         "description": "step",
         "node_configs": {
@@ -42,7 +42,7 @@
       },
       {
         "id": "end",
-        "type_used": "addition.boundary",
+        "definition_id": "addition.boundary",
         "display_name": "end",
         "description": "end"
       }

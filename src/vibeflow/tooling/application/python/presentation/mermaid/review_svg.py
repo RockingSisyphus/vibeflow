@@ -140,23 +140,6 @@ def _resource_columns(
     modules = _mapping_items(base_lib_payload.get("modules", ()) if isinstance(base_lib_payload, Mapping) else ())
     if modules:
         columns.append([_review_fragments._render_fragment("base_lib", _review_fragments._resource_mermaid("base_lib", modules, kind="base_lib"), temp_dir, theme=theme, background=background, max_text_size=max_text_size, max_edges=max_edges)])
-    host_extensions = _mapping_items(payload.get("host_extensions", ()))
-    if host_extensions:
-        columns.append(
-            [
-                _review_fragments._render_fragment(
-                    "host_extensions",
-                    _review_fragments._resource_mermaid(
-                        "host_extensions",
-                        host_extensions,
-                        kind="host_extension",
-                    ),
-                    temp_dir,
-                    theme=theme,
-                    background=background,
-                    max_text_size=max_text_size,
-                    max_edges=max_edges,
-                )
-            ]
-        )
+
+
     return columns

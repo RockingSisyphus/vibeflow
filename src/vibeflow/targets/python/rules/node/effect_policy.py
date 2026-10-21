@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 
-from vibeflow.targets.python.nodetypes.protocols import EFFECT_SCOPE_GLOBAL_STATE, EFFECT_SCOPE_PYTHON_IO, EFFECT_SCOPE_TERMINAL
+from vibeflow.targets.python.sdk.protocols import EFFECT_SCOPE_GLOBAL_STATE, EFFECT_SCOPE_PYTHON_IO, EFFECT_SCOPE_TERMINAL
 from vibeflow.targets.python.quality.source_analysis.ast_facts import (
     path_effect_call_name,
     qualified_call_name,

@@ -10,7 +10,7 @@ from vibeflow.targets.python.project.bindings import PythonBindingPlan, PythonCa
 
 
 class _Frame(Protocol):
-    type_used: str
+    definition_id: str
     node: object | None
     params: Mapping[str, object]
     is_planned_stub: bool
@@ -55,7 +55,7 @@ def _python_call_binding(
         implementation_type = type(frame.node)
         return PythonCallBinding(
             path=path,
-            type_key=frame.type_used,
+            definition_id=frame.definition_id,
             implementation=frame.node,
             effective_params=frame.params,
             source=SourceRef(
@@ -71,7 +71,7 @@ def _python_call_binding(
     # planned frame is actually executed.
     return PythonCallBinding(
         path=path,
-        type_key=frame.type_used,
+        definition_id=frame.definition_id,
         implementation=frame.planned_stub_path or frame.planned_stub_module,
         effective_params=frame.params,
         source=SourceRef(

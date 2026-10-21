@@ -11,19 +11,19 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts the isolated long_lived_listener fixture."
       },
       {
         "id": "invalid",
-        "type_used": "sandbox.invalid.long_lived_listener",
+        "definition_id": "sandbox.invalid.long_lived_listener",
         "display_name": "long lived listener",
         "description": "This negative fixture must fail during the JavaScript project audit."
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends the isolated long_lived_listener fixture."
       }
@@ -51,7 +51,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

@@ -7,20 +7,20 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.start",
+        "definition_id": "sandbox.start",
         "display_name": "Start",
         "description": "Starts the external-boundary and local-dedup review fixture."
       },
       {
         "id": "seed",
-        "type_used": "sandbox.constant",
+        "definition_id": "sandbox.constant",
         "display_name": "Seed Value",
         "description": "Produces the value used by the synchronous mainline.",
         "value": 4
       },
       {
         "id": "worker_a",
-        "type_used": "vibeflow.loop.while",
+        "definition_id": "vibeflow.loop.while",
         "display_name": "Worker Loop A",
         "description": "Runs the first valid invocation of the reusable worker body.",
         "provides": [
@@ -45,7 +45,7 @@
       },
       {
         "id": "worker_b",
-        "type_used": "vibeflow.loop.while",
+        "definition_id": "vibeflow.loop.while",
         "display_name": "Worker Loop B",
         "description": "Runs the same worker body with one internal node override.",
         "provides": [
@@ -75,7 +75,7 @@
       },
       {
         "id": "worker_c",
-        "type_used": "vibeflow.loop.while",
+        "definition_id": "vibeflow.loop.while",
         "display_name": "Worker Loop C",
         "description": "Runs the third valid invocation of the reusable worker body.",
         "provides": [
@@ -105,7 +105,7 @@
       },
       {
         "id": "worker_d",
-        "type_used": "vibeflow.loop.while",
+        "definition_id": "vibeflow.loop.while",
         "display_name": "Worker Loop D",
         "description": "Runs the fourth worker body invocation represented by the grouped title's +1 marker.",
         "provides": [
@@ -130,21 +130,21 @@
       },
       {
         "id": "add",
-        "type_used": "sandbox.add",
+        "definition_id": "sandbox.add",
         "display_name": "Mainline Add",
         "description": "Continues the mainline before the repeated worker-body branches fan out.",
         "delta": 6
       },
       {
         "id": "external_boost",
-        "type_used": "sandbox.external_boost",
+        "definition_id": "sandbox.external_boost",
         "display_name": "External Boost",
         "description": "Calls a trusted implementation maintained outside this project.",
         "bonus": 5
       },
       {
         "id": "end",
-        "type_used": "sandbox.review_join_end",
+        "definition_id": "sandbox.review_join_end",
         "display_name": "End",
         "description": "Joins the external result and all four repeated worker-body invocations.",
         "similar_to": {
@@ -235,14 +235,14 @@
   },
   "nodeset_imports": [
     {
-      "path": "nodesets/review_external_nodeset_dedup/visual_reusable_worker.jsonc"
+      "path": "nodeset_types/review_external_nodeset_dedup/visual_reusable_worker.jsonc"
     }
   ],
   "plugins": [
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

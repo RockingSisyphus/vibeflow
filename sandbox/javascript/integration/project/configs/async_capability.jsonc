@@ -18,25 +18,25 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts the async and Capability workflow."
       },
       {
         "id": "double",
-        "type_used": "sandbox.async_double",
+        "definition_id": "sandbox.async_double",
         "display_name": "double",
         "description": "Executes the declared ordinary workflow node."
       },
       {
         "id": "read",
-        "type_used": "sandbox.storage_read",
+        "definition_id": "sandbox.storage_read",
         "display_name": "Read storage",
         "description": "Reads from the per-run injected storage Capability."
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends after the asynchronous and Capability results are available.",
         "join_policy": "all"
@@ -79,7 +79,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

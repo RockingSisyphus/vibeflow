@@ -23,25 +23,25 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts the linear arithmetic workflow."
       },
       {
         "id": "add",
-        "type_used": "sandbox.add",
+        "definition_id": "sandbox.add",
         "display_name": "Add x and a",
         "description": "Computes x + a through the registered math base_lib."
       },
       {
         "id": "subtract",
-        "type_used": "sandbox.subtract",
+        "definition_id": "sandbox.subtract",
         "display_name": "Subtract b",
         "description": "Computes (x + a) - b through the registered math base_lib."
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends after the arithmetic result is available."
       }
@@ -73,7 +73,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

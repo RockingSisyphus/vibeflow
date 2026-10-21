@@ -5,7 +5,7 @@
         "status": "planned",
         "flow_kind": "predefined",
         "id": "a",
-        "type_used": "a",
+        "definition_id": "a",
         "display_name": "A",
         "description": "Runs a.",
         "requires": [],
@@ -15,14 +15,14 @@
   },
   "nodeset_imports": [
     {
-      "path": "nodesets/fail_planned_architecture_run/a.jsonc"
+      "path": "nodeset_types/fail_planned_architecture_run/a.jsonc"
     }
   ],
   "plugins": [
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

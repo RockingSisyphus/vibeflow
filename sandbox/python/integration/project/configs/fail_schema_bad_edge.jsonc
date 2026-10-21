@@ -3,7 +3,7 @@
     "nodes": [
       {
         "id": "seed",
-        "type_used": "sandbox.constant",
+        "definition_id": "sandbox.constant",
         "display_name": "Seed",
         "description": "Runs seed."
       }
@@ -18,7 +18,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

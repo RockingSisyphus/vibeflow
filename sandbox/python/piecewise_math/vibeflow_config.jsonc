@@ -1,1 +1,8 @@
-{"roots": [{"id": "piecewise_math", "path": "project"}]}
+{
+  "roots": [
+    {
+      "id": "piecewise_math",
+      "path": "project"
+    }
+  ]
+}

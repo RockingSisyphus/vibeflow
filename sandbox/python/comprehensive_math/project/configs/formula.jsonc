@@ -3,7 +3,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }
@@ -13,13 +13,13 @@
   ],
   "nodeset_imports": [
     {
-      "path": "nodesets/affine.jsonc"
+      "path": "nodeset_types/affine.jsonc"
     },
     {
-      "path": "nodesets/prepare.jsonc"
+      "path": "nodeset_types/prepare.jsonc"
     },
     {
-      "path": "nodesets/loop_body.jsonc"
+      "path": "nodeset_types/loop_body.jsonc"
     }
   ],
   "pipeline": {
@@ -35,19 +35,19 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "math.boundary",
+        "definition_id": "math.boundary",
         "display_name": "start",
         "description": "start"
       },
       {
         "id": "offset",
-        "type_used": "math.offset",
+        "definition_id": "math.offset",
         "display_name": "offset",
         "description": "offset"
       },
       {
         "id": "receive",
-        "type_used": "math.port_receive_0",
+        "definition_id": "math.port_receive_0",
         "display_name": "receive",
         "description": "receive",
         "config": {
@@ -56,7 +56,7 @@
       },
       {
         "id": "prepare",
-        "type_used": "math.prepare",
+        "definition_id": "math.prepare",
         "display_name": "prepare",
         "description": "prepare",
         "node_configs": {
@@ -71,45 +71,45 @@
       },
       {
         "id": "companion",
-        "type_used": "math.companion",
+        "definition_id": "math.companion",
         "display_name": "companion",
         "description": "companion"
       },
       {
         "id": "route",
-        "type_used": "math.route",
+        "definition_id": "math.route",
         "display_name": "route",
         "description": "route"
       },
       {
         "id": "square",
-        "type_used": "math.square",
+        "definition_id": "math.square",
         "display_name": "square",
         "description": "square"
       },
       {
         "id": "negative",
-        "type_used": "math.negative",
+        "definition_id": "math.negative",
         "display_name": "negative",
         "description": "negative"
       },
       {
         "id": "choice",
-        "type_used": "math.choice",
+        "definition_id": "math.choice",
         "display_name": "choice",
         "description": "choice",
         "join_policy": "any_active"
       },
       {
         "id": "join",
-        "type_used": "math.join",
+        "definition_id": "math.join",
         "display_name": "join",
         "description": "join",
         "join_policy": "all"
       },
       {
         "id": "loop",
-        "type_used": "vibeflow.loop.while",
+        "definition_id": "vibeflow.loop.while",
         "display_name": "loop",
         "description": "loop",
         "requires": [
@@ -184,14 +184,14 @@
       },
       {
         "id": "finish",
-        "type_used": "math.finish",
+        "definition_id": "math.finish",
         "display_name": "finish",
         "description": "finish",
         "join_policy": "all"
       },
       {
         "id": "send",
-        "type_used": "math.port_send_1",
+        "definition_id": "math.port_send_1",
         "display_name": "send",
         "description": "send",
         "config": {
@@ -200,7 +200,7 @@
       },
       {
         "id": "send_end",
-        "type_used": "math.boundary",
+        "definition_id": "math.boundary",
         "display_name": "End",
         "description": "Explicit end after sending a host value."
       }

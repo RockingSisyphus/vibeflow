@@ -1,15 +1,15 @@
 """Target-neutral, pure in-memory quality evaluation."""
 
 from vibeflow.core.findings import Finding
-from vibeflow.targets.shared.quality_support.evaluator import evaluate_project_quality
-from vibeflow.targets.shared.quality_support.nodesets import nodeset_quality_findings
+from vibeflow.targets.shared.quality_support.evaluator import evaluate_source_quality
+from vibeflow.targets.shared.quality_support.nodeset_types import nodeset_quality_findings
 from vibeflow.targets.shared.quality_support.models import (
     DirectoryQuality,
     FileQuality,
     FunctionQuality,
     ImportSite,
     PrefixClusterQuality,
-    ProjectQualityFacts,
+    SourceQualityFacts,
     QualityFinding,
     QualityPolicy,
     QualityReport,
@@ -38,7 +38,7 @@ __all__ = [
     "FunctionQuality",
     "ImportSite",
     "PrefixClusterQuality",
-    "ProjectQualityFacts",
+    "SourceQualityFacts",
     "QualityFinding",
     "QualityPolicy",
     "QualityReport",
@@ -52,7 +52,7 @@ __all__ = [
     "append_flowchart_health",
     "append_join_policy_health",
     "duplicate_logic_findings",
-    "evaluate_project_quality",
+    "evaluate_source_quality",
     "nodeset_quality_findings",
     "schema_finding",
     "validate_workflow_quality",

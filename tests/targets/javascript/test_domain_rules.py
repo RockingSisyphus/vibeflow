@@ -29,8 +29,6 @@ def domain_project(tmp_path: Path) -> tuple[Path, Path]:
         pytest.skip("requires the project-local TypeScript/esbuild toolchain")
     example = tmp_path / "example"
     shutil.copytree(EXAMPLE, example)
-    from tests.fixtures.support.plugins import copy_sdk_inputs
-    copy_sdk_inputs(EXAMPLE, example)
     project = example / "project"
     (project / "node_modules").symlink_to(toolchain / "node_modules", target_is_directory=True)
     return example / "vibeflow_config.jsonc", project
@@ -68,7 +66,7 @@ def test_domain_rule_rejects_helper_model_definition_with_precise_ownership(doma
     assert finding["source_location"]["path"] == str(helper)
     assert finding["source_location"]["line"] == 2
     assert finding["details"]["call_paths"] == [["transform"]]
-    assert finding["details"]["ownership"]["node_types"] == ["example.transform"]
+    assert finding["details"]["ownership"]["node_definitions"] == ["example.transform"]
 
 
 def _wrong_domain_location(project: Path, location: str) -> tuple[Path, int]:
@@ -102,7 +100,7 @@ def _wrong_domain_location(project: Path, location: str) -> tuple[Path, int]:
 def _domain_commands(project: Path) -> None:
     config = project / "vibeflow_project.jsonc"
     data = json.loads(config.read_text())
-    data.update({"quality_enabled": True, "architecture": {"documents": [
+    data.update({"architecture": {"documents": [
         {"workflow": "configs/model.jsonc", "document": "Architecture.jsonc"}]}})
     config.write_text(json.dumps(data))
 
@@ -110,7 +108,7 @@ def _domain_commands(project: Path) -> None:
 def _domain_cli(workspace: Path, project: Path, command: str, *options: str):
     environment = {**os.environ, "PYTHONPATH": str(ROOT / "src"), "PYTHONNOUSERSITE": "1", "PYTHONDONTWRITEBYTECODE": "1"}
     return subprocess.run([sys.executable, "-m", "vibeflow", command, "--workspace", str(workspace),
-        "--config", str(project / "configs/model.jsonc"), *options], cwd=project, env=environment,
+        *([] if command == "quality-check" else ["--config", str(project / "configs/model.jsonc")]), *options], cwd=project, env=environment,
         check=False, capture_output=True, text=True, timeout=60)
 
 
@@ -119,9 +117,9 @@ def _domain_diagnostic(diagnostics, source: Path, line: int, rule="example.model
     assert finding["definition_id"] == rule
     assert finding["object_id"] == "example.transform"
     assert finding["source_location"] == {"path": str(source), "line": line, "column": 1}
-    assert finding["details"]["node_type"] == "example.transform"
+    assert finding["details"]["definition_id"] == "example.transform"
     assert finding["details"]["call_paths"] == [["transform"]]
-    assert "example.transform" in finding["details"]["ownership"]["node_types"]
+    assert "example.transform" in finding["details"]["ownership"]["node_definitions"]
     return finding
 
 
@@ -185,7 +183,7 @@ def test_allowed_top_level_model_passes_formal_checks_build_and_actual_execution
 def test_run_only_domain_rule_is_explicit_and_does_not_become_a_build_check(domain_project, tmp_path) -> None:
     from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
     from vibeflow.targets.javascript.quality.rules import run_javascript_rules
-    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
+    from vibeflow.tooling.project.resources import prepare_workflow_catalogs
 
     workspace, project = domain_project
     source, line = _wrong_domain_location(project, "transform")
@@ -199,7 +197,7 @@ def test_run_only_domain_rule_is_explicit_and_does_not_become_a_build_check(doma
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == {"result": 7}
     # The public Target checker can explicitly select run; no JS run command or implicit runtime scan is introduced.
-    catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/model.jsonc")
+    catalogs = prepare_workflow_catalogs(project / "configs/model.jsonc")
     policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=project, allowed_external=set())
     checked = run_javascript_rules(audited.graph, catalogs, project_root=project, package_root=project, target="node", phase="run", import_policy=policy)
     _domain_diagnostic([finding.to_dict() for finding in checked.findings], source, line)
@@ -235,7 +233,7 @@ def test_process_console_policy_is_checked_at_build_and_actual_runtime(domain_pr
         finding = next(item for item in error.value.diagnostics if item.get("definition_id") == "vibeflow.no_side_effects")
         assert finding["code"] == "VF_BASE_LIB_HOST_IO"
         assert finding["source_location"] == {"path": str(source), "line": 3, "column": 3}
-        assert finding["details"]["node_type"] == "example.transform"
+        assert finding["details"]["definition_id"] == "example.transform"
         assert finding["details"]["call_paths"] == [["transform"]]
         assert not request.out_dir.exists()
         return
@@ -286,16 +284,16 @@ def test_explicit_empty_node_rulesets_is_reported_unconstrained(domain_project) 
 
 
 def test_multiple_effect_rules_retain_all_constraints_and_report_mixed(domain_project) -> None:
-    from vibeflow.core.flow import GraphConfig, NodeSpec
+    from vibeflow.core.flow import GraphConfig, NodeCallSpec
     from vibeflow.targets.javascript.quality.rules import run_javascript_rules
     from vibeflow.targets.javascript.frontend.facts import target_neutral_implementation_facts_from_catalog
-    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
+    from vibeflow.tooling.project.resources import prepare_workflow_catalogs
 
     _, project = domain_project
     file = sdk_resource(project, 'node', 'example.model')
     data = json.loads(file.read_text()); data["rulesets"] = ["vibeflow.process", "vibeflow.io"]; file.write_text(json.dumps(data))
-    catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/model.jsonc")
-    graph = GraphConfig(nodes=(NodeSpec("first", "example.model"), NodeSpec("second", "example.model")), rulesets=())
+    catalogs = prepare_workflow_catalogs(project / "configs/model.jsonc")
+    graph = GraphConfig(nodes=(NodeCallSpec("first", "example.model"), NodeCallSpec("second", "example.model")), rulesets=())
     report = run_javascript_rules(graph, catalogs, project_root=project, package_root=project, evaluate_sources=False)
     policy = report.policies["example.model"]
     assert policy["effect_scope"] == "mixed"
@@ -308,26 +306,26 @@ def test_multiple_effect_rules_retain_all_constraints_and_report_mixed(domain_pr
 
 
 def test_call_effect_policy_keeps_actual_call_config_and_findings(domain_project) -> None:
-    from vibeflow.core.flow import GraphConfig, NodeSpec
+    from vibeflow.core.flow import GraphConfig, NodeCallSpec
     from vibeflow.targets.javascript.quality.rules import run_javascript_rules
-    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
+    from vibeflow.tooling.project.resources import prepare_workflow_catalogs
 
     _, project = domain_project
-    (project / "rules/call_policy.ts").write_text('export function check(context) { const io=context.subject.call_spec.params.io; return {records:{policy:{type_id:"vibeflow.effect_policy.v1",value:{effect_scope:io?"terminal":"none",allowed_effects:io?["terminal"]:[]}}},findings:io?[]:[{code:"EXAMPLE.STRICT",severity:"error",message:"Strict constraint stays visible"}]}; }\n')
+    (project / "plugins/code_plugin/rules/call_policy.ts").write_text('export function check(context) { const io=context.subject.call_spec.params.io; return {records:{policy:{type_id:"vibeflow.effect_policy.v1",value:{effect_scope:io?"terminal":"none",allowed_effects:io?["terminal"]:[]}}},findings:io?[]:[{code:"EXAMPLE.STRICT",severity:"error",message:"Strict constraint stays visible"}]}; }\n')
     (sdk_resource(project, "rule", "test.call_policy")).write_text(json.dumps({"kind": "rule", "id": "test.call_policy", "outputs": {"policy": "vibeflow.effect_policy.v1"}, "implementations": [{"language": "typescript",  "source": {"kind": "file", "ref": "rules/call_policy.ts", "export": "check"}}]}))
     (sdk_resource(project, "ruleset", "test.call_policy")).write_text(json.dumps({"kind": "ruleset", "id": "test.call_policy", "calls": [{"id": "effect", "rule_id": "test.call_policy"}], "entrypoints": {"static": ["effect"]}}))
     file = sdk_resource(project, 'node', 'example.model')
     data = json.loads(file.read_text()); data["rulesets"] = ["test.call_policy"]; file.write_text(json.dumps(data))
-    catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/model.jsonc")
-    graph = GraphConfig(nodes=(NodeSpec("strict", "example.model", params={"io": False}), NodeSpec("io", "example.model", params={"io": True})), rulesets=())
+    catalogs = prepare_workflow_catalogs(project / "configs/model.jsonc")
+    graph = GraphConfig(nodes=(NodeCallSpec("strict", "example.model", params={"io": False}), NodeCallSpec("io", "example.model", params={"io": True})), rulesets=())
     report = run_javascript_rules(graph, catalogs, project_root=project, package_root=project, target="node")
     assert report.policies["example.model"]["effect_scope"] == "mixed"
     assert report.call_effect_scopes == {("example.model", "strict"): "none", ("example.model", "io"): "terminal"}
     assert [item.code for item in report.findings] == ["EXAMPLE.STRICT"]
     records = report.to_dict()["call_effect_policies"]
-    assert all(item["node_type"] == "example.model" for item in records)
+    assert all(item["definition_id"] == "example.model" for item in records)
     assert all(record["definition_id"] == "test.call_policy" and record["scope"] == "call" for item in records for record in item["records"])
-    single = run_javascript_rules(GraphConfig(nodes=(NodeSpec("io", "example.model", params={"io": True}),), rulesets=()), catalogs, project_root=project, package_root=project, target="node")
+    single = run_javascript_rules(GraphConfig(nodes=(NodeCallSpec("io", "example.model", params={"io": True}),), rulesets=()), catalogs, project_root=project, package_root=project, target="node")
     assert single.policies["example.model"]["effect_scope"] == "mixed"
     assert single.call_effect_scopes == {("example.model", "io"): "terminal"}
 
@@ -348,7 +346,7 @@ def _select_scoped_file_rule(project: Path, scope: str, *, implementation: str =
         if implementation == "alias":
             declaration["handler"] = "vibeflow.quality.files"
         else:
-            (project / "rules/files.ts").write_text('export function check(context, inputs, params) { return {findings:context.facts.project_facts.files.filter(file=>file.lines>params.max_file_lines).map(file=>({code:"TEST.CLOSURE.LINES",severity:"error",message:"Reached helper exceeds the chosen limit",source_location:{path:context.facts.project_facts.root+"/"+file.path,line:1},details:{limit:params.max_file_lines}}))}; }\n')
+            (project / "plugins/code_plugin/rules/files.ts").write_text('export function check(context, inputs, params) { return {findings:[...new Set(context.facts.source_files.flatMap(path=>context.sources.reachable(path)))].map(path=>({path,lines:context.sources.text(path).trimEnd().split("\\n").length})).filter(file=>file.lines>params.max_file_lines).map(file=>({code:"TEST.CLOSURE.LINES",severity:"error",message:"Reached helper exceeds the chosen limit",source_location:{path:file.path,line:1},details:{limit:params.max_file_lines}}))}; }\n')
             declaration["implementations"] = [{"language": "typescript", "source": {"kind": "file", "ref": "rules/files.ts", "export": "check"}}]
         sdk_resource(project, "rule", rule_id).write_text(json.dumps(declaration))
     ruleset = {"kind": "ruleset", "id": "test.scope", "calls": [{"id": "files", "rule_id": "vibeflow.quality.files", "params": {"max_file_lines": 8, "warn_file_lines": 8}}],
@@ -366,7 +364,7 @@ def _select_scoped_file_rule(project: Path, scope: str, *, implementation: str =
     return resource, helper
 
 
-@pytest.mark.parametrize("scope", ["node", "workflow"])
+@pytest.mark.parametrize("scope", ["node"])
 def test_selected_file_rule_uses_real_closure_and_explicit_overrides(domain_project, tmp_path, capsys, scope) -> None:
     from vibeflow.targets.shared.quality_support import QualityThresholds
     from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy
@@ -451,7 +449,7 @@ def test_formal_rule_state_failure_is_rejected_before_later_entrances(domain_pro
     business_marker = project / "business-node-ran"
     model = project / "nodes/model.ts"
     model.write_text('import {writeFileSync} from "node:fs"; writeFileSync(' + json.dumps(str(business_marker)) + ',"ran");\n' + model.read_text())
-    (project / "rules/status.ts").write_text('import {writeFileSync} from "node:fs"; export function check(context) { if(context.phase===' + json.dumps(phase) + ') return {state:' + json.dumps(state) + ',findings:' + ('[{code:"EXAMPLE.STATUS.WARNING",severity:"warning",message:"Incomplete with warning"}]' if state == "failed" else '[]') + '}; writeFileSync(' + json.dumps(str(static_marker)) + ',"later phase ran"); return {findings:[]}; }\n')
+    (project / "plugins/code_plugin/rules/status.ts").write_text('import {writeFileSync} from "node:fs"; export function check(context) { if(context.phase===' + json.dumps(phase) + ') return {state:' + json.dumps(state) + ',findings:' + ('[{code:"EXAMPLE.STATUS.WARNING",severity:"warning",message:"Incomplete with warning"}]' if state == "failed" else '[]') + '}; writeFileSync(' + json.dumps(str(static_marker)) + ',"later phase ran"); return {findings:[]}; }\n')
     (sdk_resource(project, "rule", "test.status")).write_text(json.dumps({"kind": "rule", "id": "test.status", "implementations": [{"language": "typescript",  "source": {"kind": "file", "ref": "rules/status.ts", "export": "check"}}]}))
     (sdk_resource(project, "ruleset", "test.status")).write_text(json.dumps({"kind": "ruleset", "id": "test.status", "calls": [{"id": "check", "rule_id": "test.status"}], "entrypoints": {"import": ["check"] if phase == "import" else [], "static": ["check"]}}))
     file = sdk_resource(project, 'node', 'example.model')
@@ -475,7 +473,7 @@ def test_formal_rule_state_failure_is_rejected_before_later_entrances(domain_pro
 
 def test_rule_abi_arguments_records_ast_and_native_file_io(domain_project) -> None:
     _, project = domain_project
-    rule = project / "rules/wire.ts"
+    rule = project / "plugins/code_plugin/rules/wire.ts"
     rule.write_text('import {writeFileSync} from "node:fs"; export function check(context, inputs, params) { writeFileSync(params.file, "rule ran"); const symbols=context.sources.symbols(context.facts.source_files[0]); return {records:{value:{type_id:"example.wire.v1",value:{abi:context.abiVersion, supplied:inputs.prior.value, parameter:params.limit, names:symbols.map(s=>s.name), imports:context.sources.imports(context.facts.source_files[0]).map(s=>s.resolved_path)}}},findings:[]}; }', encoding="utf-8")
     helper = project / "nodes/import_helper.ts"
     helper.write_text("export const value=1;\n")
@@ -486,7 +484,7 @@ def test_rule_abi_arguments_records_ast_and_native_file_io(domain_project) -> No
         session.open_rule("rule:wire", rule={"id": "example.wire", "module": str(rule), "export": "check"}, package_root=project)
         returned = session.evaluate_rule("rule:wire", context={"facts": {"source_files": [str(project / "nodes/model.ts")], "sources": [{"path":str(source),"text":source.read_text()},{"path":str(helper),"text":helper.read_text()}]}, "subject": {}, "scope": {}, "phase": "static", "target": "node"}, inputs={"prior": {"type_id": "example.input.v1", "value": 5}}, params={"limit": 9, "file": str(output)})
     value = returned["records"]["value"]["value"]
-    assert (value["abi"], value["supplied"], value["parameter"]) == ("vibeflow.rule.v2", 5, 9)
+    assert (value["abi"], value["supplied"], value["parameter"]) == ("vibeflow.rule.v3", 5, 9)
     assert "modelForward" in value["names"]
     assert output.read_text() == "rule ran"
     assert value["imports"] == [str(helper)]
@@ -494,21 +492,21 @@ def test_rule_abi_arguments_records_ast_and_native_file_io(domain_project) -> No
 
 @pytest.mark.parametrize(("scope", "counts"), [("call", [1, 2]), ("source", [1, 1])])
 def test_rule_scope_keeps_call_identity_and_caches_source_snapshots(domain_project, scope, counts) -> None:
-    from vibeflow.core.flow import GraphConfig, NodeSpec
+    from vibeflow.core.flow import GraphConfig, NodeCallSpec
     from vibeflow.targets.javascript.quality.rules import run_javascript_rules
     from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
-    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
+    from vibeflow.tooling.project.resources import prepare_workflow_catalogs
 
     _, project = domain_project
-    rule = project / "rules/scope.ts"
+    rule = project / "plugins/code_plugin/rules/scope.ts"
     rule.write_text('let count=0; export function check(context) { console.log("Rule log"); return {records:{count:{type_id:"example.count.v1",value:{count:++count, call:context.subject.call_spec?.id ?? null, rule:context.subject.rule_call_id ?? null}}},findings:[{code:"EXAMPLE.SCOPE",severity:"warning",message:"Scope proof",source_location:{path:context.facts.source_files[0],line:1}}]}; }\n', encoding="utf-8")
     (sdk_resource(project, "rule", "test.scope")).write_text(json.dumps({"kind": "rule", "id": "test.scope", "scope": scope, "outputs": {"count": "example.count.v1"}, "implementations": [{"language": "typescript",  "source": {"kind": "file", "ref": "rules/scope.ts", "export": "check"}}]}))
     (sdk_resource(project, "ruleset", "test.scope")).write_text(json.dumps({"kind": "ruleset", "id": "test.scope", "calls": [{"id": "check", "rule_id": "test.scope"}], "entrypoints": {"static": ["check"]}}))
     file = sdk_resource(project, 'node', 'example.model')
     data = json.loads(file.read_text()); data["rulesets"] = ["test.scope"]; file.write_text(json.dumps(data))
-    catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/model.jsonc")
+    catalogs = prepare_workflow_catalogs(project / "configs/model.jsonc")
     policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=project, allowed_external=set(), node_ids=frozenset({"example.model"}))
-    graph = GraphConfig(nodes=(NodeSpec("first", "example.model"), NodeSpec("second", "example.model")), rulesets=())
+    graph = GraphConfig(nodes=(NodeCallSpec("first", "example.model"), NodeCallSpec("second", "example.model")), rulesets=())
     report = run_javascript_rules(graph, catalogs, project_root=project, package_root=project, target="node", import_policy=policy)
     results = [execution for execution in report.results["example.model"] if execution.results]
     values = [execution.results["check"].records["count"].value for execution in results]

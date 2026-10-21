@@ -5,7 +5,7 @@ from collections.abc import Mapping, Sequence
 
 def implementation_import_scopes(scopes, implementations):
     """Keep entry references separate from a declaration module's initialization."""
-    projections = {(item["kind"], item["type_key"], item["path"], item.get("export", "")): item
+    projections = {(item["kind"], item["id"], item["path"], item.get("export", "")): item
                    for item in implementations}
     result = []
     for scope in scopes:
@@ -30,7 +30,7 @@ def resource_import_violations(source_path, target_path, sites, scopes):
     violations = []
     for scope in scopes:
         owners = scope.get("owners", ())
-        sources = [item for item in owners if item["path"] == source_path]
+        sources = [item for item in owners if item["path"] == source_path and item.get("selected",True)]
         targets = [item for item in owners if item["path"] == target_path]
         if not sources:
             continue
@@ -53,6 +53,8 @@ def _selected_sites(owner: Mapping, sites: Sequence):
 
 def _allows(source, targets):
     for target in targets:
+        if source.get("plugin_id") and source["plugin_id"] == target.get("plugin_id"):
+            return True
         if (source["kind"], source["id"]) == (target["kind"], target["id"]):
             return True
         if target["kind"] == "base_lib":
@@ -71,5 +73,5 @@ def _code(kind):
         "base_lib": "QUALITY.STRUCTURE.BASE_LIB_UPWARD_IMPORT",
         "plugin": "QUALITY.STRUCTURE.PLUGIN_NODE_IMPORT",
         "plugin_declaration": "QUALITY.STRUCTURE.PLUGIN_NODE_IMPORT",
-        "host_extension": "QUALITY.STRUCTURE.HOST_UNDECLARED_PROJECT_IMPORT",
+
     }.get(kind)

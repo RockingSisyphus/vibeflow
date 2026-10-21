@@ -1,0 +1,2 @@
+import {defineBaseLib} from "@vibeflow/plugin";
+export const resource_43 = defineBaseLib({"id": "sandbox.math", "display_name": "Sandbox math helpers", "description": "Pure add, subtract, affine, and sign helpers shared by TypeScript nodes.", "implementations": [{"language": "typescript", "targets": ["browser", "node"], "source": {"kind": "file", "ref": "base_lib/math.ts"}}], "dependencies": [], "external_packages": [], "rulesets": ["vibeflow.base_lib"]});

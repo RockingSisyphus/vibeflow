@@ -13,7 +13,7 @@ sys.path.insert(0, str(REPOSITORY / "src"))
 
 from vibeflow.core.config.node import merge_node_config, normalize_node_config_spec
 from vibeflow.targets.python import NodeRegistry
-from vibeflow.targets.python.sdk import Plugin, node
+from vibeflow.targets.python.sdk import node
 
 
 CASES = (
@@ -73,15 +73,14 @@ def raw_control(schema_type, value):
 def observe(case_id, schema_type, value):
     schema = {"value": {"type": schema_type}}
 
-    @node(type_key=f"probe.{case_id}", contract={
+    @node(id=f"probe.{case_id}", contract={
         "params_schema": schema, "params_defaults": {"value": value},
-    }, rulesets=["vibeflow.process"])
+    }, rulesets=["vibeflow.process"], node_type="vibeflow.node")
     class Probe:
         def run_pure(self, inputs, params):
             return {}
 
-    contribution = Plugin(id=f"probe.{case_id}", resources=[Probe]).contributions()
-    descriptor = contribution.resources[0].descriptor
+    descriptor = Probe.__vibeflow_resource__.descriptor
     snapshot = descriptor.to_dict()["contract"]["params_defaults"]["value"]
     result = {
         "id": case_id, "schema_type": schema_type, "original": value,
@@ -97,8 +96,8 @@ def observe(case_id, schema_type, value):
     else:
         result["status"] = "PASS"
         result["registered_config"] = {
-            "status": "PASS", "default_types": type_tree(registry.merge_config(descriptor.type_key, None)["value"]),
-            "override_types": type_tree(registry.merge_config(descriptor.type_key, {"value": deepcopy(value)})["value"]),
+            "status": "PASS", "default_types": type_tree(registry.merge_config(descriptor.id, None)["value"]),
+            "override_types": type_tree(registry.merge_config(descriptor.id, {"value": deepcopy(value)})["value"]),
         }
     result["native_json_control"] = raw_control(schema_type, value)
     return result

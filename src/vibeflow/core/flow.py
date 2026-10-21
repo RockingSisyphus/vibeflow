@@ -16,8 +16,8 @@ JOIN_POLICY_SAFE_ANY = "safe_any"
 JOIN_POLICY_ANY_ACTIVE = "any_active"
 JOIN_POLICY_ALL = "all"
 JOIN_POLICIES = frozenset({JOIN_POLICY_SAFE_ANY, JOIN_POLICY_ANY_ACTIVE, JOIN_POLICY_ALL})
-LOOP_WHILE_TYPE = "vibeflow.loop.while"
-LOOP_NODE_TYPES = frozenset({LOOP_WHILE_TYPE})
+LOOP_WHILE_DEFINITION_ID = "vibeflow.loop.while"
+LOOP_DEFINITION_IDS = frozenset({LOOP_WHILE_DEFINITION_ID})
 ENTRY_MODE_SYNC = "sync"
 ENTRY_MODE_ASYNC = "async"
 ENTRY_MODES = frozenset({ENTRY_MODE_SYNC, ENTRY_MODE_ASYNC})
@@ -148,9 +148,9 @@ class LoopSpec:
 
 
 @dataclass(frozen=True)
-class NodeSpec:
+class NodeCallSpec:
     id: str
-    type_used: str
+    definition_id: str
     requires: tuple[DataRequirement, ...] = ()
     provides: tuple[DataProvider, ...] = ()
     params: dict[str, Any] = field(default_factory=dict)
@@ -180,14 +180,6 @@ class NodeSpec:
                 "node execution_lock must be an ExecutionLockSpec or None"
             )
 
-    @property
-    def name(self) -> str:
-        return self.id
-
-    @property
-    def node_type(self) -> str:
-        return self.type_used
-
 @dataclass(frozen=True)
 class EdgeSpec:
     source: str
@@ -201,7 +193,7 @@ class EdgeSpec:
         return (self.source, self.target)
 
 @dataclass(frozen=True)
-class NodesetSpec:
+class NodesetTypeSpec:
     type_key: str
     display_name: str
     description: str
@@ -221,19 +213,11 @@ class NodesetSpec:
         if not isinstance(self.expand, bool):
             raise ValueError("nodeset expand must be a boolean")
 
-    @property
-    def name(self) -> str:
-        return self.type_key
-
-    @property
-    def exports(self) -> tuple[DataProvider, ...]:
-        return self.provides
-
 @dataclass(frozen=True)
 class GraphConfig:
-    nodes: tuple[NodeSpec, ...]
+    nodes: tuple[NodeCallSpec, ...]
     edges: tuple[EdgeSpec, ...] = ()
-    nodesets: dict[str, NodesetSpec] = field(default_factory=dict)
+    nodeset_types: dict[str, NodesetTypeSpec] = field(default_factory=dict)
     inputs: tuple[PipelineInputSpec, ...] = ()
     outputs: tuple[PipelineOutputSpec, ...] = ()
     max_steps: int = 1000

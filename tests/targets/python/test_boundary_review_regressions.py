@@ -56,10 +56,10 @@ def effect_context(kind, body, prefix='VERSION = 1\n'):
     text = prefix + ('class Task:\n    def run_pure(self, inputs, params):\n' + indent(body, '        ')
                      if kind == 'node' else 'def helper():\n' + indent(body, '    ')) + '\n'
     parsed = PythonSourceFile.parse('/virtual/review.py', 'review', text)
-    descriptor = NodeDescriptor(type_key='example.task', display_name='Task', description='Review scope.',
-                                version='1', flow_kind='process', contract=NodeContractDescriptor())
+    descriptor = NodeDescriptor(rulesets=(), id='example.task', display_name='Task', description='Review scope.',
+                                version='1', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node")
     nodes = (PythonSourceNode(descriptor, parsed.path, 'Task'),) if kind == 'node' else ()
-    facts = {'source_context': build_python_source_context(nodes, (parsed,)), 'node_catalog': (),
+    facts = {'source_context': build_python_source_context(nodes, (parsed,)), 'node_definitions': (),
              'source_owners': ({'kind': kind, 'id': 'example.task', 'role': 'entry',
                                'path': parsed.path, 'symbol': 'Task' if kind == 'node' else ''},)}
     if kind == 'python_source':
@@ -68,7 +68,7 @@ def effect_context(kind, body, prefix='VERSION = 1\n'):
         facts.update(base_lib_file=parsed, resource_symbol='')
     elif kind == 'plugin':
         facts.update(resource_source_file=parsed, resource_symbol='')
-    return RuleContext(subject={'kind': kind, 'id': 'example.task', 'type_key': 'example.task'},
+    return RuleContext(subject={'kind': kind, 'id': 'example.task', "definition_id": 'example.task'},
                        target='python', facts=facts)
 
 

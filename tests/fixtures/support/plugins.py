@@ -5,29 +5,35 @@ registration discovery, registry parsing, bundle expansion or metadata repair.
 """
 from dataclasses import dataclass
 import ast
+from copy import deepcopy
 import json
 from pathlib import Path
 import pprint
+import os
 import re
 import shutil
 
 _CONSTRUCTORS = {"node": "node", "rule": "rule", "ruleset": "ruleset",
     "data_schema": "data_schema", "base_lib": "base_lib", "capability": "capability",
-    "host_extension": "host_extension"}
+    "node_type": "node_type"}
 _JAVASCRIPT_CONSTRUCTORS = {"defineNode": "node", "defineRule": "rule",
     "defineRuleset": "ruleset", "defineDataSchema": "data_schema", "defineBaseLib": "base_lib",
-    "defineCapability": "capability", "defineHostExtension": "host_extension"}
+    "defineCapability": "capability", "defineNodeType": "node_type"}
 
 
 def plugin_file(project):
     project = Path(project)
-    return next((project / name for name in ("code_plugin.py", "code_plugin.ts")
-                 if (project / name).is_file()), project / "code_plugin.py")
+    for name in ("code_plugin", "resources"):
+        for extension in ("py", "ts"):
+            path = project / "plugins" / name / ("plugin." + extension)
+            if path.is_file():
+                return path
+    return project / "plugins/code_plugin/plugin.py"
 
 
-def resource_declarations(project):
-    """Read the literal SDK definitions authored by this fixture helper."""
-    path = plugin_file(project)
+def _literal_declarations(path):
+    if not path.exists():
+        return []
     values = []
     if path.suffix == ".py":
         for statement in ast.parse(path.read_text()).body:
@@ -42,7 +48,7 @@ def resource_declarations(project):
                     else:
                         fields[item.arg] = ast.literal_eval(item.value)
                 fields.pop("source", None)
-                values.append({"kind": call.func.id, **fields})
+                values.append({"kind": _CONSTRUCTORS[call.func.id], **fields})
             elif isinstance(call.func, ast.Name) and call.func.id == "ResourceDefinition":
                 values.append(ast.literal_eval(call.args[0].args[0]))
     else:
@@ -52,6 +58,26 @@ def resource_declarations(project):
             kind = _JAVASCRIPT_CONSTRUCTORS.get(match.group(1))
             values.append({"kind": kind, **fields} if kind else fields)
     return values
+
+
+def resource_declarations(project):
+    """Read fixture-authored declarations in the same ownership layout as products."""
+    path = plugin_file(project)
+    stem = path.parent.name
+    paths = (path, *(Path(project) / group / (stem + "_declarations" + path.suffix)
+                      for group in ("nodes", "base_lib")))
+    result = []
+    for source in paths:
+        for value in _literal_declarations(source):
+            for implementation in value.get("implementations", ()):
+                if "implementation_files" not in implementation:
+                    continue
+                implementation["implementation_files"] = [
+                    {**member, "ref": os.path.relpath(source.parent / member["ref"], project)}
+                    if isinstance(member, dict) and member.get("kind") == "file" and not Path(member["ref"]).is_absolute()
+                    else member for member in implementation.get("implementation_files", ())]
+            result.append(value)
+    return result
 
 
 def _plugin_id(path):
@@ -67,7 +93,7 @@ def _plugin_id(path):
 def update_resources(project, values):
     path = plugin_file(project)
     return write_plugin(project, values, target="python" if path.suffix == ".py" else "javascript",
-                        filename=path.name, plugin_id=_plugin_id(path))
+                        filename=path.parent.name + path.suffix, plugin_id=_plugin_id(path))
 
 
 @dataclass(frozen=True)
@@ -119,46 +145,62 @@ def resources(project, kind=None):
             for item in resource_declarations(project) if kind is None or item["kind"] == kind]
 
 
-def copy_sdk_inputs(source, destination):
-    """Copy a fixed SDK fixture overlay; historical inputs are never loaded."""
-    repository = Path(__file__).resolve().parents[3]
-    fixture = repository / "tests/fixtures/sdk_resources" / Path(source).resolve().relative_to(repository)
-    if fixture.is_dir():
-        shutil.copytree(fixture, destination, dirs_exist_ok=True)
-
 def write_plugin(project, values, *, target, filename=None, plugin_id="fixture.resources"):
-    """Fixed definitions with explicit delayed implementation locators."""
+    """Author independent Nodes/BaseLibs and one atomic Plugin package."""
     project = Path(project)
-    filename = filename or ("code_plugin.py" if target == "python" else "code_plugin.ts")
-    constructors = {"node": "node", "rule": "rule", "ruleset": "ruleset", "data_schema": "data_schema",
-                    "base_lib": "base_lib", "capability": "capability", "host_extension": "host_extension"}
-    lines, names = [], []
-    for index, entry in enumerate(values):
-        payload = dict(entry[1] if isinstance(entry, tuple) else entry)
-        kind = payload.pop("kind")
-        name = "resource_" + str(index)
-        names.append(name)
-        if target == "python":
-            if kind not in constructors:
-                expression = f"ResourceDefinition(decode_resource({pprint.pformat({'kind':kind, **payload}, sort_dicts=False)}))"
+    from tests.fixtures.support.projects import register_root
+    project.mkdir(parents=True, exist_ok=True)
+    register_root(project, target)
+    suffix = ".py" if target == "python" else ".ts"
+    stem = Path(filename or "code_plugin").stem
+    package = project / "plugins" / stem
+    package.mkdir(parents=True, exist_ok=True)
+    groups = {"plugin": [], "nodes": [], "base_lib": []}
+    for entry in values:
+        payload = deepcopy(entry[1] if isinstance(entry, tuple) else entry)
+        kind = payload["kind"]
+        groups["nodes" if kind == "node" else "base_lib" if kind == "base_lib" else "plugin"].append(payload)
+    python_names = "Plugin,node,node_type,rule,ruleset,data_schema,base_lib,capability,ResourceDefinition"
+    javascript_names = "definePlugin,defineNode,defineNodeType,defineRule,defineRuleset,defineDataSchema,defineBaseLib,defineCapability,defineResource"
+    for group, declarations in groups.items():
+        path = package / ("plugin" + suffix) if group == "plugin" else project / group / (stem + "_declarations" + suffix)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        lines, names = [], []
+        for index, payload in enumerate(declarations):
+            payload = dict(payload)
+            kind = payload.pop("kind")
+            for implementation in payload.get("implementations", ()):
+                if kind == "rule":
+                    implementation.pop("implementation_files", None)
+                    continue
+                implementation["implementation_files"] = [
+                    {**member, "ref": os.path.relpath(project / member["ref"], path.parent)}
+                    if isinstance(member, dict) and member.get("kind") == "file" and not Path(member["ref"]).is_absolute()
+                    else member for member in implementation.get("implementation_files", ())]
+            name = "resource_" + str(index)
+            names.append(name)
+            if target == "python":
+                if kind not in _CONSTRUCTORS:
+                    expression = f"ResourceDefinition(decode_resource({pprint.pformat({'kind':kind, **payload}, sort_dicts=False)}))"
+                else:
+                    if kind in {"node", "rule", "base_lib"} and payload.get("implementations"):
+                        payload["source"] = payload["implementations"][0]["source"]
+                    expression = f"{_CONSTRUCTORS[kind]}(**{pprint.pformat(payload, sort_dicts=False)})"
+                lines.append(f"{name} = {expression}")
             else:
-                if kind in {"node", "rule", "base_lib"}:
-                    payload["source"] = payload["implementations"][0]["source"]
-                expression = f"{constructors[kind]}(**{pprint.pformat(payload, sort_dicts=False)})"
-            lines.append(f"{name} = {expression}")
+                mapping = {kind: name for name, kind in _JAVASCRIPT_CONSTRUCTORS.items()}
+                constructor = mapping.get(kind, "defineResource")
+                lines.append(f"export const {name} = {constructor}({json.dumps({'kind':kind, **payload} if constructor == 'defineResource' else payload)});")
+        if target == "python":
+            prefix = f"from vibeflow.targets.python.sdk import {python_names}\nfrom vibeflow.core.descriptors.decode import decode_resource\n"
+            if group == "plugin":
+                lines.append(f"plugin = Plugin(id={plugin_id!r}, resources=[{', '.join(names)}])")
         else:
-            mapping = {"node":"defineNode", "rule":"defineRule", "ruleset":"defineRuleset",
-                "data_schema":"defineDataSchema", "base_lib":"defineBaseLib", "capability":"defineCapability", "host_extension":"defineHostExtension"}
-            constructor = mapping.get(kind, "defineResource")
-            lines.append(f"export const {name} = {constructor}({json.dumps({'kind':kind, **payload} if constructor == 'defineResource' else payload)});")
-    if target == "python":
-        prefix = "from vibeflow.targets.python.sdk import Plugin,node,rule,ruleset,data_schema,base_lib,capability,host_extension,ResourceDefinition\nfrom vibeflow.core.descriptors.decode import decode_resource\n"
-        lines.append(f"plugin = Plugin(id={plugin_id!r}, resources=[{', '.join(names)}])")
-    else:
-        prefix = 'import {definePlugin,defineNode,defineRule,defineRuleset,defineDataSchema,defineBaseLib,defineCapability,defineHostExtension,defineResource} from "@vibeflow/plugin";\n'
-        lines.append(f"export const plugin = definePlugin({{id:{json.dumps(plugin_id)}, resources:[{', '.join(names)}]}});")
-    (project / filename).write_text(prefix + "\n\n".join(lines) + "\n")
-    return {"source": {"kind": "file", "ref": filename, "export": "plugin"}}
+            prefix = f'import {{{javascript_names}}} from "@vibeflow/plugin";\n'
+            if group == "plugin":
+                lines.append(f"export const plugin = definePlugin({{id:{json.dumps(plugin_id)}, resources:[{', '.join(names)}]}});")
+        path.write_text(prefix + "\n\n".join(lines) + "\n")
+    return {"source": {"kind": "file", "ref": (package / ("plugin" + suffix)).relative_to(project).as_posix(), "export": "plugin"}}
 
 
 def publish_native_fixture(config_path, registry, *, keys=None):
@@ -178,27 +220,28 @@ def publish_native_fixture(config_path, registry, *, keys=None):
 
 def write_lifecycle_fixture(project, *, source, plugin_id, plugin_type="runtime", config=None,
                             priority=100, filename="lifecycle_plugin.py"):
-    """Declare a lifecycle factory from an explicit implementation locator."""
+    """Author one package, including the supplied lifecycle implementation."""
     project = Path(project)
-    if source["kind"] == "file":
-        module = Path(source["ref"]).with_suffix("").as_posix().replace("/", ".")
-    elif source["kind"] == "module":
-        module = source["ref"]
-    else:
-        raise ValueError("Python lifecycle fixtures require file or module sources")
+    if source["kind"] != "file":
+        raise ValueError("fixture lifecycle implementation must be an explicit file")
+    package = project / "plugins" / Path(filename).stem
+    package.mkdir(parents=True, exist_ok=True)
+    original = project / source["ref"]
+    destination = package / original.name
+    shutil.copyfile(original, destination)
+    module = destination.stem
     export = source["export"]
     code = f'''from vibeflow.targets.python.sdk import Plugin
-
+from .{module} import {export} as Implementation
 def create(context):
-    from {module} import {export}
-    instance = {export}()
+    instance = Implementation()
     instance.config = context["config"]
     if hasattr(instance, "configure"):
         instance.configure(context["config"])
     return instance
-
 plugin = Plugin(id={plugin_id!r}, {plugin_type}=create, priority={priority!r},
     display_name={plugin_id!r}, description="Native lifecycle fixture", version="1.0")
 '''
-    (project / filename).write_text(code)
-    return {"source": {"kind": "file", "ref": filename, "export": "plugin"}, "config": config or {}}
+    entry = package / "plugin.py"
+    entry.write_text(code)
+    return {"source": {"kind": "file", "ref": entry.relative_to(project).as_posix(), "export": "plugin"}, "config": config or {}}

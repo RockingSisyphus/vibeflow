@@ -3,7 +3,7 @@ import ast
 import pytest
 from tests.fixtures.support.strict_support import PurityPolicy
 from tests.fixtures.support.rule_inspection import node_document, _inspect_node_source as _inspect_declared_source
-from vibeflow.targets.python.nodetypes.protocols import EFFECT_SCOPE_NONE, EFFECT_SCOPE_TERMINAL, EFFECT_SCOPE_PYTHON_IO, EFFECT_SCOPE_GLOBAL_STATE
+from vibeflow.targets.python.sdk.protocols import EFFECT_SCOPE_NONE, EFFECT_SCOPE_TERMINAL, EFFECT_SCOPE_PYTHON_IO, EFFECT_SCOPE_GLOBAL_STATE
 from vibeflow.targets.python.rules.node.effect_policy import call_violation, import_violation_code
 from vibeflow.targets.python.quality.source_analysis.types import _default_rule_id
 

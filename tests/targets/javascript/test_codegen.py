@@ -31,7 +31,7 @@ RESOURCE_NAMES = (
     'coordination/workflow_host.mjs',
     'coordination/workflow_node.mjs',
     'sdk.d.ts',
-    'sdk.mjs',
+    'sdk.mjs', 'node_declarations.mjs', 'node_contracts.d.ts',
     'sdk_loader.mjs',
     'source_ownership.mjs',
     'status_helpers.mjs',
@@ -145,17 +145,19 @@ def test_published_sdk_supports_node_declarations_and_types(tmp_path) -> None:
     sdk = tmp_path / "kernel/javascript/sdk.mjs"
     program = f'''
 import {{strict as assert}} from "node:assert";
-import {{defineNode, definePlugin}} from {json.dumps(sdk.as_uri())};
+import {{defineNode, definePlugin, defineNodeType}} from {json.dumps(sdk.as_uri())};
 const node = defineNode({{
-  type_key: "sample", contract: {{}},
+  node_type:"vibeflow.node", id: "sample", contract: {{}},
   __origin: {{path: "/example/plugin.mjs", symbol: "sample"}},
   run(inputs) {{return {{value: inputs.value + 1}};}}
 }});
 assert.deepEqual(node.run({{value: 4}}), {{value: 5}});
 assert.equal(node.descriptor.flow_kind, "process");
 assert.equal(node.descriptor.display_name, "sample");
-const plugin = definePlugin({{id: "example", resources: [node]}});
-assert.equal(plugin.resources[0].descriptor.implementations[0].source.export, "sample.run");
+assert.equal(node.descriptor.implementations[0].source.export, "sample.run");
+assert.throws(()=>definePlugin({{id:"bad",resources:[node]}}),/business Nodes/);
+const plugin=definePlugin({{id:"example",resources:[defineNodeType({{id:"shell"}})]}});
+assert.equal(plugin.resources[0].descriptor.kind,"node_type");
 '''
     result = subprocess.run(["node", "--input-type=module", "--eval", program],
                             capture_output=True, text=True, check=False)
@@ -163,7 +165,7 @@ assert.equal(plugin.resources[0].descriptor.implementations[0].source.export, "s
 
     consumer = tmp_path / "consumer.ts"
     consumer.write_text('''import {defineNode, type NodeRunContext} from "./kernel/javascript/sdk";
-const node = defineNode({type_key: "sample", contract: {},
+const node = defineNode({"node_type":"vibeflow.node",id: "sample", contract: {},
     run(inputs: {value: number}, params: {}, context: NodeRunContext) {
         context.trace("sample", {value: inputs.value});
         return {value: inputs.value + 1};

@@ -10,24 +10,29 @@ from typing import Any, Mapping
 from vibeflow.core.descriptors.catalogs import DescriptorCatalogs, DescriptorCatalogError
 from vibeflow.core.descriptors.json_values import freeze_mapping
 from vibeflow.core.descriptors.models import DescriptorModelError, _required_text
+from vibeflow.core.descriptors.ownership import ResourceOwner
 
 
-PLUGIN_ABI = "vibeflow.plugin.v3"
+PLUGIN_ABI = "vibeflow.plugin.v4"
 RESOURCE_GROUPS = {
+    "node_type": "node_types",
     "node": "nodes", "rule": "rules", "ruleset": "rulesets",
     "data_schema": "schemas", "base_lib": "base_libs",
-    "capability": "capabilities", "host_extension": "host_extensions", "plugin": "plugins",
+    "capability": "capabilities",  "plugin": "plugins",
 }
 
 
 def resource_kind(descriptor: Any) -> str:
     """Read typed declaration identity without serializing its contents."""
-    from vibeflow.core.descriptors.models import NodeDescriptor, DataSchemaDescriptor, BaseLibDescriptor, CapabilityDescriptor, HostExtensionDescriptor, PluginDescriptor
+    from vibeflow.core.descriptors.models import NodeDescriptor, DataSchemaDescriptor, BaseLibDescriptor, CapabilityDescriptor, PluginDescriptor
     from vibeflow.core.rules.models import RuleDescriptor, RulesetDescriptor
     from vibeflow.core.descriptors.source_bundle import PluginDeclarationDescriptor
+    from vibeflow.core.descriptors.node_types import NodeTypeDescriptor
+    if isinstance(descriptor, NodeTypeDescriptor):
+        return "node_type"
     types = ((NodeDescriptor, "node"), (RuleDescriptor, "rule"), (RulesetDescriptor, "ruleset"),
              (DataSchemaDescriptor, "data_schema"), (BaseLibDescriptor, "base_lib"),
-             (CapabilityDescriptor, "capability"), (HostExtensionDescriptor, "host_extension"),
+             (CapabilityDescriptor, "capability"),
              (PluginDescriptor, "plugin"), (PluginDeclarationDescriptor, "plugin_declaration"))
     for descriptor_type, kind in types:
         if isinstance(descriptor, descriptor_type):
@@ -37,14 +42,15 @@ def resource_kind(descriptor: Any) -> str:
 
 @dataclass(frozen=True)
 class ResourceOrigin:
-    plugin_id: str
+    owner: ResourceOwner
     path: str
     line: int | None = None
     column: int | None = None
     symbol: str = ""
 
     def __post_init__(self) -> None:
-        _required_text(self.plugin_id, field_name="origin.plugin_id")
+        if not isinstance(self.owner, ResourceOwner):
+            raise DescriptorModelError("origin.owner must be a ResourceOwner")
         for field_name in ("path", "symbol"):
             if not isinstance(getattr(self, field_name), str):
                 raise DescriptorModelError(f"origin.{field_name} must be a string")
@@ -54,7 +60,7 @@ class ResourceOrigin:
                 raise DescriptorModelError(f"origin.{field_name} must be a positive integer")
 
     def to_dict(self) -> dict[str, Any]:
-        return {"plugin_id": self.plugin_id, "path": self.path,
+        return {"owner": self.owner.to_dict(), "path": self.path,
                 **({"line": self.line} if self.line is not None else {}),
                 **({"column": self.column} if self.column is not None else {}), "symbol": self.symbol}
 
@@ -108,10 +114,12 @@ class ContributionBuilder:
         if self._closed:
             raise DescriptorModelError("plugin contributions are already frozen")
         kind = resource_kind(descriptor)
+        if kind == "node":
+            raise DescriptorModelError("Plugins contribute NodeTypes; business Nodes belong in project/root nodes/")
         if kind not in RESOURCE_GROUPS:
             raise DescriptorModelError(f"unsupported plugin resource kind: {kind}")
-        location = origin or ResourceOrigin(self.id, self.source)
-        if not isinstance(location, ResourceOrigin) or location.plugin_id != self.id:
+        location = origin or ResourceOrigin(ResourceOwner("plugin", self.id), self.source)
+        if not isinstance(location, ResourceOrigin) or location.owner.plugin_id != self.id:
             raise DescriptorModelError("resource origin must name the contributing plugin")
         try:
             getattr(self._catalogs, RESOURCE_GROUPS[kind]).register(descriptor, source=location.path, source_location=location.to_dict())
@@ -131,10 +139,12 @@ class ContributionBuilder:
         return PluginContributions(self.id, tuple(self._entries), config or {}, self.source)
 
 
-def compose_contributions(contributions: tuple[PluginContributions, ...]) -> DescriptorCatalogs:
+def compose_contributions(contributions: tuple[PluginContributions, ...], *,
+                          resources: tuple[ResourceDeclaration, ...] = ()) -> DescriptorCatalogs:
     catalogs = DescriptorCatalogs.empty()
     origins, settings, seen = {}, {}, {}
     files = []
+    entries = []
     for plugin in contributions:
         if plugin.id in seen:
             previous = seen[plugin.id]
@@ -144,21 +154,26 @@ def compose_contributions(contributions: tuple[PluginContributions, ...]) -> Des
                                     "previous": {"plugin_id":previous.id,"path":previous.source}}})
         seen[plugin.id] = plugin
         settings[plugin.id] = plugin.config
-        for entry in plugin.resources:
-            descriptor, origin = entry.descriptor, entry.origin
-            group = RESOURCE_GROUPS[resource_kind(descriptor)]
-            key = (group, descriptor.id)
-            try:
-                getattr(catalogs, group).register(descriptor, source=origin.path, source_location={"path":origin.path, **({"line":origin.line} if origin.line else {}), **({"column":origin.column} if origin.column else {})})
-            except DescriptorCatalogError as exc:
-                previous = origins.get(key)
-                error = DescriptorCatalogError(exc.code, exc.message, exc.descriptor_id, exc.source, exc.previous_source,
-                    {"location": {key:value for key,value in origin.to_dict().items() if key in {"line","column"}},
-                     "origins": {"current": origin.to_dict(), "previous": previous.to_dict() if previous else {}}})
-                raise error from exc
-            origins[key] = origin
-            if origin.path not in files:
-                files.append(origin.path)
+        entries.extend(plugin.resources)
+    for entry in resources:
+        if entry.origin.owner.kind == "plugin":
+            raise DescriptorModelError("plugin-owned resources must be selected through their complete plugin")
+        entries.append(entry)
+    for entry in entries:
+        descriptor, origin = entry.descriptor, entry.origin
+        group = RESOURCE_GROUPS[resource_kind(descriptor)]
+        key = (group, descriptor.id)
+        try:
+            getattr(catalogs, group).register(descriptor, source=origin.path, source_location={"path":origin.path, **({"line":origin.line} if origin.line else {}), **({"column":origin.column} if origin.column else {})})
+        except DescriptorCatalogError as exc:
+            previous = origins.get(key)
+            error = DescriptorCatalogError(exc.code, exc.message, exc.descriptor_id, exc.source, exc.previous_source,
+                {"location": {key:value for key,value in origin.to_dict().items() if key in {"line","column"}},
+                 "origins": {"current": origin.to_dict(), "previous": previous.to_dict() if previous else {}}})
+            raise error from exc
+        origins[key] = origin
+        if origin.path not in files:
+            files.append(origin.path)
     from dataclasses import replace
     for group in RESOURCE_GROUPS.values():
         getattr(catalogs, group).freeze()

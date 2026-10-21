@@ -8,7 +8,7 @@ from typing import Mapping
 
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
-from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, LoopSpec, NodeSpec, STATUS_PLANNED
+from vibeflow.core.flow import GraphConfig, LOOP_DEFINITION_IDS, LoopSpec, NodeCallSpec, STATUS_PLANNED
 from vibeflow.core.constants import FLOW_KIND_GLOBAL_STATE
 from vibeflow.core.planned import effective_planned_behavior
 from vibeflow.tooling.presentation.node_presentation import registry_descriptor, resolve_presentation
@@ -21,8 +21,7 @@ from vibeflow.tooling.application.python.presentation.review_model import (
     node_flow_kind,
     node_review_effect_scope,
     node_review_metadata,
-    reachable_nodesets,
-    registry_node_class,
+    reachable_nodeset_types,
     rendered_resources_payload,
     resources_payload,
     source_reference,
@@ -50,24 +49,25 @@ def build_architecture_facts(prepared) -> dict[str, object]:
     payload = {
         "project_target": "python",
         "workflow": _workflow_document(graph, actual_compiled, registry=registry, resources=resources, prepared=prepared),
-        "nodesets": _nodesets_document(graph, registry=registry, prepared=prepared),
-        "node_types": _node_types_document(graph, registry=registry, roots=roots),
+        "nodeset_types": _nodeset_types_document(graph, registry=registry, prepared=prepared),
+        "node_definitions": _node_definitions_document(graph, registry=registry, roots=roots),
+        "node_types": registry.prepared_resources.catalogs.node_types.to_dict() if getattr(registry, "prepared_resources", None) else {},
         "resources": _resources_document(graph, resources, roots=roots),
     }
-    if getattr(registry, "loaded_plugins", None) is not None and prepared.source_config_available:
+    if getattr(registry, "prepared_resources", None) is not None and prepared.source_config_available:
         from vibeflow.tooling.presentation.resource_architecture import resource_architecture
         sources = prepared.source_context
-        catalogs = registry.loaded_plugins.catalogs
+        catalogs = registry.prepared_resources.catalogs
         payload["implementation_graph"] = resource_architecture(catalogs,project_root=graph.root_path,
             source_facts=prepared.implementation_sources,selections=getattr(resources, "selection_facts", resources if isinstance(resources, Mapping) else {}),
-            selected_nodes={item.type_key for item in sources.nodes},
+            selected_nodes={item.definition_id for item in sources.nodes},
             findings=getattr(registry,"review_findings",()),
             roots={str(root_id):str(path) for path,root_id in registry.source_root_ids.items()})
     from vibeflow.core.rules.planning import selection_report
     payload["call_effect_scopes"] = [{"call_path":list(path), "effect_scope":scope} for path,scope in sorted(getattr(registry,"call_effect_scopes",{}).items())]
     from vibeflow.tooling.presentation.workflow_facts import policy_facts
     payload["call_policies"] = policy_facts(getattr(registry, "call_capability_policies", {}))
-    catalogs = getattr(getattr(registry, "loaded_plugins", None), "catalogs", None)
+    catalogs = getattr(getattr(registry, "prepared_resources", None), "catalogs", None)
     if catalogs is not None:
         payload["rule_selections"] = selection_report(graph, catalogs)
     from vibeflow.tooling.presentation.portable_paths import portable_paths
@@ -113,10 +113,10 @@ def _workflow_document(
     }
 
 
-def _nodesets_document(graph: GraphConfig, *, registry: object | None, prepared=None) -> dict[str, object]:
-    reachable = reachable_nodesets(graph)
+def _nodeset_types_document(graph: GraphConfig, *, registry: object | None, prepared=None) -> dict[str, object]:
+    reachable = reachable_nodeset_types(graph)
     documents: dict[str, object] = {}
-    for type_key, nodeset in sorted(graph.nodesets.items()):
+    for type_key, nodeset in sorted(graph.nodeset_types.items()):
         source = source_reference(nodeset.root_id, nodeset.root_path, nodeset.source_path)
         body = None
         if nodeset.graph.nodes:
@@ -197,7 +197,7 @@ def _graph_body_document(
 def _node_document(
     graph: GraphConfig,
     compiled: CompiledGraph,
-    node: NodeSpec,
+    node: NodeCallSpec,
     *,
     registry: object | None,
     graph_lock_scope: str,
@@ -206,8 +206,8 @@ def _node_document(
     source = source_reference(graph.root_id, graph.root_path, graph.source_path)
     invocation = invocation_for_node(graph, node)
     target = invocation.nodeset if invocation is not None else None
-    descriptor = registry_descriptor(registry, node.type_used)
-    selected_rulesets = selection_data(target.graph.rulesets) if target is not None else selection_data(node.rulesets if node.rulesets is not None else registry.rulesets(node.type_used)) if descriptor is not None else []
+    descriptor = registry_descriptor(registry, node.definition_id)
+    selected_rulesets = selection_data(target.graph.rulesets) if target is not None else selection_data(node.rulesets if node.rulesets is not None else registry.rulesets(node.definition_id)) if descriptor is not None else []
     planned = node.status == STATUS_PLANNED or getattr(target, "status", "") == STATUS_PLANNED
     invokes = None
     if invocation is not None:
@@ -244,7 +244,7 @@ def _node_document(
             )
     return {
         "id": node.id,
-        "type_used": node.type_used,
+        "definition_id": node.definition_id,
         "source": source,
         "role": node_review_metadata(graph, node, registry),
         "flow_kind": node_flow_kind(node, compiled),
@@ -252,7 +252,7 @@ def _node_document(
         "selected_rulesets": selected_rulesets,
         "tags": list(descriptor.tags) if descriptor is not None else [],
         "metadata": dict(descriptor.metadata) if descriptor is not None else {},
-        "presentation": resolve_presentation(registry_descriptor(registry, node.type_used), flow_kind=node_flow_kind(node, compiled), native_class=("loopNode" if node.type_used in LOOP_NODE_TYPES else "nodesetNode") if invocation is not None else "", status_class="plannedNode" if planned else "", call_style=node.style, node=node, compiled=compiled).to_dict(),
+        "presentation": resolve_presentation(registry_descriptor(registry, node.definition_id), flow_kind=node_flow_kind(node, compiled), native_class=("loopNode" if node.definition_id in LOOP_DEFINITION_IDS else "nodesetNode") if invocation is not None else "", status_class="plannedNode" if planned else "", call_style=node.style, node=node, compiled=compiled).to_dict(),
         "effect_scope": node_review_effect_scope(graph, node, registry, compiled=compiled),
 
         "execution_lock": (
@@ -286,14 +286,14 @@ def _node_document(
     }
 
 
-def _contract_source(graph: GraphConfig, node: NodeSpec) -> str:
+def _contract_source(graph: GraphConfig, node: NodeCallSpec) -> str:
     if node.status == STATUS_PLANNED:
         return "planned_config"
-    if node.type_used in LOOP_NODE_TYPES:
+    if node.definition_id in LOOP_DEFINITION_IDS:
         return "system_config"
     if invocation_for_node(graph, node) is not None:
         return "nodeset"
-    return "node_type"
+    return "node_definition"
 
 
 def _execution_lock_payload(lock: object, *, scope: str) -> dict[str, str]:
@@ -302,7 +302,7 @@ def _execution_lock_payload(lock: object, *, scope: str) -> dict[str, str]:
 
 def _effective_execution_lock(
     graph: GraphConfig,
-    node: NodeSpec,
+    node: NodeCallSpec,
     *,
     invocation: object | None,
     graph_lock_scope: str,
@@ -376,47 +376,46 @@ def _edge_document(graph: GraphConfig, compiled: CompiledGraph, edge: object) ->
     }
 
 
-def _node_types_document(
+def _node_definitions_document(
     graph: GraphConfig,
     *,
     registry: object | None,
     roots: Mapping[str, str],
 ) -> dict[str, object]:
-    occurrences = _node_type_occurrences(graph)
+    occurrences = _node_definition_occurrences(graph)
     return {
-        type_key: _node_type_document(type_key, nodes, registry=registry, roots=roots)
-        for type_key, nodes in sorted(occurrences.items())
+        node_id: _node_definition_document(node_id, nodes, registry=registry, roots=roots)
+        for node_id, nodes in sorted(occurrences.items())
     }
 
 
-def _node_type_occurrences(graph: GraphConfig) -> dict[str, list[tuple[GraphConfig, NodeSpec]]]:
-    occurrences: dict[str, list[tuple[GraphConfig, NodeSpec]]] = {}
-    bodies = [graph, *(nodeset.graph for _, nodeset in sorted(graph.nodesets.items()))]
+def _node_definition_occurrences(graph: GraphConfig) -> dict[str, list[tuple[GraphConfig, NodeCallSpec]]]:
+    occurrences: dict[str, list[tuple[GraphConfig, NodeCallSpec]]] = {}
+    bodies = [graph, *(nodeset.graph for _, nodeset in sorted(graph.nodeset_types.items()))]
     for body in bodies:
         for node in body.nodes:
-            if node.type_used not in LOOP_NODE_TYPES and invocation_for_node(body, node) is not None:
+            if node.definition_id not in LOOP_DEFINITION_IDS and invocation_for_node(body, node) is not None:
                 continue
-            occurrences.setdefault(node.type_used, []).append((body, node))
+            occurrences.setdefault(node.definition_id, []).append((body, node))
     return occurrences
 
 
-def _node_type_document(
-    type_key: str,
-    occurrences: list[tuple[GraphConfig, NodeSpec]],
+def _node_definition_document(
+    node_id: str,
+    occurrences: list[tuple[GraphConfig, NodeCallSpec]],
     *,
     registry: object | None,
     roots: Mapping[str, str],
 ) -> dict[str, object]:
-    if type_key in LOOP_NODE_TYPES:
-        return _loop_node_type_document(type_key, roots=roots)
+    if node_id in LOOP_DEFINITION_IDS:
+        return _loop_node_definition_document(node_id, roots=roots)
     has_implemented_occurrence = any(node.status != STATUS_PLANNED for _, node in occurrences)
-    node_cls = registry_node_class(registry, type_key) if has_implemented_occurrence else None
-    descriptor = registry_descriptor(registry, type_key)
+    descriptor = registry_descriptor(registry, node_id)
     if descriptor is None:
         owner, node = occurrences[0]
         metadata = node_review_metadata(owner, node, registry)
         return {
-            "type_key": type_key,
+            "id": node_id,
             "source": source_reference(owner.root_id, owner.root_path, owner.source_path),
             "info": {
                 "display_name": metadata["display_name"],
@@ -429,24 +428,26 @@ def _node_type_document(
             "rulesets": [],
         }
     return {
-        "type_key": type_key,
-        "source": _python_source(node_cls, roots=roots) if node_cls is not None else _declared_python_source(registry, type_key, descriptor, roots=roots),
-        "declaration": next((source_reference(root_id, root_path, registry.source_info(type_key).path)
+        "id": node_id,
+        "node_type": descriptor.node_type,
+        "source": _declared_python_source(registry, node_id, descriptor, roots=roots),
+        "declaration": next((source_reference(root_id, root_path, registry.source_info(node_id).path)
                              for root_id, root_path in sorted(roots.items())
-                             if source_reference(root_id, root_path, registry.source_info(type_key).path).get("path")), {}),
-        "info": {**_node_info_document(descriptor), "effect_scope": registry.effect_scope(type_key) if has_implemented_occurrence else "unavailable"},
+                             if source_reference(root_id, root_path, registry.source_info(node_id).path).get("path")), {}),
+        "info": {**_node_info_document(descriptor), "effect_scope": registry.effect_scope(node_id) if has_implemented_occurrence else "unavailable"},
         "contract": _node_contract_document(descriptor.contract),
-        "rulesets": selection_data(registry.rulesets(type_key)),
-        "declared_presentation":dict(descriptor.presentation),
+        "rulesets": selection_data(registry.rulesets(node_id)),
+        "declared_presentation":dict(getattr(descriptor, "declaration", descriptor).presentation),
+        "declared_rulesets":selection_data(getattr(descriptor, "declaration", descriptor).rulesets),
         "presentation": resolve_presentation(descriptor).to_dict(),
-        "config": _node_config_document(registry, type_key),
+        "config": _node_config_document(registry, node_id),
     }
 
 
-def _loop_node_type_document(type_key: str, *, roots: Mapping[str, str]) -> dict[str, object]:
+def _loop_node_definition_document(node_id: str, *, roots: Mapping[str, str]) -> dict[str, object]:
     field_schema = loop_field_schema()
     return {
-        "type_key": type_key,
+        "id": node_id,
         "source": {
             **_python_source(LoopSpec, roots=roots),
             "runtime": {
@@ -517,9 +518,9 @@ def _node_contract_document(contract: object) -> dict[str, object]:
     }
 
 
-def _node_config_document(registry: object, type_key: str) -> dict[str, object] | None:
+def _node_config_document(registry: object, node_id: str) -> dict[str, object] | None:
     try:
-        config_spec = registry.get_config_spec(type_key)
+        config_spec = registry.get_config_spec(node_id)
     except Exception:
         return None
     return _snapshot(config_spec.to_dict())
@@ -535,7 +536,7 @@ def _resources_document(
     base_lib = payload.get("base_lib", {})
     modules = base_lib.get("modules", ()) if isinstance(base_lib, Mapping) else ()
     plugins = payload.get("plugins", ())
-    host_extensions = payload.get("host_extensions", ())
+
     document = {
         "base_lib": [
             _resource_document(item, kind="base_lib", roots=roots)
@@ -548,16 +549,8 @@ def _resources_document(
             if isinstance(item, Mapping)
         ],
     }
-    rendered_host_extensions = [
-            _resource_document(item, kind="host_extension", roots=roots)
-            for item in sorted(
-                host_extensions,
-                key=lambda item: str(item.get("id", "")),
-            )
-            if isinstance(item, Mapping)
-    ]
-    if rendered_host_extensions:
-        document["host_extensions"] = rendered_host_extensions
+
+
     return document
 
 
@@ -578,30 +571,6 @@ def _resource_document(item: Mapping[str, object], *, kind: str, roots: Mapping[
     }
     if kind == "base_lib":
         return {"module": str(item.get("module", "") or ""), **common}
-    if kind == "host_extension":
-        return {
-            "targets": sorted(
-                str(value)
-                for value in item.get("targets", ())
-                if isinstance(value, str)
-            ),
-            "provides": sorted(
-                str(value)
-                for value in item.get("provides", ())
-                if isinstance(value, str)
-            ),
-            "dependencies": sorted(
-                str(value)
-                for value in item.get("dependencies", ())
-                if isinstance(value, str)
-            ),
-            "config_keys": sorted(
-                str(key)
-                for key in item.get("config_keys", ())
-                if isinstance(key, str)
-            ),
-            **common,
-        }
     plugin_document: dict[str, object] = {
         "name": str(item.get("name", "") or ""),
         "type": str(item.get("type", info_map.get("type", "")) or ""),
@@ -641,7 +610,7 @@ def _config_declaration(value: object, *, source: Mapping[str, str]) -> dict[str
 
 def _root_paths(graph: GraphConfig) -> dict[str, str]:
     roots: dict[str, str] = {}
-    candidates = [(graph.root_id, graph.root_path), *((item.root_id, item.root_path) for item in graph.nodesets.values())]
+    candidates = [(graph.root_id, graph.root_path), *((item.root_id, item.root_path) for item in graph.nodeset_types.values())]
     for root_id, root_path in candidates:
         if root_id and root_path:
             roots[str(root_id)] = str(root_path)
@@ -669,8 +638,8 @@ def _python_source(node_cls: type, *, roots: Mapping[str, str]) -> dict[str, obj
     return payload
 
 
-def _declared_python_source(registry, type_key, descriptor, *, roots):
-    location = getattr(registry, "source_locations", {}).get(type_key)
+def _declared_python_source(registry, node_id, descriptor, *, roots):
+    location = getattr(registry, "source_locations", {}).get(node_id)
     if location is None:
         return {"implementations": [item.to_dict() for item in descriptor.implementations]}
     path, name, root_id, root = location

@@ -88,7 +88,6 @@ def counted_case(work,kernel,toolchain,command="validate"):
     identifier="js.S02.analysis."+("one_check_session" if command=="validate" else "quality_check_session")
     root=project(work/identifier,toolchain)
     args=cli_args(root,command)
-    if command=="quality-check":args += ["--config",str(root/"workflow.jsonc")]
     result=run_probe(root,_COUNT_PROBE,kernel,args=args,name="counted-"+command,toolchain=toolchain)
     observed=result.get("payload") or {"process":result};failures=[]
     if result["exit_code"]!=0 or observed.get("exit_code")!=0 or observed.get("status") not in {"PASS","CONCERNS"}:

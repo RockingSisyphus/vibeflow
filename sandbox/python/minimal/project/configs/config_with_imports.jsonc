@@ -1,0 +1,70 @@
+{
+  "base_lib": {
+    "modules": [
+      "base_lib.math_tools"
+    ]
+  },
+  "nodeset_imports": [
+    {
+      "path": "nodeset_types/add_one.jsonc"
+    }
+  ],
+  "pipeline": {
+    "nodes": [
+      {
+        "display_name": "Start",
+        "description": "Starts the imported-nodeset example pipeline.",
+        "id": "start",
+        "definition_id": "example.start"
+      },
+      {
+        "display_name": "Seed Value",
+        "description": "Produces the initial value.",
+        "value": 4,
+        "id": "seed",
+        "definition_id": "example.seed"
+      },
+      {
+        "display_name": "Add One Flow",
+        "description": "Runs the imported add-one nodeset.",
+        "id": "add_one_flow",
+        "definition_id": "example.add_one"
+      },
+      {
+        "display_name": "End",
+        "description": "Consumes the final pipeline output.",
+        "id": "end",
+        "definition_id": "example.end"
+      }
+    ],
+    "edges": [
+      [
+        "start",
+        "seed"
+      ],
+      [
+        "seed",
+        "add_one_flow"
+      ],
+      [
+        "add_one_flow",
+        "end"
+      ]
+    ],
+    "outputs": [
+      {
+        "type": "value.out",
+        "cardinality": "exactly_one",
+        "display_name": "Value Out"
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugins/code_plugin/plugin.py"
+      }
+    }
+  ]
+}

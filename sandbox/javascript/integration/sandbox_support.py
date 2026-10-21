@@ -237,7 +237,7 @@ try {{
         thread.join(timeout=5)
 
 
-def run_browser_long_host(
+def run_browser_message_loop(
     web_dir: Path,
     *,
     puppeteer_root: Path,
@@ -283,7 +283,7 @@ try {{
     );
 
     assert(state.messages.length === 0, "page import produced host messages");
-    const resolvedWorkflow = moduleEntry
+    const loadedWorkflow = moduleEntry
       ? await import(new URL(moduleEntry, location.href).href)
       : await new Promise(resolve => {{
           document.dispatchEvent(new CustomEvent(
@@ -291,17 +291,22 @@ try {{
             {{ detail: {{ resolve }} }},
           ));
         }});
+    const adapter = moduleEntry ? await import(new URL("session.mjs",location.href).href) : null;
+    const resolvedWorkflow = moduleEntry ? {{
+      ...loadedWorkflow,
+      createSession:entry=>adapter.createBrowserSession(loadedWorkflow,entry),
+    }} : loadedWorkflow;
     assert(
-      typeof resolvedWorkflow?.createWorkflowHost === "function",
-      "workflow host factory is unavailable",
+      typeof resolvedWorkflow?.runWorkflowAsync === "function",
+      "workflow entry is unavailable",
     );
     const afterImport = [...state.messages];
     assert(afterImport.length === 0, "module import started host work");
 
-    const first = resolvedWorkflow.createWorkflowHost();
-    const second = resolvedWorkflow.createWorkflowHost();
+    const first = resolvedWorkflow.createSession();
+    const second = resolvedWorkflow.createSession();
     const afterCreate = [...state.messages];
-    assert(afterCreate.length === 0, "createWorkflowHost registered active work");
+    assert(afterCreate.length === 0, "API construction registered active work");
 
     window.postMessage({{
       kind: "vibeflow-sandbox-input",
@@ -318,7 +323,7 @@ try {{
       () => messages("vibeflow-sandbox-lifecycle").filter(
         item => item.phase === "start",
       ).length === 1,
-      "first Host Extension start",
+      "first explicit listener start",
     );
     window.postMessage({{
       kind: "vibeflow-sandbox-bind",
@@ -326,7 +331,7 @@ try {{
     }}, "*");
     await waitUntil(
       () => messages("vibeflow-sandbox-bound").some(item => item.hostId === 1),
-      "first Host Extension binding",
+      "first explicit listener binding",
     );
 
     await second.start();
@@ -334,7 +339,7 @@ try {{
       () => messages("vibeflow-sandbox-lifecycle").filter(
         item => item.phase === "start",
       ).length === 2,
-      "second Host Extension start",
+      "second explicit listener start",
     );
     window.postMessage({{
       kind: "vibeflow-sandbox-bind",
@@ -342,7 +347,7 @@ try {{
     }}, "*");
     await waitUntil(
       () => messages("vibeflow-sandbox-bound").some(item => item.hostId === 2),
-      "second Host Extension binding",
+      "second explicit listener binding",
     );
 
     for (const [hostId, value] of [[1, 4], [1, 7], [2, 10]]) {{
@@ -357,8 +362,8 @@ try {{
       "queued browser inputs",
     );
 
-    const firstInvocation = first.runWorkflowAsync({{}});
-    const secondInvocation = second.runWorkflowAsync({{}});
+    const firstInvocation = first.completion;
+    const secondInvocation = second.completion;
     const observe = invocation => invocation.then(
       () => "completed",
       error => error?.code ?? String(error),
@@ -399,7 +404,7 @@ try {{
       () => messages("vibeflow-sandbox-lifecycle").filter(
         item => item.phase === "stop",
       ).length === 2,
-      "idempotent Host Extension stops",
+      "idempotent explicit listener stops",
     );
     await delay(50);
 
@@ -420,16 +425,37 @@ try {{
     const lifecycle = messages("vibeflow-sandbox-lifecycle");
     assert(
       lifecycle.filter(item => item.phase === "start").length === 2,
-      "Host Extension started more than once",
+      "explicit listener started more than once",
     );
     assert(
       lifecycle.filter(item => item.phase === "stop").length === 2,
-      "Host Extension stopped more than once",
+      "explicit listener stopped more than once",
     );
+    const normal = resolvedWorkflow.createSession("once");
+    normal.start();
+    await waitUntil(()=>messages("vibeflow-sandbox-lifecycle").filter(x=>x.phase==="start").length===3,"finite entry open");
+    window.postMessage({{kind:"vibeflow-sandbox-bind",hostId:3}},"*");
+    await waitUntil(()=>messages("vibeflow-sandbox-bound").some(x=>x.hostId===3),"finite entry bind");
+    window.postMessage({{kind:"vibeflow-sandbox-input",hostId:3,value:1}},"*");
+    await normal.completion;
+    await waitUntil(()=>messages("vibeflow-sandbox-lifecycle").filter(x=>x.phase==="stop").length===3,"explicit close Node");
+    assert(messages("vibeflow-sandbox-output").some(x=>x.hostId===3&&x.value===5),"finite entry result");
+
+    const failed = resolvedWorkflow.createSession();
+    failed.start();
+    await waitUntil(()=>messages("vibeflow-sandbox-lifecycle").filter(x=>x.phase==="start").length===4,"error entry open");
+    window.postMessage({{kind:"vibeflow-sandbox-bind",hostId:4}},"*");
+    await waitUntil(()=>messages("vibeflow-sandbox-bound").some(x=>x.hostId===4),"error entry bind");
+    window.postMessage({{kind:"vibeflow-sandbox-input",hostId:4,value:"invalid-number"}},"*");
+    const errorCode = await failed.completion.then(()=>"completed",error=>error?.code);
+    assert(errorCode==="VF_OUTPUT_SCHEMA",`unexpected processing error: ${{errorCode}}`);
+    await waitUntil(()=>messages("vibeflow-sandbox-lifecycle").filter(x=>x.phase==="stop").length===4,"error cleanup");
+    assert(state.unhandledRejections.length===0,"error cleanup produced an unhandled rejection");
     return {{
       afterImport,
       afterCreate,
       failureCodes,
+      errorCode,
       firstOutputs,
       secondOutputs,
       waiting: messages("vibeflow-sandbox-waiting").map(item => ({{

@@ -25,14 +25,14 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     },
     {
       "source": {
         "kind": "file",
-        "ref": "plugins/value_plugin.py",
+        "ref": "plugins/value_shift/plugin.py",
         "export": "plugin"
       },
       "config": {
@@ -58,13 +58,13 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.start",
+        "definition_id": "sandbox.start",
         "display_name": "Start",
         "description": "Runs start."
       },
       {
         "id": "add_pair",
-        "type_used": "semantic.add_pair",
+        "definition_id": "semantic.add_pair",
         "display_name": "Add Pair",
         "description": "Runs add_pair."
       },
@@ -74,7 +74,7 @@
         "subtrahend": 999,
         "divisor": 999,
         "id": "resource_calc",
-        "type_used": "sandbox.resource_arithmetic",
+        "definition_id": "sandbox.resource_arithmetic",
         "display_name": "Resource Calc",
         "description": "Runs resource_calc."
       },
@@ -85,13 +85,13 @@
         },
         "allow_config_override": false,
         "id": "configured_finalize",
-        "type_used": "math.configured_finalize",
+        "definition_id": "math.configured_finalize",
         "display_name": "Configured Finalize",
         "description": "Runs configured_finalize."
       },
       {
         "id": "end",
-        "type_used": "semantic.final_end",
+        "definition_id": "semantic.final_end",
         "display_name": "End",
         "description": "Runs end."
       }
@@ -134,7 +134,7 @@
   },
   "nodeset_imports": [
     {
-      "path": "nodesets/pass_config_resources_nodeset_arithmetic/math_configured_finalize.jsonc"
+      "path": "nodeset_types/pass_config_resources_nodeset_arithmetic/math_configured_finalize.jsonc"
     }
   ]
 }

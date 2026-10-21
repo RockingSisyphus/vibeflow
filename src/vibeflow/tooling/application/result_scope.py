@@ -139,6 +139,13 @@ _RULE_COVERAGE = {
     "vibeflow.input_writes": "direct_input_writes",
     "vibeflow.node_interface": "node_contract_shape",
     "vibeflow.maintainability": "source_quality",
+    "vibeflow.project.layout": "project_structure",
+    "vibeflow.root.layout": "project_structure",
+    "vibeflow.root.resources": "config_registration",
+    "vibeflow.root.files": "source_quality",
+    "vibeflow.root.dependencies": "source_quality",
+    "vibeflow.root.duplicates": "source_quality",
+    "vibeflow.root.structure": "project_structure",
     "vibeflow.quality.files": "source_quality",
     "vibeflow.quality.dependencies": "source_quality",
     "vibeflow.quality.duplicates": "source_quality",
@@ -163,7 +170,7 @@ def _selected_checks(payload):
                     if any(record.get("type_id") == "vibeflow.effect_policy.v1"
                            for record in result.get("records", {}).values()):
                         checks.add("effect_boundaries")
-            for name in ("rule_executions", "rule_checks", "subjects", "info", "health", "roots", "workspace_roots", "reports", "source_quality"):
+            for name in ("rule_executions", "rule_checks", "subjects", "info", "health", "roots", "workspace_roots", "reports", "source_quality", "governance"):
                 child = value.get(name)
                 if child is not None:
                     if name == "subjects" and isinstance(child, Mapping):

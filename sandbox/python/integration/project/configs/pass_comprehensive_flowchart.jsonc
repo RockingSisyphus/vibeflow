@@ -11,7 +11,7 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.start",
+        "definition_id": "sandbox.start",
         "display_name": "Start",
         "description": "Runs start."
       },
@@ -20,64 +20,64 @@
           "key": "sandbox.runtime.mode"
         },
         "id": "runtime_mode",
-        "type_used": "sandbox.configure_runtime_mode",
+        "definition_id": "sandbox.configure_runtime_mode",
         "display_name": "Runtime Mode",
         "description": "Configures audited process-local ambient state."
       },
       {
         "id": "input",
-        "type_used": "sandbox.value_input",
+        "definition_id": "sandbox.value_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
         "offset": 1,
         "id": "prepare",
-        "type_used": "sandbox.prepare_value",
+        "definition_id": "sandbox.prepare_value",
         "display_name": "Prepare",
         "description": "Runs prepare."
       },
       {
         "id": "core",
-        "type_used": "comprehensive.core",
+        "definition_id": "comprehensive.core",
         "display_name": "Core",
         "description": "Runs core."
       },
       {
         "threshold": 8,
         "id": "route",
-        "type_used": "sandbox.route_decision",
+        "definition_id": "sandbox.route_decision",
         "display_name": "Route",
         "description": "Runs route."
       },
       {
         "bonus": 5,
         "id": "external",
-        "type_used": "sandbox.external_boost",
+        "definition_id": "sandbox.external_boost",
         "display_name": "External",
         "description": "Runs external."
       },
       {
         "id": "store",
-        "type_used": "sandbox.audit_store",
+        "definition_id": "sandbox.audit_store",
         "display_name": "Store",
         "description": "Runs store."
       },
       {
         "id": "document",
-        "type_used": "sandbox.report_document",
+        "definition_id": "sandbox.report_document",
         "display_name": "Document",
         "description": "Runs document."
       },
       {
         "id": "output",
-        "type_used": "sandbox.report_output",
+        "definition_id": "sandbox.report_output",
         "display_name": "Output",
         "description": "Runs output."
       },
       {
         "id": "end",
-        "type_used": "sandbox.report_end",
+        "definition_id": "sandbox.report_end",
         "display_name": "End",
         "description": "Runs end."
       },
@@ -85,7 +85,7 @@
         "display_name": "Again Branch End",
         "description": "Terminates the inactive again branch in the acyclic comprehensive fixture.",
         "id": "again_end",
-        "type_used": "sandbox.start"
+        "definition_id": "sandbox.start"
       }
     ],
     "edges": [
@@ -154,14 +154,14 @@
   },
   "nodeset_imports": [
     {
-      "path": "nodesets/pass_comprehensive_flowchart/comprehensive_core.jsonc"
+      "path": "nodeset_types/pass_comprehensive_flowchart/comprehensive_core.jsonc"
     }
   ],
   "plugins": [
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

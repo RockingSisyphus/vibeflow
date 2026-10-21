@@ -29,7 +29,7 @@ def analysis(context, inputs, params):
 def _nodeset_analysis(context, graphs):
     """Analyze declaration relationships without fabricating execution calls."""
     from vibeflow.core.nodeset_dependencies import analyze_nodeset_dependencies, nodeset_dependency_cycles, nodeset_depth_violations
-    from vibeflow.core.flow import LOOP_NODE_TYPES
+    from vibeflow.core.flow import LOOP_DEFINITION_IDS
     owned = {item["definition"].type_key: item["definition"] for item in graphs if item.get("definition") is not None}
     definitions = dict(owned)
     pending = list(owned.values())
@@ -40,16 +40,16 @@ def _nodeset_analysis(context, graphs):
         definition = pending.pop()
         graph = definition.graph
         for node in graph.nodes:
-            key = node.loop.body if node.type_used in LOOP_NODE_TYPES else node.type_used
-            child = graph.nodesets.get(key) or background.nodesets.get(key)
+            key = node.loop.body if node.definition_id in LOOP_DEFINITION_IDS else node.definition_id
+            child = graph.nodeset_types.get(key) or background.nodeset_types.get(key)
             if child is None or key in definitions:
                 continue
             if declaration_subtree and child.graph.rulesets is None:
                 definitions[key] = child
                 pending.append(child)
             else:
-                definitions[key] = replace(child, graph=replace(child.graph, nodes=(), edges=(), nodesets={}))
-    graph = replace(context.require("graph"), nodesets=definitions)
+                definitions[key] = replace(child, graph=replace(child.graph, nodes=(), edges=(), nodeset_types={}))
+    graph = replace(context.require("graph"), nodeset_types=definitions)
     return {
         "nodeset_widths": tuple({"type_key":key, "node_count":len(item.graph.nodes),
             "call_paths":tuple(graph["call_path"] for graph in graphs
@@ -64,7 +64,7 @@ def _nodeset_analysis(context, graphs):
 
 
 def topic(name):
-    checker = {"flow": _flow, "join": _join, "nodesets": _nodesets, "duplicates": _duplicates, "planned": _planned}[name]
+    checker = {"flow": _flow, "join": _join, "nodeset_types": _nodesets, "duplicates": _duplicates, "planned": _planned}[name]
     def check(context, inputs, params):
         findings, events, unavailable = [], [], False
         for local in graph_contexts(context, inputs):
@@ -75,14 +75,14 @@ def topic(name):
                 continue
             # Nesting/width uses the analysis of responsible graphs; boundary
             # definitions deliberately contain no child implementation.
-            if name == "nodesets":
+            if name == "nodeset_types":
                 continue
             result = checker(local, {}, params)
             findings.extend(replace(item, details={**item.details, "owner": local.facts["owner"],
                 "call_path": local.facts.get("call_path", ())}) for item in result.findings)
             if name == "planned":
                 events.extend(result.records["events"].value)
-        if name == "nodesets":
+        if name == "nodeset_types":
             measured = inputs["analysis"].value
             limit = params["nodeset_max_depth"]
             if not isinstance(limit, int) or isinstance(limit, bool) or limit <= 0:
@@ -142,5 +142,5 @@ def summary(context, inputs, params):
     return RuleResult({"planned_events": inputs["events"], "workflow_review": inputs["review"]})
 
 
-def nodesets(context, inputs, params):
-    return topic("nodesets")(context, inputs, params)
+def nodeset_types(context, inputs, params):
+    return topic("nodeset_types")(context, inputs, params)

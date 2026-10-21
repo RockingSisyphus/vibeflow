@@ -1,4 +1,4 @@
-export const VIBEFLOW_PLUGIN_ABI: "vibeflow.plugin.v3";
+export const VIBEFLOW_PLUGIN_ABI: "vibeflow.plugin.v4";
 
 export type PluginType = "compiler" | "runtime";
 export type PluginTarget = "node" | "browser";
@@ -12,7 +12,7 @@ export type JsonValue =
   | { readonly [key: string]: JsonValue };
 
 export interface PluginFactoryContext {
-  readonly abiVersion: "vibeflow.plugin.v3";
+  readonly abiVersion: "vibeflow.plugin.v4";
   readonly pluginId: string;
   readonly pluginType: PluginType;
   readonly target: PluginTarget;

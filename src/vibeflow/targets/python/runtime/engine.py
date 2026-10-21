@@ -79,7 +79,7 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         self.graph, self.compiled = self._plan.graph, self._plan.compiled
         graph = self.graph
         self.trace = RuntimeTrace()
-        self._node_runs: dict[str, int] = {node.name: 0 for node in graph.nodes}
+        self._node_runs: dict[str, int] = {node.id: 0 for node in graph.nodes}
         self._frames = self._plan.frames
         self._nodeset_runtimes: dict[str, PipelineRuntime] = {}
         self._run_dir = Path(run_dir) if run_dir is not None else Path("runs") / "vibeflow"

@@ -7,7 +7,7 @@ import tempfile
 from typing import Mapping
 
 from vibeflow.core.constants import FLOW_KIND_DOCUMENT
-from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, NodeSpec, NodesetSpec, STATUS_PLANNED
+from vibeflow.core.flow import GraphConfig, LOOP_DEFINITION_IDS, NodeCallSpec, NodesetTypeSpec, STATUS_PLANNED
 from vibeflow.core.planned import effective_planned_behavior, planned_behavior_label
 from vibeflow.tooling.presentation.mermaid import (
     DEFAULT_MERMAID_MAX_EDGES,
@@ -36,8 +36,8 @@ ReviewCoverage = tuple[str, str, str]
 class _InvocationGroup:
     kind: str
     target: str
-    nodeset: NodesetSpec
-    nodes: tuple[NodeSpec, ...]
+    nodeset: NodesetTypeSpec
+    nodes: tuple[NodeCallSpec, ...]
 
 
 def render_mermaid(
@@ -69,7 +69,7 @@ def render_mermaid(
             + _graph_mermaid(
                 result,
                 group.nodeset.graph,
-                result.compiled_nodesets[group.target],
+                result.compiled_nodeset_types[group.target],
                 direction=_body_direction(group.nodeset.graph),
                 show_contract=show_contract,
                 show_semantics=show_semantics,
@@ -105,13 +105,13 @@ def render_ascii(
                     f" effect_scope={'unavailable' if planned else _effect_scope(compiled, node.id, flow_kind)}"
                 )
             lines.append(
-                f"{indent}- {node.id} [{node.type_used}]{identity} <- {parents}{semantics}"
+                f"{indent}- {node.id} [{node.definition_id}]{identity} <- {parents}{semantics}"
             )
         if expand_nodesets:
             for group in _invocation_groups(graph):
                 append_graph(
                     group.nodeset.graph,
-                    result.compiled_nodesets[group.target],
+                    result.compiled_nodeset_types[group.target],
                     title=f"{group.kind} {group.target}",
                     indent=indent + "  ",
                 )
@@ -296,7 +296,7 @@ def _render_group_fragment(
             max_text_size=max_text_size,
             max_edges=max_edges,
         )
-    compiled = result.compiled_nodesets[group.target]
+    compiled = result.compiled_nodeset_types[group.target]
     children = _invocation_groups(group.nodeset.graph)
     if not children:
         return _render_fragment(
@@ -446,9 +446,9 @@ def _graph_mermaid(
         flow_kind = compiled.flow_kinds.get(node.id, node.flow_kind)
         node_class = _node_class(node, nodeset=nodeset, flow_kind=flow_kind, is_external=is_external)
         presentation = _node_presentation_fact(result, graph, node) or resolve_presentation(descriptor, flow_kind=flow_kind,
-            native_class="externalDependency" if descriptor is not None and bool(getattr(descriptor, "external", False)) and nodeset is None else "loopNode" if node.type_used in LOOP_NODE_TYPES else "nodesetNode" if nodeset is not None else "documentNode" if flow_kind == FLOW_KIND_DOCUMENT else "defaultNode",
+            native_class="externalDependency" if descriptor is not None and bool(getattr(descriptor, "external", False)) and nodeset is None else "loopNode" if node.definition_id in LOOP_DEFINITION_IDS else "nodesetNode" if nodeset is not None else "documentNode" if flow_kind == FLOW_KIND_DOCUMENT else "defaultNode",
             status_class=node_class if node_class == "plannedNode" else "", call_style=node.style, node=node, compiled=compiled)
-        label = [display_name, "", f"id: {node.id}", f"type_used: {node.type_used}"]
+        label = [display_name, "", f"id: {node.id}", f"definition_id: {node.definition_id}"]
         if presentation.values.get("icon"):
             label[0] = f"{presentation.values['icon']} {label[0]}"
         if descriptor is not None:
@@ -456,10 +456,10 @@ def _graph_mermaid(
             label.append(f"rulesets: {', '.join(str(getattr(ref, 'rule_id', ref)) for ref in selection) or 'unconstrained'}")
             if getattr(descriptor, "tags", ()):
                 label.append(f"tags: {', '.join(descriptor.tags)}")
-        if node.type_used in LOOP_NODE_TYPES:
+        if node.definition_id in LOOP_DEFINITION_IDS:
             label.append(f"body: {node.loop.body}")
-        elif node.type_used in graph.nodesets:
-            label.append(f"type_key: {node.type_used}")
+        elif node.definition_id in graph.nodeset_types:
+            label.append(f"type_key: {node.definition_id}")
         if is_planned:
             behavior = effective_planned_behavior(node, nodeset)
             label.extend(
@@ -521,10 +521,10 @@ def _node_presentation_fact(result, graph, node):
     """Render the same checked presentation that the Architecture records."""
     architecture = getattr(result, "architecture", None) or {}
     document = architecture.get("workflow", {}) if graph is result.graph else next((
-        architecture.get("nodesets", {}).get(definition.type_key, {}).get("body") or {}
-        for definition in result.graph.nodesets.values() if definition.graph is graph), {})
+        architecture.get("nodeset_types", {}).get(definition.type_key, {}).get("body") or {}
+        for definition in result.graph.nodeset_types.values() if definition.graph is graph), {})
     for record in document.get("nodes", ()):
-        if record.get("id") == node.id and record.get("type_used") == node.type_used:
+        if record.get("id") == node.id and record.get("definition_id") == node.definition_id:
             presentation = record.get("presentation", {})
             values = presentation.get("values", {})
             if "shape" in values:
@@ -532,19 +532,19 @@ def _node_presentation_fact(result, graph, node):
     return None
 
 
-def _node_descriptor(result: object, node: NodeSpec) -> object | None:
+def _node_descriptor(result: object, node: NodeCallSpec) -> object | None:
     catalogs = getattr(result, "catalogs", None)
     nodes = getattr(catalogs, "nodes", None)
     get_descriptor = getattr(nodes, "get", None)
     if not callable(get_descriptor):
         return None
-    return get_descriptor(node.type_used)
+    return get_descriptor(node.definition_id)
 
 
-def _nodeset_for_node(graph: GraphConfig, node: NodeSpec) -> NodesetSpec | None:
-    if node.type_used in LOOP_NODE_TYPES:
-        return graph.nodesets.get(node.loop.body)
-    return graph.nodesets.get(node.type_used)
+def _nodeset_for_node(graph: GraphConfig, node: NodeCallSpec) -> NodesetTypeSpec | None:
+    if node.definition_id in LOOP_DEFINITION_IDS:
+        return graph.nodeset_types.get(node.loop.body)
+    return graph.nodeset_types.get(node.definition_id)
 
 
 def _body_direction(graph: GraphConfig) -> str:
@@ -553,9 +553,9 @@ def _body_direction(graph: GraphConfig) -> str:
 
 
 def _node_class(
-    node: NodeSpec,
+    node: NodeCallSpec,
     *,
-    nodeset: NodesetSpec | None,
+    nodeset: NodesetTypeSpec | None,
     flow_kind: str,
     is_external: bool,
 ) -> str:
@@ -565,7 +565,7 @@ def _node_class(
         return "plannedNode"
     if is_external:
         return "externalDependency"
-    if node.type_used in LOOP_NODE_TYPES:
+    if node.definition_id in LOOP_DEFINITION_IDS:
         return "loopNode"
     if nodeset is not None:
         return "nodesetNode"
@@ -576,26 +576,26 @@ def _node_class(
 
 def _invocation_groups(graph: GraphConfig) -> tuple[_InvocationGroup, ...]:
     order: list[tuple[str, str]] = []
-    grouped: dict[tuple[str, str], list[NodeSpec]] = {}
-    nodesets: dict[tuple[str, str], NodesetSpec] = {}
+    grouped: dict[tuple[str, str], list[NodeCallSpec]] = {}
+    nodeset_types: dict[tuple[str, str], NodesetTypeSpec] = {}
     for node in graph.nodes:
         kind = ""
         target = ""
-        if node.type_used in LOOP_NODE_TYPES and node.loop.body:
+        if node.definition_id in LOOP_DEFINITION_IDS and node.loop.body:
             kind, target = "loop_body", node.loop.body
-        elif node.type_used in graph.nodesets:
-            kind, target = "nodeset", node.type_used
-        nodeset = graph.nodesets.get(target)
+        elif node.definition_id in graph.nodeset_types:
+            kind, target = "nodeset", node.definition_id
+        nodeset = graph.nodeset_types.get(target)
         if nodeset is None or not nodeset.expand:
             continue
         key = (kind, target)
         if key not in grouped:
             order.append(key)
             grouped[key] = []
-            nodesets[key] = nodeset
+            nodeset_types[key] = nodeset
         grouped[key].append(node)
     return tuple(
-        _InvocationGroup(kind, target, nodesets[(kind, target)], tuple(grouped[(kind, target)]))
+        _InvocationGroup(kind, target, nodeset_types[(kind, target)], tuple(grouped[(kind, target)]))
         for kind, target in order
     )
 
@@ -643,21 +643,17 @@ def _resource_records(result: object) -> tuple[tuple[str, tuple[Mapping[str, obj
         lifecycle = []
         for descriptor in getattr(catalogs, "plugins", ()):
             origin = getattr(catalogs, "origins", {}).get(("plugins", descriptor.id))
-            if origin and origin.plugin_id == record.get("id"):
+            if origin and origin.owner.plugin_id == record.get("id"):
                 lifecycle.append(descriptor.to_dict())
         selected_records.append({**declaration, **dict(record), "_health_status":
             _resource_health_status(result, ("plugin_declaration", "plugin"), (declaration, *lifecycle))})
-    host_catalog = getattr(catalogs, "host_extensions", None)
-    host_records = []
-    for record in result.host_records:
-        descriptor = host_catalog.get(str(record.get("id", ""))) if host_catalog else None
-        merged = {**(descriptor.to_dict() if descriptor else {}), **record}
-        host_records.append({**merged, "_health_status": _resource_health_status(result, ("host_extension",), (merged,))})
+
+
+
     return (
         ("plugins", tuple(selected_records)),
         ("base_lib", tuple({**record, "_health_status": _resource_health_status(result, ("base_lib",), (record,))}
                            for record in base_records)),
-        ("host_extensions", tuple(host_records)),
         ("capabilities", _mapping_records(capabilities)),
     )
 
@@ -725,13 +721,13 @@ def _provider_edge_text(provider: object) -> str:
 def _resource_mermaid(kind: str, records: tuple[Mapping[str, object], ...]) -> str:
     root = _safe_id(f"resource_{kind}")
     lines = ["flowchart LR", f'  {root}@{{ shape: hex, label: "{_escape_label(kind)}" }}']
-    resource_kind = {"plugins": "plugin", "base_lib": "base_lib", "host_extensions": "host_extension"}.get(kind, kind)
+    resource_kind = {"plugins": "plugin", "base_lib": "base_lib"}.get(kind, kind)
     for index, record in enumerate(records):
         resource_id = f"{root}_{index}"
         identifier = str(record.get("id") or record.get("module") or f"{kind}_{index}")
         status = str(record.get("status", "implemented"))
         display_name = str(record.get("display_name", "") or identifier)
-        native_class = {"base_lib": "baseLibResource", "plugin": "pluginResource", "host_extension": "hostExtensionResource"}.get(resource_kind, "")
+        native_class = {"base_lib": "baseLibResource", "plugin": "pluginResource"}.get(resource_kind, "")
         presentation = resolve_presentation(record, resource_kind=resource_kind, native_class=native_class,
             status_class="plannedResource" if status == "planned" else record.get("_health_status", ""), call_style=record.get("style"))
         shape = mermaid_shape(presentation.shape)
@@ -760,9 +756,9 @@ def _effect_scope(compiled: object, node_id: str, flow_kind: str) -> str:
     )
 
 
-def _lock_text(graph: GraphConfig, node: NodeSpec) -> str:
+def _lock_text(graph: GraphConfig, node: NodeCallSpec) -> str:
     if node.execution_lock is not None:
-        scope = "block" if node.type_used in LOOP_NODE_TYPES or node.type_used in graph.nodesets else "node"
+        scope = "block" if node.definition_id in LOOP_DEFINITION_IDS or node.definition_id in graph.nodeset_types else "node"
         return f"{node.execution_lock.key} ({scope})"
     if graph.execution_lock is not None:
         return f"{graph.execution_lock.key} (root, inherited)"

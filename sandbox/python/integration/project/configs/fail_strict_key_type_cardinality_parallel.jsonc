@@ -3,33 +3,33 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.start",
+        "definition_id": "sandbox.start",
         "display_name": "Start",
         "description": "Runs start."
       },
       {
         "value": 4,
         "id": "left",
-        "type_used": "sandbox.branch_left",
+        "definition_id": "sandbox.branch_left",
         "display_name": "Left",
         "description": "Runs left."
       },
       {
         "value": 6,
         "id": "right",
-        "type_used": "sandbox.branch_right",
+        "definition_id": "sandbox.branch_right",
         "display_name": "Right",
         "description": "Runs right."
       },
       {
         "id": "consume_branch",
-        "type_used": "semantic.branch_type_consumer",
+        "definition_id": "semantic.branch_type_consumer",
         "display_name": "Consume Branch",
         "description": "Runs consume_branch."
       },
       {
         "id": "end",
-        "type_used": "semantic.branch_final_end",
+        "definition_id": "semantic.branch_final_end",
         "display_name": "End",
         "description": "Runs end."
       }
@@ -68,7 +68,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

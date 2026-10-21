@@ -50,6 +50,7 @@ def fail_report(
     failure_layer: str,
     *,
     effective_policy: Mapping[str, object] | None = None,
+    details: Mapping[str, object] | None = None,
 ) -> HealthReport:
     return HealthReport(
         status="FAIL",
@@ -62,6 +63,7 @@ def fail_report(
                 failure_layer=failure_layer,
                 message=message,
                 suggested_fix_type="fix_config",
+                details=dict(details or {}),
             ),
         ),
         effective_policy=dict(effective_policy or {}),
@@ -231,7 +233,6 @@ def _workspace_info(workspace: WorkspaceConfig) -> dict[str, object]:
                 "path": str(root.path),
                 "config": str(root.config_path),
                 "project_target": root.project_target,
-                "quality_enabled": root.quality_enabled,
             }
             for root in workspace.roots
         ],
@@ -273,7 +274,7 @@ def _source_for_finding(
                 "source_path": location_path,
             }
     if finding.object_type == "nodeset":
-        nodeset = graph.nodesets.get(finding.object_id)
+        nodeset = graph.nodeset_types.get(finding.object_id)
         return (
             _source_payload(
                 nodeset.root_id,
@@ -316,7 +317,7 @@ def _node_source_for_finding(
             graph.root_path,
             graph.source_path,
         )
-    for nodeset in graph.nodesets.values():
+    for nodeset in graph.nodeset_types.values():
         if any(node.id == finding.object_id for node in nodeset.graph.nodes):
             return _source_payload(
                 nodeset.graph.root_id,
@@ -330,7 +331,7 @@ def _graph_for_owner(graph: object, owner: str) -> object | None:
     if not owner or owner == "pipeline":
         return graph
     if owner.startswith("nodeset:"):
-        nodeset = graph.nodesets.get(owner[len("nodeset:") :])
+        nodeset = graph.nodeset_types.get(owner[len("nodeset:") :])
         return nodeset.graph if nodeset is not None else None
     return None
 

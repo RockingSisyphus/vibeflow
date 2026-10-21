@@ -95,10 +95,9 @@ class _ImportExecutionVisitor(ast.NodeVisitor):
                 return name(value.value) + "." + value.attr
             return ""
         prefix = "vibeflow.targets.python.sdk."
-        return name(expression.func) in {prefix + item for item in (
-            "Plugin", "node", "rule", "ruleset", "data_schema", "base_lib", "lifecycle", "capability",
-            "host_extension", "SourceLocator", "RuleCall", "RuleRelation", "DataProvider",
-            "DataRequirement", "NodeContractDescriptor")}
+        from vibeflow.targets.python.quality.source_analysis.sdk_declarations import CONSTRUCTORS
+        return name(expression.func) in {prefix + item for item in CONSTRUCTORS}
+
 
     def visit_FunctionDef(self, node):
         self._decorators(node)

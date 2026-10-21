@@ -392,10 +392,10 @@ def test_selected_rule_warns_when_source_nears_policy_limit() -> None:
     assert any(item.code == "NODE.PURITY.SOURCE_NEAR_LIMIT" and item.severity == "warning" for item in violations)
 
 
-def test_cli_inspect_node_uses_explicit_policy_path(tmp_path, capsys) -> None:
-    policy_path = tmp_path / "kernel_policy.jsonc"
-    policy_path.write_text('{"node_source": {"max_lines": 1}}', encoding="utf-8")
-    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(), extra_args=["--policy", str(policy_path)])
+def test_cli_inspect_node_uses_explicit_rule_parameters(tmp_path, capsys) -> None:
+    declaration = node_document()
+    declaration['rulesets'] = [{'rule_id':'vibeflow.maintainability','params':{'policy':{'node_source':{'max_lines':1}}}}]
+    code, payload = _inspect_node_source(tmp_path, capsys, _valid_node_source(), descriptor=declaration)
     assert code == 1
     assert any(error["code"] == "NODE.PURITY.SOURCE_TOO_LARGE" for error in payload["health"]["errors"])
 
@@ -565,7 +565,7 @@ def test_runtime_allows_input_mutation_by_reference() -> None:
 
 def test_collect_node_metrics_reports_complexity_and_contract_size() -> None:
     report = _review_node(AddNode_DECLARATION, AddNode, policy=PurityPolicy(max_source_lines=1000))
-    payload = report.node_metrics[AddNode_DECLARATION.type_key]
+    payload = report.node_metrics[AddNode_DECLARATION.id]
     assert payload["function_count"] == 1
     assert payload["branch_count"] == 0
     # Python parameters come from the canonical descriptor contract.
@@ -601,9 +601,9 @@ def test_branch_and_nesting_complexity_are_enforced(tmp_path, capsys) -> None:
         return {"demo.out": 1}
 """.rstrip(),
     )
-    policy_path = tmp_path / "kernel_policy.jsonc"
-    policy_path.write_text('{"complexity": {"max_branches": 1, "max_nesting_depth": 1}}', encoding="utf-8")
-    code, payload = _inspect_node_source(tmp_path, capsys, source, extra_args=["--policy", str(policy_path)])
+    declaration = node_document()
+    declaration['rulesets'] = [{'rule_id':'vibeflow.maintainability','params':{'policy':{'complexity':{'max_branches':1,'max_nesting_depth':1}}}}]
+    code, payload = _inspect_node_source(tmp_path, capsys, source, descriptor=declaration)
     assert code == 1
     codes = {error["code"] for error in payload["health"]["errors"]}
     assert "NODE.MAINTAINABILITY.COMPLEXITY_MAX_BRANCHES" in codes

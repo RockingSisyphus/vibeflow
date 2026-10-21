@@ -14,36 +14,42 @@ sys.path.insert(0, str(ROOT / 'src'))
 
 def run(work, toolchain, count, rounds):
     from vibeflow.tooling.application.javascript.build import ProjectBuildRequest, build_project_aot
-    project = work / f'chain-{count}'
+    workspace = work / f'chain-{count}'
+    workspace.mkdir()
+    project = workspace / 'project'
     project.mkdir()
     (project / 'node_modules').symlink_to(toolchain / 'node_modules', target_is_directory=True)
     (project / 'package.json').write_text('{"name":"aot-preparation-probe","private":true,"type":"module"}')
     shutil.copy2(ROOT / 'sandbox/javascript/minimal/project/package-lock.json', project / 'package-lock.json')
-    (project / 'vibeflow_config.jsonc').write_text(json.dumps({'roots': [{'id': 'probe', 'path': '.'}]}))
+    (workspace / 'vibeflow_config.jsonc').write_text(json.dumps({'roots': [{'id': 'probe', 'path': 'project'}]}))
     (project / 'vibeflow_project.jsonc').write_text(json.dumps({'project_target': 'javascript',
-        'javascript': {'package_root': '.'}, 'quality_enabled': False}))
+        'javascript': {'package_root': '.'}}))
     source = ['import {defineNode,definePlugin,defineDataSchema} from "@vibeflow/plugin";',
-        'export const boundary=defineNode({type_key:"probe.boundary",flow_kind:"terminal",contract:{},rulesets:[],run(){return {};}});']
+        'export const boundary=defineNode({node_type:"vibeflow.node",id:"probe.boundary",flow_kind:"terminal",contract:{},rulesets:[],run(){return {};}});']
+    schemas = [source[0]]
     for i in range(count+1):
-        source.append(f'export const schema{i}=defineDataSchema({{type_key:"value.{i}",schema:{{type:"number"}}}});')
+        schemas.append(f'export const schema{i}=defineDataSchema({{type_key:"value.{i}",schema:{{type:"number"}}}});')
     for i in range(count):
         contract = {'requires': [{'type': f'value.{i}', 'display_name': 'Input', 'cardinality': 'exactly_one'}],
             'provides': [{'key': f'result{i}', 'type': f'value.{i+1}', 'display_name': 'Result'}],
             'input_semantics': {f'value.{i}': ['Previous result']}, 'output_semantics': {f'result{i}': ['Add one']}}
-        source.append(f'export const step{i}=defineNode({{type_key:"probe.step{i}",contract:{json.dumps(contract)},'
+        source.append(f'export const step{i}=defineNode({{node_type:"vibeflow.node",id:"probe.step{i}",contract:{json.dumps(contract)},'
             f'rulesets:[],run(inputs,params){{return {{result{i}:Number(inputs["value.{i}"].value)+1}};}}}});')
-    resources = ['boundary', *[f'schema{i}' for i in range(count+1)], *[f'step{i}' for i in range(count)]]
-    source.append('export const plugin=definePlugin({id:"probe",resources:[' + ','.join(resources) + ']});')
-    (project / 'plugin.ts').write_text('\n'.join(source))
-    config = {'plugins': [{'source': {'kind': 'file', 'ref': 'plugin.ts'}}], 'rulesets': [], 'pipeline': {
+    schemas.append('export const plugin=definePlugin({id:"probe",resources:[' + ','.join(f'schema{i}' for i in range(count+1)) + ']});')
+    (project / 'nodes').mkdir()
+    (project / 'nodes/steps.ts').write_text('\n'.join(source))
+    (project / 'plugins/schemas').mkdir(parents=True)
+    (project / 'plugins/schemas/plugin.ts').write_text('\n'.join(schemas))
+    (project / 'root_rules.jsonc').write_text('{"rulesets":[]}')
+    config = {'plugins': [{'source': {'kind': 'file', 'ref': 'plugins/schemas/plugin.ts'}}], 'rulesets': [], 'pipeline': {
         'inputs': [{'key': 'number', 'type': 'value.0', 'display_name': 'Input', 'required': True}],
         'outputs': [{'type': f'value.{count}', 'as': 'number', 'display_name': 'Result', 'cardinality': 'exactly_one'}],
-        'nodes': [{'id': 'start', 'type_used': 'probe.boundary', 'display_name': 'Start', 'description': 'Enter chain'},
-            *[{'id': f'step{i}', 'type_used': f'probe.step{i}', 'display_name': f'Step {i}', 'description': 'Add one'} for i in range(count)],
-            {'id': 'end', 'type_used': 'probe.boundary', 'display_name': 'End', 'description': 'Exit chain'}],
+        'nodes': [{'id': 'start', 'definition_id': 'probe.boundary', 'display_name': 'Start', 'description': 'Enter chain'},
+            *[{'id': f'step{i}', 'definition_id': f'probe.step{i}', 'display_name': f'Step {i}', 'description': 'Add one'} for i in range(count)],
+            {'id': 'end', 'definition_id': 'probe.boundary', 'display_name': 'End', 'description': 'Exit chain'}],
         'edges': [['start', 'step0'], *[[f'step{i}', f'step{i+1}'] for i in range(count-1)], [f'step{count-1}', 'end']]}}
     (project / 'workflow.jsonc').write_text(json.dumps(config))
-    built = build_project_aot(ProjectBuildRequest(workspace=project / 'vibeflow_config.jsonc',
+    built = build_project_aot(ProjectBuildRequest(workspace=workspace / 'vibeflow_config.jsonc',
         config=project / 'workflow.jsonc', out_dir=work / f'built-{count}', target='node', profile='single-esm',
         preview_root=work / 'preview'))
     entry = Path(built.build.entry)

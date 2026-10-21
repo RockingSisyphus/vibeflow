@@ -12,19 +12,19 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "example.boundary",
+        "definition_id": "example.boundary",
         "display_name": "Start",
         "description": "Begin."
       },
       {
         "id": "calculate",
-        "type_used": "example.calculate",
+        "definition_id": "example.calculate",
         "display_name": "Calculate",
         "description": "Compute twice the input plus one."
       },
       {
         "id": "end",
-        "type_used": "example.boundary",
+        "definition_id": "example.boundary",
         "display_name": "End",
         "description": "Finish."
       }
@@ -52,7 +52,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

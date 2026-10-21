@@ -51,7 +51,7 @@ const workflow = await import(pathToFileURL({json.dumps(str(path))}).href);
 
 def _empty_sync_plan(node_module: Path) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "test.host-lifecycle",
         "entry_mode": "sync",
         "inputs": [],
@@ -61,7 +61,7 @@ def _empty_sync_plan(node_module: Path) -> dict[str, object]:
         "nodes": [
             {
                 "id": "run",
-                "type_used": "test.noop",
+                "definition_id": "test.noop",
                 "implementation": {
                     "ref": str(node_module),
                     "export": "run",
@@ -88,7 +88,7 @@ _DoubleNode_DECLARATION = NodeDescriptor(
         output_semantics={"answer": ("doubled number",)},
     ),
     rulesets=("vibeflow.process",),
-)
+ node_type="vibeflow.node")
 
 class _DoubleNode:
 
@@ -105,24 +105,24 @@ def test_python_port_nodes_receive_transform_and_send(
             "pipeline": {
                 "entry_mode": "async",
                 "nodes": [
-                    {"id":"start", "type_used":"fixture.port.boundary", "display_name":"Start", "description":"Enter port workflow"},
-                    {"id":"end", "type_used":"fixture.port.boundary", "display_name":"End", "description":"Finish port workflow"},
+                    {"id":"start", "definition_id":"fixture.port.boundary", "display_name":"Start", "description":"Enter port workflow"},
+                    {"id":"end", "definition_id":"fixture.port.boundary", "display_name":"End", "description":"Finish port workflow"},
                     {
                         "id": "receive",
-                        "type_used": "fixture.port.receive",
+                        "definition_id": "fixture.port.receive",
                         "display_name": "Receive number",
                         "description": "Receives the input number from the math input port.",
                         "config": {"port": "math.in"},
                     },
                     {
                         "id": "double",
-                        "type_used": "test.double",
+                        "definition_id": "test.double",
                         "display_name": "Double number",
                         "description": "Doubles the received number for this workflow.",
                     },
                     {
                         "id": "send",
-                        "type_used": "fixture.port.send",
+                        "definition_id": "fixture.port.send",
                         "display_name": "Send answer",
                         "description": "Sends the doubled answer through the math output port.",
                         "config": {"port": "math.out"},
@@ -190,7 +190,7 @@ export function double(inputs) {
         encoding="utf-8",
     )
     plan = {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "test.port",
         "entry_mode": "async",
         "inputs": [],
@@ -247,7 +247,7 @@ export function double(inputs) {
         "nodes": [
             {
                 "id": "receive",
-                "type_used": "test.receive",
+                "definition_id": "test.receive",
                 "implementation": {"ref":str(node_module),"export":"receive"},
                 "params":{"port":"math.in"},
                 "requires": [],
@@ -265,7 +265,7 @@ export function double(inputs) {
             },
             {
                 "id": "double",
-                "type_used": "test.double",
+                "definition_id": "test.double",
                 "implementation": {
                     "ref": str(node_module),
                     "export": "double",
@@ -277,7 +277,7 @@ export function double(inputs) {
             },
             {
                 "id": "send",
-                "type_used": "test.send",
+                "definition_id": "test.send",
                 "implementation": {"ref":str(node_module),"export":"send"},
                 "params":{"port":"math.out"},
                 "requires": [{"type": "answer", "cardinality": "exactly_one"}],
@@ -301,7 +301,7 @@ export function double(inputs) {
         "max_steps": 10,
     }
     plan["nodes"].extend([
-        {"id":identifier,"type_used":"test.boundary","is_terminal":True,"flow_kind":"terminal",
+        {"id":identifier,"definition_id":"test.boundary","is_terminal":True,"flow_kind":"terminal",
          "implementation":{"ref":str(node_module),"export":"boundary"}} for identifier in ("start","end")])
     plan["routes"].extend([{"source":"start","target":"receive"},{"source":"send","target":"end"}])
     plan["order"] = ["start","receive","double","send","end"]
@@ -340,406 +340,4 @@ console.log(JSON.stringify({
         "sent": {"port": "math.out", "value": 18},
         "hasSync": False,
         "hasAsync": True,
-    }
-
-
-def test_host_extension_lifecycle_is_explicit_and_reverse_ordered(
-    tmp_path: Path,
-) -> None:
-    node_module = tmp_path / "node.mjs"
-    extension_a = tmp_path / "extension-a.mjs"
-    extension_b = tmp_path / "extension-b.mjs"
-    node_module.write_text(
-        """
-export function useCapability(inputs, _params, context) {
-  return {
-    answer: context.capabilities["test.math"].double(inputs.number.value),
-  };
-}
-""",
-        encoding="utf-8",
-    )
-    extension_a.write_text(
-        """
-export function createHostExtension(context) {
-  globalThis.__calls.push("create:a");
-  globalThis.__calls.push(`config:a:${context.config.label}`);
-  return {
-    capabilities: {
-      "test.math": { double(value) { return value * 2; } },
-    },
-    start() { globalThis.__calls.push("start:a"); },
-    stop() { globalThis.__calls.push("stop:a"); },
-  };
-}
-""",
-        encoding="utf-8",
-    )
-    extension_b.write_text(
-        """
-export function createHostExtension() {
-  globalThis.__calls.push("create:b");
-  return {
-    start() { globalThis.__calls.push("start:b"); },
-    stop() { globalThis.__calls.push("stop:b"); },
-  };
-}
-""",
-        encoding="utf-8",
-    )
-    plan = {
-        "abi_version": "vibeflow.workflow.v9",
-        "workflow_id": "test.host",
-        "entry_mode": "sync",
-        "inputs": [
-            {
-                "key": "number",
-                "type": "number",
-                "required": True,
-                "schema": {"type": "number"},
-            }
-        ],
-        "outputs": [
-            {
-                "type": "answer",
-                "cardinality": "exactly_one",
-                "as": "answer",
-                "schema": {"type": "number"},
-            }
-        ],
-        "schemas": {
-            "number": {"type": "number"},
-            "answer": {"type": "number"},
-        },
-        "capabilities": [
-            {
-                "id": "test.math",
-                "operations": {
-                    "double": {
-                        "input_type": "number",
-                        "output_type": "answer",
-                        "completion": "immediate",
-                    }
-                },
-            }
-        ],
-        "nodes": [
-            {
-                "id": "run",
-                "type_used": "test.use-capability",
-                "implementation": {
-                    "ref": str(node_module),
-                    "export": "useCapability",
-                    "completion": "immediate",
-                },
-                "requires": [{"type": "number", "cardinality": "exactly_one"}],
-                "provides": [{"key": "answer", "type": "answer"}],
-                "flow_kind": "terminal",
-                "is_terminal": True,
-                "capabilities": [
-                    {"id": "test.math", "operations": ["double"]}
-                ],
-            }
-        ],
-        "routes": [],
-        "order": ["run"],
-        "max_steps": 5,
-    }
-    emitted = emit_fixture(
-        plan,
-        host_extensions=(
-            {
-                "id": "test.a",
-                "module": str(extension_a),
-                "export": "createHostExtension",
-                "provides": ["test.math"],
-                "dependencies": [],
-                "config": {"label": "primary"},
-            },
-            {
-                "id": "test.b",
-                "module": str(extension_b),
-                "export": "createHostExtension",
-                "provides": [],
-                "dependencies": ["test.a"],
-            },
-        ),
-    )
-    workflow = tmp_path / "host-workflow.mjs"
-    workflow.write_text(emitted.source, encoding="utf-8")
-
-    result = _run_module(
-        workflow,
-        """
-const afterImport = [...globalThis.__calls];
-const host = workflow.createWorkflowHost();
-const afterCreate = [...globalThis.__calls];
-await host.start();
-const answer = host.runWorkflow({ number: 7 });
-await host.stop();
-await host.stop();
-console.log(JSON.stringify({
-  afterImport,
-  afterCreate,
-  answer,
-  calls: globalThis.__calls,
-  started: host.started,
-}));
-""",
-    )
-
-    assert result == {
-        "afterImport": [],
-        "afterCreate": ["create:a", "config:a:primary", "create:b"],
-        "answer": {"answer": 14},
-        "calls": [
-            "create:a",
-            "config:a:primary",
-            "create:b",
-            "start:a",
-            "start:b",
-            "stop:b",
-            "stop:a",
-        ],
-        "started": False,
-    }
-
-
-def test_async_host_extension_invocation_is_awaitable(
-    tmp_path: Path,
-) -> None:
-    node_module = tmp_path / "node.mjs"
-    extension = tmp_path / "extension.mjs"
-    node_module.write_text(
-        "export function run() { return {}; }\n",
-        encoding="utf-8",
-    )
-    extension.write_text(
-        """
-export function createHostExtension() {
-  return { start() {}, stop() {} };
-}
-""",
-        encoding="utf-8",
-    )
-    plan = _empty_sync_plan(node_module)
-    plan["entry_mode"] = "async"
-    emitted = emit_fixture(
-        plan,
-        host_extensions=(
-            {
-                "id": "test.async",
-                "module": str(extension),
-                "export": "createHostExtension",
-                "provides": [],
-                "dependencies": [],
-            },
-        ),
-    )
-    assert "async function invoke(inputs, rawOptions = {})" in emitted.source
-    workflow = tmp_path / "async-host-workflow.mjs"
-    workflow.write_text(emitted.source, encoding="utf-8")
-
-    result = _run_module(
-        workflow,
-        """
-const host = workflow.createWorkflowHost();
-const rejectedBeforeStart = host.runWorkflowAsync({});
-let beforeStartCode = null;
-try {
-  await rejectedBeforeStart;
-} catch (error) {
-  beforeStartCode = error.code;
-}
-await host.start();
-const invocation = host.runWorkflowAsync({});
-const answer = await invocation;
-await host.stop();
-console.log(JSON.stringify({
-  beforeStartWasPromise: rejectedBeforeStart instanceof Promise,
-  beforeStartCode,
-  invocationWasPromise: invocation instanceof Promise,
-  answer,
-  hasSync: "runWorkflow" in host,
-  hasAsync: "runWorkflowAsync" in host,
-}));
-""",
-    )
-
-    assert result == {
-        "beforeStartWasPromise": True,
-        "beforeStartCode": "VF_HOST_NOT_STARTED",
-        "invocationWasPromise": True,
-        "answer": {},
-        "hasSync": False,
-        "hasAsync": True,
-    }
-
-
-def test_host_extension_instances_are_isolated(tmp_path: Path) -> None:
-    node_module = tmp_path / "node.mjs"
-    extension = tmp_path / "extension.mjs"
-    node_module.write_text(
-        "export function run() { return {}; }\n",
-        encoding="utf-8",
-    )
-    extension.write_text(
-        """
-export function createHostExtension(context) {
-  const id = (globalThis.__nextHostId = (globalThis.__nextHostId || 0) + 1);
-  globalThis.__configs = globalThis.__configs || [];
-  globalThis.__configs.push(context.config);
-  globalThis.__calls.push(`create:${id}`);
-  globalThis.__calls.push(
-    `config:${id}:${Object.isFrozen(context.config)}:${Object.isFrozen(context.config.nested)}`
-  );
-  try {
-    context.config.nested.count += 1;
-  } catch {
-    globalThis.__calls.push(`mutation-blocked:${id}`);
-  }
-  return {
-    start() { globalThis.__calls.push(`start:${id}`); },
-    stop() { globalThis.__calls.push(`stop:${id}`); },
-  };
-}
-""",
-        encoding="utf-8",
-    )
-    emitted = emit_fixture(
-        _empty_sync_plan(node_module),
-        host_extensions=(
-            {
-                "id": "test.isolated",
-                "module": str(extension),
-                "export": "createHostExtension",
-                "provides": [],
-                "dependencies": [],
-                "config": {"nested": {"count": 1}},
-            },
-        ),
-    )
-    workflow = tmp_path / "isolated-hosts.mjs"
-    workflow.write_text(emitted.source, encoding="utf-8")
-
-    result = _run_module(
-        workflow,
-        """
-const first = workflow.createWorkflowHost();
-const second = workflow.createWorkflowHost();
-await first.start();
-await second.start();
-await first.stop();
-await second.stop();
-console.log(JSON.stringify({
-  calls: globalThis.__calls,
-  separateTopLevel: globalThis.__configs[0] !== globalThis.__configs[1],
-  separateNested: (
-    globalThis.__configs[0].nested !== globalThis.__configs[1].nested
-  ),
-  counts: globalThis.__configs.map((config) => config.nested.count),
-}));
-""",
-    )
-
-    assert result == {
-        "calls": [
-            "create:1",
-            "config:1:true:true",
-            "mutation-blocked:1",
-            "create:2",
-            "config:2:true:true",
-            "mutation-blocked:2",
-            "start:1",
-            "start:2",
-            "stop:1",
-            "stop:2",
-        ],
-        "separateTopLevel": True,
-        "separateNested": True,
-        "counts": [1, 1],
-    }
-
-
-def test_host_extension_partial_start_failure_cleans_started_extensions(
-    tmp_path: Path,
-) -> None:
-    node_module = tmp_path / "node.mjs"
-    extension_a = tmp_path / "extension-a.mjs"
-    extension_b = tmp_path / "extension-b.mjs"
-    node_module.write_text(
-        "export function run() { return {}; }\n",
-        encoding="utf-8",
-    )
-    extension_a.write_text(
-        """
-export function createHostExtension() {
-  return {
-    start() { globalThis.__calls.push("start:a"); },
-    stop() { globalThis.__calls.push("stop:a"); },
-  };
-}
-""",
-        encoding="utf-8",
-    )
-    extension_b.write_text(
-        """
-export function createHostExtension() {
-  return {
-    start() {
-      globalThis.__calls.push("start:b");
-      throw new Error("start failed");
-    },
-    stop() { globalThis.__calls.push("stop:b"); },
-  };
-}
-""",
-        encoding="utf-8",
-    )
-    emitted = emit_fixture(
-        _empty_sync_plan(node_module),
-        host_extensions=(
-            {
-                "id": "test.a",
-                "module": str(extension_a),
-                "export": "createHostExtension",
-                "provides": [],
-                "dependencies": [],
-            },
-            {
-                "id": "test.b",
-                "module": str(extension_b),
-                "export": "createHostExtension",
-                "provides": [],
-                "dependencies": ["test.a"],
-            },
-        ),
-    )
-    workflow = tmp_path / "failed-host.mjs"
-    workflow.write_text(emitted.source, encoding="utf-8")
-
-    result = _run_module(
-        workflow,
-        """
-const host = workflow.createWorkflowHost();
-let code = null;
-try {
-  await host.start();
-} catch (error) {
-  code = error.code;
-}
-console.log(JSON.stringify({
-  code,
-  calls: globalThis.__calls,
-  started: host.started,
-  aborted: host.signal.aborted,
-}));
-""",
-    )
-
-    assert result == {
-        "code": "VF_HOST_EXTENSION_START",
-        "calls": ["start:a", "start:b", "stop:a"],
-        "started": False,
-        "aborted": True,
     }

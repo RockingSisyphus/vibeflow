@@ -55,9 +55,9 @@ def _refuse_on_planned_run(
         return
     planned_ids = [str(item.get("id", "")) for item in planned]
     non_stub = [str(item.get("id", "")) for item in planned if item.get("behavior") != "python_stub"]
-    reason = "planned nodes/nodesets cannot run"
+    reason = "planned nodes/nodeset_types cannot run"
     if options.allow_planned_stub:
-        reason = "only planned python_stub nodes/nodesets can run with allow_planned_stub"
+        reason = "only planned python_stub nodes/nodeset_types can run with allow_planned_stub"
     error = HealthFinding(
         rule_id="GRAPH.PLANNED.NODE_IN_RUN",
         severity="error",

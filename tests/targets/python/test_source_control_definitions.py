@@ -36,8 +36,8 @@ def _context(text):
     path = "/virtual/source_control_definitions.py"
     compile(text, path, "exec")
     source = PythonSourceFile.parse(path, "source_control_definitions", text)
-    descriptor = NodeDescriptor(type_key="probe.controls", display_name="Controls", description="Control definitions.",
-        version="1", flow_kind="process", contract=NodeContractDescriptor())
+    descriptor = NodeDescriptor(rulesets=(), id="probe.controls", display_name="Controls", description="Control definitions.",
+        version="1", flow_kind="process", contract=NodeContractDescriptor(), node_type="vibeflow.node")
     resource = PythonSourceNode(descriptor, path, "Task")
     return source, resource, build_python_source_context((resource,), (source,))
 
@@ -65,7 +65,7 @@ def test_control_suites_provide_same_scope_function_ast_and_call(label, template
     assert [(item.target, item.line, item.column) for item in references] == [
         (helper.id, calls[0].lineno, calls[0].col_offset + 1)]
     assert (calls[0].lineno, calls[0].col_offset + 1) in sources.resolved_function_calls(source.path)
-    assert helper in sources.helpers(resource.type_key)
+    assert helper in sources.helpers(resource.definition_id)
     assert ast.dump(source._tree) == before
 
 
@@ -195,8 +195,8 @@ def test_pure_close_declared_in_try_uses_its_resolved_body_in_formal_effects():
             pass
         return {}
 """)
-    context = RuleContext(subject={"kind": "node", "type_key": resource.type_key}, target="python",
-        facts={"source_context": sources, "node_catalog": (), "source_owners": ()})
+    context = RuleContext(subject={"kind": "node", "definition_id": resource.definition_id}, target="python",
+        facts={"source_context": sources, "node_definitions": (), "source_owners": ()})
     result = no_side_effects(context, {}, {"effect_scope": "none"})
     assert result.state == "completed"
     assert result.findings == (), result.findings
@@ -217,7 +217,7 @@ def test_unrelated_object_close_is_not_resolved_by_the_helpers_name():
     call = next(item for item in ast.walk(source._tree) if isinstance(item, ast.Call)
                 and isinstance(item.func, ast.Attribute) and item.func.attr == "close")
     assert (call.lineno, call.col_offset + 1) not in sources.resolved_function_calls(source.path)
-    context = RuleContext(subject={"kind": "node", "type_key": resource.type_key}, target="python",
-        facts={"source_context": sources, "node_catalog": (), "source_owners": ()})
+    context = RuleContext(subject={"kind": "node", "definition_id": resource.definition_id}, target="python",
+        facts={"source_context": sources, "node_definitions": (), "source_owners": ()})
     result = no_side_effects(context, {}, {"effect_scope": "none"})
     assert result.findings == (), result.findings

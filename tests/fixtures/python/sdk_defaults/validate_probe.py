@@ -27,7 +27,7 @@ from sandbox.python.runtime_observation.project import write_project
 
 def execute(root, command, work):
     argv = [sys.executable, "-B", "-m", "vibeflow", command,
-            "--workspace", str(root / "vibeflow_config.jsonc"), "--config", str(root / "workflow.jsonc")]
+            "--workspace", str(root.parent / "vibeflow_config.jsonc"), "--config", str(root / "workflow.jsonc")]
     if command == "validate":
         argv.append("--json")
     else:

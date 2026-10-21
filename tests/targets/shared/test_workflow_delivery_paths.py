@@ -6,20 +6,20 @@ import pytest
 
 from vibeflow.core.compiler import compile_core
 from vibeflow.core.contracts import DataProvider, DataRequirement
-from vibeflow.core.flow import EdgeSpec, GraphConfig, NodeSpec, PipelineInputSpec
+from vibeflow.core.flow import EdgeSpec, GraphConfig, NodeCallSpec, PipelineInputSpec
 from vibeflow.core.models import CoreCompileRequest, ImplementationFact, ImplementationFacts, TargetFeatureSet
 from vibeflow.targets.shared.quality_support.workflow_rules.flow_data import append_data_contract_warnings
 from vibeflow.targets.shared.quality_support.workflow_rules.joins import append_join_policy_health
 
 
 def node(name, kind="process", *, supplies=False, consumes=False):
-    return NodeSpec(name, "probe." + name, flow_kind=kind,
+    return NodeCallSpec(name, "probe." + name, flow_kind=kind,
                     provides=(DataProvider(name + ".out", "value"),) if supplies else (),
                     requires=(DataRequirement("value", "exactly_one"),) if consumes else ())
 
 
 def review(graph):
-    facts = ImplementationFacts(tuple(ImplementationFact(n.type_used, flow_kind=n.flow_kind,
+    facts = ImplementationFacts(tuple(ImplementationFact(n.definition_id, flow_kind=n.flow_kind,
                                 requires=n.requires, provides=n.provides) for n in graph.nodes))
     result = compile_core(CoreCompileRequest(graph, facts, TargetFeatureSet("probe", frozenset())))
     state = SimpleNamespace(errors=[], warnings=[])

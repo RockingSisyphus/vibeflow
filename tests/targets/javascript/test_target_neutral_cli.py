@@ -42,13 +42,11 @@ def _copy_minimal(
             "*.pyc",
         ),
     )
-    from tests.fixtures.support.plugins import copy_sdk_inputs
-    copy_sdk_inputs(SANDBOX, sandbox)
     project_config_path = sandbox / "project/vibeflow_project.jsonc"
     project_config = json.loads(
         project_config_path.read_text(encoding="utf-8")
     )
-    project_config["quality_enabled"] = True
+
     project_config_path.write_text(
         json.dumps(project_config, indent=2) + "\n",
         encoding="utf-8",
@@ -132,9 +130,9 @@ def test_validate_audits_only_selected_node_and_base_lib_sources(
     )
     _write_json(
         sdk_resource(project, "node", "example.unused"),
-        {
+        {'node_type': 'vibeflow.node',
             "kind": "node",
-            "type_key": "example.unused",
+            'id': "example.unused",
             "display_name": "Unused node",
 
             "description": "Not selected by greeting.jsonc.",
@@ -178,59 +176,18 @@ def test_validate_audits_only_selected_node_and_base_lib_sources(
         "audit_sources": False,
     }
     selected = audit_javascript_project(JavascriptAuditRequest(**request))
-    complete = audit_javascript_project(
-        JavascriptAuditRequest(
-            **request,
-            audit_registered_resources=True,
-        )
-    )
 
     assert str(project / "nodes/greet.ts") in selected.source_files
     assert str(project / "base_lib/text.ts") in selected.source_files
     assert str(project / "nodes/unused.ts") not in selected.source_files
     assert str(project / "base_lib/unused.ts") not in selected.source_files
-    assert str(project / "nodes/unused.ts") in complete.source_files
-    assert str(project / "base_lib/unused.ts") in complete.source_files
+    from vibeflow.tooling.project.preparation import ProjectPreparation
+    from vibeflow.tooling.project.workspace_loader import load_workspace_config
+    workspace=load_workspace_config(sandbox / "vibeflow_config.jsonc")
+    files = ProjectPreparation(workspace).source_facts(workspace.roots[0]).files
+    assert {"nodes/unused.ts","base_lib/unused.ts"} <= {item.path for item in files}
 
 
-def test_homogeneous_javascript_quality_respects_disabled_root(
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    project = tmp_path / "project"
-    config = project / "configs/main.jsonc"
-    config.parent.mkdir(parents=True)
-    _write_json(
-        project / "vibeflow_project.jsonc",
-        {
-            "project_target": "javascript",
-            "quality_enabled": False,
-            "javascript": {"package_root": "."},
-        },
-    )
-    _write_json(config, {"pipeline": {"nodes": []}})
-    workspace = tmp_path / "vibeflow_config.jsonc"
-    _write_json(workspace, {"roots": [{"id": "js", "path": "project"}]})
-
-    exit_code = dispatch_main(
-        [
-            "quality-check",
-            "--workspace",
-            str(workspace),
-            "--config",
-            str(config),
-            "--json",
-        ]
-    )
-
-    payload = json.loads(capsys.readouterr().out)
-    assert exit_code == 0
-    assert payload["status"] == "PASS"
-    assert payload["project_target"] == "javascript"
-    assert payload["reports"] == []
-    assert payload["skipped"] == "quality_enabled=false"
-    assert payload["result_code"] == "VIBEFLOW_QUALITY_PASS"
-    assert payload["checked"] == []
 
 
 def test_minimal_javascript_validate_needs_no_platform_target(
@@ -260,86 +217,8 @@ def test_minimal_javascript_validate_needs_no_platform_target(
     assert payload["workflow_id"] == "greeting"
 
 
-def test_standalone_quality_uses_explicit_javascript_target(
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    toolchain = _toolchain_root()
-    if not (toolchain / "node_modules/typescript").is_dir():
-        pytest.skip("the JavaScript sandbox toolchain has not been installed")
-    project = tmp_path / "standalone"
-    project.mkdir()
-    for name in ("package.json", "package-lock.json"):
-        shutil.copy2(toolchain / name, project / name)
-    (project / "node_modules").symlink_to(
-        toolchain / "node_modules",
-        target_is_directory=True,
-    )
-    (project / "source.ts").write_text(
-        "const projectTypeError: string = 42;\n"
-        "export function inspect() {\n"
-        "  void (globalThis as any).process;\n"
-        "  return projectTypeError;\n"
-        "}\n",
-        encoding="utf-8",
-    )
-
-    exit_code = main(
-        [
-            "quality-check",
-            "--path",
-            str(project),
-            "--project-target",
-            "javascript",
-            "--json",
-        ]
-    )
-
-    payload = json.loads(capsys.readouterr().out)
-    assert exit_code == 0
-    assert payload["status"] == "PASS"
-    assert payload["project_target"] == "javascript"
-    assert payload["source_files"] == [str(project / "source.ts")]
 
 
-def test_standalone_quality_keeps_unregistered_source_out_of_ownership_audit(
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    toolchain = _toolchain_root()
-    if not (toolchain / "node_modules/typescript").is_dir():
-        pytest.skip("the JavaScript sandbox toolchain has not been installed")
-    project = tmp_path / "standalone"
-    project.mkdir()
-    for name in ("package.json", "package-lock.json"):
-        shutil.copy2(toolchain / name, project / name)
-    (project / "node_modules").symlink_to(
-        toolchain / "node_modules",
-        target_is_directory=True,
-    )
-    (project / "source.ts").write_text(
-        "export function install() {\n"
-        "  addEventListener('message', () => {});\n"
-        "}\n",
-        encoding="utf-8",
-    )
-
-    exit_code = main(
-        [
-            "quality-check",
-            "--path",
-            str(project),
-            "--project-target",
-            "javascript",
-            "--json",
-        ]
-    )
-
-    payload = json.loads(capsys.readouterr().out)
-    assert exit_code == 0
-    assert payload["status"] == "PASS"
-    assert payload["reports"] == []
-    assert payload["source_quality"]["summary"]["files"] == 1
 
 
 def test_project_quality_detects_browser_only_discarded_fetch(
@@ -349,8 +228,9 @@ def test_project_quality_detects_browser_only_discarded_fetch(
     toolchain = _toolchain_root()
     if not (toolchain / "node_modules/typescript").is_dir():
         pytest.skip("the JavaScript sandbox toolchain has not been installed")
-    sandbox = _copy_minimal(tmp_path, toolchain=toolchain)
-    project = sandbox / "project"
+    from tests.targets.javascript.test_quality_sandbox import _project_case
+    workspace, project, config = _project_case(tmp_path)
+    sandbox = workspace.parent
     manifest_path = sdk_resource(project, 'node', 'example.greet')
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["implementations"][0]["targets"] = ["browser"]
@@ -368,8 +248,6 @@ def test_project_quality_detects_browser_only_discarded_fetch(
             "quality-check",
             "--workspace",
             str(sandbox / "vibeflow_config.jsonc"),
-            "--config",
-            str(project / "configs/greeting.jsonc"),
             "--json",
         ]
     )
@@ -392,32 +270,11 @@ def test_project_quality_does_not_register_unselected_plugin_files(
         pytest.skip("the JavaScript sandbox toolchain has not been installed")
     sandbox = _copy_minimal(tmp_path, toolchain=toolchain)
     project = sandbox / "project"
-    # This package is deliberately absent from workflow.plugins. Historical
-    # manifest inputs are migrated into the selected fixture package by main's
-    # test wrapper, so they cannot represent unselected SDK contributions.
-    (project / "plugins").mkdir()
-    (project / "plugins/unselected.ts").write_text(
-        'import {definePlugin} from "@vibeflow/plugin";\n'
-        'import {host} from "../host/unselected.ts";\n'
+    package = project / "plugins/unselected"
+    package.mkdir()
+    (package / "plugin.ts").write_text('import {definePlugin,defineNodeType} from "@vibeflow/plugin";\n'
         'throw new Error("UNSELECTED_PLUGIN_WAS_LOADED");\n'
-        'export const plugin=definePlugin({id:"example.unselected_plugin",\n'
-        '  resources:[host],runtime(){\n'
-        "    return { beforeRun() { addEventListener('message', () => {}); } };\n"
-        '  }});\n',
-        encoding="utf-8",
-    )
-    (project / "host").mkdir()
-    (project / "host/unselected.ts").write_text(
-        'import {defineHostExtension} from "@vibeflow/plugin";\n'
-        "import { run } from '../nodes/greet.ts';\n"
-        "export function createHostExtension() {\n"
-        "  void run;\n"
-        "  return { start() {}, stop() {} };\n"
-        "}\n"
-        'export const host=defineHostExtension({id:"example.unselected_host",\n'
-        '  targets:["browser"],provides:[],dependencies:[],factory:createHostExtension});\n',
-        encoding="utf-8",
-    )
+        'export const plugin=definePlugin({id:"example.unselected",resources:[defineNodeType({id:"unused.shell"})]});\n')
     config = project / "configs/greeting.jsonc"
 
     validate_exit = main(
@@ -439,8 +296,6 @@ def test_project_quality_does_not_register_unselected_plugin_files(
             "quality-check",
             "--workspace",
             str(sandbox / "vibeflow_config.jsonc"),
-            "--config",
-            str(config),
             "--json",
         ]
     )
@@ -451,40 +306,11 @@ def test_project_quality_does_not_register_unselected_plugin_files(
     assert quality_payload["status"] in {"PASS", "CONCERNS"}
     report = quality_payload["reports"][0]
     assert "example.greet" in report["rule_checks"]["subjects"]
-    assert "host_extension:example.unselected_host" not in report["rule_checks"]["subjects"]
-    assert "plugin:example.unselected_plugin" not in report["rule_checks"]["subjects"]
+    assert "plugin:example.unselected" not in report["rule_checks"]["subjects"]
     assert not any("plugins/unselected.ts" in file for file in report["source_files"])
-    assert any(file["path"] == "plugins/unselected.ts" for file in quality_payload["source_quality"]["files"])
+    assert all("UNSELECTED_PLUGIN_WAS_LOADED" not in str(item) for item in quality_payload["reports"])
 
 
-def test_dispatched_quality_path_uses_project_config_without_workspace(
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    toolchain = _toolchain_root()
-    if not (toolchain / "node_modules/typescript").is_dir():
-        pytest.skip("the JavaScript sandbox toolchain has not been installed")
-    sandbox = _copy_minimal(tmp_path, toolchain=toolchain)
-    project = sandbox / "project"
-    (sandbox / "vibeflow_config.jsonc").unlink()
-
-    exit_code = dispatch_main(
-        [
-            "quality-check",
-            "--path",
-            str(project),
-            "--json",
-        ]
-    )
-
-    payload = json.loads(capsys.readouterr().out)
-    assert exit_code == 0
-    assert payload["status"] == "CONCERNS"
-    assert [item["code"] for item in payload["source_quality"]["warnings"]] == ["QUALITY.STRUCTURE.ROOT_LEVEL_CODE_FILE"]
-    assert payload["source_quality"]["warnings"][0]["details"]["files"] == ["code_plugin.ts"]
-    assert payload["project_target"] == "javascript"
-    assert payload["reports"]
-    assert not (project / "vibeflow_config.jsonc").exists()
 
 
 # Publish controlled case inputs as fixed SDK plugins before formal entrypoints.

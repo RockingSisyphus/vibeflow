@@ -28,8 +28,7 @@ def run_python(args):
                 preview_root=args.preview_root, **options)
         else:
             from vibeflow.tooling.application.python.runner import run_checked
-            from vibeflow.tooling.application.python.project.declarations import default_python_registry
-            result = run_checked(args.config, registry=default_python_registry(), preview_root=args.preview_root, **options)
+            result = run_checked(args.config, preview_root=args.preview_root, **options)
         return result.public_outputs
 
     return run_host(execute, workflow=workflow, stop=signal.request_stop, url=args.url, identifier=args.id)

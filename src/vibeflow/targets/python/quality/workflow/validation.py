@@ -12,7 +12,7 @@ class _HealthValidationState:
     warnings: list = field(default_factory=list)
     node_metrics: dict = field(default_factory=dict)
     node_effect_scopes: dict = field(default_factory=dict)
-    node_types: dict = field(default_factory=dict)
+    call_definitions: dict = field(default_factory=dict)
     node_similarities: dict = field(default_factory=dict)
     nodeset_findings: dict = field(default_factory=dict)
     fingerprints: dict = field(default_factory=dict)
@@ -23,7 +23,7 @@ class _HealthValidationState:
 
 
 def validate_graph_health(graph, *, registry=None, plugin_registry=None,
-    global_config=None, purity_policy=None, nodeset_max_depth=4,
+    global_config=None, purity_policy=None,
     source_context=None, rule_phase="static", quality_policy=None, compilation=None, entry=None):
     from vibeflow.targets.python.project.compiler import GraphCompiler, GraphCompileError
     from vibeflow.targets.python.project.check_session import current_python_check
@@ -37,7 +37,7 @@ def validate_graph_health(graph, *, registry=None, plugin_registry=None,
     if registry is not None:
         registry.configure_rule_defaults(purity_policy=purity_policy,quality_policy=quality_policy)
     execute_workflow_rules(graph, state, registry=registry, source_context=source_context, phase="import",
-        purity_policy=purity_policy, quality_policy=quality_policy, nodeset_max_depth=nodeset_max_depth, global_config=global_config)
+        purity_policy=purity_policy, quality_policy=quality_policy, global_config=global_config)
     if state.errors:
         return _build_health_report(graph, None, plugin_registry, state, rule_phase="import")
     source_report = None
@@ -78,13 +78,13 @@ def validate_graph_health(graph, *, registry=None, plugin_registry=None,
     if registry is not None and source_context is not None:
         for call in source_context.calls:
             key = (call.owner,call.node_id)
-            state.node_types[call.node_id] = call.type_key
+            state.call_definitions[call.node_id] = call.definition_id
             state.node_effect_scopes[call.node_id] = source_report.call_effect_scopes.get(key,
-                source_report.effect_scopes.get(call.type_key,"unconstrained"))
+                source_report.effect_scopes.get(call.definition_id,"unconstrained"))
             if key in source_report.call_node_metrics:
                 state.node_metrics[call.node_id] = dict(source_report.call_node_metrics[key])
     execute_workflow_rules(graph, state, registry=registry, source_context=source_context, phase=rule_phase,
-        purity_policy=purity_policy, quality_policy=quality_policy, nodeset_max_depth=nodeset_max_depth,
+        purity_policy=purity_policy, quality_policy=quality_policy,
         global_config=global_config, compiled=compiled, compilation_findings=compilation.findings, source_report=source_report)
     if registry is not None:
         from vibeflow.core.graph_calls import graph_call_subjects

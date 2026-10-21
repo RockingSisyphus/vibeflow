@@ -10,7 +10,7 @@ from vibeflow.block_compiler import compile_workflow
 from vibeflow.core.compiler import GraphCompileError, compile_core
 from vibeflow.core.contracts import DataProvider, DataRequirement, PipelineInputSpec, PipelineOutputSpec
 from vibeflow.core.descriptors import NodeContractDescriptor, NodeDescriptor
-from vibeflow.core.flow import EdgeSpec, GraphConfig, NodeSpec
+from vibeflow.core.flow import EdgeSpec, GraphConfig, NodeCallSpec
 from vibeflow.core.models import CoreCompileRequest, ImplementationFact, ImplementationFacts
 from vibeflow.targets.javascript.frontend.bindings import build_javascript_binding_plan
 from vibeflow.targets.javascript.frontend.emitter import emit_workflow_module
@@ -47,14 +47,14 @@ class Finish:
 
 def graph_for(conditions, *, optional=False, join="safe_any", mode="sync"):
     return GraphConfig(
-        nodes=(NodeSpec("start", "probe.start", flow_kind="terminal"),
-               NodeSpec("emit", "probe.emit", flow_kind="process",
+        nodes=(NodeCallSpec("start", "probe.start", flow_kind="terminal"),
+               NodeCallSpec("emit", "probe.emit", flow_kind="process",
                         requires=(DataRequirement("event", "exactly_one"),),
                         provides=(DataProvider("route", "route"), DataProvider("payload", "payload"))),
-               NodeSpec("finish", "probe.finish", flow_kind="process", join_policy=join,
+               NodeCallSpec("finish", "probe.finish", flow_kind="process", join_policy=join,
                         requires=(DataRequirement("payload", "optional_one" if optional else "exactly_one"),),
                         provides=(DataProvider("answer", "answer"),)),
-               NodeSpec("end", "probe.end", flow_kind="terminal",
+               NodeCallSpec("end", "probe.end", flow_kind="terminal",
                         requires=(DataRequirement("answer", "exactly_one"),))),
         edges=(EdgeSpec("start", "emit"),
                *(EdgeSpec("emit", "finish", when=condition) for condition in conditions),
@@ -67,7 +67,7 @@ def graph_for(conditions, *, optional=False, join="safe_any", mode="sync"):
 
 def compile_graph(graph):
     facts = ImplementationFacts(tuple(
-        ImplementationFact(n.type_used, flow_kind=n.flow_kind, requires=n.requires, provides=n.provides,
+        ImplementationFact(n.definition_id, flow_kind=n.flow_kind, requires=n.requires, provides=n.provides,
                            source_kind="file", source_ref="./nodes.mjs", source_export=n.id)
         for n in graph.nodes), strict=True)
     return compile_core(CoreCompileRequest(graph, facts)), facts
@@ -83,12 +83,12 @@ def expected_value(conditions, event):
 def python_runtime(graph, execution):
     registry = default_python_registry()
     for node, implementation in zip(graph.nodes, (Start, Emit, Finish, Start)):
-        descriptor = NodeDescriptor(node.type_used, node.id, "Conditional route regression.", "1.0.0",
-                                    node.flow_kind, contract=NodeContractDescriptor(
+        descriptor = NodeDescriptor(node.definition_id, node.id, "Conditional route regression.", "1.0.0",
+                                    node.flow_kind, rulesets=(), contract=NodeContractDescriptor(
                                         requires=tuple(replace(r, display_name=r.type) for r in node.requires),
                                         provides=tuple(replace(p, display_name=p.key) for p in node.provides),
                                         input_semantics={r.type: ("Fixture input.",) for r in node.requires},
-                                        output_semantics={p.key: ("Fixture output.",) for p in node.provides}))
+                                        output_semantics={p.key: ("Fixture output.",) for p in node.provides}), node_type="vibeflow.node")
         registry.register(descriptor, implementation)
     return PipelineRuntime(graph, registry=registry, runtime_options={"execution": execution})
 
@@ -213,7 +213,7 @@ def test_roleless_route_cannot_borrow_roles_from_another_route():
 
 def test_inferred_bypass_does_not_disable_parallel_conditional_route():
     graph = graph_for(("", DONE))
-    graph = replace(graph, nodes=(*graph.nodes[:2], NodeSpec("middle", "probe.middle", flow_kind="process"),
+    graph = replace(graph, nodes=(*graph.nodes[:2], NodeCallSpec("middle", "probe.middle", flow_kind="process"),
                                  *graph.nodes[2:]),
                     edges=(*graph.edges, EdgeSpec("emit", "middle"), EdgeSpec("middle", "finish")))
     compilation, _ = compile_graph(graph)

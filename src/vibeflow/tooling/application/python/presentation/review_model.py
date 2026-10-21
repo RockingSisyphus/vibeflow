@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Mapping
 
 from vibeflow.core.compiler import CompiledGraph
-from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, LoopSpec, NodeSpec, NodesetSpec, STATUS_PLANNED
+from vibeflow.core.flow import GraphConfig, LOOP_DEFINITION_IDS, LoopSpec, NodeCallSpec, NodesetTypeSpec, STATUS_PLANNED
 
 if TYPE_CHECKING:
     from vibeflow.targets.python.project.registry import NodeRegistry
@@ -73,29 +73,29 @@ def loop_field_schema() -> dict[str, object]:
 class ReviewInvocation:
     kind: str
     target: str
-    nodeset: NodesetSpec
+    nodeset: NodesetTypeSpec
 
 
-def invocation_for_node(graph: GraphConfig, node: NodeSpec) -> ReviewInvocation | None:
-    if node.type_used in LOOP_NODE_TYPES and node.loop.body:
-        nodeset = graph.nodesets.get(node.loop.body)
+def invocation_for_node(graph: GraphConfig, node: NodeCallSpec) -> ReviewInvocation | None:
+    if node.definition_id in LOOP_DEFINITION_IDS and node.loop.body:
+        nodeset = graph.nodeset_types.get(node.loop.body)
         return ReviewInvocation("loop_body", node.loop.body, nodeset) if nodeset is not None else None
-    nodeset = graph.nodesets.get(node.type_used)
-    return ReviewInvocation("nodeset", node.type_used, nodeset) if nodeset is not None else None
+    nodeset = graph.nodeset_types.get(node.definition_id)
+    return ReviewInvocation("nodeset", node.definition_id, nodeset) if nodeset is not None else None
 
 
-def nodeset_for_node(graph: GraphConfig, node: NodeSpec) -> NodesetSpec | None:
+def nodeset_for_node(graph: GraphConfig, node: NodeCallSpec) -> NodesetTypeSpec | None:
     invocation = invocation_for_node(graph, node)
     return invocation.nodeset if invocation is not None else None
 
 
-def node_flow_kind(node: NodeSpec, compiled: CompiledGraph) -> str:
+def node_flow_kind(node: NodeCallSpec, compiled: CompiledGraph) -> str:
     if node.status == STATUS_PLANNED:
         return node.flow_kind
     return compiled.flow_kinds.get(node.id, "")
 
 
-def node_review_effect_scope(graph: GraphConfig, node: NodeSpec, registry: NodeRegistry | None, *, compiled: CompiledGraph | None = None) -> str:
+def node_review_effect_scope(graph: GraphConfig, node: NodeCallSpec, registry: NodeRegistry | None, *, compiled: CompiledGraph | None = None) -> str:
     """Report selected rule constraints separately from native execution identity."""
 
     invocation = invocation_for_node(graph, node)
@@ -103,10 +103,10 @@ def node_review_effect_scope(graph: GraphConfig, node: NodeSpec, registry: NodeR
         return "unavailable"
     if compiled is not None and node.id in compiled.effect_scopes:
         return compiled.effect_scopes[node.id]
-    if node.type_used in LOOP_NODE_TYPES or invocation is not None:
+    if node.definition_id in LOOP_DEFINITION_IDS or invocation is not None:
         return "unconstrained"
-    if registry is not None and node.type_used in registry.available():
-        return registry.effect_scope(node.type_used)
+    if registry is not None and node.definition_id in registry.available():
+        return registry.effect_scope(node.definition_id)
     return "unconstrained"
 
 
@@ -116,7 +116,7 @@ def registry_node_class(registry: NodeRegistry | None, type_key: str) -> type | 
     return getattr(registry, "_registry", {}).get(type_key)
 
 
-def node_review_metadata(graph: GraphConfig, node: NodeSpec, registry: NodeRegistry | None) -> dict[str, object]:
+def node_review_metadata(graph: GraphConfig, node: NodeCallSpec, registry: NodeRegistry | None) -> dict[str, object]:
     return {
         "display_name": node.metadata.display_name,
         "description": node.metadata.description,
@@ -167,7 +167,7 @@ def rendered_resources_payload(resources: object | None, graph: GraphConfig | No
     payload = resources_payload(resources)
     if not payload:
         return {}
-    catalogs = getattr(getattr(registry, "loaded_plugins", None), "catalogs", None)
+    catalogs = getattr(getattr(registry, "prepared_resources", None), "catalogs", None)
     # PythonResources describes lifecycle bindings. The user's directory shows
     # the selected package once, including packages without lifecycle hooks.
     if catalogs is not None and hasattr(resources, "plugins"):
@@ -178,10 +178,7 @@ def rendered_resources_payload(resources: object | None, graph: GraphConfig | No
         ]}
     root_ids = graph_root_ids(graph)
     plugins = _rendered_resource_items(mapping_items(payload.get("plugins", ())), root_ids=root_ids)
-    host_extensions = _rendered_resource_items(
-        mapping_items(payload.get("host_extensions", ())),
-        root_ids=root_ids,
-    )
+
     base_lib_payload = payload.get("base_lib", {})
     modules = _rendered_resource_items(
         mapping_items(base_lib_payload.get("modules", ()) if isinstance(base_lib_payload, Mapping) else ()),
@@ -192,20 +189,14 @@ def rendered_resources_payload(resources: object | None, graph: GraphConfig | No
         result["base_lib"] = {"modules": list(modules)}
     if plugins:
         result["plugins"] = list(plugins)
-    if host_extensions:
-        result["host_extensions"] = list(host_extensions)
+
     if catalogs is not None:
-        for kind, items in (("base_lib", modules), ("host_extension", host_extensions)):
-            catalog = catalogs.base_libs if kind == "base_lib" else catalogs.host_extensions
-            enriched = []
-            for item in items:
-                descriptor = catalog.get(str(item.get("id", "")))
-                enriched.append({**(descriptor.to_dict() if descriptor else {}), **item})
-            if enriched:
-                if kind == "base_lib":
-                    result["base_lib"] = {"modules": enriched}
-                else:
-                    result["host_extensions"] = enriched
+        enriched = []
+        for item in modules:
+            descriptor = catalogs.base_libs.get(str(item.get("id", "")))
+            enriched.append({**(descriptor.to_dict() if descriptor else {}), **item})
+        if enriched:
+            result["base_lib"] = {"modules": enriched}
     return result
 
 
@@ -236,7 +227,7 @@ def graph_root_ids(graph: GraphConfig | None) -> frozenset[str]:
     return frozenset(root_ids)
 
 
-def reachable_nodesets(graph: GraphConfig) -> frozenset[str]:
+def reachable_nodeset_types(graph: GraphConfig) -> frozenset[str]:
     reachable: set[str] = set()
     pending = [item.target for node in graph.nodes if (item := invocation_for_node(graph, node)) is not None]
     while pending:
@@ -244,7 +235,7 @@ def reachable_nodesets(graph: GraphConfig) -> frozenset[str]:
         if type_key in reachable:
             continue
         reachable.add(type_key)
-        nodeset = graph.nodesets.get(type_key)
+        nodeset = graph.nodeset_types.get(type_key)
         if nodeset is None:
             continue
         pending.extend(

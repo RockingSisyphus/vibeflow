@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 from time import perf_counter
 
 
@@ -19,7 +20,7 @@ def environment(kernel: Path, **extra) -> dict[str, str]:
            "PYTHONDONTWRITEBYTECODE": "1", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"}
     for name in ("PYTEST_ADDOPTS", "PYTEST_PLUGINS"):
         env.pop(name, None)
-    env.setdefault("npm_config_cache", "/tmp/vibeflow-npm-cache")
+    env.setdefault("npm_config_cache", str(Path(os.environ.get("TMPDIR",tempfile.gettempdir())) / "vibeflow-npm-cache"))
     env.update({str(key): str(value) for key, value in extra.items() if value is not None})
     return env
 

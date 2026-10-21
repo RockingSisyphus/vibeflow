@@ -5,17 +5,17 @@ import pytest
 from vibeflow.core.config.concurrency import business_config, dispatch_limit, merge_call_config
 from vibeflow.core.config.node import NodeConfigError, merge_node_config, normalize_node_config_spec
 from vibeflow.core.config.scope import node_invocation_scope, normalize_node_config_overrides, ConfigBindingError
-from vibeflow.core.flow import GraphConfigError, NodeSpec
+from vibeflow.core.flow import GraphConfigError, NodeCallSpec
 from vibeflow.tooling.project.graph_config import parse_graph_config
 
 
 @pytest.mark.parametrize("value", [0, -1, True, False, 2.5, "4", None, [], {}])
 def test_call_config_rejects_invalid_capacity(value):
     with pytest.raises(GraphConfigError, match="max_concurrency"):
-        parse_graph_config({"pipeline": {"nodes": [{"id": "dispatch", "type_used": "test.dispatch",
+        parse_graph_config({"pipeline": {"nodes": [{"id": "dispatch", "definition_id": "test.dispatch",
             "display_name": "Dispatch", "description": "Queue calls", "config": {"max_concurrency": value}}]}})
     with pytest.raises(NodeConfigError, match="max_concurrency"):
-        NodeSpec("dispatch", "test.dispatch", params={"max_concurrency": value})
+        NodeCallSpec("dispatch", "test.dispatch", params={"max_concurrency": value})
 
 
 def test_call_config_extracts_scheduler_value_without_relaxing_business_contract():
@@ -50,6 +50,6 @@ def test_call_override_validation_covers_nested_dispatchers():
     with pytest.raises(ConfigBindingError, match="max_concurrency"):
         normalize_node_config_overrides({"body.dispatch": {"max_concurrency": False}})
     with pytest.raises(GraphConfigError, match="max_concurrency"):
-        parse_graph_config({"pipeline": {"nodes": [{"id": "outer", "type_used": "test.body",
+        parse_graph_config({"pipeline": {"nodes": [{"id": "outer", "definition_id": "test.body",
             "display_name": "Outer", "description": "Nested work",
             "node_configs": {"dispatch": {"max_concurrency": 0}}}]}})

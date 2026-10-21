@@ -23,43 +23,43 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.start",
+        "definition_id": "sandbox.start",
         "display_name": "Start",
         "description": "Runs start."
       },
       {
         "id": "input",
-        "type_used": "sandbox.training_input",
+        "definition_id": "sandbox.training_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
         "id": "forward",
-        "type_used": "sandbox.forward_loss",
+        "definition_id": "sandbox.forward_loss",
         "display_name": "Forward",
         "description": "Runs forward."
       },
       {
         "id": "backward",
-        "type_used": "sandbox.backward_grad",
+        "definition_id": "sandbox.backward_grad",
         "display_name": "Backward",
         "description": "Runs backward."
       },
       {
         "id": "step",
-        "type_used": "sandbox.optimizer_step",
+        "definition_id": "sandbox.optimizer_step",
         "display_name": "Step",
         "description": "Runs step."
       },
       {
         "id": "metrics",
-        "type_used": "sandbox.training_metrics",
+        "definition_id": "sandbox.training_metrics",
         "display_name": "Metrics",
         "description": "Runs metrics."
       },
       {
         "id": "end",
-        "type_used": "sandbox.training_metrics_end",
+        "definition_id": "sandbox.training_metrics_end",
         "display_name": "End",
         "description": "Runs end."
       }
@@ -139,7 +139,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

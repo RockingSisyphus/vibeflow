@@ -1,0 +1,14 @@
+{
+  "project_target": "javascript",
+  "javascript": {
+    "package_root": "."
+  },
+  "architecture": {
+    "documents": [
+      {
+        "workflow": "configs/workflow.jsonc",
+        "document": "ARCHITECTURE.jsonc"
+      }
+    ]
+  }
+}

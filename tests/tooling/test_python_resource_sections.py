@@ -13,11 +13,11 @@ from vibeflow.tooling.application.python.workspace_service import load_workspace
 
 SOURCE = '''from vibeflow.targets.python.sdk import Plugin,node,rule,ruleset,base_lib
 from vibeflow.core.rules import RuleResult
-@node(type_key="demo.start",flow_kind="terminal",contract={},rulesets=[])
+@node(node_type='vibeflow.node', id="demo.start",flow_kind="terminal",contract={},rulesets=[])
 class Start:
     def run_pure(self,inputs,params):
         raise AssertionError("business must remain untouched")
-@node(type_key="demo",contract={"provides":[{"key":"result","type":"number","display_name":"Result"}],"output_semantics":{"result":["A result"]}},rulesets=["demo.rules"])
+@node(node_type='vibeflow.node', id="demo",contract={"provides":[{"key":"result","type":"number","display_name":"Result"}],"output_semantics":{"result":["A result"]}},rulesets=["demo.rules"])
 class Demo:
     def run_pure(self,inputs,params):
         raise AssertionError("business must remain untouched")
@@ -41,7 +41,14 @@ plugin=Plugin(id="demo",resources=[Start,Demo,library,other,check,rules],runtime
 
 @pytest.fixture
 def checked(tmp_path):
-    workspace, config = executable_project(tmp_path,SOURCE)
+    start = SOURCE.index('@base_lib')
+    end = SOURCE.index('@rule')
+    business, libraries = SOURCE[:start], SOURCE[start:end]
+    plugin = SOURCE[:SOURCE.index('@node')] + SOURCE[end:]
+    plugin = plugin.replace('resources=[Start,Demo,library,other,check,rules]', 'resources=[check,rules]')
+    workspace, config = executable_project(tmp_path, business, plugin_source=plugin)
+    (tmp_path / "base_lib").mkdir()
+    (tmp_path / "base_lib/libraries.py").write_text('from vibeflow.targets.python.sdk import base_lib\n' + libraries)
     value = json.loads(config.read_text())
     value["base_lib"] = {"modules":[{"id":"demo.library","style":{"fill":"#ffeebb"}},"demo.other"]}
     config.write_text(json.dumps(value))

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from collections import Counter
 from typing import Mapping, Sequence
 
-from vibeflow.core.flow import LOOP_NODE_TYPES, STATUS_PLANNED
+from vibeflow.core.flow import LOOP_DEFINITION_IDS, STATUS_PLANNED
 from vibeflow.core.findings import HealthFinding
 from vibeflow.core.constants import FLOW_KIND_DECISION, FLOW_KIND_TERMINAL
 from vibeflow.core.planned import PLANNED_BEHAVIOR_PYTHON_STUB, PLANNED_BEHAVIOR_TRANSPARENT, effective_planned_behavior
@@ -29,9 +29,9 @@ def _flowchart_health_facts(
     active_nodes = [node for node in graph.nodes if _node_participates_in_flow(graph, node)]
     if not active_nodes:
         return
-    active_names = {node.name for node in active_nodes}
+    active_names = {node.id for node in active_nodes}
     incoming, outgoing, outgoing_edges, incoming_edges = _flow_maps(compiled, active_names)
-    node_by_name = {node.name: node for node in active_nodes}
+    node_by_name = {node.id: node for node in active_nodes}
     starts = {
         name
         for name in active_names
@@ -89,12 +89,12 @@ def _flow_maps(compiled, active_names: set[str]) -> tuple[dict[str, list[str]], 
 def _node_participates_in_flow(graph, node) -> bool:
     if node.status != STATUS_PLANNED:
         return True
-    nodeset = graph.nodesets.get(node.type_used)
+    nodeset = graph.nodeset_types.get(node.definition_id)
     return effective_planned_behavior(node, nodeset).kind in {PLANNED_BEHAVIOR_TRANSPARENT, PLANNED_BEHAVIOR_PYTHON_STUB}
 
 
 def _is_permanent_loop(node: object) -> bool:
-    if getattr(node, "type_used", "") not in LOOP_NODE_TYPES:
+    if getattr(node, "definition_id", "") not in LOOP_DEFINITION_IDS:
         return False
     loop = getattr(node, "loop", None)
     stop_when = getattr(loop, "stop_when", None)
@@ -191,25 +191,25 @@ def _append_orphan_findings(
 
 
 def _append_decision_branch_health(graph, compiled, state, flow: _DecisionFlow, *, owner: str) -> None:
-    nodes_by_name = {node.name: node for node in graph.nodes}
+    nodes_by_name = {node.id: node for node in graph.nodes}
     for node in graph.nodes:
-        if node.status == STATUS_PLANNED or compiled.flow_kinds.get(node.name) != FLOW_KIND_DECISION:
+        if node.status == STATUS_PLANNED or compiled.flow_kinds.get(node.id) != FLOW_KIND_DECISION:
             continue
         _append_single_decision_health(node, nodes_by_name, state, flow, owner=owner)
 
 
 def _append_single_decision_health(node, nodes_by_name, state, flow: _DecisionFlow, *, owner: str) -> None:
-    for edge in flow.outgoing_edges.get(node.name, ()):
+    for edge in flow.outgoing_edges.get(node.id, ()):
         target = getattr(edge, "target", "")
-        if target in nodes_by_name and not _is_loop_branch(node.name, target, flow.outgoing) and target not in flow.can_reach_end:
+        if target in nodes_by_name and not _is_loop_branch(node.id, target, flow.outgoing) and target not in flow.can_reach_end:
             state.errors.append(
                 _flow_finding(
                     "GRAPH.DECISION.BRANCH_CANNOT_REACH_END",
-                    node.name,
-                    f"decision branch {node.name}->{target} cannot reach a terminal end node",
+                    node.id,
+                    f"decision branch {node.id}->{target} cannot reach a terminal end node",
                     object_type="node",
                     details={
-                        **_node_flow_details(owner, node.name, flow.incoming_edges, flow.outgoing_edges),
+                        **_node_flow_details(owner, node.id, flow.incoming_edges, flow.outgoing_edges),
                         "branch_edge": _edge_summary(edge),
                         "target": target,
                     },

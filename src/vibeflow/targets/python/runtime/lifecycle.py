@@ -79,7 +79,7 @@ class NodeRunContext:
     def __init__(self, runtime, frame):
         self.signal = CancellationSignal()
         allowed = {}
-        descriptor = runtime.registry.descriptor(frame.type_used)
+        descriptor = runtime.registry.descriptor(frame.definition_id)
         for requirement in descriptor.capabilities:
             supplied = runtime._capabilities.get(requirement.id)
             if not isinstance(supplied, Mapping):
@@ -117,5 +117,5 @@ class NodeRunContext:
 
     def trace(self, kind, details=None):
         self._runtime._record_runtime_event(
-            kind, self._frame.id, self._frame.type_used, details=details
+            kind, self._frame.id, self._frame.definition_id, details=details
         )

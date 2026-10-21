@@ -93,9 +93,9 @@ def analyze_mainline(graph: GraphConfig, edges: Sequence[EdgeSpec], flow_kinds: 
         if edge not in scheduled and edge in transferred
     )
     mainline_nodes = tuple(
-        node.name
+        node.id
         for node in graph.nodes
-        if _node_on_mainline(node.name, mainline_edges, flow_kinds)
+        if _node_on_mainline(node.id, mainline_edges, flow_kinds)
     )
     findings = _mainline_findings(
         graph,
@@ -172,12 +172,12 @@ def _mainline_findings(
         )
 
     for node in graph.nodes:
-        outgoing = schedule_outgoing.get(node.name, ())
+        outgoing = schedule_outgoing.get(node.id, ())
         if len({edge.target for edge in outgoing}) <= 1:
             continue
-        if flow_kinds.get(node.name) == FLOW_KIND_DECISION:
+        if flow_kinds.get(node.id) == FLOW_KIND_DECISION:
             continue
-        if _fanout_has_explicit_join(outgoing, schedule_outgoing, {item.name: item for item in graph.nodes}):
+        if _fanout_has_explicit_join(outgoing, schedule_outgoing, {item.id: item for item in graph.nodes}):
             continue
         branch_nodes = sorted({target for edge in outgoing for target in _walk({edge.target}, schedule_outgoing)} | {edge.target for edge in outgoing})
         findings.append(
@@ -185,13 +185,13 @@ def _mainline_findings(
                 "GRAPH.MAINLINE.UNDECLARED_SYNC_FANOUT",
                 owner,
                 outgoing[0],
-                f"node '{node.name}' dispatches multiple branches without an explicit downstream all-join",
+                f"node '{node.id}' dispatches multiple branches without an explicit downstream all-join",
                 attempted=EDGE_CLASS_MAINLINE,
                 mainline_path=_first_mainline_path(starts, ends, mainline_edges),
                 branch_nodes=branch_nodes,
                 branch_edges=list(outgoing),
                 suggested_fixes=[
-                    f"serialize the outgoing work after '{node.name}' into a single mainline chain",
+                    f"serialize the outgoing work after '{node.id}' into a single mainline chain",
                     "keep only shortcut/data-transfer edges when a downstream mainline path already exists",
                     "connect the work to an explicit downstream all-join",
                 ],
@@ -222,9 +222,9 @@ def _mainline_findings(
         )
 
     for node in graph.nodes:
-        if node.name in reachable_from_start:
+        if node.id in reachable_from_start:
             continue
-        related = tuple(edge for edge in sync_edges if edge.source == node.name or edge.target == node.name)
+        related = tuple(edge for edge in sync_edges if edge.source == node.id or edge.target == node.id)
         if not related:
             continue
         findings.append(
@@ -232,13 +232,13 @@ def _mainline_findings(
                 "GRAPH.MAINLINE.AMBIGUOUS_SIDE_BRANCH",
                 owner,
                 related[0],
-                f"sync node '{node.name}' is not covered by any inferred mainline path",
+                f"sync node '{node.id}' is not covered by any inferred mainline path",
                 attempted=EDGE_CLASS_MAINLINE,
                 mainline_path=_first_mainline_path(starts, ends, mainline_edges),
-                branch_nodes=[node.name],
+                branch_nodes=[node.id],
                 branch_edges=list(related),
                 suggested_fixes=[
-                    f"connect '{node.name}' into the synchronous mainline",
+                    f"connect '{node.id}' into the synchronous mainline",
                     f"connect the work to an explicit downstream all-join",
                     "remove the side branch if it is only an unused data dependency sketch",
                 ],
@@ -282,25 +282,25 @@ def _fanout_has_explicit_join(
 def _start_nodes(graph: GraphConfig, edges: tuple[EdgeSpec, ...], flow_kinds: Mapping[str, str]) -> set[str]:
     incoming = _incoming(edges)
     starts = {
-        node.name
+        node.id
         for node in graph.nodes
-        if flow_kinds.get(node.name) == FLOW_KIND_TERMINAL and not incoming.get(node.name)
+        if flow_kinds.get(node.id) == FLOW_KIND_TERMINAL and not incoming.get(node.id)
     }
     if starts:
         return starts
-    return {node.name for node in graph.nodes[:1]}
+    return {node.id for node in graph.nodes[:1]}
 
 
 def _end_nodes(graph: GraphConfig, edges: tuple[EdgeSpec, ...], flow_kinds: Mapping[str, str]) -> set[str]:
     outgoing = _outgoing(edges)
     ends = {
-        node.name
+        node.id
         for node in graph.nodes
-        if flow_kinds.get(node.name) == FLOW_KIND_TERMINAL and not outgoing.get(node.name)
+        if flow_kinds.get(node.id) == FLOW_KIND_TERMINAL and not outgoing.get(node.id)
     }
     if ends:
         return ends
-    return {graph.nodes[-1].name} if graph.nodes else set()
+    return {graph.nodes[-1].id} if graph.nodes else set()
 
 
 def _finding(

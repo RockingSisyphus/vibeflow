@@ -86,21 +86,21 @@ def test_planned_nodeset_architecture_is_identical_across_hash_seeds(distributio
     project = distribution / "javascript_project"
     directory = project / "configs/planned_nodesets"
     directory.mkdir()
-    nodes = [{"id": "start", "type_used": "minimal.start", "display_name": "Start",
+    nodes = [{"id": "start", "definition_id": "minimal.start", "display_name": "Start",
               "description": "Starts the planned Nodeset order regression."}]
     for name in names:
         document = {"type_key": "repro." + name, "display_name": name,
             "description": "Transparent planned Nodeset for order regression.",
             "status": "planned", "planned_behavior": "transparent", "requires": [], "provides": []}
         (directory / (name + ".jsonc")).write_text(json.dumps(document), encoding="utf-8")
-        nodes.append({"id": name, "type_used": document["type_key"], "display_name": name,
+        nodes.append({"id": name, "definition_id": document["type_key"], "display_name": name,
             "description": document["description"], "status": "planned", "planned_behavior": "transparent",
             "flow_kind": "process", "requires": [], "provides": []})
-    nodes.append({"id": "end", "type_used": "minimal.end", "display_name": "End",
+    nodes.append({"id": "end", "definition_id": "minimal.end", "display_name": "End",
                   "description": "Ends the planned Nodeset order regression."})
     document = {"pipeline": {"inputs": [], "outputs": [], "nodes": nodes,
         "edges": [[left["id"], right["id"]] for left, right in zip(nodes, nodes[1:])]},
-        "plugins": [{"source": {"kind": "file", "ref": "plugins/code_plugin.ts", "export": "plugin"}}],
+        "plugins": [{"source": {"kind": "file", "ref": "plugins/code_plugin/plugin.ts", "export": "plugin"}}],
         "nodeset_imports": [{"path": "planned_nodesets/" + name + ".jsonc"} for name in reversed(names)]}
     (project / "configs/planned_order.jsonc").write_text(json.dumps(document), encoding="utf-8")
     options = {"config": "planned_order.jsonc", "output": "PLANNED_ORDER_ARCHITECTURE.jsonc"}

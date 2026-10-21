@@ -11,25 +11,25 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "example.boundary",
+        "definition_id": "example.boundary",
         "display_name": "Start",
         "description": "Starts the native workflow."
       },
       {
         "id": "model",
-        "type_used": "example.model",
+        "definition_id": "example.model",
         "display_name": "model",
         "description": "Executes this functional block through native Node contracts."
       },
       {
         "id": "transform",
-        "type_used": "example.transform",
+        "definition_id": "example.transform",
         "display_name": "transform",
         "description": "Executes this functional block through native Node contracts."
       },
       {
         "id": "end",
-        "type_used": "example.boundary",
+        "definition_id": "example.boundary",
         "display_name": "End",
         "description": "Ends the native workflow."
       }
@@ -61,7 +61,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

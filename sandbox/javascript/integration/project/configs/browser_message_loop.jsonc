@@ -1,0 +1,131 @@
+{
+  "nodeset_imports": [
+    {
+      "path": "nodeset_types/permanent_port_body.jsonc"
+    }
+  ],
+  "pipeline": {
+    "entry_mode": "async",
+    "nodes": [
+      {
+        "id": "start",
+        "definition_id": "sandbox.terminal",
+        "display_name": "Start browser Port workflow",
+        "description": "Starts the browser-hosted permanent Port workflow."
+      },
+      {
+        "id": "open",
+        "definition_id": "sandbox.window_open",
+        "display_name": "Open window listener",
+        "description": "Establish the browser listener and its cancellation cleanup."
+      },
+      {
+        "id": "loop",
+        "definition_id": "vibeflow.loop.while",
+        "display_name": "Browser Port loop",
+        "description": "Processes window messages until the host is stopped.",
+        "loop": {
+          "body": "sandbox.permanent_port_body",
+          "max_iterations": null
+        },
+        "requires": [],
+        "provides": []
+      },
+      {
+        "id": "close",
+        "definition_id": "sandbox.window_close",
+        "display_name": "Close window listener",
+        "description": "Release the listener after normal completion."
+      },
+      {
+        "id": "end",
+        "definition_id": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Finish message processing."
+      },
+      {
+        "id": "once_start",
+        "definition_id": "sandbox.terminal",
+        "display_name": "Start one message",
+        "description": "Run one finite browser message transaction."
+      },
+      {
+        "id": "once_open",
+        "definition_id": "sandbox.window_open",
+        "display_name": "Open one-message listener",
+        "description": "Explicitly establish the listener for the finite entry."
+      },
+      {
+        "id": "once_process",
+        "definition_id": "sandbox.permanent_port_body",
+        "display_name": "Process one message",
+        "description": "Receive, calculate and send one message through the reusable NodesetType."
+      },
+      {
+        "id": "once_close",
+        "definition_id": "sandbox.window_close",
+        "display_name": "Close listener",
+        "description": "Normal completion explicitly releases the listener."
+      },
+      {
+        "id": "once_end",
+        "definition_id": "sandbox.terminal",
+        "display_name": "One message complete",
+        "description": "Finish the finite entry."
+      }
+    ],
+    "edges": [
+      [
+        "start",
+        "open"
+      ],
+      [
+        "open",
+        "loop"
+      ],
+      [
+        "loop",
+        "close"
+      ],
+      [
+        "close",
+        "end"
+      ],
+      [
+        "once_start",
+        "once_open"
+      ],
+      [
+        "once_open",
+        "once_process"
+      ],
+      [
+        "once_process",
+        "once_close"
+      ],
+      [
+        "once_close",
+        "once_end"
+      ]
+    ],
+    "outputs": [],
+    "entries": {
+      "serve": {
+        "start": "start"
+      },
+      "once": {
+        "start": "once_start"
+      }
+    },
+    "default_entry": "serve"
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugins/code_plugin/plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
+}

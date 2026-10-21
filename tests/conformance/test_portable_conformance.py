@@ -25,7 +25,7 @@ _TerminalNode_DECLARATION = NodeDescriptor(
     'fixture.terminal', 'Terminal', 'Starts or ends a conformance workflow.', '1', 'terminal',
     contract=NodeContractDescriptor(params_schema={}, params_defaults={}),
     rulesets=(),
-)
+ node_type="vibeflow.node")
 
 
 class _TerminalNode:
@@ -38,7 +38,7 @@ _AliasNode_DECLARATION = NodeDescriptor(
     'fixture.alias', 'Alias values', 'Produces values for every pipeline output cardinality.', '1', 'process',
     contract=NodeContractDescriptor(provides=(DataProvider('exact', 'value.exact', display_name='exact'), DataProvider('optional', 'value.optional', display_name='optional'), DataProvider('item', 'value.item', display_name='item')), params_schema={}, params_defaults={}, output_semantics={'exact': ('Conformance output exact.',), 'optional': ('Conformance output optional.',), 'item': ('Conformance output item.',)}),
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _AliasNode:
@@ -51,7 +51,7 @@ _AddNode_DECLARATION = NodeDescriptor(
     'fixture.add', 'Add', 'Adds a configured delta.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('number', 'exactly_one', display_name='number'),), provides=(DataProvider('answer', 'answer', display_name='answer'),), params_schema={'delta': {'type': 'number'}}, params_defaults={'delta': 1}, input_semantics={'number': ('Conformance input number.',)}, output_semantics={'answer': ('Conformance output answer.',)}),
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _AddNode:
@@ -64,7 +64,7 @@ _RouteNode_DECLARATION = NodeDescriptor(
     'fixture.route', 'Route', 'Chooses a branch from the input sign.', '1', 'decision',
     contract=NodeContractDescriptor(requires=(DataRequirement('number', 'exactly_one', display_name='number'),), provides=(DataProvider('number.branch', 'number', display_name='number.branch'), DataProvider('branch.left', 'branch.left', display_name='branch.left')), input_semantics={'number': ('Conformance input number.',)}, output_semantics={'number.branch': ('Conformance output number.branch.',), 'branch.left': ('Conformance output branch.left.',)}),
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _RouteNode:
@@ -78,7 +78,7 @@ _AsyncRouteNode_DECLARATION = NodeDescriptor(
     'fixture.async_route', 'Async route', 'Chooses a branch after resolving a result-key future.', '1', 'decision',
     contract=_RouteNode_DECLARATION.contract,
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _AsyncRouteNode:
@@ -92,7 +92,7 @@ _NumericTruthRouteNode_DECLARATION = NodeDescriptor(
     'fixture.numeric_truth_route', 'Numeric truth route', 'Produces numeric one to verify strict portable condition equality.', '1', 'decision',
     contract=_RouteNode_DECLARATION.contract,
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _NumericTruthRouteNode:
@@ -108,7 +108,7 @@ _LeftNode_DECLARATION = NodeDescriptor(
     'fixture.left', 'Left', 'Runs the true branch.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('number', 'exactly_one', display_name='number'),), provides=(DataProvider('left.answer', 'answer', display_name='left.answer'),), input_semantics={'number': ('Conformance input number.',)}, output_semantics={'left.answer': ('Conformance output left.answer.',)}),
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _LeftNode:
@@ -121,7 +121,7 @@ _RightNode_DECLARATION = NodeDescriptor(
     'fixture.right', 'Right', 'Runs the false branch.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('number', 'exactly_one', display_name='number'),), provides=(DataProvider('right.answer', 'answer', display_name='right.answer'),), input_semantics={'number': ('Conformance input number.',)}, output_semantics={'right.answer': ('Conformance output right.answer.',)}),
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _RightNode:
@@ -134,7 +134,7 @@ _OptionalLeftNode_DECLARATION = NodeDescriptor(
     'fixture.optional_left', 'Optional left', 'Runs the selected optional-data left branch.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('number', 'optional_one', display_name='number'),), provides=(DataProvider('left.answer', 'answer', display_name='left.answer'),), input_semantics={'number': ('Conformance input number.',)}, output_semantics={'left.answer': ('Conformance output left.answer.',)}),
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _OptionalLeftNode:
@@ -149,7 +149,7 @@ _OptionalRightNode_DECLARATION = NodeDescriptor(
     'fixture.optional_right', 'Optional right', 'Runs the selected optional-data right branch.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('number', 'optional_one', display_name='number'),), provides=(DataProvider('right.answer', 'answer', display_name='right.answer'),), input_semantics={'number': ('Conformance input number.',)}, output_semantics={'right.answer': ('Conformance output right.answer.',)}),
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _OptionalRightNode:
@@ -164,7 +164,7 @@ _LeftItemNode_DECLARATION = NodeDescriptor(
     'fixture.left_item', 'Left item', 'Produces the first fan-in item.', '1', 'process',
     contract=NodeContractDescriptor(provides=(DataProvider('left', 'item', display_name='left'),), output_semantics={'left': ('Conformance output left.',)}),
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _LeftItemNode:
@@ -177,7 +177,7 @@ _RightItemNode_DECLARATION = NodeDescriptor(
     'fixture.right_item', 'Right item', 'Produces the second fan-in item.', '1', 'process',
     contract=NodeContractDescriptor(provides=(DataProvider('right', 'item', display_name='right'),), output_semantics={'right': ('Conformance output right.',)}),
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _RightItemNode:
@@ -190,7 +190,7 @@ _ItemJoinNode_DECLARATION = NodeDescriptor(
     'fixture.item_join', 'Item Join', 'Consumes one active fan-in item.', '1', 'terminal',
     contract=NodeContractDescriptor(requires=(DataRequirement('item', 'exactly_one', display_name='Item'),), input_semantics={'item': ('selected fan-in item',)}),
     rulesets=(),
-)
+ node_type="vibeflow.node")
 
 
 class _ItemJoinNode:
@@ -203,7 +203,7 @@ _DoubleNode_DECLARATION = NodeDescriptor(
     'fixture.double', 'Double', 'Doubles a number inside a nodeset.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('number', 'exactly_one', display_name='number'),), provides=(DataProvider('answer', 'answer', display_name='answer'),), input_semantics={'number': ('Conformance input number.',)}, output_semantics={'answer': ('Conformance output answer.',)}),
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _DoubleNode:
@@ -216,7 +216,7 @@ _AsyncDoubleNode_DECLARATION = NodeDescriptor(
     'fixture.async_double', 'Async double', 'Doubles a number through a deferred nested task.', '1', 'process',
     contract=_DoubleNode_DECLARATION.contract,
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _AsyncDoubleNode:
@@ -229,7 +229,7 @@ _IncrementNode_DECLARATION = NodeDescriptor(
     'fixture.increment', 'Increment', 'Advances one bounded-loop iteration.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('loop.current', 'exactly_one', display_name='loop.current'),), provides=(DataProvider('loop.next', 'loop.next', display_name='loop.next'),), input_semantics={'loop.current': ('Conformance input loop.current.',)}, output_semantics={'loop.next': ('Conformance output loop.next.',)}),
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _IncrementNode:
@@ -242,7 +242,7 @@ _IncrementUntilNode_DECLARATION = NodeDescriptor(
     'fixture.increment_until', 'Increment until', 'Advances a loop and reports its stop condition.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('loop.current', 'exactly_one', display_name='loop.current'),), provides=(DataProvider('loop.next', 'loop.next', display_name='loop.next'), DataProvider('loop.done', 'loop.done', display_name='loop.done')), params_schema={'target': {'type': 'number'}}, params_defaults={'target': 3}, input_semantics={'loop.current': ('Conformance input loop.current.',)}, output_semantics={'loop.next': ('Conformance output loop.next.',), 'loop.done': ('Conformance output loop.done.',)}),
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _IncrementUntilNode:
@@ -259,7 +259,7 @@ _AdvanceOuterNode_DECLARATION = NodeDescriptor(
     'fixture.advance_outer', 'Advance outer loop', 'Maps an inner-loop result into the outer carry and stop values.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('inner.final', 'exactly_one', display_name='inner.final'),), provides=(DataProvider('loop.next', 'loop.next', display_name='loop.next'), DataProvider('loop.done', 'loop.done', display_name='loop.done')), params_schema={'target': {'type': 'number'}}, params_defaults={'target': 3}, input_semantics={'inner.final': ('Conformance input inner.final.',)}, output_semantics={'loop.next': ('Conformance output loop.next.',), 'loop.done': ('Conformance output loop.done.',)}),
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _AdvanceOuterNode:
@@ -276,7 +276,7 @@ _FailNode_DECLARATION = NodeDescriptor(
     'fixture.fail', 'Fail', 'Raises the shared conformance error.', '1', 'process',
     contract=NodeContractDescriptor(),
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _FailNode:
@@ -289,7 +289,7 @@ _DetachedAuditNode_DECLARATION = NodeDescriptor(
     'fixture.detached_audit', 'Detached audit', 'Completes a delayed side task before workflow cleanup returns.', '1', 'process',
     contract=NodeContractDescriptor(),
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _DetachedAuditNode:
@@ -424,26 +424,26 @@ def _registry() -> NodeRegistry:
     registry.register(_IncrementUntilNode_DECLARATION, _IncrementUntilNode)
     registry.register(_AdvanceOuterNode_DECLARATION, _AdvanceOuterNode)
     declarations = {
-        _TerminalNode_DECLARATION.type_key: _TerminalNode_DECLARATION,
-        _AliasNode_DECLARATION.type_key: _AliasNode_DECLARATION,
-        _AddNode_DECLARATION.type_key: _AddNode_DECLARATION,
-        _RouteNode_DECLARATION.type_key: _RouteNode_DECLARATION,
-        _AsyncRouteNode_DECLARATION.type_key: _AsyncRouteNode_DECLARATION,
-        _NumericTruthRouteNode_DECLARATION.type_key: _NumericTruthRouteNode_DECLARATION,
-        _LeftNode_DECLARATION.type_key: _LeftNode_DECLARATION,
-        _RightNode_DECLARATION.type_key: _RightNode_DECLARATION,
-        _OptionalLeftNode_DECLARATION.type_key: _OptionalLeftNode_DECLARATION,
-        _OptionalRightNode_DECLARATION.type_key: _OptionalRightNode_DECLARATION,
-        _LeftItemNode_DECLARATION.type_key: _LeftItemNode_DECLARATION,
-        _RightItemNode_DECLARATION.type_key: _RightItemNode_DECLARATION,
-        _ItemJoinNode_DECLARATION.type_key: _ItemJoinNode_DECLARATION,
-        _DoubleNode_DECLARATION.type_key: _DoubleNode_DECLARATION,
-        _AsyncDoubleNode_DECLARATION.type_key: _AsyncDoubleNode_DECLARATION,
-        _IncrementNode_DECLARATION.type_key: _IncrementNode_DECLARATION,
-        _IncrementUntilNode_DECLARATION.type_key: _IncrementUntilNode_DECLARATION,
-        _AdvanceOuterNode_DECLARATION.type_key: _AdvanceOuterNode_DECLARATION,
-        _FailNode_DECLARATION.type_key: _FailNode_DECLARATION,
-        _DetachedAuditNode_DECLARATION.type_key: _DetachedAuditNode_DECLARATION,
+        _TerminalNode_DECLARATION.id: _TerminalNode_DECLARATION,
+        _AliasNode_DECLARATION.id: _AliasNode_DECLARATION,
+        _AddNode_DECLARATION.id: _AddNode_DECLARATION,
+        _RouteNode_DECLARATION.id: _RouteNode_DECLARATION,
+        _AsyncRouteNode_DECLARATION.id: _AsyncRouteNode_DECLARATION,
+        _NumericTruthRouteNode_DECLARATION.id: _NumericTruthRouteNode_DECLARATION,
+        _LeftNode_DECLARATION.id: _LeftNode_DECLARATION,
+        _RightNode_DECLARATION.id: _RightNode_DECLARATION,
+        _OptionalLeftNode_DECLARATION.id: _OptionalLeftNode_DECLARATION,
+        _OptionalRightNode_DECLARATION.id: _OptionalRightNode_DECLARATION,
+        _LeftItemNode_DECLARATION.id: _LeftItemNode_DECLARATION,
+        _RightItemNode_DECLARATION.id: _RightItemNode_DECLARATION,
+        _ItemJoinNode_DECLARATION.id: _ItemJoinNode_DECLARATION,
+        _DoubleNode_DECLARATION.id: _DoubleNode_DECLARATION,
+        _AsyncDoubleNode_DECLARATION.id: _AsyncDoubleNode_DECLARATION,
+        _IncrementNode_DECLARATION.id: _IncrementNode_DECLARATION,
+        _IncrementUntilNode_DECLARATION.id: _IncrementUntilNode_DECLARATION,
+        _AdvanceOuterNode_DECLARATION.id: _AdvanceOuterNode_DECLARATION,
+        _FailNode_DECLARATION.id: _FailNode_DECLARATION,
+        _DetachedAuditNode_DECLARATION.id: _DetachedAuditNode_DECLARATION,
     }
     for type_key, node in (
         ("fixture.route", _RouteNode),
@@ -519,7 +519,7 @@ def _node(
 ) -> dict[str, object]:
     node = {
         "id": node_id,
-        "type_used": type_key,
+        "definition_id": type_key,
         "display_name": node_id,
         "description": f"Conformance node {node_id}.",
         **extra,
@@ -641,7 +641,7 @@ def _input_preflight_document(
 
 def _unbounded_loop_document() -> dict[str, object]:
     return {
-        "nodesets": [
+        "nodeset_types": [
             {
                 "type_key": "fixture.loop_body",
                 "display_name": "Unbounded loop body",
@@ -1066,7 +1066,7 @@ def test_portable_conditions_do_not_coerce_number_one_to_boolean_true(
     document = _branch_document(optional_targets=True)
     route = document["pipeline"]["nodes"][1]
     assert isinstance(route, dict)
-    route["type_used"] = "fixture.numeric_truth_route"
+    route["definition_id"] = "fixture.numeric_truth_route"
 
     result = run_portable_conformance(
         _case(
@@ -1306,7 +1306,7 @@ def test_portable_conformance_port_receive_transform_and_send(
 
 def test_portable_conformance_nested_nodeset(tmp_path: Path) -> None:
     document = {
-        "nodesets": [
+        "nodeset_types": [
             {
                 "type_key": "fixture.double_flow",
                 "display_name": "Double flow",
@@ -1368,7 +1368,7 @@ def test_portable_conformance_nested_nodeset_deferred_result_key(
     tmp_path: Path,
 ) -> None:
     document = {
-        "nodesets": [
+        "nodeset_types": [
             {
                 "type_key": "fixture.async_double_flow",
                 "display_name": "Async double flow",
@@ -1438,7 +1438,7 @@ def test_portable_conformance_nested_nodeset_detached_cleanup(
     tmp_path: Path,
 ) -> None:
     document = {
-        "nodesets": [
+        "nodeset_types": [
             {
                 "type_key": "fixture.detached_flow",
                 "display_name": "Detached flow",
@@ -1511,7 +1511,7 @@ def test_portable_conformance_nested_nodeset_all_output(
     tmp_path: Path,
 ) -> None:
     document = {
-        "nodesets": [
+        "nodeset_types": [
             {
                 "type_key": "fixture.items_flow",
                 "display_name": "Items flow",
@@ -1602,11 +1602,11 @@ def test_portable_plan_canonically_preserves_unbounded_loop_sink(
 
     first = runtime._plan.to_workflow_plan(
         workflow_id="conformance.unbounded_loop",
-        source_by_type=sources,
+        source_by_definition=sources,
     )
     second = runtime._plan.to_workflow_plan(
         workflow_id="conformance.unbounded_loop",
-        source_by_type=sources,
+        source_by_definition=sources,
     )
 
     assert first.to_json() == second.to_json()
@@ -1635,7 +1635,7 @@ def test_portable_plan_canonically_preserves_unbounded_loop_sink(
 
 def test_portable_conformance_bounded_loop(tmp_path: Path) -> None:
     document = {
-        "nodesets": [
+        "nodeset_types": [
             {
                 "type_key": "fixture.loop_body",
                 "display_name": "Loop body",
@@ -1709,7 +1709,7 @@ def test_portable_conformance_loop_body_contains_nested_nodeset(
     tmp_path: Path,
 ) -> None:
     document = {
-        "nodesets": [
+        "nodeset_types": [
             {
                 "type_key": "fixture.increment_flow",
                 "display_name": "Nested increment",
@@ -1820,7 +1820,7 @@ def test_portable_conformance_nested_loops_carry_collect_and_stop(
     tmp_path: Path,
 ) -> None:
     document = {
-        "nodesets": [
+        "nodeset_types": [
             {
                 "type_key": "fixture.inner_loop_body",
                 "display_name": "Inner loop body",
@@ -1985,7 +1985,7 @@ def test_portable_conformance_stop_when_loop_with_carry_and_collect(
     tmp_path: Path,
 ) -> None:
     document = {
-        "nodesets": [
+        "nodeset_types": [
             {
                 "type_key": "fixture.loop_body",
                 "display_name": "Conditional loop body",

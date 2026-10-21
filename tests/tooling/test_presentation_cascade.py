@@ -18,17 +18,17 @@ class Empty:
 
 def test_external_composite_loop_and_planned_styles_match_canonical_facts():
     descriptor = NodeDescriptor("external", "External", "External block", "1.0", "process",
-                                external=True, rulesets=(), contract=NodeContractDescriptor())
+                                external=True, rulesets=(), contract=NodeContractDescriptor(), node_type="vibeflow.node")
     registry = NodeRegistry()
     registry.register(descriptor, Empty)
     catalogs = DescriptorCatalogs.empty()
     catalogs.nodes.register(descriptor)
 
-    def call(name, type_used, **extra):
-        return {"id": name, "type_used": type_used, "display_name": name.title(),
+    def call(name, definition_id, **extra):
+        return {"id": name, "definition_id": definition_id, "display_name": name.title(),
                 "description": name, **extra}
 
-    graph = parse_graph_config({"rulesets": [], "nodesets": [
+    graph = parse_graph_config({"rulesets": [], "nodeset_types": [
         {"type_key": "body", "display_name": "Body", "description": "Body", "requires": [], "provides": [],
          "pipeline": {"nodes": [call("step", "external")]}},
         {"type_key": "design", "display_name": "Design", "description": "Design", "status": "planned", "requires": [], "provides": []},
@@ -47,10 +47,10 @@ def test_external_composite_loop_and_planned_styles_match_canonical_facts():
     assert python_nodes["future"]["sources"]["fill"] == "status"
     assert python_nodes["external"]["values"]["fill"] != python_nodes["block"]["values"]["fill"]
     assert python["rulesets"] == javascript["rulesets"] == []
-    assert document["nodesets"]["body"]["effect_scope"] == "unconstrained"
-    assert document["nodesets"]["body"]["rulesets"] is None
-    assert document["nodesets"]["design"]["effect_scope"] == "unavailable"
-    assert document["node_types"]["vibeflow.loop.while"]["info"]["effect_scope"] == "unconstrained"
+    assert document["nodeset_types"]["body"]["effect_scope"] == "unconstrained"
+    assert document["nodeset_types"]["body"]["rulesets"] is None
+    assert document["nodeset_types"]["design"]["effect_scope"] == "unavailable"
+    assert document["node_definitions"]["vibeflow.loop.while"]["info"]["effect_scope"] == "unconstrained"
     assert {item["id"]: item["effect_scope"] for item in python["nodes"]} == {item["id"]: item["effect_scope"] for item in javascript["nodes"]}
     python_mermaid = export_mermaid(graph, compiled=compiled, registry=registry)
     javascript_mermaid = render_mermaid(SimpleNamespace(graph=graph, compiled=compiled, catalogs=catalogs))

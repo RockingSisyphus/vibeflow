@@ -41,6 +41,23 @@ RETIRED_FILES = (
     'tooling/application/python/project/resources.py',
     'tooling/application/python/project/source_preflight.py',
 )
+RETIRED_FILES += (
+    'targets/javascript/build/host_selection.py','tooling/application/javascript/host_selection.py',
+    'tooling/project/host_extensions.py','tooling/project/descriptor_loader.py',
+    'tooling/project/quality_policy.py','tooling/project/project_architecture.py',
+    'tooling/application/quality_options.py','tooling/application/workspace_quality.py',
+    'tooling/application/python/project/effective_policy.py','tooling/application/python/project/policy.py',
+    'tooling/application/python/project/quality.py','tooling/application/python/cli/quality.py',
+    'targets/python/quality/files.py',
+    'targets/python/nodetypes/__init__.py','targets/python/nodetypes/declarations.py','targets/python/nodetypes/protocols.py',
+    'targets/javascript/nodetypes/__init__.py','targets/javascript/nodetypes/declarations.mjs','targets/javascript/nodetypes/contracts.d.ts',
+    'targets/python/rules/project.py','targets/python/rulesets/project.py',
+    'targets/javascript/rules/project.py','targets/javascript/rulesets/project.py',
+    'targets/python/rules/graph/nodesets.py','targets/shared/quality_support/nodesets.py',
+    'targets/shared/rule_support/project.py','targets/shared/rule_support/project_analysis.py',
+    'tooling/project/schema/nodeset.schema.json','tooling/project/schema/policy.schema.json',
+)
+
 MOVED_FILES = ('core/rules/builtin/__init__.py', 'core/rules/builtin/effects.py',
     'core/rules/builtin/implementation.py', 'core/rules/builtin/project_quality.py',
     'core/rules/builtin/workflow.py')
@@ -69,6 +86,10 @@ RETIRED_SYMBOLS = frozenset({'RuntimeDispatchSite', 'RuntimeDispatchAnalysis',
     '_PLUGIN_ROLE', 'base_lib_paths', 'base_lib_modules', 'module_roles',
     'infer_roles_from_path', 'SIDE_EFFECT_IMPORT_ROOTS', 'SIDE_EFFECT_CALLS',
     'SIDE_EFFECT_ATTR_CALLS'})
+RETIRED_SYMBOLS |= frozenset({'HostExtensionDescriptor','HostExtensionSelection','HostExtensionRegistry',
+    'IoSpec','NodesetSpec','PolicyResolveResult','bound_workflow_depth_defaults',
+    'bound_python_workflow_defaults','source_policy_for_document'})
+
 RETIRED_DIAGNOSTIC_CODES = frozenset({'node_info_flow_kind', 'node_flow_kind_invalid',
     'missing_node_info', 'missing_contract', 'node_external_invalid',
     'node_decision_missing_route_output', 'type_mismatch', 'signature_unavailable',

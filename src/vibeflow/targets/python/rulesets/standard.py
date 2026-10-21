@@ -18,7 +18,7 @@ def standard_rulesets():
         review_calls = ("effects", "maintainability") if name == "base_lib" else ("effects", "architecture", "inputs", "interface", "async", "maintainability")
         rulesets.append(RulesetDescriptor("vibeflow." + name, calls=calls,
                         entrypoints={"static": review_calls, "run": review_calls, "import": ("imports",)}))
-    topics = ("flow", "join", "nodesets", "duplicates", "planned", "review")
+    topics = ("flow", "join", "nodeset_types", "duplicates", "planned", "review")
     rulesets.append(RulesetDescriptor("vibeflow.workflow",
         calls=(RuleCall("analysis", rule_id="vibeflow.workflow.analysis"),
                *(RuleCall(name, rule_id="vibeflow.workflow." + name) for name in topics),
@@ -29,7 +29,7 @@ def standard_rulesets():
                    *(RuleRelation("summary", name, "requires") for name in topics if name not in {"planned", "review"})),
         entrypoints={"static": ("summary",), "run": ("summary",)},
         workflow_default=True, graph_scope="effective_subtree"))
-    for name, scope in (("plugin", "none"), ("host_extension", "python_io")):
+    for name, scope in ([("plugin", "none")]):
         rulesets.append(RulesetDescriptor("vibeflow." + name, calls=(
             RuleCall("imports", rule_id="vibeflow.import_side_effects"),
             RuleCall("effects", rule_id="vibeflow.no_side_effects", params={"effect_scope":scope}),

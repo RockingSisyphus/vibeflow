@@ -119,11 +119,14 @@ class RuleDescriptor:
     params_defaults: Mapping[str, Any] = field(default_factory=dict)
     handler: str = ""
     scope: str = "call"
+    level: str = "node"
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "id", _text(self.id, "rule.id"))
         if not isinstance(self.scope, str) or self.scope not in {"call", "source"}:
             raise ValueError("rule.scope must be 'call' or 'source'")
+        if self.level not in {"node", "graph", "root", "project"}:
+            raise ValueError("rule.level must be node, graph, root or project")
         for name in ("inputs", "outputs"):
             value = getattr(self, name)
             if not isinstance(value, Mapping):
@@ -148,7 +151,7 @@ class RuleDescriptor:
                 "description": self.description, "implementations": [item.to_dict() for item in self.implementations],
                 "inputs": plain(self.inputs), "outputs": plain(self.outputs),
                 "params_schema": plain(self.params_schema), "params_defaults": plain(self.params_defaults),
-                "handler": self.handler, "scope": self.scope}
+                "handler": self.handler, "scope": self.scope, "level": self.level}
 
 
 @dataclass(frozen=True)

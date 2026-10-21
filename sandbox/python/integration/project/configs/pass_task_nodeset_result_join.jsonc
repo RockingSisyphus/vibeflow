@@ -15,25 +15,25 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.start",
+        "definition_id": "sandbox.start",
         "display_name": "Start",
         "description": "Runs start."
       },
       {
         "id": "input",
-        "type_used": "sandbox.value_input",
+        "definition_id": "sandbox.value_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
         "id": "composite",
-        "type_used": "math.add_five",
+        "definition_id": "math.add_five",
         "display_name": "composite",
         "description": "Executes the declared ordinary workflow node."
       },
       {
         "id": "end",
-        "type_used": "sandbox.out_value_end",
+        "definition_id": "sandbox.out_value_end",
         "display_name": "End",
         "description": "Runs end."
       }
@@ -62,14 +62,14 @@
   },
   "nodeset_imports": [
     {
-      "path": "nodesets/pass_task_nodeset_result_join/math_add_five.jsonc"
+      "path": "nodeset_types/pass_task_nodeset_result_join/math_add_five.jsonc"
     }
   ],
   "plugins": [
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

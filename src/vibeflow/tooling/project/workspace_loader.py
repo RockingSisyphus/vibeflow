@@ -5,14 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping
 
-from vibeflow.targets.shared.quality_support import QualityStructureLimits
 from vibeflow.tooling.project.architecture_types import WorkspaceConfigError
 from vibeflow.tooling.project.config_loader import (
     ConfigLoadError,
     load_raw_config_document,
 )
-from vibeflow.tooling.project.project_architecture import (
-    project_architecture_documents,
+from vibeflow.tooling.project.architecture_registration import (
+    root_architecture_documents,
 )
 from vibeflow.tooling.project.project_config_options import (
     project_javascript_options,
@@ -23,6 +22,7 @@ from vibeflow.tooling.project.workspace_model import (
     ProjectTarget,
     WorkspaceConfig,
     WorkspaceRoot,
+    WORKSPACE_CONFIG_NAME,
 )
 
 
@@ -41,47 +41,32 @@ def load_workspace_config(path: str | Path) -> WorkspaceConfig:
         ) from exc
     data = document.data
     _validate_workspace_keys(data, workspace_path)
+    if not isinstance(data.get("purpose", ""), str):
+        raise WorkspaceConfigError("WORKSPACE.PURPOSE", "project purpose must be a string", {"path":str(workspace_path)})
     roots = _workspace_roots(data.get("roots"), workspace_path=workspace_path)
     return WorkspaceConfig(
         path=workspace_path,
         root=workspace_path.parent.resolve(),
-        policy=data.get("policy", {}),
         roots=tuple(roots),
+        purpose=data.get("purpose", ""),
     )
 
 
 def load_project_workspace(path: str | Path) -> WorkspaceConfig:
-    """Load one project root as an in-memory workspace.
-
-    This supports project-scoped read-only commands when no surrounding
-    ``vibeflow_config.jsonc`` exists.  No synthetic workspace file is written;
-    the returned model simply gives the normal loaders the same root metadata.
-    """
-
-    project_path = Path(path).expanduser().resolve()
-    config_path = (
-        project_path
-        if project_path.name == PROJECT_CONFIG_NAME and project_path.is_file()
-        else find_project_config(project_path)
-    )
-    if config_path is None:
-        raise WorkspaceConfigError(
-            "WORKSPACE.PROJECT_CONFIG.MISSING",
-            f"cannot find {PROJECT_CONFIG_NAME} above {project_path}",
-            {"path": str(project_path)},
-        )
-    root_path = config_path.parent.resolve()
-    root = _workspace_root_from_project_config(
-        "project",
-        root_path=root_path,
-        config_path=config_path,
-    )
-    return WorkspaceConfig(
-        path=config_path,
-        root=root_path,
-        policy={},
-        roots=(root,),
-    )
+    """Load the registered project containing a root or workflow path."""
+    candidate = Path(path).expanduser().resolve()
+    start = candidate if candidate.is_dir() else candidate.parent
+    for directory in (start, *start.parents):
+        config = directory / WORKSPACE_CONFIG_NAME
+        if config.is_file():
+            workspace = load_workspace_config(config)
+            if candidate not in {config, directory} and workspace.root_for_path(candidate) is None:
+                raise WorkspaceConfigError("WORKSPACE.ROOT.UNREGISTERED",
+                    f"path does not belong to a registered root: {candidate}", {"path": str(candidate)})
+            return workspace
+    raise WorkspaceConfigError("WORKSPACE.CONFIG.MISSING",
+        f"create {WORKSPACE_CONFIG_NAME} with at least one root in a separate subdirectory; "
+        "standalone roots are no longer supported", {"path": str(candidate)})
 
 
 def find_project_config(path: str | Path) -> Path | None:
@@ -127,21 +112,27 @@ def _workspace_roots(
                 f"roots[{index}] must be an object",
                 {"path": str(workspace_path)},
             )
-        unknown = set(item) - {"id", "path", "config"}
+        unknown = set(item) - {"id", "path", "config", "purpose"}
         if unknown:
             raise WorkspaceConfigError(
                 "WORKSPACE.ROOT.UNKNOWN_FIELD",
                 f"roots[{index}] contains unknown fields: {sorted(unknown)}",
                 {"path": str(workspace_path)},
             )
-        root_id = str(item.get("id", "")).strip()
-        raw_path = str(item.get("path", "")).strip()
+        if not isinstance(item.get("purpose", ""), str):
+            raise WorkspaceConfigError("WORKSPACE.ROOT.PURPOSE", "root purpose must be a string", {"path":str(workspace_path)})
+        if not isinstance(item.get("id"), str) or not isinstance(item.get("path"), str):
+            raise WorkspaceConfigError("WORKSPACE.ROOT.REQUIRED", "root id and path must be strings", {"path":str(workspace_path)})
+        root_id = item["id"].strip()
+        raw_path = item["path"].strip()
         if not root_id or not raw_path:
             raise WorkspaceConfigError(
                 "WORKSPACE.ROOT.REQUIRED",
                 f"roots[{index}] requires id and path",
                 {"path": str(workspace_path)},
             )
+        if root_id.startswith("@"):
+            raise WorkspaceConfigError("WORKSPACE.ROOT.ID", "root IDs cannot start with @ (reserved for project scope)", {"path":str(workspace_path)})
         if root_id in seen:
             raise WorkspaceConfigError(
                 "WORKSPACE.ROOT.DUPLICATE",
@@ -156,6 +147,12 @@ def _workspace_roots(
                 workspace_path=workspace_path,
             )
         )
+    for index, root in enumerate(roots):
+        for other in roots[:index]:
+            if root.path.is_relative_to(other.path) or other.path.is_relative_to(root.path):
+                raise WorkspaceConfigError("WORKSPACE.ROOT.OVERLAP",
+                    f"roots '{root.id}' and '{other.id}' must have separate directories",
+                    {"path": str(workspace_path)})
     return roots
 
 
@@ -169,6 +166,11 @@ def _workspace_root_from_item(
         str(item.get("path", "")).strip(),
         base=workspace_path.parent,
     )
+    project_path = workspace_path.parent.resolve()
+    if root_path == project_path or not root_path.is_relative_to(project_path):
+        raise WorkspaceConfigError("WORKSPACE.ROOT.SEPARATE_DIRECTORY",
+            "each root must be in its own subdirectory of the project; path '.' is unsupported",
+            {"path": str(workspace_path), "root": root_id})
     if not root_path.is_dir():
         raise WorkspaceConfigError(
             "WORKSPACE.ROOT.PATH",
@@ -180,6 +182,9 @@ def _workspace_root_from_item(
         or PROJECT_CONFIG_NAME
     )
     config_path = _resolve_workspace_relative(config_name, base=root_path)
+    if not config_path.is_relative_to(root_path):
+        raise WorkspaceConfigError("WORKSPACE.PROJECT_CONFIG.PATH",
+            "root configuration must be inside its root directory", {"path": str(config_path)})
     if not config_path.is_file():
         raise WorkspaceConfigError(
             "WORKSPACE.PROJECT_CONFIG.MISSING",
@@ -190,6 +195,7 @@ def _workspace_root_from_item(
         root_id,
         root_path=root_path,
         config_path=config_path,
+        purpose=item.get("purpose", ""),
     )
 
 
@@ -198,7 +204,10 @@ def _workspace_root_from_project_config(
     *,
     root_path: Path,
     config_path: Path,
+    purpose: str = "",
 ) -> WorkspaceRoot:
+    if not isinstance(purpose, str):
+        raise WorkspaceConfigError("WORKSPACE.ROOT.PURPOSE", "root purpose must be a string", {"path": str(config_path)})
     project_config = _load_project_config(config_path, root_path=root_path)
     return WorkspaceRoot(
         id=root_id,
@@ -206,13 +215,9 @@ def _workspace_root_from_project_config(
         config_path=config_path,
         project_config=project_config,
         project_target=_project_target(project_config, config_path),
-        quality_enabled=bool(project_config.get("quality_enabled", True)),
-        quality_structure=_project_quality_structure(
-            project_config,
-            config_path,
-        ),
+        purpose=purpose,
         runtime_options=_project_runtime_options(project_config, config_path),
-        architecture_documents=project_architecture_documents(
+        architecture_documents=root_architecture_documents(
             project_config,
             root_path=root_path,
             path=config_path,
@@ -242,8 +247,6 @@ def _load_project_config(
             {"path": str(path), "field": sorted(removed)[0], "fields": sorted(removed)})
     unknown = set(data) - {
         "project_target",
-        "quality_enabled",
-        "quality",
         "runtime",
         "architecture",
         "javascript",
@@ -257,19 +260,9 @@ def _load_project_config(
         )
     target = _project_target(data, path)
     _validate_project_target_fields(data, target=target, path=path)
-    if "quality_enabled" in data and not isinstance(
-        data["quality_enabled"],
-        bool,
-    ):
-        raise WorkspaceConfigError(
-            "WORKSPACE.PROJECT_CONFIG.QUALITY",
-            "project config quality_enabled must be a boolean",
-            {"path": str(path)},
-        )
-    _project_quality_structure(data, path)
     _project_runtime_options(data, path)
     project_javascript_options(data, path)
-    project_architecture_documents(data, root_path=root_path, path=path)
+    root_architecture_documents(data, root_path=root_path, path=path)
     from vibeflow.tooling.project.preview_options import validate_preview_options
     validate_preview_options(data.get("preview", {}), path=path)
     return data
@@ -343,7 +336,6 @@ def _project_runtime_options(
             {"path": str(path)},
         )
     allowed = {
-        "nodeset_max_depth",
         "status_interval",
         "status_file",
     }
@@ -372,134 +364,10 @@ def _project_runtime_value(name: str, value: object, *, path: Path) -> object:
             return value
         raise WorkspaceConfigError("WORKSPACE.PROJECT_CONFIG.RUNTIME",
                                    "runtime.status_interval must be positive finite seconds", {"path": str(path)})
-    if name in {"nodeset_max_depth"}:
-        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
-            return value
-        raise WorkspaceConfigError(
-            "WORKSPACE.PROJECT_CONFIG.RUNTIME",
-            f"runtime.{name} must be a positive integer",
-            {"path": str(path)},
-        )
-
-
-def _project_quality_structure(
-    data: Mapping[str, Any],
-    path: Path,
-) -> QualityStructureLimits:
-    raw_quality = data.get("quality")
-    if raw_quality in (None, {}):
-        return QualityStructureLimits()
-    if not isinstance(raw_quality, Mapping):
-        raise WorkspaceConfigError(
-            "WORKSPACE.PROJECT_CONFIG.QUALITY",
-            "project config quality must be an object",
-            {"path": str(path)},
-        )
-    unknown_quality = set(raw_quality) - {"structure"}
-    if unknown_quality:
-        raise WorkspaceConfigError(
-            "WORKSPACE.PROJECT_CONFIG.QUALITY",
-            "project config quality contains unknown fields: "
-            f"{sorted(unknown_quality)}",
-            {"path": str(path)},
-        )
-    raw_structure = raw_quality.get("structure")
-    if raw_structure in (None, {}):
-        return QualityStructureLimits()
-    if not isinstance(raw_structure, Mapping):
-        raise WorkspaceConfigError(
-            "WORKSPACE.PROJECT_CONFIG.QUALITY",
-            "project config quality.structure must be an object",
-            {"path": str(path)},
-        )
-    allowed = set(QualityStructureLimits().to_dict())
-    unknown = set(raw_structure) - allowed
-    if unknown:
-        raise WorkspaceConfigError(
-            "WORKSPACE.PROJECT_CONFIG.QUALITY",
-            "project config quality.structure contains unknown fields: "
-            f"{sorted(unknown)}",
-            {"path": str(path)},
-        )
-    values = _quality_structure_values(raw_structure, path)
-    limits = QualityStructureLimits(**values)
-    _validate_quality_structure_pairs(limits, path)
-    return limits
-
-
-def _quality_structure_values(
-    raw: Mapping[str, Any],
-    path: Path,
-) -> dict[str, Any]:
-    values: dict[str, Any] = {}
-    for field, value in raw.items():
-        if field in {"enabled", "enforce_role_imports"}:
-            if not isinstance(value, bool):
-                raise WorkspaceConfigError(
-                    "WORKSPACE.PROJECT_CONFIG.QUALITY",
-                    f"quality.structure.{field} must be a boolean",
-                    {"path": str(path)},
-                )
-            values[field] = value
-        elif field == "allowed_root_code_files":
-            values[field] = _string_tuple(
-                value,
-                f"quality.structure.{field}",
-                path,
-            )
-        else:
-            values[field] = _positive_int(
-                value,
-                f"quality.structure.{field}",
-                path,
-            )
-    return values
-
-
-def _validate_quality_structure_pairs(
-    limits: QualityStructureLimits,
-    path: Path,
-) -> None:
-    for warn_field, max_field in (
-        ("warn_root_code_files", "max_root_code_files"),
-        ("warn_code_dirs", "max_code_dirs"),
-        ("warn_code_files_per_dir", "max_code_files_per_dir"),
-        ("warn_code_dir_depth", "max_code_dir_depth"),
-        ("warn_child_code_dirs_per_dir", "max_child_code_dirs_per_dir"),
-        ("warn_root_level_code_files", "max_root_level_code_files"),
-    ):
-        if getattr(limits, warn_field) > getattr(limits, max_field):
-            raise WorkspaceConfigError(
-                "WORKSPACE.PROJECT_CONFIG.QUALITY",
-                f"quality.structure.{warn_field} must be <= {max_field}",
-                {"path": str(path)},
-            )
-
-
-def _positive_int(value: object, field: str, path: Path) -> int:
-    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
-        raise WorkspaceConfigError(
-            "WORKSPACE.PROJECT_CONFIG.QUALITY",
-            f"{field} must be a positive integer",
-            {"path": str(path)},
-        )
-    return value
-
-
-def _string_tuple(value: object, field: str, path: Path) -> tuple[str, ...]:
-    if not isinstance(value, list) or not all(
-        isinstance(item, str) and item.strip() for item in value
-    ):
-        raise WorkspaceConfigError(
-            "WORKSPACE.PROJECT_CONFIG.QUALITY",
-            f"{field} must be a list of non-empty strings",
-            {"path": str(path)},
-        )
-    return tuple(dict.fromkeys(item.strip() for item in value))
 
 
 def _validate_workspace_keys(data: Mapping[str, Any], path: Path) -> None:
-    unknown = set(data) - {"policy", "roots"}
+    unknown = set(data) - {"roots", "purpose"}
     if unknown:
         raise WorkspaceConfigError(
             "WORKSPACE.UNKNOWN_FIELD",

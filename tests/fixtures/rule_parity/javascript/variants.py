@@ -29,7 +29,7 @@ class Variation:
 
 def variants(f: Any) -> tuple[Variation, ...]:
     C, body = f.Case, f._body
-    node, plugin, host, base = body(f.NODE), body(f.PLUGIN), body(f.HOST), body(f.BASE_LIB)
+    node, plugin, base = body(f.NODE), body(f.PLUGIN), body(f.BASE_LIB)
     rows: list[Variation] = []
 
     def add(name, title, family, source, code='', *, role='node', **options):
@@ -53,7 +53,6 @@ def variants(f: Any) -> tuple[Variation, ...]:
     add('completion.plugin-promise-hook', 'immediate Plugin hook 同步返回 Promise', 'completion.signature', plugin.replace('BODY', '').replace('void context.abiVersion;', 'void context.abiVersion; return Promise.resolve();'), 'VF_COMPLETION_IMMEDIATE_PROMISE', role='plugin')
     add('completion.plugin-suspend-hook', 'suspend Plugin 允许 async hook 且工厂同步', 'completion.signature', plugin.replace('beforeRun()', 'async beforeRun()'), role='plugin', case_options={'completion': 'suspend'})
     add('completion.plugin-async-factory', 'Plugin 工厂自身 async 不等于可 suspend hook', 'completion.signature', plugin.replace('function createPlugin', 'async function createPlugin'), 'VF_PLUGIN_FACTORY', role='plugin')
-    add('completion.host-async-start', 'Host 生命周期 async start 属于允许职责', 'completion.signature', host.replace('start()', 'async start()'), role='host')
     add('completion.abi-input', '真实 build 拒绝 Node 输入 TS 签名不匹配', 'native.contract', node.replace(f.INPUTS, 'Readonly<{"parity.value": Readonly<{value: string}>}>'), 'VF_TYPESCRIPT', case_options={'entrypoint': 'build'}, located=False)
 
     # Immutable import-time declarations keep the intended mutation rule reachable.
@@ -84,8 +83,7 @@ def variants(f: Any) -> tuple[Variation, ...]:
         add('state.regexp-' + flag, '模块持有 RegExp ' + flag + ' 状态', 'effects.regexp', 'const matcher = /value/' + flag + ';\n' + body(f.NODE, 'matcher.exec("value");'), 'VF_MODULE_STATE')
     add('state.regexp-local.normal', '每次调用创建局部 g/y RegExp', 'effects.regexp', body(f.NODE, 'const matcher = /value/gy; matcher.test("value");'))
     add('state.regexp-stateless.normal', '模块普通无 g/y RegExp', 'effects.regexp', 'const matcher = /value/i;\n' + body(f.NODE, 'matcher.test("value");'))
-    add('state.global-this-write', 'Host globalThis 对象写入不在旧 builtin/module alias 判断中', 'effects.analysis_boundary', body(f.HOST, '(globalThis as unknown as {parity: number}).parity = 1;'), role='host',
-        case_options={'classification': 'baseline_limitation', 'notes': 'globalThis 非 builtinObjects 集合；未据此宣称审查允许所有全局状态。'})
+
 
     # Host primitives use the real checker, including local symbol shadows.
     for name, expression in (
@@ -111,7 +109,7 @@ def variants(f: Any) -> tuple[Variation, ...]:
     plugin_extras = {'plugins/other.ts': plugin}
     plugin_manifest = {'plugins/other.jsonc': f._plugin_descriptor('parity.other_plugin', 'plugins/other.ts')}
     for role, template in (('node', f.NODE), ('base_lib', f.BASE_LIB)):
-        add('imports.' + role + '-plugin', role + ' 跨层导入实际已选 Plugin', 'imports.layer', 'import {createPlugin} from "../plugins/other.ts";\n' + body(template, 'void createPlugin;'), 'VF_IMPORT_LAYER', role=role,
+        add('imports.' + role + '-plugin', role + ' 跨层导入实际已选 Plugin', 'imports.layer', 'import {createPlugin} from "../plugins/code_plugin/other.ts";\n' + body(template, 'void createPlugin;'), 'VF_IMPORT_LAYER', role=role,
             case_options={'extras': plugin_extras, 'extra_manifests': plugin_manifest}, config_patch={'plugins': ['parity.other_plugin']})
     for kind in ('runtime', 'registry', 'capability'):
         add('imports.' + kind + '-unowned', '正式 Application 无独立 ' + kind + ' 源 owner 时仍拒绝未归属文件', 'imports.unreachable_owner', f'import {{helper}} from "../{kind}/helper.ts";\n' + body(f.NODE, 'helper();'), 'VF_IMPORT_OWNER',
@@ -122,32 +120,13 @@ def variants(f: Any) -> tuple[Variation, ...]:
         case_options={'extras': {'base_lib/other.ts': 'export function step(value: number) { return value + 1; }\n'}, 'extra_manifests': {'base_lib/other.jsonc': base_other, 'base_lib/math.jsonc': math}})
     for role, factory, template, helper, path, resource_id, selected_key in (
         ('plugin', 'createPlugin', f.PLUGIN, f._plugin_descriptor, 'plugins', 'parity.other_plugin', 'plugins'),
-        ('host', 'createHostExtension', f.HOST, f._host_descriptor, 'host_extensions', 'parity.other_host', 'host_extensions'),
     ):
-        main_id = 'parity.plugin' if role == 'plugin' else 'parity.host'
-        main_file = 'plugins/runtime.ts' if role == 'plugin' else 'host_extensions/host.ts'
+        main_id = 'parity.plugin'
+        main_file = 'plugins/runtime.ts'
         main_manifest = helper(main_id, main_file)
         main_manifest['dependencies'] = [resource_id]
         add('imports.' + role + '-declared.normal', '声明实际 ' + role + ' 间依赖后的正常导入', 'imports.control', f'import {{{factory} as other}} from "./other.ts";\n' + body(template, 'void other;'), role=role,
-            case_options={'extras': {path + '/other.ts': body(template)}, 'extra_manifests': {path + '/other.jsonc': helper(resource_id, path + '/other.ts'), path + ('/runtime.jsonc' if role == 'plugin' else '/host.jsonc'): main_manifest}}, config_patch={selected_key: [main_id, resource_id]})
-
-    # Host duties make native capability checks reachable before optional Node IO.
-    for name, expression, code in (
-        ('worker', 'new Worker("./worker.js");', 'VF_SINGLE_ESM_WORKER'),
-        ('shared-worker', 'new SharedWorker("./worker.js");', 'VF_SINGLE_ESM_WORKER'),
-        ('service-worker', 'navigator.serviceWorker.register("./worker.js");', 'VF_SINGLE_ESM_WORKER'),
-        ('worklet', 'declareWorklet.addModule("./processor.js");', 'VF_SINGLE_ESM_WORKER'),
-        ('module-url', 'new URL("./asset.dat", import.meta.url);', 'VF_SINGLE_ESM_RESOURCE'),
-        ('fetch-local', 'fetch("./asset.dat");', 'VF_SINGLE_ESM_RESOURCE'),
-        ('import-scripts', 'importScripts("./worker.js");', 'VF_SINGLE_ESM_RESOURCE'),
-        ('wasm', 'void WebAssembly;', 'VF_SINGLE_ESM_WASM'),
-    ):
-        source = body(f.HOST, expression)
-        if name == 'worklet':
-            source = 'declare const declareWorklet: {addModule(path: string): void};\n' + source
-        add('native.' + name, 'single-esm 原生能力 ' + name, 'native.single_esm', source, code, role='host', target='browser', case_options={'entrypoint': 'build'})
-    for name, expression in (('absolute-url', 'new URL("https://example.invalid/data", import.meta.url);'), ('fetch-absolute', 'fetch("https://example.invalid/data");')):
-        add('native.' + name + '.normal', 'single-esm 允许非本地资源 URL ' + name, 'native.single_esm', body(f.HOST, expression), role='host', target='browser', case_options={'entrypoint': 'build', 'notes': '只构建，不启动 Host，不产生网络请求。'})
+            case_options={'extras': {path + '/other.ts': body(template)}, 'extra_manifests': {path + '/other.jsonc': helper(resource_id, path + '/other.ts'), path + '/runtime.jsonc': main_manifest}}, config_patch={selected_key: [main_id, resource_id]})
 
     # Precise text boundaries use real TS files, not fabricated metrics.
     def lines(count):
@@ -241,7 +220,7 @@ def _task_route(fixture, root, variant, document, mode):
         source = 'export function run() {return {};}\n'
     fixture._write_json(fixture.definition(root, variant, 'node', 'parity.consume', 'nodes/consume.jsonc'), declaration)
     (root / 'nodes/consume.ts').write_text(source, encoding='utf-8')
-    call = {'id': 'consume', 'type_used': 'parity.consume', 'display_name': 'Consume actual task', 'description': 'Real task route.'}
+    call = {'id': 'consume', 'definition_id': 'parity.consume', 'display_name': 'Consume actual task', 'description': 'Real task route.'}
     if mode == 'detached':
         call['async'] = 'detached'
     document['pipeline']['nodes'].append(call)
@@ -256,8 +235,8 @@ def _task_route(fixture, root, variant, document, mode):
         fixture._write_json(fixture.definition(root,variant,'node','parity.terminal','nodes/terminal.jsonc'),terminal)
         (root/'nodes/terminal.ts').write_text('export function run(){return {};}\n')
         nodes=document['pipeline']['nodes'];last=nodes[-1]['id']
-        nodes.insert(0,{'id':'start','type_used':'parity.terminal','display_name':'Start','description':'Enter explicit task management'})
-        nodes.append({'id':'end','type_used':'parity.terminal','display_name':'End','description':'Exit after all owned work'})
+        nodes.insert(0,{'id':'start','definition_id':'parity.terminal','display_name':'Start','description':'Enter explicit task management'})
+        nodes.append({'id':'end','definition_id':'parity.terminal','display_name':'End','description':'Exit after all owned work'})
         document['pipeline']['edges'].extend([{'from':'start','to':'calculate'},{'from':last,'to':'end'}])
 
 
@@ -278,7 +257,7 @@ def run_variants(work_root: Path, variant: str, toolchain: Path, *, fixture: Any
         if case.id.startswith('js.variant.task.') and case.id.endswith(('.normal', '.sync')):
             _task_route(fixture, root, variant, document, item.call_patch['async'])
         if variant == "current":
-            document["plugins"] = [{"source": {"kind":"file", "ref":"code_plugin.ts", "export":"plugin"}}]
+            document["plugins"] = [{"source": {"kind":"file", "ref":"plugins/code_plugin/plugin.ts", "export":"plugin"}}]
         fixture._write_json(config, document)
         node_path = fixture.definition(root, variant, 'node', 'parity.calc', 'nodes/calc.jsonc')
         descriptor = json.loads(node_path.read_text())

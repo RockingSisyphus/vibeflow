@@ -10,7 +10,6 @@ from typing import Any, Callable, Mapping
 from vibeflow.targets.javascript.build.builder import BuildRequest, BuildResult, build_aot
 from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
 from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy
-from vibeflow.tooling.application.javascript.rule_defaults import workflow_rule_defaults
 from vibeflow.targets.javascript.build.project_graph import (
     PreparationState as _PreparationState,
     prepare_graph as _prepare_graph,
@@ -20,14 +19,7 @@ from vibeflow.targets.javascript.build.project_paths import (
     javascript_options as _javascript_options,
     safe_project_path as _safe_project_path,
 )
-from vibeflow.targets.javascript.build.project_resources import (
-    base_lib_closure as _base_lib_closure,
-    host_extension_closure as _host_extension_closure,
-    target_neutral_import_policy,
-    required_capabilities as _required_capabilities,
-    schemas_for_types as _schemas_for_types,
-    used_schema_types as _used_schema_types,
-)
+from vibeflow.targets.javascript.build.project_resources import base_lib_closure as _base_lib_closure, target_neutral_import_policy, required_capabilities as _required_capabilities, schemas_for_types as _schemas_for_types, used_schema_types as _used_schema_types
 from vibeflow.core import (
     CompiledGraph,
     CoreCompileRequest,
@@ -36,8 +28,8 @@ from vibeflow.core import (
     compile_core,
 )
 from vibeflow.tooling.project.config_loader import load_workspace_config_document
-from vibeflow.tooling.application.javascript.host_selection import declared_hosts
-from vibeflow.targets.javascript.build.host_selection import active_host_ids
+
+
 from vibeflow.core.descriptors import DescriptorCatalogs
 from vibeflow.targets.javascript.frontend.facts import (
     JavascriptImplementationFactsError,
@@ -45,7 +37,7 @@ from vibeflow.targets.javascript.frontend.facts import (
     apply_call_effect_scopes,
     validate_javascript_descriptor_catalogs,
 )
-from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
+from vibeflow.tooling.project.resources import prepare_workflow_catalogs
 from vibeflow.core.flow import GraphConfig
 from vibeflow.tooling.project.graph_config import parse_graph_config
 from vibeflow.block_compiler import WorkflowPlan, compile_graph_plan
@@ -110,13 +102,13 @@ class PreparedProjectBuild:
     javascript_bindings: JavascriptBindingPlan
     import_policy: Mapping[str, Any]
     external_packages: tuple[str, ...]
-    used_node_types: tuple[str, ...]
+    used_node_ids: tuple[str, ...]
     used_base_libs: tuple[str, ...]
     used_capabilities: tuple[str, ...]
-    used_host_extensions: tuple[str, ...]
-    declared_host_extensions: tuple[Mapping[str, Any], ...]
-    planned_host_extensions: tuple[str, ...]
-    host_extensions: tuple[Mapping[str, Any], ...]
+
+
+
+
     declared_plugins: tuple[Mapping[str, Any], ...] = ()
     planned_plugins: tuple[str, ...] = ()
     plugin_bindings: tuple[Mapping[str, Any], ...] = ()
@@ -185,10 +177,20 @@ def prepare_project_build(
             f"workflow config does not exist: {config_path}",
         )
 
-    catalogs = load_workflow_catalogs(
-        root.path,
-        project_config=root.config_path, workflow_config=config_path, workspace=workspace, node_command=request.node_command,
-    )
+    from vibeflow.tooling.project.preparation import ProjectPreparation
+    preparation = ProjectPreparation(workspace, root=root, workflow=config_path, node_command=request.node_command)
+    from vibeflow.tooling.project.config_schema import ConfigSchemaError
+    try:
+        prepared_resources = preparation.workflow_resources(config_path)
+    except ConfigSchemaError as exc:
+        raise ProjectBuildError(exc.code, str(exc), diagnostics=exc.diagnostics) from exc
+    catalogs = prepared_resources.catalogs
+    governance = preparation.review()
+    governance_errors = tuple(item for item in governance.findings if item.severity == "error")
+    if governance_errors:
+        raise ProjectBuildError(governance_errors[0].rule_id, governance_errors[0].message,
+                                diagnostics=tuple(item.to_dict() for item in governance.findings))
+
     try:
         validate_javascript_descriptor_catalogs(catalogs)
     except JavascriptImplementationFactsError as exc:
@@ -208,14 +210,8 @@ def prepare_project_build(
         require_directory=True,
     )
 
-    document = load_workspace_config_document(config_path, workspace=workspace)
-    graph = parse_graph_config(
-        document.data,
-        project_root=root.path,
-        root_id=root.id,
-        root_path=root.path,
-        source_path=config_path,
-    )
+    document = prepared_resources.document
+    graph = prepared_resources.graph
     graph = _apply_before_compile_hooks(
         graph,
         catalogs=catalogs,
@@ -228,19 +224,17 @@ def prepare_project_build(
         entry_mode=graph.entry_mode,
         project_root=root.path,
     )
-    selected_hosts = declared_hosts(document.data, catalog=catalogs.host_extensions)
-    selected_host_ids = active_host_ids(tuple(item.id for item in selected_hosts if item.status == "implemented"),
-        catalog=catalogs.host_extensions, planned=frozenset(item.id for item in selected_hosts if item.status == "planned"))
-    rule_import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=root.path, allowed_external=set(javascript["external_packages"]), node_ids=frozenset(source_node_calls(graph)), host_extension_ids=frozenset(selected_host_ids), plugin_ids=frozenset(item.id for item in _active_plugin_bindings(plugin_plan)))
+
+
+    rule_import_policy, _ = target_neutral_import_policy(resource_inventory=prepared_resources.resource_inventory, catalogs=catalogs, project_root=root.path, allowed_external=set(javascript["external_packages"]), node_ids=frozenset(source_node_calls(graph)),  plugin_ids=frozenset(item.id for item in _active_plugin_bindings(plugin_plan)))
     rule_report = run_javascript_rules(graph, catalogs, project_root=root.path, package_root=package_root, phase="static", target=request.target, import_policy=rule_import_policy, node_command=request.node_command,
-                                     quality_policy=javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
+                                     quality_policy=javascript_quality_policy())
     rule_errors = tuple(item for item in rule_report.findings if item.severity == "error")
     if rule_errors:
         first = rule_errors[0]
         raise ProjectBuildError(first.rule_id, first.message, diagnostics=tuple(item.to_dict() for item in rule_report.findings))
     rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={}, node_report=rule_report, project_root=root.path, package_root=package_root, phase="import", target=request.target, node_command=request.node_command,
-        rule_defaults=workflow_rule_defaults(catalogs, javascript["nodeset_max_depth"]),
-        quality_policy=javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
+        quality_policy=javascript_quality_policy())
     rule_errors = tuple(item for item in rule_report.findings if item.severity == "error")
     if rule_errors:
         first = rule_errors[0]
@@ -263,7 +257,7 @@ def prepare_project_build(
                     graph,
                     implementation_facts=implementation_facts,
                     target_features=target_features,
-                    known_nodesets=set(graph.nodesets),
+                    known_nodeset_types=set(graph.nodeset_types),
                     owner="pipeline",
                 )
                 graph = compilation.workflow.graph
@@ -277,7 +271,7 @@ def prepare_project_build(
             graph,
             implementation_facts=implementation_facts,
             target_features=target_features,
-            known_nodesets=set(graph.nodesets),
+            known_nodeset_types=set(graph.nodeset_types),
             owner="pipeline",
         )
         graph = compilation.workflow.graph
@@ -303,16 +297,16 @@ def prepare_project_build(
         project_root=root.path,
         catalog=node_catalog,
         base_libs=base_lib_catalog,
-        compile_graph=lambda child_graph, known_nodesets, owner: _compile_core_graph(
+        compile_graph=lambda child_graph, known_nodeset_types, owner: _compile_core_graph(
             child_graph,
             implementation_facts=implementation_facts,
             target_features=target_features,
-            known_nodesets=known_nodesets,
+            known_nodeset_types=known_nodeset_types,
             owner=owner,
         ),
         compiled_by_path={},
         params_by_path={},
-        source_by_type={},
+        source_by_definition={},
         implementations={},
         used_nodes={},
         used_types=set(),
@@ -331,10 +325,10 @@ def prepare_project_build(
     from vibeflow.core.rules.planning import graph_rule_subjects
     declarations = {subject.definition.type_key: subject.graph
         for subject in graph_rule_subjects(graph) if subject.declaration_only}
-    compiled_declarations = {key: state.compile_graph(child, set(child.nodesets), "nodeset:" + key)
+    compiled_declarations = {key: state.compile_graph(child, set(child.nodeset_types), "nodeset:" + key)
         for key, child in declarations.items()}
-    rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={(): compiled, **state.compiled_by_path}, node_report=rule_report, project_root=root.path, package_root=package_root, rule_defaults=workflow_rule_defaults(catalogs, javascript["nodeset_max_depth"]), target=request.target, node_command=request.node_command,
-        compiled_nodesets=compiled_declarations, quality_policy=javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
+    rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={(): compiled, **state.compiled_by_path}, node_report=rule_report, project_root=root.path, package_root=package_root, target=request.target, node_command=request.node_command,
+        compiled_nodeset_types=compiled_declarations, quality_policy=javascript_quality_policy())
     workflow_errors = tuple(item for item in rule_report.findings if item.severity == "error")
     if workflow_errors:
         first = workflow_errors[0]
@@ -357,61 +351,40 @@ def prepare_project_build(
         graph,
         compiled,
         workflow_id=request.workflow_id or None,
-        source_by_type=state.source_by_type,
+        source_by_definition=state.source_by_definition,
         compiled_by_path=state.compiled_by_path,
         params_by_path=state.params_by_path,
         implementation_facts=implementation_facts,
         target_features=target_features,
     )
-    declared_host_extensions = selected_hosts
+
     from vibeflow.targets.shared.rule_support.capability_policy import policies_from_executions
     from vibeflow.block_compiler.policies import apply_call_policies
     paths = [(*block.path, call.id) for block in plan.blocks for call in block.nodes]
     plan = apply_call_policies(plan, policies_from_executions(
         (execution for values in rule_report.results.values() for execution in values), paths))
-    implemented_host_extensions = tuple(
-        item.id
-        for item in declared_host_extensions
-        if item.status == "implemented"
-    )
-    planned_host_extensions = frozenset(
-        item.id
-        for item in declared_host_extensions
-        if item.status == "planned"
-    )
-    host_extensions = _host_extension_closure(
-        implemented_host_extensions,
-        catalogs=catalogs,
-        target=request.target,
-        project_root=root.path,
-        configurations={
-            item.id: dict(item.config)
-            for item in declared_host_extensions
-            if item.status == "implemented"
-        },
-        planned=planned_host_extensions,
-        resolved_ids=selected_host_ids,
-    )
+
+
+
     project_external = tuple(javascript["external_packages"])
     allowed_external = set(project_external)
     for descriptor in base_lib_order:
         allowed_external.update(descriptor.external_packages)
-    for extension in host_extensions:
-        allowed_external.update(extension["external_packages"])
+
     for binding in _active_plugin_bindings(plugin_plan):
         allowed_external.update(binding.external_packages)
-    import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=root.path,
+    import_policy, _ = target_neutral_import_policy(resource_inventory=prepared_resources.resource_inventory, catalogs=catalogs, project_root=root.path,
         allowed_external=allowed_external, node_ids=frozenset(state.used_nodes),
-        host_extension_ids=frozenset(extension["id"] for extension in host_extensions),
+
         plugin_ids=frozenset(item.id for item in _active_plugin_bindings(plugin_plan)))
     javascript_bindings = build_javascript_binding_plan(
         plan,
         implementations=state.implementations,
-        base_libs_by_type={
+        base_libs_by_definition={
             key: tuple(descriptor.base_libs)
             for key, descriptor in state.used_nodes.items()
         },
-        capabilities_by_type={
+        capabilities_by_definition={
             key: tuple(
                 requirement.to_dict()
                 for requirement in descriptor.capabilities
@@ -442,7 +415,7 @@ def prepare_project_build(
             }
             for capability in capabilities
         },
-        host_extensions=host_extensions,
+
         runtime_plugins=plugin_plan.runtime_plugins,
         import_policy=import_policy,
     )
@@ -459,17 +432,13 @@ def prepare_project_build(
         plan=plan,
         import_policy=import_policy,
         external_packages=project_external,
-        used_node_types=tuple(sorted(state.used_nodes)),
+        used_node_ids=tuple(sorted(state.used_nodes)),
         used_base_libs=tuple(item.id for item in base_lib_order),
         used_capabilities=tuple(item.id for item in capabilities),
-        used_host_extensions=tuple(
-            str(item["id"]) for item in host_extensions
-        ),
-        declared_host_extensions=tuple(
-            item.to_dict() for item in declared_host_extensions
-        ),
-        planned_host_extensions=tuple(sorted(planned_host_extensions)),
-        host_extensions=host_extensions,
+
+
+
+
         declared_plugins=tuple(
             _plugin_manifest_binding(item, project_root=root.path)
             for item in (
@@ -500,7 +469,7 @@ def _compile_core_graph(
     *,
     implementation_facts: ImplementationFacts,
     target_features: TargetFeatureSet,
-    known_nodesets: set[str],
+    known_nodeset_types: set[str],
     owner: str,
 ) -> CompiledGraph:
     """Call the public Core compile boundary and return its graph view."""
@@ -509,7 +478,7 @@ def _compile_core_graph(
         graph,
         implementation_facts=implementation_facts,
         target_features=target_features,
-        known_nodesets=known_nodesets,
+        known_nodeset_types=known_nodeset_types,
         owner=owner,
     ).compiled_graph
 
@@ -519,7 +488,7 @@ def _compile_core_compilation(
     *,
     implementation_facts: ImplementationFacts,
     target_features: TargetFeatureSet,
-    known_nodesets: set[str],
+    known_nodeset_types: set[str],
     owner: str,
 ):
     return compile_core(
@@ -527,7 +496,7 @@ def _compile_core_compilation(
             graph=graph,
             implementation_facts=implementation_facts,
             target_features=target_features,
-            known_nodesets=frozenset(known_nodesets),
+            known_nodeset_types=frozenset(known_nodeset_types),
             owner=owner,
         )
     )

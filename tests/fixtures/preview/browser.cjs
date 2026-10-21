@@ -29,21 +29,19 @@ const puppeteer=createRequire(renderer)('puppeteer');
       for(const [index,id] of [[2,'base_lib:layout.helper'],[3,'plugin_declaration:layout.resources']]) {
         await page.click(`#tabs button:nth-child(${index})`);
         await page.waitForFunction(id=>[...document.querySelectorAll('[data-resource-id]')].some(e=>e.dataset.resourceId===id),{},id);
+        assert.deepEqual(await page.$$eval('[data-resource-id]',es=>es.map(e=>e.dataset.resourceId)),[id]);
+        assert.equal(await page.$$eval('[data-edge-id]',es=>es.length),0);
         await page.click('[data-resource-id="'+id+'"]');
         assert.match(await page.$eval('#details',e=>e.textContent),/source|sources/);
         assert(await page.$eval('[data-resource-id="'+id+'"]',e=>e.querySelector('.node-card')!==null));
         if(index===2){
           assert.equal(await page.$eval('[data-resource-id="'+id+'"] .card-outline',e=>getComputedStyle(e).fill),'rgb(255, 230, 179)');
-          await page.click('[data-resource-id="node:layout.step"]');
-          const text=await page.$eval('#details',e=>e.innerText);
-          assert(text.includes('输出契约')&&text.includes('The calculated fixture value.'));
-          const linked=await page.$eval('#details details pre',e=>JSON.parse(e.textContent));
-          assert(linked.node_type&&linked.resource);
-          assert(text.includes('最终样式')&&text.includes('#d6eaff'));
+        }else{
+          assert.equal(await page.$eval('[data-resource-id="'+id+'"] .card-outline',e=>getComputedStyle(e).fill),'rgb(217, 230, 255)');
         }
       }
       await page.click('#tabs button:nth-child(4)');
-      await page.waitForFunction(()=>document.getElementById('empty').textContent.includes('资源'));
+      await page.waitForFunction(()=>document.getElementById('empty').textContent.includes('关联'));
       assert.equal(await page.$$('.resource-card').then(e=>e.length),0);
       assert.equal(errors.length,0);assert.equal(network.length,0);
       console.log(JSON.stringify({resources:true,page_errors:errors,network_requests:network}));return;
@@ -69,8 +67,8 @@ const puppeteer=createRequire(renderer)('puppeteer');
         }
         graphic.remove();
       }
-      const resource={kind:'node',type_key:'fixture.external',display_name:'External resource',external:true};
-      const resourceCard=VFShapes.measure(resource,{'fixture.external':{external:true,contract:{requires:[{key:'input'}],provides:[]}}});
+      const resource={kind:'node',definition_id:'fixture.external',display_name:'External resource',external:true};
+      const resourceCard=VFShapes.measure(resource,{node_definitions:{'fixture.external':{external:true,contract:{requires:[{key:'input'}],provides:[]}}}});
       const rows=resourceCard.rows.map(r=>r.text);
       svg.remove();return {failures,rows};
     });

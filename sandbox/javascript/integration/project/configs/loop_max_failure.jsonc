@@ -1,7 +1,7 @@
 {
   "nodeset_imports": [
     {
-      "path": "nodesets/loop_until_body.jsonc"
+      "path": "nodeset_types/loop_until_body.jsonc"
     }
   ],
   "pipeline": {
@@ -17,13 +17,13 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts a loop that cannot converge before its bound."
       },
       {
         "id": "loop",
-        "type_used": "vibeflow.loop.while",
+        "definition_id": "vibeflow.loop.while",
         "display_name": "Bounded failing loop",
         "description": "Requires three increments but permits only two.",
         "requires": [
@@ -64,7 +64,7 @@
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Must not run after the loop exceeds its bound."
       }
@@ -92,7 +92,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

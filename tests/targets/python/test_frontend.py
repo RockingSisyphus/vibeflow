@@ -74,7 +74,7 @@ def test_registration_provenance_still_points_to_caller() -> None:
     from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
     from vibeflow.targets.python.project.registry import NodeRegistry
 
-    ExampleNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.provenance', display_name='Provenance', description='Captures registration provenance.', version='1', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.process",))
+    ExampleNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.provenance', display_name='Provenance', description='Captures registration provenance.', version='1', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(), rulesets=("vibeflow.process",))
 
     class ExampleNode:
 
@@ -124,7 +124,7 @@ def test_compiler_plugin_hooks_keep_declared_order() -> None:
 
 def test_compiler_plugin_failures_remain_fail_fast() -> None:
     from vibeflow.targets.python.project.compiler import GraphCompileError
-    from vibeflow.core.flow import EdgeSpec, GraphConfig, NodeSpec
+    from vibeflow.core.flow import EdgeSpec, GraphConfig, NodeCallSpec
     from vibeflow.targets.python.project.compiler import GraphCompiler
 
     events: list[str] = []
@@ -139,7 +139,7 @@ def test_compiler_plugin_failures_remain_fail_fast() -> None:
             events.append("after")
 
     cyclic = GraphConfig(
-        nodes=(NodeSpec("a", "a"), NodeSpec("b", "b")),
+        nodes=(NodeCallSpec("a", "a"), NodeCallSpec("b", "b")),
         edges=(EdgeSpec("a", "b"), EdgeSpec("b", "a")),
     )
     with pytest.raises(GraphCompileError, match="CYCLE"):

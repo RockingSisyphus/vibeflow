@@ -6,7 +6,7 @@ import shutil
 
 
 def node_call(name, kind):
-    return {"id": name, "type_used": kind, "display_name": name,
+    return {"id": name, "definition_id": kind, "display_name": name,
             "description": f"Execute the {name} resource."}
 
 
@@ -43,7 +43,7 @@ def write_project(root: Path, *, nodes=8, libraries=1, lines=100, repeats=1,
             names.append(f"Step{index}")
             contract = {"provides": [{"key": f"value{index}", "type": "number", "display_name": f"Value {index}"}],
                         "output_semantics": {f"value{index}": [f"The computed value of step {index}."]}}
-            code.extend([f"@node(type_key='perf.step.{index}', contract={contract!r},",
+            code.extend([f"@node(node_type='vibeflow.node', id='perf.step.{index}', contract={contract!r},",
                          "      rulesets=['vibeflow.process','perf.calls'], "
                          f"base_libs={[f'perf.library.{i}' for i in range(libraries)]!r},",
                          "      presentation={'fill':'#d6eaff','shape':'rounded'})",
@@ -58,11 +58,11 @@ def write_project(root: Path, *, nodes=8, libraries=1, lines=100, repeats=1,
         groups.extend(names)
         imports.append(f"from nodes.group{group} import {', '.join(names)}")
     terminal = """from vibeflow.targets.python.sdk import node
-@node(type_key='perf.start', flow_kind='terminal', contract={}, rulesets=['vibeflow.io'])
+@node(node_type='vibeflow.node', id='perf.start', flow_kind='terminal', contract={}, rulesets=['vibeflow.io'])
 class Start:
     def run_pure(self, inputs, params):
         return {}
-@node(type_key='perf.end', flow_kind='terminal', contract={}, rulesets=['vibeflow.io'])
+@node(node_type='vibeflow.node', id='perf.end', flow_kind='terminal', contract={}, rulesets=['vibeflow.io'])
 class End:
     def run_pure(self, inputs, params):
         return {}
@@ -75,24 +75,26 @@ class End:
             "Path(__file__).with_name('late.marker').write_text('imported')\n"
             "class Late:\n    def run_pure(self, inputs, params):\n        return {}\n")
         imports.append("from vibeflow.targets.python.sdk import node, SourceLocator")
-        imports.append("late = node(type_key='perf.late', contract={}, rulesets=[], "
+        imports.append("late = node(node_type='vibeflow.node', id='perf.late', contract={}, rulesets=[], "
                        f"source=SourceLocator('file', {str(root / 'late.py')!r}, 'Late'))")
         resources.append("late")
-    imports.extend(["from vibeflow.targets.python.sdk import rule, ruleset",
-                    "@rule(id='perf.call', scope='call')",
-                    "def count_call(context, inputs, params):",
-                    "    return {'state':'completed','records':{},'findings':[]}",
-                    "call_rules = ruleset(id='perf.calls', calls=[{'id':'check','rule_id':'perf.call'}], "
-                    "entrypoints={'static':['check']})"])
-    resources.extend(["count_call", "call_rules"])
-    bundle = "\n".join(["from vibeflow.targets.python.sdk import Plugin", *imports,
-                         f"plugin = Plugin(id='perf.resources', resources=[{', '.join(resources)}],",
-                         "                declaration_rulesets=['vibeflow.plugin_declaration'])", ""])
-    (root / "code_plugin.py").write_text(bundle)
+    package = root / "plugins/code_plugin"
+    package.mkdir(parents=True, exist_ok=True)
+    (package / "plugin.py").write_text("""from vibeflow.targets.python.sdk import Plugin, rule, ruleset
+@rule(id='perf.call', scope='call')
+def count_call(context, inputs, params):
+    return {'state':'completed','records':{},'findings':[]}
+call_rules = ruleset(id='perf.calls', calls=[{'id':'check','rule_id':'perf.call'}], entrypoints={'static':['check']})
+plugin = Plugin(id='perf.resources', resources=[count_call,call_rules], declaration_rulesets=['vibeflow.plugin_declaration'])
+""")
+    if late:
+        (root / "nodes/late.py").write_text("from vibeflow.targets.python.sdk import node,SourceLocator\n"
+            + "late=node(node_type='vibeflow.node',id='perf.late',contract={},rulesets=[],"
+            + f"source=SourceLocator('file',{str(root/'late.py')!r},'Late'))\n")
     calls = [node_call(f"step{i}", f"perf.step.{i}") for i in range(nodes)]
     if late:
         calls.append(node_call("late", "perf.late"))
-    workflow = {"plugins": [{"source": {"kind": "file", "ref": "code_plugin.py"}}],
+    workflow = {"plugins": [{"source": {"kind": "file", "ref": "plugins/code_plugin/plugin.py"}}],
                 "rulesets": ["vibeflow.workflow"]}
     if nested:
         calls = [node_call('body_start', 'perf.start'), *calls, node_call('body_end', 'perf.end')]
@@ -118,15 +120,21 @@ class End:
                                              "cardinality": "all", "display_name": "Computed values"}]
     (root / "workflow.jsonc").write_text(json.dumps(workflow, indent=2)+"\n")
     (root / "input.json").write_text("{}\n")
-    (root / "vibeflow_config.jsonc").write_text(json.dumps({"roots": [{"id": "perf", "path": "."}]}))
-    (root / "vibeflow_project.jsonc").write_text('{"project_target":"python"}\n')
+    from tests.fixtures.support.projects import register_root
+    register_root(root)
     if cross_root:
+        # The library is project-owned and actually consumed by two roots.
+        shared = root.parent / 'base_lib'
+        shutil.move(str(root/'base_lib'), str(shared))
         support = root.parent/(root.name+'-support')
         support.mkdir()
-        shutil.move(str(root/'base_lib'),str(support/'base_lib'))
         (support/'vibeflow_project.jsonc').write_text('{"project_target":"python"}\n')
-        (root/'vibeflow_config.jsonc').write_text(json.dumps({'roots':[
-            {'id':'perf','path':'.'}, {'id':'support','path':'../'+support.name}]}))
+        (support/'root_rules.jsonc').write_text('{"rulesets":[]}\n')
+        shutil.copytree(root/'nodes', support/'nodes')
+        shutil.copytree(root/'plugins', support/'plugins')
+        shutil.copy(root/'workflow.jsonc',support/'workflow.jsonc')
+        (root.parent/'vibeflow_config.jsonc').write_text(json.dumps({'roots':[
+            {'id':'perf','path':root.name}, {'id':'support','path':support.name}]}))
     return root / "workflow.jsonc"
 
 

@@ -69,7 +69,7 @@ def base_lib_closure(
         complete.add(resource_id)
         ordered.append(descriptor)
 
-    for descriptor in sorted(nodes.values(), key=lambda item: item.type_key):
+    for descriptor in sorted(nodes.values(), key=lambda item: item.id):
         for resource_id in descriptor.base_libs:
             visit(resource_id)
     return tuple(ordered), implementations
@@ -89,7 +89,7 @@ def required_capabilities(
                 raise ProjectBuildError(
                     "VF_AOT_CAPABILITY_UNKNOWN",
                     (
-                        f"node '{node.type_key}' requires unknown capability "
+                        f"node '{node.id}' requires unknown capability "
                         f"'{requirement.id}'"
                     ),
                 )
@@ -108,7 +108,7 @@ def required_capabilities(
                 raise ProjectBuildError(
                     "VF_AOT_CAPABILITY_OPERATION",
                     (
-                        f"node '{node.type_key}' requires unknown operations "
+                        f"node '{node.id}' requires unknown operations "
                         f"on capability '{capability.id}': {unknown}"
                     ),
                 )
@@ -116,83 +116,7 @@ def required_capabilities(
     return tuple(selected[key] for key in sorted(selected))
 
 
-def host_extension_closure(
-    enabled: tuple[str, ...],
-    *,
-    catalogs: DescriptorCatalogs,
-    target: str,
-    project_root: Path,
-    configurations: Mapping[str, Mapping[str, Any]] | None = None,
-    planned: frozenset[str] = frozenset(),
-    resolved_ids: tuple[str, ...] | None = None,
-) -> tuple[Mapping[str, Any], ...]:
-    ordered: list[Mapping[str, Any]] = []
-    extension_config = configurations or {}
 
-    from vibeflow.targets.javascript.build.host_selection import active_host_ids
-    selected_ids = resolved_ids if resolved_ids is not None else active_host_ids(enabled,
-        catalog=catalogs.host_extensions, planned=planned)
-    for extension_id in selected_ids:
-        descriptor = catalogs.host_extensions.require(extension_id)
-        if target not in descriptor.targets:
-            raise ProjectBuildError(
-                "VF_AOT_TARGET_IMPLEMENTATION_MISSING",
-                (
-                    f"host_extension '{extension_id}' has no implementation "
-                    f"for target '{target}'"
-                ),
-            )
-        for capability_id in descriptor.provides:
-            capability = catalogs.capabilities.get(capability_id)
-            if capability is None:
-                raise ProjectBuildError(
-                    "VF_AOT_HOST_EXTENSION_CAPABILITY",
-                    (
-                        f"host_extension '{extension_id}' provides unknown "
-                        f"capability '{capability_id}'"
-                    ),
-                )
-            if target not in capability.targets:
-                raise ProjectBuildError(
-                    "VF_AOT_HOST_EXTENSION_CAPABILITY",
-                    (
-                        f"host_extension '{extension_id}' provides capability "
-                        f"'{capability_id}' unsupported on target '{target}'"
-                    ),
-                )
-        selected = select_implementation(
-            descriptor.implementations,
-            target=target,
-            subject=f"host_extension '{descriptor.id}'",
-        )
-        if selected.completion != "immediate":
-            raise ProjectBuildError(
-                "VF_AOT_HOST_EXTENSION_FACTORY",
-                (
-                    f"host_extension '{descriptor.id}' factory must use "
-                    "completion='immediate'; start/stop may still return Promise"
-                ),
-            )
-        _source, mapping = implementation_source(
-            selected,
-            project_root=project_root,
-            source_roots=catalogs.source_roots,
-            subject=f"host_extension '{descriptor.id}'",
-        )
-        ordered.append(
-            {
-                "id": descriptor.id,
-                "module": mapping["module"],
-                "export": mapping["export"],
-                "dependencies": list(descriptor.dependencies),
-                "provides": list(descriptor.provides),
-                "config": dict(extension_config.get(descriptor.id, {})),
-                "external_packages": list(
-                    descriptor.external_packages
-                ),
-            }
-        )
-    return tuple(ordered)
 
 
 def used_schema_types(
@@ -248,15 +172,7 @@ def schemas_for_types(
     return schemas
 
 
-def target_neutral_import_policy(
-    *,
-    catalogs: DescriptorCatalogs,
-    project_root: Path,
-    allowed_external: set[str],
-    node_ids: frozenset[str] | None = None,
-    host_extension_ids: frozenset[str] = frozenset(),
-    plugin_ids: frozenset[str] = frozenset(),
-) -> tuple[dict[str, Any], tuple[str, ...]]:
+def target_neutral_import_policy(*, catalogs: DescriptorCatalogs, project_root: Path, allowed_external: set[str], node_ids: frozenset[str] | None=None, plugin_ids: frozenset[str]=frozenset(), resource_inventory=()) -> tuple[dict[str, Any], tuple[str, ...]]:
     """Describe a JS/TS source closure without selecting a platform.
 
     ``node_ids=None`` selects the complete registered node/base-lib catalog for
@@ -291,6 +207,11 @@ def target_neutral_import_policy(
             owner = {"path":str(source), "kind":kind, "id":resource_id,
                      "export":(locator.export or default_export) if role == "entry" else "",
                      "role":role, "flowKind":flow_kind, "completion":getattr(implementation,"completion","immediate")}
+            group = {"node":"nodes", "base_lib":"base_libs", "plugin":"plugins", "rule":"rules"}.get(kind)
+            origin = catalogs.origins.get((group,resource_id))
+            package_id = origin.owner.plugin_id if origin else resource_id if kind == "plugin_declaration" else ""
+            package = next((item.get("package_path", "") for item in catalogs.plugin_records if item.get("id") == package_id), "")
+            owner.update(pluginId=package_id, packagePath=package)
             previous = owners_by_path.setdefault(source, [])
             if owner not in previous:
                 previous.append(owner)
@@ -298,7 +219,7 @@ def target_neutral_import_policy(
     selected_nodes = tuple(
         descriptor
         for descriptor in catalogs.nodes
-        if node_ids is None or descriptor.type_key in node_ids
+        if node_ids is None or descriptor.id in node_ids
     )
     selected_base_lib_ids: set[str]
     if node_ids is None:
@@ -332,7 +253,7 @@ def target_neutral_import_policy(
             selected_base_lib_ids.add(resource_id)
 
         dependent_resources = (*selected_nodes,
-            *(item for item in catalogs.host_extensions if item.id in host_extension_ids),
+
             *(item for item in catalogs.plugins if item.id in plugin_ids),
             *(item for kind,item in source_resources(catalogs) if kind == "plugin_declaration"))
         for descriptor in dependent_resources:
@@ -350,7 +271,7 @@ def target_neutral_import_policy(
             add_implementation(
                 implementation,
                 kind="node",
-                resource_id=descriptor.type_key,
+                resource_id=descriptor.id,
                 default_export="run",
                 flow_kind=descriptor.flow_kind,
             )
@@ -363,17 +284,7 @@ def target_neutral_import_policy(
                 resource_id=descriptor.id,
                 default_export="",
             )
-    for descriptor in catalogs.host_extensions:
-        if descriptor.id not in host_extension_ids:
-            continue
-        allowed_external.update(descriptor.external_packages)
-        for implementation in descriptor.implementations:
-            add_implementation(
-                implementation,
-                kind="host_extension",
-                resource_id=descriptor.id,
-                default_export="createHostExtension",
-            )
+
     for descriptor in catalogs.plugins:
         if descriptor.id not in plugin_ids:
             continue
@@ -398,8 +309,22 @@ def target_neutral_import_policy(
             continue
         for implementation in descriptor.implementations:
             if implementation.source.kind == "file" and (project_root/implementation.source.ref).is_file():
-                add_implementation(implementation, kind="plugin_declaration",resource_id=origin.plugin_id,default_export="check")
+                add_implementation(implementation, kind="plugin_declaration",resource_id=origin.owner.plugin_id,default_export="check")
 
+    from vibeflow.core.descriptors.contributions import resource_kind
+    known_owners = []
+    for entry in resource_inventory:
+        descriptor = entry.descriptor
+        kind = resource_kind(descriptor)
+        if kind not in {"node", "base_lib"}:
+            continue
+        for implementation in descriptor.implementations:
+            if implementation.language not in {"javascript", "typescript"}:
+                continue
+            for role, locator in implementation_sources(implementation):
+                if locator.kind == "file":
+                    known_owners.append({"path":locator.ref, "kind":kind, "id":descriptor.id,
+                        "export":locator.export or "run" if role == "entry" else "", "role":role})
     owners = [
         owner
         for path in sorted(owners_by_path, key=lambda item: item.as_posix())
@@ -408,25 +333,22 @@ def target_neutral_import_policy(
     return (
         {
             "owners": owners,
+            "known_owners": known_owners,
             "node_base_libs": {
-                descriptor.type_key: list(descriptor.base_libs)
+                descriptor.id: list(descriptor.base_libs)
                 for descriptor in selected_nodes
             },
             "base_lib_dependencies": {
                 descriptor.id: list(descriptor.dependencies)
                 for descriptor in selected_base_libs
             },
-            "host_extension_dependencies": {
-                descriptor.id: list(descriptor.dependencies)
-                for descriptor in catalogs.host_extensions
-                if descriptor.id in host_extension_ids
-            },
+
             "resource_base_libs": {kind + ":" + item.id:list(item.base_libs)
                 for kind,item in source_resources(catalogs) if hasattr(item,"base_libs")},
             "plugin_contributions": {record["id"]:[{"kind":kind,"id":item.id}
-                for kind,group in (("node","nodes"),("base_lib","base_libs"),("plugin","plugins"),("host_extension","host_extensions"),("rule","rules"))
+                for kind,group in (("node","nodes"),("base_lib","base_libs"),("plugin","plugins"),("rule","rules"))
                 for item in getattr(catalogs,group)
-                if catalogs.origins.get((group,item.id)) and catalogs.origins[(group,item.id)].plugin_id == record["id"]]
+                if catalogs.origins.get((group,item.id)) and catalogs.origins[(group,item.id)].owner.plugin_id == record["id"]]
                 for record in catalogs.plugin_records if record.get("loaded")},
             "plugin_dependencies": {
                 descriptor.id: list(descriptor.dependencies)
@@ -446,13 +368,14 @@ def driver_import_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
     fields = {
         "node_base_libs": "nodeBaseLibs",
         "base_lib_dependencies": "baseLibDependencies",
-        "host_extension_dependencies": "hostExtensionDependencies",
+
         "plugin_dependencies": "pluginDependencies",
         "resource_base_libs": "resourceBaseLibs",
         "plugin_contributions": "pluginContributions",
     }
     return {
         "owners": [dict(item) for item in policy.get("owners", ())],
+        "knownOwners": [dict(item) for item in policy.get("known_owners", policy.get("knownOwners", ()))],
         **{driver: dict(policy.get(key, policy.get(driver, {})) or {})
            for key, driver in fields.items()},
         "allowedExternalPackages": list(policy.get("allowed_external_packages", policy.get("allowedExternalPackages", ()))),
@@ -464,7 +387,6 @@ def driver_import_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
 __all__ = [
     "base_lib_closure",
     "driver_import_policy",
-    "host_extension_closure",
     "required_capabilities",
     "schemas_for_types",
     "target_neutral_import_policy",

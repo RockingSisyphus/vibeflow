@@ -3,6 +3,7 @@ from tests.fixtures.support.plugins import resource as resource_ref, resources, 
 
 from copy import deepcopy
 import json
+import shutil
 from pathlib import Path
 
 from common import cli, command, copy_project, row, write
@@ -58,8 +59,8 @@ def _handlers(project, target, marker, record_type):
             f"  return {{records:{{value:{{type_id:{json.dumps(record_type)},value:3}}}}}};\n}}\n")
         consumer = "export function check(context, inputs, params) { return {findings:[]}; }\n"
         extension = "ts"
-    (project / f"rules/declaration_provider.{extension}").write_text(provider)
-    (project / f"rules/declaration_consumer.{extension}").write_text(consumer)
+    (project / f"plugins/code_plugin/rules/declaration_provider.{extension}").write_text(provider)
+    (project / f"plugins/code_plugin/rules/declaration_consumer.{extension}").write_text(consumer)
 
 
 def _resource_case(rows, work, target, label, group, value, toolchain):
@@ -89,7 +90,7 @@ def _resource_case(rows, work, target, label, group, value, toolchain):
     for entry in ("review-rules", "validate"):
         marker.unlink(missing_ok=True)
         observed = cli(project, entry, name=label + "-" + entry)
-        declaration_source = project / ("code_plugin.py" if target == "python" else "code_plugin.ts")
+        declaration_source = project / ("nodes/code_plugin_declarations.py" if target == "python" else "nodes/code_plugin_declarations.ts") if group=="node" else project / ("plugins/code_plugin/plugin.py" if target=="python" else "plugins/code_plugin/plugin.ts")
         located = str(declaration_source) in json.dumps(observed["payload"], ensure_ascii=False) or str(declaration_source) in observed["message"]
         observed["metrics"].update(handler_called=marker.exists(), resource_located=located)
         metrics = {"exit_code": 0 if valid else 1, "json_output": True,
@@ -103,37 +104,21 @@ def _resource_case(rows, work, target, label, group, value, toolchain):
                         "declaration_contract", observed, expected))
 
 
-def _sibling_project(work, toolchain, *, conflict=False):
-    main_root, project = copy_project(work / "main", "python", toolchain=toolchain)
-    sibling_root, sibling = copy_project(work / "sibling", "python", toolchain=toolchain)
-    declarations = resource_declarations(sibling)
-    for data in declarations:
-        if data["kind"] == "node":
-            data["type_key"] = "sibling." + data["type_key"]
-            if data.get("base_libs"):
-                data["base_libs"] = ["sibling." + value for value in data["base_libs"]]
-        elif data["kind"] == "base_lib":
-            data["id"] = "sibling." + data["id"]
-    write_plugin(sibling, [data for data in declarations if data["kind"] != "data_schema"],
-                 target="python", plugin_id="sibling.resources")
-    config = project / "configs/model.jsonc"
-    graph = _read(config)
-    graph["pipeline"]["nodes"][1]["type_used"] = "sibling.example.model"
-    graph["plugins"].append({"root":"sibling", "source": {"kind":"file", "ref":"code_plugin.py", "export":"plugin"}})
-    write(config, graph)
-    # The sibling Node must select one shared, explicitly enabled definition.
-    # The non-conflict case contributes only sibling Nodes/helpers, referencing
-    # main's rules. The conflict case intentionally contributes both definitions.
-    if not conflict:
-        update_resources(sibling, [data for data in resource_declarations(sibling) if data["kind"] not in {"rule", "ruleset"}])
+def _sibling_project(work,toolchain,*,conflict=False):
+    _,project=copy_project(work/'main','python',toolchain=toolchain)
+    _,sibling=copy_project(work/'sibling','python',toolchain=toolchain)
+    package=work/'plugins/shared';shutil.copytree(project/'plugins/code_plugin',package)
+    path=package/'plugin.py';path.write_text(path.read_text().replace("id='example.python.domain_rules'","id='shared.domain_rules'"))
     if conflict:
-        path = resource_ref(sibling, 'rule', 'example.model_definition')
-        data = _read(path)
-        data["description"] += " A conflicting sibling definition."
-        write(path, data)
-    workspace = work / "workspace.jsonc"
-    write(workspace, {"roots": [{"id": "main", "path": str(project)}, {"id": "sibling", "path": str(sibling)}]})
-    return project, sibling, config, workspace
+        path.write_text(path.read_text().replace('One direct model_forward method','A conflicting direct model_forward method'))
+    selection={'scope':'project','source':{'kind':'file','ref':'plugins/shared/plugin.py'}}
+    config=project/'configs/model.jsonc'
+    for owner in (project,sibling):
+        workflow=owner/'configs/model.jsonc';data=_read(workflow)
+        data['plugins']=([*data['plugins'],selection] if conflict and owner==project else [selection]);write(workflow,data)
+    workspace=work/'vibeflow_config.jsonc'
+    write(workspace,{'roots':[{'id':name,'path':owner.relative_to(work).as_posix()} for name,owner in (('main',project),('sibling',sibling))]})
+    return project,sibling,config,workspace
 
 
 def _workspace_cases(rows, work, toolchain):
@@ -156,7 +141,7 @@ def _workspace_cases(rows, work, toolchain):
             expected = {"should_accept": not conflict, "metrics": {"exit_code": int(conflict), "json_output": True}}
             if conflict:
                 observed["metrics"]["both_origins"] = all(str(path) in json.dumps(observed["payload"]) for path in
-                    (project / "code_plugin.py", sibling / "code_plugin.py"))
+                    (project / "plugins/code_plugin/plugin.py", workspace.parent / "plugins/shared/plugin.py"))
                 expected["metrics"]["both_origins"] = True
                 expected["message_contains"] = "conflict"
                 if entry == "validate":
@@ -164,15 +149,15 @@ def _workspace_cases(rows, work, toolchain):
                 else:
                     expected["codes"] = ["RULE.RESOURCE.CONFLICT"]
             else:
-                observed["metrics"]["model_selected"] = _model_selected(observed["payload"], type_key="sibling.example.model")
+                observed["metrics"]["model_selected"] = _model_selected(observed["payload"], type_key="example.model")
                 expected["metrics"]["model_selected"] = True
-            rows.append(row(f"tooling.gaps.sibling.{label}.{entry}", "Same Target sibling " + label,
+            rows.append(row(f"tooling.gaps.sibling.{label}.{entry}", "Project-shared Plugin package " + label,
                             "workspace_rule_scope", observed, expected))
 
 
 def _model_selected(payload, *, type_key="example.model"):
     if isinstance(payload.get("nodes"), list):
-        return any(item["type_key"] == type_key and "example.model_domain" in item["rulesets"] for item in payload["nodes"])
+        return any(item["definition_id"] == type_key and "example.model_domain" in item["rulesets"] for item in payload["nodes"])
     if "rule_checks" in payload:
         return bool(payload["rule_checks"].get("subjects", {}).get(type_key))
     return any(execution.get("plan", {}).get("ruleset_id") == "example.model_domain"

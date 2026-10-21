@@ -66,19 +66,19 @@ from vibeflow.tooling.project.workspace_loader import load_workspace_config
 from vibeflow.tooling.project.config_loader import load_config_document
 from vibeflow.tooling.project.graph_config import parse_graph_config
 root=Path(sys.argv[1])
-registry=declared_python_registry(load_workspace_config(root/'workspace.jsonc'),config_path=root/'workflow.jsonc')
+registry=declared_python_registry(load_workspace_config(root.parent/'vibeflow_config.jsonc'),config_path=root/'workflow.jsonc')
 graph=parse_graph_config(load_config_document(root/'workflow.jsonc').data,project_root=root)
 context=collect_workflow_source_context(registry,graph)
 relative=lambda path: str(Path(path).relative_to(root)) if path else ''
-proof={'node_paths':{node.type_key:relative(node.path) for node in context.nodes},
-       'node_rulesets':{node.type_key:list(registry.rulesets(node.type_key)) for node in context.nodes},
+proof={'node_paths':{node.definition_id:relative(node.path) for node in context.nodes},
+       'node_rulesets':{node.definition_id:list(registry.rulesets(node.definition_id)) for node in context.nodes},
        'source_files':[relative(source.path) for source in context.files],
        'physical_imports':[{'path':relative(item.path),'resolved_path':relative(item.resolved_path),
                            'module':item.module,'symbol':item.symbol,'alias':item.alias,'line':item.line}
                           for item in context.imports],
-       'helper_owners':sorted({item.type_key for item in context.ownership
+       'helper_owners':sorted({item.definition_id for item in context.ownership
                               if item.symbol_id==str(root/'helper.py')+':transform'}),
-       'calls':[{'type':item.type_key,'owner':item.owner,'path':list(item.call_path)} for item in context.calls]}
+       'calls':[{'type':item.definition_id,'owner':item.owner,'path':list(item.call_path)} for item in context.calls]}
 print(json.dumps(proof))
 '''
 

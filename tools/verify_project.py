@@ -257,10 +257,10 @@ def _isolation_declarations() -> list[dict[str, object]]:
         elif key == "end":
             contract = {"requires": [{"type": "value.out", "cardinality": "exactly_one", "display_name": "Result"}],
                         "input_semantics": {"value.out": ["Isolation result"]}}
-        declarations.append({"kind": "node", "type_key": "isolation." + key, "display_name": key.title(),
+        declarations.append({"kind": "node", "node_type":"vibeflow.node", "id": "isolation." + key, "display_name": key.title(),
              "description": "Isolated " + key + " implementation.", "version": "1.0.0",
             "flow_kind": kind, "rulesets": ["vibeflow.process"], "contract": contract,
-            "implementations": [{"language": "python", "targets": ["python"], "source": {"kind": "file", "ref": "isolation_nodes.py", "export": symbol}}]})
+            "implementations": [{"language": "python", "targets": ["python"], "source": {"kind": "file", "ref": "nodes/isolation_nodes.py", "export": symbol}}]})
     return declarations
 
 
@@ -338,19 +338,20 @@ import os
 from pathlib import Path
 import sys
 
-root = Path(os.environ["VF_ISOLATION_PYTHON_ROOT"])
+root = Path(os.environ["VF_ISOLATION_PYTHON_ROOT"]) / "project"
 root.mkdir(parents=True, exist_ok=True)
 project_config = root / "vibeflow_project.jsonc"
 project_config.write_text(json.dumps({
     "project_target": "python",
 }), encoding="utf-8")
-workspace = root / "vibeflow_config.jsonc"
+workspace = root.parent / "vibeflow_config.jsonc"
 workspace.write_text(json.dumps({
-    "roots": [{"id": "python-isolation", "path": "."}],
+    "roots": [{"id": "python-isolation", "path": "project"}],
 }), encoding="utf-8")
-node_path = root / "isolation_nodes.py"
+(root / "nodes").mkdir()
+node_path = root / "nodes/isolation_nodes.py"
 node_path.write_text(NODE_SOURCE, encoding="utf-8")
-plugin_source = "from vibeflow.targets.python.sdk import Plugin,node,SourceLocator\n"
+declaration_source = "from vibeflow.targets.python.sdk import node,SourceLocator\n"
 resources = []
 for index, descriptor in enumerate(DECLARATIONS):
     options = dict(descriptor)
@@ -359,18 +360,16 @@ for index, descriptor in enumerate(DECLARATIONS):
     options["source"] = implementation["source"]
     resource = "resource_" + str(index)
     resources.append(resource)
-    plugin_source += resource + "=node(**" + repr(options) + ")\n"
-plugin_source += "plugin=Plugin(id='isolation',resources=[" + ",".join(resources) + "])\n"
-(root / "plugin.py").write_text(plugin_source, encoding="utf-8")
+    declaration_source += resource + "=node(**" + repr(options) + ")\n"
+(root / "nodes/declarations.py").write_text(declaration_source, encoding="utf-8")
 
 config = root / "workflow.jsonc"
 config.write_text(json.dumps({
-    "plugins": [{"source": {"kind": "file", "ref": "plugin.py"}}],
     "pipeline": {
         "nodes": [
-            {"id": "start", "type_used": "isolation.start", "display_name": "Start", "description": "Starts the isolation workflow."},
-            {"id": "seed", "type_used": "isolation.seed", "display_name": "Seed", "description": "Produces the isolation result.", "value": 7},
-            {"id": "end", "type_used": "isolation.end", "display_name": "End", "description": "Consumes the isolation result."},
+            {"id": "start", "definition_id": "isolation.start", "display_name": "Start", "description": "Starts the isolation workflow."},
+            {"id": "seed", "definition_id": "isolation.seed", "display_name": "Seed", "description": "Produces the isolation result.", "value": 7},
+            {"id": "end", "definition_id": "isolation.end", "display_name": "End", "description": "Consumes the isolation result."},
         ],
         "edges": [["start", "seed"], ["seed", "end"]],
         "outputs": [{"type": "value.out", "cardinality": "exactly_one", "display_name": "Result"}],
@@ -477,12 +476,12 @@ def _wheel_smoke(scratch: Path) -> None:
             "root = files('vibeflow')",
             f"for retired in {(*RETIRED_FILES, *MOVED_FILES)!r}:",
             "    assert not root.joinpath(retired).is_file(), retired",
-            "for name in ('config.schema.json', 'health_report.schema.json', 'node.schema.json', 'nodeset.schema.json', 'policy.schema.json', 'rule.schema.json', 'ruleset.schema.json'):",
+            "for name in ('config.schema.json', 'health_report.schema.json', 'node.schema.json', 'nodeset_type.schema.json', 'node_type.schema.json', 'rule.schema.json', 'ruleset.schema.json'):",
             "    assert root.joinpath('tooling/project/schema', name).is_file()",
             "for name in ('runtime_helpers.mjs', 'capability_helpers.mjs', 'plugin_helpers.mjs', 'root_helpers.mjs', 'coordination/workflow_client.mjs', 'coordination/workflow_host.mjs', 'coordination/workflow_node.mjs', 'toolchain_driver.mjs', 'plugin_worker.mjs', 'plugin_abi.d.ts', 'rule_abi.d.ts', 'sdk.mjs', 'sdk.d.ts', 'sdk_loader.mjs'):",
             "    assert root.joinpath('targets/javascript/resources', name).is_file()",
-            "for name in ('declarations.mjs', 'contracts.d.ts'):",
-            "    assert root.joinpath('targets/javascript/nodetypes', name).is_file()",
+            "for name in ('node_declarations.mjs', 'node_contracts.d.ts'):",
+            "    assert root.joinpath('targets/javascript/resources', name).is_file()",
             "for removed in ('aot', 'runtime', 'portable', 'config', 'health', 'purity', 'devtools', 'rendering', 'workspace', 'builtin', 'core/quality'):",
             "    assert not root.joinpath(removed).is_dir(), removed",
         )

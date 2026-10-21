@@ -13,9 +13,9 @@ def _runtime(tmp_path, implementations, execution="plan", plugin_registry=None, 
     registry=native_registry()
     class Terminal:
         def run_pure(self,inputs,params):return {}
-    registry.register(NodeDescriptor("native.terminal","Boundary","Boundary","1","terminal",contract=NodeContractDescriptor(),rulesets=()),Terminal)
+    registry.register(NodeDescriptor("native.terminal","Boundary","Boundary","1","terminal",contract=NodeContractDescriptor(),rulesets=(), node_type="vibeflow.node"),Terminal)
     for name,impl in implementations.items():
-        registry.register(NodeDescriptor("native."+name,name,name,"1","process",contract=NodeContractDescriptor(),rulesets=()),impl)
+        registry.register(NodeDescriptor("native."+name,name,name,"1","process",contract=NodeContractDescriptor(),rulesets=(), node_type="vibeflow.node"),impl)
     graph=parse_graph_config({"pipeline":{"nodes":[_call("start","native.terminal"),
         *[_call(name,"native."+name,**({"execution_lock":{"key":lock}} if lock else {})) for name in implementations],_call("end","native.terminal",join_policy="all")],
         "edges":[["start",name] for name in implementations]+[[name,"end"] for name in implementations]}})

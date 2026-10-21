@@ -2,7 +2,7 @@
 from pathlib import Path
 from typing import Mapping
 from vibeflow.core import CompiledGraph
-from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, STATUS_PLANNED
+from vibeflow.core.flow import GraphConfig, LOOP_DEFINITION_IDS, STATUS_PLANNED
 from vibeflow.core.constants import FLOW_KIND_GLOBAL_STATE
 from vibeflow.core.descriptors import DescriptorCatalogs
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
@@ -26,12 +26,11 @@ def build_architecture_facts(
     graph: GraphConfig,
     *,
     compiled: CompiledGraph,
-    compiled_nodesets: Mapping[str, CompiledGraph],
+    compiled_nodeset_types: Mapping[str, CompiledGraph],
     catalogs: DescriptorCatalogs,
-    used_node_types: frozenset[str],
+    used_node_ids: frozenset[str],
     active_base_lib_ids: frozenset[str],
     plugin_records: tuple[Mapping[str, object], ...],
-    host_records: tuple[Mapping[str, object], ...],
     root_id: str,
     source_path: str,
     findings: tuple = (),
@@ -40,6 +39,7 @@ def build_architecture_facts(
     roots=None,
     rule_report=None,
 ) -> dict[str, object]:
+    roots = {**({"@project": catalogs.source_roots[-1]} if len(catalogs.source_roots) > 1 else {}), **(roots or {})}
     from .status import node_health_classes
     if rule_report is not None:
         findings = rule_report.findings
@@ -60,7 +60,7 @@ def build_architecture_facts(
             catalogs=catalogs,
             health_classes=health_classes,
         ),
-        "nodesets": {
+        "nodeset_types": {
             key: {
                 "type_key": value.type_key,
                 "source": _javascript_source_reference(value),
@@ -79,7 +79,7 @@ def build_architecture_facts(
                 "body": (
                     _javascript_graph_document(
                         value.graph,
-                        compiled_nodesets[key],
+                        compiled_nodeset_types[key],
                         source=_javascript_source_reference(value),
                         graph_lock_scope="block",
                         catalogs=catalogs,
@@ -89,14 +89,16 @@ def build_architecture_facts(
                     else None
                 ),
             }
-            for key, value in sorted(graph.nodesets.items())
+            for key, value in sorted(graph.nodeset_types.items())
         },
-        "node_types": {
-            descriptor.type_key: {**descriptor.to_dict(),
+        "node_definitions": {
+            descriptor.id: {**descriptor.to_dict(),
+                "declaration": getattr(descriptor, "declaration", descriptor).to_dict(),
                 "effective_presentation": resolve_presentation(descriptor).to_dict(),
             }
             for descriptor in catalogs.nodes
         },
+        "node_types": catalogs.node_types.to_dict(),
         "resources": {
             "data_schemas": catalogs.schemas.to_dict(),
             "base_lib": {
@@ -109,11 +111,11 @@ def build_architecture_facts(
                 for key, value in catalogs.capabilities.to_dict().items()
                 if key in _active_capability_ids(
                     catalogs,
-                    used_node_types=used_node_types,
-                    host_records=host_records,
+                    used_node_ids=used_node_ids,
+
                 )
             },
-            "host_extensions": list(host_records),
+
             "plugins": list(plugin_records),
         },
     }
@@ -127,33 +129,28 @@ def build_architecture_facts(
         from vibeflow.tooling.presentation.portable_paths import portable_paths
         sources = tuple(item for scope in rule_report.source_scopes.values() for item in scope["sources"]) if rule_report else ()
         payload["implementation_graph"] = resource_architecture(catalogs, project_root=project_root,
-            selections=selections, selected_nodes=used_node_types, source_facts=sources,
+            selections=selections, selected_nodes=used_node_ids, source_facts=sources,
             findings=findings, roots=roots)
-        payload = portable_paths(payload, roots=roots or {}, primary_root=project_root)
+        from vibeflow.targets.javascript.build.driver_session import current_scope
+        scope = current_scope()
+        kernel_roots = {"@vibeflow/javascript": driver.resources for driver in scope.drivers.values()} if scope else {}
+        payload = portable_paths(payload, roots={**(roots or {}), **kernel_roots}, primary_root=project_root)
     return payload
 
 
 def _active_capability_ids(
     catalogs: DescriptorCatalogs,
     *,
-    used_node_types: frozenset[str],
-    host_records: tuple[Mapping[str, object], ...],
+    used_node_ids: frozenset[str],
 ) -> frozenset[str]:
     active = {
         requirement.id
-        for type_key in used_node_types
+        for type_key in used_node_ids
         for descriptor in (catalogs.nodes.get(type_key),)
         if descriptor is not None
         for requirement in descriptor.capabilities
     }
-    for record in host_records:
-        for provided in record.get("provides", ()):
-            if isinstance(provided, Mapping):
-                capability_id = str(provided.get("id", ""))
-            else:
-                capability_id = str(provided)
-            if capability_id:
-                active.add(capability_id)
+
     return frozenset(active)
 
 
@@ -218,10 +215,10 @@ def _javascript_node_document(
     health_classes: Mapping[tuple[int, str], str] | None = None,
 ) -> dict[str, object]:
     node_id = str(getattr(node, "id", ""))
-    type_used = str(getattr(node, "type_used", ""))
-    is_loop = type_used in LOOP_NODE_TYPES
-    target = getattr(getattr(node, "loop", None), "body", "") if is_loop else type_used
-    nodeset = graph.nodesets.get(target)
+    definition_id = str(getattr(node, "definition_id", ""))
+    is_loop = definition_id in LOOP_DEFINITION_IDS
+    target = getattr(getattr(node, "loop", None), "body", "") if is_loop else definition_id
+    nodeset = graph.nodeset_types.get(target)
     invokes = None
     if nodeset is not None:
         invokes = {
@@ -252,15 +249,15 @@ def _javascript_node_document(
         if is_loop
         else "nodeset"
         if nodeset is not None
-        else "node_type"
+        else "node_definition"
     )
-    descriptor = catalogs.nodes.get(type_used)
+    descriptor = catalogs.nodes.get(definition_id)
     native_class = "externalDependency" if descriptor is not None and descriptor.external and nodeset is None else "loopNode" if is_loop else "nodesetNode" if nodeset is not None else "documentNode" if flow_kind == "document" else "defaultNode"
     planned = status == STATUS_PLANNED or nodeset is not None and nodeset.status == STATUS_PLANNED
     presentation = resolve_presentation(descriptor, native_class=native_class, status_class="plannedNode" if planned else (health_classes or {}).get((id(graph), node_id), ""), call_style=getattr(node, "style", None), flow_kind=flow_kind, node=node, compiled=compiled)
     return {
         "id": node_id,
-        "type_used": type_used,
+        "definition_id": definition_id,
         "source": dict(source),
         "role": getattr(node, "metadata").to_dict(),
         "presentation": presentation.to_dict(),
@@ -336,10 +333,10 @@ def _reachable_javascript_nodesets(graph: GraphConfig) -> frozenset[str]:
         for node in body.nodes:
             target = (
                 node.loop.body
-                if node.type_used in LOOP_NODE_TYPES
-                else node.type_used
+                if node.definition_id in LOOP_DEFINITION_IDS
+                else node.definition_id
             )
-            nodeset = body.nodesets.get(target)
+            nodeset = body.nodeset_types.get(target)
             if nodeset is None or target in reachable:
                 continue
             reachable.add(target)
@@ -352,22 +349,22 @@ def _reachable_javascript_nodesets(graph: GraphConfig) -> frozenset[str]:
 def build_prepared_architecture(prepared):
     """Adapt checked build inputs without compiling or interpreting source again."""
     inputs = prepared.presentation_inputs
-    compiled_nodesets = dict(inputs["declarations"])
+    compiled_nodeset_types = dict(inputs["declarations"])
 
     def remember(graph, path=()):
         for node in graph.nodes:
-            target = node.loop.body if node.type_used in LOOP_NODE_TYPES else node.type_used
-            definition = graph.nodesets.get(target)
+            target = node.loop.body if node.definition_id in LOOP_DEFINITION_IDS else node.definition_id
+            definition = graph.nodeset_types.get(target)
             call = path + (node.id,)
             if definition is not None and call in inputs["compiled_by_path"]:
-                compiled_nodesets.setdefault(target, inputs["compiled_by_path"][call])
+                compiled_nodeset_types.setdefault(target, inputs["compiled_by_path"][call])
                 remember(definition.graph, call)
 
     remember(prepared.graph)
     return build_architecture_facts(prepared.graph, compiled=prepared.compiled,
-        compiled_nodesets=compiled_nodesets, catalogs=prepared.catalogs,
-        used_node_types=frozenset(prepared.used_node_types), active_base_lib_ids=frozenset(prepared.used_base_libs),
-        plugin_records=prepared.declared_plugins, host_records=prepared.declared_host_extensions,
+        compiled_nodeset_types=compiled_nodeset_types, catalogs=prepared.catalogs,
+        used_node_ids=frozenset(prepared.used_node_ids), active_base_lib_ids=frozenset(prepared.used_base_libs),
+        plugin_records=prepared.declared_plugins,
         root_id=prepared.root.id, source_path=prepared.config_path.relative_to(prepared.root.path).as_posix(),
         project_root=prepared.root.path, selections=inputs["selections"],
         roots={root.id:root.path for root in prepared.workspace.roots}, rule_report=prepared.rule_report)

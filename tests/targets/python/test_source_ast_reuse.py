@@ -19,7 +19,7 @@ from vibeflow.targets.python.quality.source_context import (
 def _sources():
     path = "/project/implementations.py"
     helper_path = "/project/shared.py"
-    descriptors = tuple(node_declaration(NodeDescriptor(type_key='test.' + name.lower(), display_name=name, description='Checks an implementation.', version='1', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor()) for name in ("First", "Second"))
+    descriptors = tuple(node_declaration(NodeDescriptor(rulesets=(), id='test.' + name.lower(), display_name=name, description='Checks an implementation.', version='1', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor()) for name in ("First", "Second"))
     files = (
         PythonSourceFile.parse(path, "implementations", '''from math import sqrt, ceil
 from shared import announce
@@ -51,15 +51,15 @@ class Second:
 
 def _context(sources, kind="node", name="First"):
     node = next(item for item in sources.nodes if item.symbol == name)
-    identity = node.type_key if kind == "node" else "test.resource"
+    identity = node.definition_id if kind == "node" else "test.resource"
     owners = tuple({"kind":kind, "id":identity, "path":file.path,
         "role":"entry" if file.path == node.path else "support",
         "symbol":name if file.path == node.path else "", "base_libs":[], "dependencies":[]}
         for file in sources.files)
     return RuleContext(facts={"source_context":sources, "resource_source_file":sources.file(node.path),
         "base_lib_file":sources.file(node.path), "resource_symbol":name, "source_owners":owners,
-        "node_catalog":tuple(item.descriptor for item in sources.nodes)},
-        subject={"kind":kind, "id":identity, "type_key":identity})
+        "node_definitions":tuple(item.descriptor for item in sources.nodes)},
+        subject={"kind":kind, "id":identity, "definition_id":identity})
 
 
 def _ast_snapshot(sources):

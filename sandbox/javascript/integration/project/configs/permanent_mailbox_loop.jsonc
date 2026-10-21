@@ -1,0 +1,46 @@
+{
+  "nodeset_imports": [
+    {
+      "path": "nodeset_types/permanent_port_body.jsonc"
+    }
+  ],
+  "pipeline": {
+    "entry_mode": "async",
+    "nodes": [
+      {
+        "id": "start",
+        "definition_id": "sandbox.terminal",
+        "display_name": "Start permanent workflow",
+        "description": "Starts the asynchronous permanent Port workflow."
+      },
+      {
+        "id": "loop",
+        "definition_id": "vibeflow.loop.while",
+        "display_name": "Permanent Port loop",
+        "description": "Processes Port values until the host aborts this invocation.",
+        "loop": {
+          "body": "sandbox.permanent_port_body",
+          "max_iterations": null
+        },
+        "requires": [],
+        "provides": []
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "loop"
+      }
+    ],
+    "outputs": []
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugins/code_plugin/plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
+}

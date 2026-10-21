@@ -12,47 +12,47 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.start",
+        "definition_id": "sandbox.start",
         "display_name": "Start",
         "description": "Runs start."
       },
       {
         "id": "input",
-        "type_used": "sandbox.value_input",
+        "definition_id": "sandbox.value_input",
         "display_name": "Input",
         "description": "Runs input."
       },
       {
         "offset": 1,
         "id": "prepare",
-        "type_used": "sandbox.prepare_value",
+        "definition_id": "sandbox.prepare_value",
         "display_name": "Prepare",
         "description": "Runs prepare."
       },
       {
         "factor": 2,
         "id": "compute",
-        "type_used": "sandbox.core_compute",
+        "definition_id": "sandbox.core_compute",
         "display_name": "Compute",
         "description": "Runs compute."
       },
       {
         "threshold": 10,
         "id": "route",
-        "type_used": "sandbox.route_decision",
+        "definition_id": "sandbox.route_decision",
         "display_name": "Route",
         "description": "Runs route."
       },
       {
         "bonus": 5,
         "id": "external",
-        "type_used": "sandbox.external_boost",
+        "definition_id": "sandbox.external_boost",
         "display_name": "External",
         "description": "Runs external."
       },
       {
         "id": "end",
-        "type_used": "sandbox.final_value_end",
+        "definition_id": "sandbox.final_value_end",
         "display_name": "End",
         "description": "Runs end."
       },
@@ -60,7 +60,7 @@
         "display_name": "Again Branch End",
         "description": "Terminates the inactive again branch in the acyclic compiled fixture.",
         "id": "again_end",
-        "type_used": "sandbox.start"
+        "definition_id": "sandbox.start"
       }
     ],
     "edges": [
@@ -116,7 +116,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

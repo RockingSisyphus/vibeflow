@@ -82,7 +82,7 @@ class RuntimeContractMixin:
         for requirement in frame.requires:
             matches = [
                 envelope
-                for envelope in state.inboxes[frame.name]
+                for envelope in state.inboxes[frame.id]
                 if envelope.type == requirement.type
             ]
             matches.sort(key=lambda item: self._plan.order.index(item.source_node) if item.source_node in self._plan.order else -1)
@@ -90,14 +90,14 @@ class RuntimeContractMixin:
             if requirement.cardinality == CARDINALITY_EXACTLY_ONE:
                 if len(matches) != 1:
                     raise PipelineRuntimeError(
-                        f"node '{frame.name}' requires type "
+                        f"node '{frame.id}' requires type "
                         f"'{requirement.type}' exactly once, got {len(matches)}"
                     )
                 inputs[requirement.type] = matches[0].to_input()
             elif requirement.cardinality == CARDINALITY_OPTIONAL_ONE:
                 if len(matches) > 1:
                     raise PipelineRuntimeError(
-                        f"node '{frame.name}' requires type "
+                        f"node '{frame.id}' requires type "
                         f"'{requirement.type}' at most once, got {len(matches)}"
                     )
                 inputs[requirement.type] = (
@@ -110,7 +110,7 @@ class RuntimeContractMixin:
                 ]
             else:
                 raise PipelineRuntimeError(
-                    f"node '{frame.name}' has invalid cardinality "
+                    f"node '{frame.id}' has invalid cardinality "
                     f"'{requirement.cardinality}'"
                 )
         return inputs

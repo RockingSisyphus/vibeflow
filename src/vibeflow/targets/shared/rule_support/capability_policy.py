@@ -41,7 +41,7 @@ def policy_findings(graph, policies, descriptor):
         for node in subject.graph.nodes:
             path = (*subject.call_path, node.id)
             constraints = policies.get(path, {}).get("capabilities", {})
-            declared = descriptor(node.type_used)
+            declared = descriptor(node.definition_id)
             if declared is None:
                 continue
             for required in declared.capabilities:

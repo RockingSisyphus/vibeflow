@@ -23,7 +23,7 @@ def _diagnostics(payload):
 
 
 def _cli(root, kernel, command="validate", *, name=None, config="workflow.jsonc"):
-    args = [command, "--workspace", str(root / "vibeflow_config.jsonc"),
+    args = [command, "--workspace", str(root.parent / "vibeflow_config.jsonc"),
             "--config", str(root / config)]
     if command == "run":
         run_root = root / "runs"
@@ -93,7 +93,8 @@ def _node_identity_cases(work, kernel):
         root = work / ("node-" + variant)
         root.mkdir(parents=True, exist_ok=True)
         (root / "safe.py").write_text('class Safe:\n    def run_pure(self, inputs, params):\n        return {"value":7}\n')
-        (root / "support.py").write_text('def seven():\n    return 7\n')
+        (root / "nodes").mkdir(exist_ok=True)
+        (root / "nodes/support.py").write_text('def seven():\n    return 7\n')
         selected = ["vibeflow.process"]
         body = ""
         option = ""
@@ -102,15 +103,15 @@ def _node_identity_cases(work, kernel):
             option = f", implementations={[implementation(root/'safe.py','Safe')]!r}"
         elif variant == "same_file_other_symbol":
             body = 'class Safe:\n    def run_pure(self, inputs, params):\n        return {"value":7}\n'
-            option = f", implementations={[implementation(root/'plugin.py','Safe')]!r}"
+            option = f", implementations={[implementation(root/'nodes/steps.py','Safe')]!r}"
         elif variant in {"same_source_metadata", "relative_alias", "module_alias", "symbol_alias"}:
-            ref = "./plugin.py" if variant == "relative_alias" else "plugin" if variant == "module_alias" else root / "plugin.py"
+            ref = "./nodes/steps.py" if variant == "relative_alias" else "nodes.steps" if variant == "module_alias" else root / "nodes/steps.py"
             kind = "module" if variant == "module_alias" else "file"
             symbol = "StepAlias" if variant == "symbol_alias" else "Step"
-            extra = {"completion":"immediate", "implementation_files":[{"kind":"file","ref":"support.py"}]}
+            extra = {"completion":"immediate", "implementation_files":[{"kind":"file","ref":"./support.py"}]}
             option = f", implementations={[implementation(ref,symbol,kind=kind,extra=extra)]!r}"
         unsafe = variant in {"other_file", "same_file_other_symbol", "auto_actual"}
-        node = (f'@node(type_key="case.step", contract={CONTRACT!r}, rulesets={selected!r}{option})\n'
+        node = (f'@node(node_type="vibeflow.node", id="case.step", contract={CONTRACT!r}, rulesets={selected!r}{option})\n'
                 'class Step:\n'
                 '    def run_pure(self, inputs, params):\n'
                 + ('        print("UNREVIEWED_ACTUAL_IMPLEMENTATION")\n' if unsafe else '')
@@ -119,14 +120,14 @@ def _node_identity_cases(work, kernel):
             node += "StepAlias = Step\n"
         if variant == "delayed":
             (root / "late.py").write_text('class Late:\n    def run_pure(self, inputs, params):\n        return {"value":7}\n')
-            node = f'Step = node(type_key="case.step", contract={CONTRACT!r}, rulesets=[], source=SourceLocator("file", "late.py", "Late"))\n'
+            node = f'Step = node(node_type="vibeflow.node", id="case.step", contract={CONTRACT!r}, rulesets=[], source=SourceLocator("file", "late.py", "Late"))\n'
         write_project(root, body=body, node_source=node)
         target = CONFLICT if variant in {"other_file","same_file_other_symbol"} else "NODE.EFFECT.CALL_FORBIDDEN" if unsafe else None
         rows.append(_cli_row("A01.node."+variant,"Node implementation identity: "+variant,root,kernel,code=target))
         if variant in {"other_file","auto_actual","same_source_metadata","delayed"}:
             rows.append(_cli_row("A01.node."+variant+".checked_run","Checked run uses the reviewed Node: "+variant,root,kernel,command="run",code=target))
         if variant == "same_source_metadata":
-            result = run_cli(root,["inspect-resources","--workspace",str(root/'vibeflow_config.jsonc'),"--config",str(root/'workflow.jsonc'),"--kind","node","--id","case.step","--json"],kernel,name="resources")
+            result = run_cli(root,["inspect-resources","--workspace",str(root.parent/'vibeflow_config.jsonc'),"--config",str(root/'workflow.jsonc'),"--kind","node","--id","case.step","--json"],kernel,name="resources")
             payload = result["payload"] or {}
             descriptors = [item['descriptor'] for item in payload.get('resources',[])]
             entry = descriptors[0]['implementations'][0] if descriptors else {}
@@ -134,7 +135,7 @@ def _node_identity_cases(work, kernel):
                       'targets':entry.get('targets'), 'support_files':[part['ref'] for part in entry.get('implementation_files',[])],
                       'source':entry.get('source')}
             expected = {'exit_code':0,'completion':'immediate','targets':['python'],
-                        'support_files':[str(root/'support.py')], 'source':{'kind':'file','ref':str(root/'plugin.py'),'export':'Step'}}
+                        'support_files':[str(root/'nodes/support.py')], 'source':{'kind':'file','ref':str(root/'nodes/steps.py'),'export':'Step'}}
             rows.append(row('A01.node.metadata_preserved','A01','Same-source explicit metadata remains public',expected,actual,project=root))
     return rows
 
@@ -144,14 +145,15 @@ def _rule_identity_cases(work, kernel):
     for variant in ("other_file", "auto", "same_source", "delayed", "builtin_alias", "handler_with_direct", "handler_with_source"):
         root = work / ("rule-" + variant)
         root.mkdir(parents=True, exist_ok=True)
-        declared = root / "declared.py"
+        (root / "plugins/case").mkdir(parents=True,exist_ok=True)
+        declared = root / "plugins/case/declared.py"
         declared.write_text('def declared_check(context,inputs,params):\n    return {"findings":[{"code":"CASE.DECLARED","severity":"warning","message":"Declared check ran","file":__file__,"line":1}]}\n')
         options = ""
         resources = ["actual_check", "checks"]
         if variant == "other_file":
             options = ", implementations=" + repr([{'language':'python','source':{'kind':'file','ref':str(declared),'export':'declared_check'}}])
         if variant in {"same_source","handler_with_direct"}:
-            options = ", implementations=" + repr([{'language':'python','source':{'kind':'file','ref':str(root/'plugin.py'),'export':'actual_check'}}])
+            options = ", implementations=" + repr([{'language':'python','source':{'kind':'file','ref':str(root/'plugins/case/plugin.py'),'export':'actual_check'}}])
         if variant == "handler_with_direct":
             options += ', handler="vibeflow.quality.files"'
         body = (f'@rule(id="case.check"{options})\n'
@@ -242,7 +244,7 @@ def _record_cli_cases(work, kernel):
         if variant == 'provider_error':
             body = body.replace('return RuleResult({"data":RuleRecord("case.data",value)})',
                 'return RuleResult({"data":RuleRecord("case.data",value)}, (HealthFinding(rule_id="CASE.PROVIDER",severity="error",object_type="node",object_id="case.step",message="Records remain valid",source_location={"path":__file__,"line":1}),))')
-        node = '@node(type_key="case.step",contract={},rulesets=["case.records"])\nclass Step:\n    def run_pure(self,inputs,params):\n        return {}\n'
+        node = '@node(node_type="vibeflow.node", id="case.step",contract={},rulesets=["case.records"])\nclass Step:\n    def run_pure(self,inputs,params):\n        return {}\n'
         write_project(root,body=body,resources=['provide','consume','checks'],node_source=node,calls=2)
         workflow = json.loads((root/'workflow.jsonc').read_text())
         workflow['pipeline'].pop('outputs')
@@ -292,35 +294,35 @@ def _contribution_cases(work, kernel):
         if variant == 'wrong_descriptor':
             expected['code'] = 'DESCRIPTOR.TYPE'
         if variant == 'duplicate':
-            expected.update(code='RULE.RESOURCE.DUPLICATE',origins={'current':{'path':'second.py','plugin_id':'case.plugin'},
-                                                                'previous':{'path':'first.py','plugin_id':'case.plugin'}})
+            expected.update(code='RULE.RESOURCE.DUPLICATE',origins={'current':{'path':'second.py','owner':{'kind':'plugin','id':'case.plugin'}},
+                                                                'previous':{'path':'first.py','owner':{'kind':'plugin','id':'case.plugin'}}})
         rows.append(row('S01.public_validation.'+variant,'S01','Direct public contributions stay validated: '+variant,
                         expected,payload.get('invalid',{}).get(variant,{}),project=root))
     root = work / 'workflow-isolation'
     body = '''
 from pathlib import Path
 import json
-@rule(id="case.config")
+@rule(id="case.config", level="graph", params_schema={"mode":{"type":"integer"}}, params_defaults={"mode":0})
 def inspect_config(context, inputs, params):
     with Path(__file__).with_name("config.marker").open("a") as stream:
-        stream.write(json.dumps({"mode":context.facts["plugins"]["case.resources"]["mode"]})+"\\n")
+        stream.write(json.dumps({"mode":params["mode"]})+"\\n")
     return RuleResult()
-checks = ruleset(id="case.configs", workflow_default=True,calls=[{"id":"check","rule_id":"case.config"}],entrypoints={"static":["check"]})
+checks = ruleset(id="case.configs", workflow_default=False,calls=[{"id":"check","rule_id":"case.config"}],entrypoints={"static":["check"]})
 '''
     write_project(root,body=body,resources=['inspect_config','checks'],selections=[],config={'mode':1})
     write_workflow(root,name='second.jsonc',config={'mode':2})
     for filename in ('workflow.jsonc','second.jsonc'):
         path = root / filename
         data = json.loads(path.read_text())
-        data['rulesets'] = ['case.configs']
+        data['rulesets'] = [{'rule_id':'case.config','params':{'mode':1 if filename=='workflow.jsonc' else 2}}]
         path.write_text(json.dumps(data))
     statuses = []
     for index,config in enumerate(('workflow.jsonc','second.jsonc','workflow.jsonc')):
         actual, _ = _cli(root,kernel,name='isolation_'+str(index),config=config)
         statuses.append(actual['exit_code'])
     values = [json.loads(line)['mode'] for line in (root/'config.marker').read_text().splitlines()] if (root/'config.marker').exists() else []
-    rows.append(row('S01.workflow_isolation','S01','Workflow config does not rewrite the fixed plugin definition',
-                    {'exit_codes':[0,0,0],'observed_modes':[1,2,1]}, {'exit_codes':statuses,'observed_modes':values},project=root))
+    rows.append(row('S01.workflow_isolation','S01','Workflow Rule parameters remain isolated across repeated preparations',
+                    {'exit_codes':[0,0,0],'observed_modes':[1,1,2,2,1,1]}, {'exit_codes':statuses,'observed_modes':values},project=root))
     return rows
 
 

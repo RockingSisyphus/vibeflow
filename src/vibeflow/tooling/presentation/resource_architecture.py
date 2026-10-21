@@ -9,8 +9,8 @@ from vibeflow.tooling.presentation.node_presentation import resolve_presentation
 
 def _selected_resources(selections, catalogs):
     selected = {}
-    for kind, values in (("host_extension", selections.get("host_extensions", ())),
-                         ("base_lib", selections.get("base_lib", {}).get("modules", ()))):
+    for kind, values in (
+                         [("base_lib", selections.get("base_lib", {}).get("modules", ()))]):
         for value in values:
             item = {"id":value} if isinstance(value,str) else value
             if item.get("id"):
@@ -44,7 +44,7 @@ def resource_architecture(catalogs, *, project_root, source_facts=(), selections
         file = Path(path)
         if file.is_relative_to(root):identity=file.relative_to(root).as_posix()
         else:
-            identity=next(("@"+key+"/"+file.relative_to(value).as_posix() for key,value in known_roots.items()
+            identity=next(((key if key.startswith("@") else "@"+key)+"/"+file.relative_to(value).as_posix() for key,value in known_roots.items()
                            if file.is_relative_to(value)),str(file))
         return "file:" + hashlib.sha256(identity.encode()).hexdigest()[:16]
 
@@ -70,26 +70,28 @@ def resource_architecture(catalogs, *, project_root, source_facts=(), selections
                 source_rows.append({"id":key,"path":path,"role":role,"symbol":owner["symbol"],
                     "language":implementation.language,"load_state":files[key]["load_state"]})
         if not source_rows and kind != "plugin_declaration" and not use and not (kind == "node" and selected is not None):continue
-        group={"node":"nodes","base_lib":"base_libs","plugin":"plugins","host_extension":"host_extensions"}.get(kind)
+        group={"node":"nodes","base_lib":"base_libs","plugin":"plugins"}.get(kind)
         origin=catalogs.origins.get((group,descriptor.id))
-        plugin_id=origin.plugin_id if origin else descriptor.id if kind == "plugin_declaration" else ""
+        plugin_id=origin.owner.plugin_id if origin else descriptor.id if kind == "plugin_declaration" else ""
         package=uses.get(("plugin_declaration",plugin_id),{})
         style=use.get("style", package.get("style",{}) if kind == "plugin" else {})
         status=use.get("status","implemented")
         related=[item for item in diagnostics if item.get("object_id",item.get("subject_id"))==descriptor.id
-                 and item.get("object_type",kind) in {kind,"node_type" if kind=="node" else kind}
+                 and item.get("object_type",kind) in {kind}
                  or not item.get("object_id",item.get("subject_id"))
                  and item.get("source_location",{}).get("path") in {row["path"] for row in source_rows}]
         markers=(["planned"] if status=="planned" else [])+(["external"] if getattr(descriptor,"external",False) else [])
         severity={item.get("severity") for item in related}
         markers += [value for value in ("error","warning") if value in severity]
-        native={"base_lib":"baseLibResource","plugin":"pluginResource","plugin_declaration":"pluginResource","host_extension":"hostExtensionResource"}.get(kind,"")
+        native={"base_lib":"baseLibResource","plugin":"pluginResource","plugin_declaration":"pluginResource"}.get(kind,"")
         status_class="plannedResource" if status=="planned" else "healthError" if "error" in severity else "healthWarning" if "warning" in severity else "externalDependency" if "external" in markers else ""
         presentation=resolve_presentation(descriptor,native_class=native,status_class=status_class,
                                           call_style=style,resource_kind=kind)
         key=kind+":"+descriptor.id
-        resources[key]={**descriptor.to_dict(),"id":descriptor.id,"kind":kind,"plugin_id":plugin_id,
-            "origin":origin.to_dict() if origin else {"plugin_id":plugin_id,"path":source_rows[0]["path"] if source_rows else ""},
+        ownership = origin.owner.to_dict() if origin else {"kind":"plugin", "id":plugin_id,
+            "root_id":package.get("root", ""), "path":package.get("package_path", "")}
+        resources[key]={**descriptor.to_dict(),"id":descriptor.id,"kind":kind,"plugin_id":plugin_id,"owner":ownership,
+            "origin":origin.to_dict() if origin else {"owner":ownership,"path":source_rows[0]["path"] if source_rows else ""},
             "status":status,"markers":markers,"diagnostics":related,"effective_rules":_rule_plans(descriptor,catalogs),
             "effective_presentation":presentation.to_dict(),"sources":source_rows}
         for row in source_rows:edges.append({"from":key,"to":row["id"],"relation":row["role"]})
@@ -99,8 +101,7 @@ def resource_architecture(catalogs, *, project_root, source_facts=(), selections
         key = kind + ":" + identity
         if kind == "plugin_declaration" or key in resources or record.get("status") != "planned":
             continue
-        native = {"base_lib":"baseLibResource", "plugin":"pluginResource",
-                  "host_extension":"hostExtensionResource"}[kind]
+        native = {"base_lib":"baseLibResource", "plugin":"pluginResource"}[kind]
         presentation = resolve_presentation(record, native_class=native, status_class="plannedResource",
             call_style=record.get("style", {}), resource_kind=kind)
         resources[key] = {**record, "kind":kind, "id":identity, "plugin_id":"", "status":"planned",
@@ -111,13 +112,13 @@ def resource_architecture(catalogs, *, project_root, source_facts=(), selections
         key="plugin_declaration:"+record["id"]
         presentation=resolve_presentation(record,native_class="pluginResource",status_class="plannedResource",
                                           call_style=record.get("style",{}),resource_kind="plugin_declaration")
-        resources[key]={**record,"kind":"plugin_declaration","id":record["id"],"plugin_id":record["id"],
+        resources[key]={**record,"kind":"plugin_declaration","id":record["id"],"plugin_id":record["id"],"owner":{"kind":"plugin","id":record["id"]},
             "status":"planned","markers":["planned"],"rulesets":[],"effective_rules":{},"sources":[],
-            "origin":{"plugin_id":record["id"],"path":str(known_roots.get(record.get("root"),root)/record.get("source",{}).get("ref",""))},
+            "origin":{"owner":{"kind":"plugin","id":record["id"]},"path":str(known_roots.get(record.get("root"),root)/record.get("source",{}).get("ref",""))},
             "effective_presentation":presentation.to_dict()}
     for descriptor in catalogs.rules:
         origin=catalogs.origins.get(("rules",descriptor.id))
-        package="plugin_declaration:"+origin.plugin_id if origin else ""
+        package="plugin_declaration:"+origin.owner.plugin_id if origin else ""
         if package not in resources:continue
         for implementation in descriptor.implementations:
             locator=implementation.source

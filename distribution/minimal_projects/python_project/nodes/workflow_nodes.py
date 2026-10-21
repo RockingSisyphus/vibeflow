@@ -6,8 +6,8 @@ def _value(inputs, data_type: str):
     return inputs[data_type]["value"]
 
 
-@node(**{'rulesets': ['vibeflow.process'],
- 'type_key': 'minimal.start',
+@node(**{'node_type': 'vibeflow.node', 'rulesets': ['vibeflow.process'],
+ 'id': 'minimal.start',
  'display_name': 'Workflow start',
  'description': 'Marks the structural start of the minimal workflow.',
  'version': '0.15.0',
@@ -27,8 +27,8 @@ class StartNode:
         return {}
 
 
-@node(**{'rulesets': ['vibeflow.io'],
- 'type_key': 'minimal.input_boundary',
+@node(**{'node_type': 'vibeflow.node', 'rulesets': ['vibeflow.io'],
+ 'id': 'minimal.input_boundary',
  'display_name': 'Input boundary',
  'description': "Adapts the public request into the workflow's internal payload.",
  'version': '0.15.0',
@@ -53,8 +53,8 @@ class InputBoundaryNode:
         return {"internal_payload": _value(inputs, "payload.request")}
 
 
-@node(**{'rulesets': ['vibeflow.process'],
- 'type_key': 'minimal.process_payload',
+@node(**{'node_type': 'vibeflow.node', 'rulesets': ['vibeflow.process'],
+ 'id': 'minimal.process_payload',
  'display_name': 'Process payload',
  'description': 'Contains the project-specific business transformation.',
  'version': '0.15.0',
@@ -81,8 +81,8 @@ class ProcessPayloadNode:
         return {"processed_payload": _value(inputs, "payload.internal")}
 
 
-@node(**{'rulesets': ['vibeflow.io'],
- 'type_key': 'minimal.output_boundary',
+@node(**{'node_type': 'vibeflow.node', 'rulesets': ['vibeflow.io'],
+ 'id': 'minimal.output_boundary',
  'display_name': 'Output boundary',
  'description': 'Adapts the processed payload to the public response.',
  'version': '0.15.0',
@@ -107,8 +107,8 @@ class OutputBoundaryNode:
         return {"response": _value(inputs, "payload.processed")}
 
 
-@node(**{'rulesets': ['vibeflow.process'],
- 'type_key': 'minimal.end',
+@node(**{'node_type': 'vibeflow.node', 'rulesets': ['vibeflow.process'],
+ 'id': 'minimal.end',
  'display_name': 'Workflow end',
  'description': 'Marks the structural end after the response is available.',
  'version': '0.15.0',

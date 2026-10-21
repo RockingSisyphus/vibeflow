@@ -17,19 +17,19 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts the optional pipeline input fixture."
       },
       {
         "id": "add",
-        "type_used": "sandbox.optional_add",
+        "definition_id": "sandbox.optional_add",
         "display_name": "Add optional offset",
         "description": "Adds offset when supplied and otherwise adds zero."
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends after the optional arithmetic result is available."
       }
@@ -57,7 +57,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

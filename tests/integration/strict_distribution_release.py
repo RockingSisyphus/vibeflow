@@ -113,7 +113,7 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
     ).read_text(encoding="utf-8")
     assert '"project_target": "javascript"' in architecture
     assert str(first.directory) not in architecture
-    assert '"type_used": "minimal.process_payload"' in architecture
+    assert '"definition_id": "minimal.process_payload"' in architecture
 
     published_guidance = "\n".join(
         path.read_text(encoding="utf-8")
@@ -142,7 +142,7 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
     assert b'FLOW_KIND_GLOBAL_STATE = "global_state"' in constants
     assert b'EFFECT_SCOPE_GLOBAL_STATE = "global_state"' in constants
     assert b"class ExecutionLockSpec" in flow
-    assert b'WORKFLOW_ABI_VERSION = "vibeflow.workflow.v9"' in workflow_model
+    assert b'WORKFLOW_ABI_VERSION = "vibeflow.workflow.v10"' in workflow_model
 
     with zipfile.ZipFile(first.archive) as archive:
         names = archive.namelist()

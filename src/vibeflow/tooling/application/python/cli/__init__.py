@@ -1,4 +1,5 @@
 from __future__ import annotations
+from vibeflow.tooling.project.diagnostics import workspace_or_report
 
 import argparse
 import json
@@ -17,27 +18,24 @@ def build_parser() -> argparse.ArgumentParser:
     validate = sub.add_parser("validate", help="validate topology config structure and compile graph")
     validate.add_argument("--config", required=True)
     validate.add_argument("--workspace", required=False, help="workspace vibeflow_config.jsonc path")
-    validate.add_argument("--policy", required=False, help="explicit kernel_policy.jsonc/governance.jsonc path")
     validate.add_argument("--json", action="store_true", help="emit full HealthReport JSON")
 
     inspect_node = sub.add_parser("inspect-node", help="inspect a node class and static purity findings")
     inspect_node.add_argument("--config", required=True, help="workflow selecting the resource plugins")
-    inspect_node.add_argument("--type", required=True, dest="node_type")
+    inspect_node.add_argument("--node-id", required=True, dest="node_id")
     inspect_node.add_argument("--module", required=False, help="Python file containing the node class")
     inspect_node.add_argument("--class", required=False, dest="class_name", help="Class name to inspect inside --module")
-    inspect_node.add_argument("--policy", required=False, help="explicit kernel_policy.jsonc/governance.jsonc path")
 
     inspect_config = sub.add_parser("inspect-config", help="inspect parsed topology config and compiled edges")
     inspect_config.add_argument("--config", required=True)
     inspect_config.add_argument("--workspace", required=False, help="workspace vibeflow_config.jsonc path")
-    inspect_config.add_argument("--policy", required=False, help="explicit kernel_policy.jsonc/governance.jsonc path")
 
     mermaid = sub.add_parser("export-mermaid", help="export topology config to Mermaid flowchart")
     mermaid.add_argument("--config", required=True)
     mermaid.add_argument("--workspace", required=False, help="workspace vibeflow_config.jsonc path")
     mermaid.add_argument("--output", required=False)
     mermaid.add_argument("--expand-nodesets", dest="expand_nodesets", action="store_true")
-    mermaid.add_argument("--collapse-nodesets", dest="expand_nodesets", action="store_false")
+    mermaid.add_argument("--collapse-nodeset_types", dest="expand_nodesets", action="store_false")
     mermaid.add_argument("--hide-contract", action="store_true")
     mermaid.add_argument("--hide-semantics", action="store_true")
     mermaid.add_argument(
@@ -59,7 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
     ascii_chart.add_argument("--workspace", required=False, help="workspace vibeflow_config.jsonc path")
     ascii_chart.add_argument("--output", required=False)
     ascii_chart.add_argument("--expand-nodesets", dest="expand_nodesets", action="store_true")
-    ascii_chart.add_argument("--collapse-nodesets", dest="expand_nodesets", action="store_false")
+    ascii_chart.add_argument("--collapse-nodeset_types", dest="expand_nodesets", action="store_false")
     ascii_chart.add_argument("--hide-contract", action="store_true")
     ascii_chart.add_argument("--hide-semantics", action="store_true")
     ascii_chart.set_defaults(expand_nodesets=False)
@@ -69,7 +67,7 @@ def build_parser() -> argparse.ArgumentParser:
     svg.add_argument("--workspace", required=False, help="workspace vibeflow_config.jsonc path")
     svg.add_argument("--output", required=False)
     svg.add_argument("--expand-nodesets", dest="expand_nodesets", action="store_true")
-    svg.add_argument("--collapse-nodesets", dest="expand_nodesets", action="store_false")
+    svg.add_argument("--collapse-nodeset_types", dest="expand_nodesets", action="store_false")
     svg.add_argument("--hide-contract", action="store_true")
     svg.add_argument("--hide-semantics", action="store_true")
     svg.add_argument("--theme", default="default")
@@ -103,7 +101,6 @@ def build_parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run", help="run topology config after mandatory health checks")
     run.add_argument("--config", required=True)
     run.add_argument("--workspace", required=False, help="workspace vibeflow_config.jsonc path")
-    run.add_argument("--policy", required=False, help="explicit kernel_policy.jsonc/governance.jsonc path")
     run.add_argument("--input", required=False, help="optional JSON object file for initial context")
     run.add_argument("--entry", help="named workflow entry")
     run.add_argument("--preview-root", help="override offline preview directory")
@@ -124,7 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     add_review_parser(sub)
 
-    from vibeflow.tooling.application.python.cli.quality import add_quality_parser
+    from vibeflow.tooling.application.project_quality import add_quality_parser
 
     add_quality_parser(sub)
     from vibeflow.tooling.application.python.cli.build import add_build_parser
@@ -145,8 +142,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             delegated_args = []
         args, unknown = parser.parse_known_args(kernel_args)
         args.delegate_argv = [*unknown, *delegated_args]
-        if args.policy is not None:
-            parser.error("delegate-cli does not accept --policy; configure workspace policy in vibeflow_config.jsonc")
     else:
         args = parser.parse_args(raw_args)
     handlers = {
@@ -176,18 +171,16 @@ def _handle_validate(args: argparse.Namespace) -> int:
     from vibeflow.tooling.application.python.reports import format_finding_text
 
     if getattr(args, "workspace", None):
-        if args.policy:
-            return _workspace_policy_arg_error()
         from vibeflow.core.findings import HealthReport
         from vibeflow.tooling.application.python.workspace_service import validate_workspace_config_path
 
-        workspace = _load_workspace_for_cli(Path(args.workspace))
+        workspace = workspace_or_report(Path(args.workspace))
         if isinstance(workspace, HealthReport):
             report = workspace
         else:
             report = validate_workspace_config_path(Path(args.config), workspace=workspace)
     else:
-        report = validate_config_path(Path(args.config), policy_path=Path(args.policy) if args.policy else None)
+        report = validate_config_path(Path(args.config))
     payload = add_result_scope(
         report.to_dict(),
         "vibeflow_structure",
@@ -206,10 +199,9 @@ def _handle_inspect_node(args: argparse.Namespace) -> int:
     from vibeflow.tooling.application.python.cli.node import inspect_node_payload
 
     payload, status = inspect_node_payload(
-        node_type=args.node_type, config_path=Path(args.config),
+        node_id=args.node_id, config_path=Path(args.config),
         module_path=Path(args.module) if args.module else None,
         class_name=args.class_name,
-        policy_path=Path(args.policy) if args.policy else None,
     )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return status
@@ -219,11 +211,9 @@ def _handle_inspect_config(args: argparse.Namespace) -> int:
     from vibeflow.tooling.application.python.cli.config import inspect_config_payload
 
     if getattr(args, "workspace", None):
-        if args.policy:
-            return _workspace_policy_arg_error()
         payload, status = _inspect_workspace_config_payload(Path(args.config), Path(args.workspace))
     else:
-        payload, status = inspect_config_payload(Path(args.config), policy_path=Path(args.policy) if args.policy else None)
+        payload, status = inspect_config_payload(Path(args.config))
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return status
 
@@ -264,7 +254,6 @@ def _handle_run(args: argparse.Namespace) -> int:
     from vibeflow.targets.python.project.registry import NodeRegistry
     from vibeflow.tooling.application.python.project.declarations import default_python_registry
     from vibeflow.tooling.application.python.execution import (CheckedRunError)
-    from vibeflow.tooling.application.python.runner import (run_checked)
 
     try:
         initial = _load_initial_input(Path(args.input)) if args.input else {}
@@ -272,54 +261,18 @@ def _handle_run(args: argparse.Namespace) -> int:
         print_run_report({"status": "ERROR", "error": str(exc)})
         return 1
     try:
-        from vibeflow.tooling.project.workspace_loader import find_project_config, load_project_workspace
-        project_config = find_project_config(Path(args.config))
-        if getattr(args, "workspace", None) or project_config is not None:
-            if args.policy and getattr(args,"workspace",None):
-                return _workspace_policy_arg_error()
-            from vibeflow.core.findings import HealthReport
-            from vibeflow.tooling.application.python.workspace_service import run_workspace_checked
-
-            workspace = _load_workspace_for_cli(Path(args.workspace)) if getattr(args,"workspace",None) else load_project_workspace(project_config)
-            if isinstance(workspace, HealthReport):
-                print_run_report({"status": workspace.status, "error": "workspace load failed", "health": workspace.to_dict()})
-                return 1
-            if args.policy:
-                from dataclasses import replace
-                from vibeflow.tooling.application.python.project.effective_policy import resolve_effective_policy
-                from vibeflow.tooling.project.config_loader import load_config_document
-                policy = resolve_effective_policy(load_config_document(Path(args.config)).data,
-                    config_path=Path(args.config), explicit_policy_path=Path(args.policy))
-                if policy.findings:
-                    report = HealthReport(status="FAIL",errors=tuple(policy.findings))
-                    print_run_report({"status":report.status,"error":"policy load failed","health":report.to_dict()})
-                    return 1
-                workspace = replace(workspace,policy=policy.effective_policy.data)
-
-            result = run_workspace_checked(
-                Path(args.config),
-                workspace=workspace,
-                initial=initial,
-                run_root=Path(args.run_root) if args.run_root else None,
-                run_id=args.run_id,
-                runtime_options=_runtime_options_from_args(args),
-                _prepared_run_dir=getattr(args, "_prepared_run_dir", None),
-                preview_root=getattr(args, "preview_root", None),
-                entry=getattr(args, "entry", None),
-            )
-        else:
-            result = run_checked(
-                Path(args.config),
-                registry=default_python_registry(),
-                initial=initial,
-                policy_path=Path(args.policy) if args.policy else None,
-                run_root=Path(args.run_root) if args.run_root else None,
-                run_id=args.run_id,
-                runtime_options=_runtime_options_from_args(args),
-                _prepared_run_dir=getattr(args, "_prepared_run_dir", None),
-                preview_root=getattr(args, "preview_root", None),
-                entry=getattr(args, "entry", None),
-            )
+        from vibeflow.core.findings import HealthReport
+        from vibeflow.tooling.project.workspace_loader import load_project_workspace
+        from vibeflow.tooling.application.python.workspace_service import run_workspace_checked
+        workspace = workspace_or_report(Path(args.workspace)) if args.workspace else workspace_or_report(Path(args.config), registered_source=True)
+        if isinstance(workspace, HealthReport):
+            print_run_report({"status": workspace.status, "error": "workspace load failed", "health": workspace.to_dict()})
+            return 1
+        result = run_workspace_checked(Path(args.config), workspace=workspace, initial=initial,
+            run_root=Path(args.run_root) if args.run_root else None, run_id=args.run_id,
+            runtime_options=_runtime_options_from_args(args),
+            _prepared_run_dir=getattr(args, "_prepared_run_dir", None),
+            preview_root=getattr(args, "preview_root", None), entry=getattr(args, "entry", None))
     except CheckedRunError as exc:
         from vibeflow.tooling.application.python.execution import (_checked_run_error_payload)
         print_run_report(_checked_run_error_payload(exc))
@@ -337,7 +290,7 @@ def _handle_delegate_cli(args: argparse.Namespace) -> int:
 
 
 def _handle_quality_check(args: argparse.Namespace) -> int:
-    from vibeflow.tooling.application.python.cli.quality import handle_quality_check
+    from vibeflow.tooling.application.project_quality import handle_quality_check
 
     return handle_quality_check(args)
 
@@ -347,7 +300,7 @@ def _inspect_workspace_config_payload(config_path: Path, workspace_path: Path) -
     from vibeflow.core.findings import HealthReport
     from vibeflow.tooling.application.python.cli.config import _inspect_workspace_graph
 
-    workspace = _load_workspace_for_cli(workspace_path)
+    workspace = workspace_or_report(workspace_path)
     if isinstance(workspace, HealthReport):
         return {"health": workspace.to_dict()}, 1
     prepared = _inspect_workspace_graph(config_path, workspace=workspace)
@@ -362,7 +315,7 @@ def _inspect_workspace_config_payload(config_path: Path, workspace_path: Path) -
         "nodes": [
             {
                 "id": node.id,
-                "type_used": node.type_used,
+                "definition_id": node.definition_id,
                 "requires": requirements_to_dicts(node.requires),
                 "provides": providers_to_dicts(node.provides),
                 "status": node.status,
@@ -373,7 +326,7 @@ def _inspect_workspace_config_payload(config_path: Path, workspace_path: Path) -
             }
             for node in graph.nodes
         ],
-        "nodesets": [
+        "nodeset_types": [
             {
                 "type_key": nodeset.type_key,
                 "expand": nodeset.expand,
@@ -388,7 +341,7 @@ def _inspect_workspace_config_payload(config_path: Path, workspace_path: Path) -
                 "root_path": nodeset.root_path,
                 "source_path": nodeset.source_path,
             }
-            for nodeset in graph.nodesets.values()
+            for nodeset in graph.nodeset_types.values()
         ],
         "nodeset_imports": [dict(item) for item in document.nodeset_imports],
         "resources": resources.to_dict(),
@@ -397,43 +350,6 @@ def _inspect_workspace_config_payload(config_path: Path, workspace_path: Path) -
     }
     return payload, 0
 
-
-def _load_workspace_for_cli(path: Path):
-    from vibeflow.core.findings import HealthFinding, HealthReport
-    from vibeflow.tooling.application.python.workspace_service import WorkspaceConfigError, load_workspace_config
-
-    try:
-        return load_workspace_config(path)
-    except WorkspaceConfigError as exc:
-        return HealthReport(
-            status="ERROR",
-            errors=(
-                HealthFinding(
-                    rule_id=exc.rule_id,
-                    severity="error",
-                    object_type="workspace",
-                    object_id=str(path),
-                    source_location=dict(exc.source_location),
-                    failure_layer=exc.failure_layer,
-                    message=exc.message,
-                    suggested_fix_type="fix_config",
-                ),
-            ),
-        )
-
-
-def _workspace_policy_arg_error() -> int:
-    print(
-        json.dumps(
-            {
-                "status": "ERROR",
-                "error": "--policy is not supported with --workspace; move workspace policy to vibeflow_config.jsonc",
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-    )
-    return 1
 
 
 def _load_initial_input(path: Path) -> dict[str, object]:

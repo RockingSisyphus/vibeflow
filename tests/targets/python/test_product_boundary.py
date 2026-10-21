@@ -11,10 +11,10 @@ from vibeflow.targets.python.quality.source_context import PythonSourceFile, Pyt
 
 def context(body, *, contract=None, flow_kind="process"):
     source=PythonSourceFile.parse("/virtual/task.py", "task", "class Task:\n    def run_pure(self, inputs, params):\n"+indent(body,"        ")+"\n")
-    descriptor=NodeDescriptor(type_key="example.task", display_name="Task", description="Product boundary example.", version="1", flow_kind=flow_kind, contract=contract or NodeContractDescriptor())
+    descriptor=NodeDescriptor(rulesets=(), id="example.task", display_name="Task", description="Product boundary example.", version="1", flow_kind=flow_kind, contract=contract or NodeContractDescriptor(), node_type="vibeflow.node")
     node=PythonSourceNode(descriptor, source.path,"Task")
     sources=build_python_source_context((node,), (source,))
-    return RuleContext(subject={"kind":"node","type_key":"example.task"},target="python",facts={"source_context":sources,"node_catalog":(descriptor,),"source_owners":({"kind":"node","id":"example.task","role":"entry","path":source.path,"symbol":"Task"},)})
+    return RuleContext(subject={"kind":"node","definition_id":"example.task"},target="python",facts={"source_context":sources,"node_definitions":(descriptor,),"source_owners":({'node_type': 'vibeflow.node', "kind":"node","id":"example.task","role":"entry","path":source.path,"symbol":"Task"},)})
 
 
 @pytest.mark.parametrize("body", (
@@ -53,13 +53,13 @@ def test_node_import_ownership_distinguishes_shared_declarations(shared, used, r
         "from foreign import Foreign\nclass Task:\n    def run_pure(self, inputs, params):\n        " + body + "\n")
     other = PythonSourceFile.parse("/virtual/foreign.py", "foreign",
         "class Foreign:\n    def run_pure(self, inputs, params): return {}\n")
-    task = NodeDescriptor(type_key="example.task", display_name="Task", description="Task", version="1", flow_kind="process", contract=NodeContractDescriptor())
-    foreign = NodeDescriptor(type_key="example.foreign", display_name="Foreign", description="Foreign", version="1", flow_kind="process", contract=NodeContractDescriptor())
+    task = NodeDescriptor(rulesets=(), id="example.task", display_name="Task", description="Task", version="1", flow_kind="process", contract=NodeContractDescriptor(), node_type="vibeflow.node")
+    foreign = NodeDescriptor(rulesets=(), id="example.foreign", display_name="Foreign", description="Foreign", version="1", flow_kind="process", contract=NodeContractDescriptor(), node_type="vibeflow.node")
     nodes = (PythonSourceNode(task, source.path, "Task"), PythonSourceNode(foreign, other.path, "Foreign"))
-    owners = [{"kind":"node", "id":item.type_key, "role":"entry", "path":item.path, "symbol":item.symbol} for item in nodes]
+    owners = [{'node_type': 'vibeflow.node', "kind":"node", "id":item.definition_id, "role":"entry", "path":item.path, "symbol":item.symbol} for item in nodes]
     if shared:
         owners.append({"kind":shared, "id":"example.other", "role":"entry", "path":source.path, "symbol":"other"})
-    context_ = RuleContext(subject={"kind":"node", "type_key":task.type_key}, target="python",
-        facts={"source_context":build_python_source_context(nodes, (source, other)), "node_catalog":(task, foreign), "source_owners":owners})
+    context_ = RuleContext(subject={"kind":"node", "definition_id":task.id}, target="python",
+        facts={"source_context":build_python_source_context(nodes, (source, other)), "node_definitions":(task, foreign), "source_owners":owners})
     result = node_architecture(context_, {}, {})
     assert bool(result.findings) is rejected

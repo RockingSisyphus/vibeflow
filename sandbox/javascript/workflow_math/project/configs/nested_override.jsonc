@@ -1,13 +1,13 @@
 {
   "nodeset_imports": [
     {
-      "path": "nodesets/affine_inner.jsonc"
+      "path": "nodeset_types/affine_inner.jsonc"
     },
     {
-      "path": "nodesets/affine_inner_default.jsonc"
+      "path": "nodeset_types/affine_inner_default.jsonc"
     },
     {
-      "path": "nodesets/affine_outer.jsonc"
+      "path": "nodeset_types/affine_outer.jsonc"
     }
   ],
   "pipeline": {
@@ -22,13 +22,13 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts the nested override workflow."
       },
       {
         "id": "outer",
-        "type_used": "sandbox.affine_outer",
+        "definition_id": "sandbox.affine_outer",
         "display_name": "Run nested transform",
         "description": "Overrides only the qualified inner math node.",
         "node_configs": {
@@ -40,7 +40,7 @@
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends after the nested transform."
       }
@@ -74,7 +74,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

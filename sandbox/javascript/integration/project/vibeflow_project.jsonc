@@ -15,10 +15,9 @@
         "document": "review_artifacts/NESTED_ASYNC_ARCHITECTURE.jsonc"
       },
       {
-        "workflow": "configs/browser_permanent_port_host.jsonc",
+        "workflow": "configs/browser_message_loop.jsonc",
         "document": "review_artifacts/PERMANENT_PORT_ARCHITECTURE.jsonc"
       }
     ]
-  },
-  "quality_enabled": false
+  }
 }

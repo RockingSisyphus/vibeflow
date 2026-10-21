@@ -4,11 +4,5 @@
       "id": "comprehensive-math",
       "path": "project"
     }
-  ],
-  "policy": {
-    "node_source": {
-      "warn_lines": 4,
-      "max_lines": 500
-    }
-  }
+  ]
 }

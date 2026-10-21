@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 
 from tests.targets.python.test_rule_sessions import _registry
-from vibeflow.core.flow import GraphConfig, NodeSpec
+from vibeflow.core.flow import GraphConfig, NodeCallSpec
 from vibeflow.targets.shared.rule_support.effect_records import EFFECT_POLICY_TYPE
 from vibeflow.core.rules import RuleCall, RuleDescriptor, RuleRecord, RuleResult, RulesetDescriptor
 from vibeflow.targets.python.project.check_session import current_python_check
@@ -34,7 +34,7 @@ def test_review_refreshes_rule_owned_metadata_without_replacing_stage_artifact(t
         calls.append(request)
         return original(request)
     monkeypatch.setattr(compiler,"compile_core",native)
-    graph = GraphConfig(nodes=(NodeSpec("leaf","test.leaf"),), rulesets=())
+    graph = GraphConfig(nodes=(NodeCallSpec("leaf","test.leaf"),), rulesets=())
     with python_check_scope(registry):
         stage = GraphCompiler().compile_with_findings(graph, registry=registry, plugin_registry=plugins)
         graph = stage.workflow.graph
@@ -56,7 +56,7 @@ def test_compiler_stages_are_private_to_the_current_check(tmp_path):
     selection = RulesetDescriptor("test.none", calls=())
     registry = _registry(tmp_path, (), selection)
     plugins = SimpleNamespace(compiler_plugins=lambda:())
-    graph = GraphConfig(nodes=(NodeSpec("leaf","test.leaf"),), rulesets=())
+    graph = GraphConfig(nodes=(NodeCallSpec("leaf","test.leaf"),), rulesets=())
     with python_check_scope(registry):
         stage = GraphCompiler().compile_with_findings(graph, registry=registry, plugin_registry=plugins)
         session = current_python_check(registry)

@@ -3,7 +3,7 @@ from typing import Mapping
 
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
-from vibeflow.core.flow import GraphConfig, NodeSpec, STATUS_PLANNED
+from vibeflow.core.flow import GraphConfig, NodeCallSpec, STATUS_PLANNED
 from vibeflow.targets.python.runtime.helpers import has_planned, planned_items
 from .review_model import node_flow_kind, nodeset_for_node
 from .review_model import node_review_effect_scope, resources_payload
@@ -14,7 +14,7 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph, *, resou
         "nodes": [
             {
                 "id": node.id,
-                "type_used": node.type_used,
+                "definition_id": node.definition_id,
                 "requires": requirements_to_dicts(node.requires),
                 "provides": providers_to_dicts(node.provides),
                 "status": node.status,
@@ -51,7 +51,7 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph, *, resou
         "providers": dict(compiled.providers),
         "entry_providers": {name: dict(providers) for name, providers in compiled.entry_providers.items()},
         "consumers": {key: list(values) for key, values in compiled.consumers.items()},
-        "nodesets": sorted(graph.nodesets),
+        "nodeset_types": sorted(graph.nodeset_types),
         "nodeset_sources": [
             {
                 "type_key": nodeset.type_key,
@@ -59,7 +59,7 @@ def compiled_graph_payload(graph: GraphConfig, compiled: CompiledGraph, *, resou
                 "root_path": nodeset.root_path,
                 "source_path": nodeset.source_path,
             }
-            for nodeset in sorted(graph.nodesets.values(), key=lambda item: item.type_key)
+            for nodeset in sorted(graph.nodeset_types.values(), key=lambda item: item.type_key)
         ],
         "planned": [dict(item) for item in planned_items(graph)],
         "production_ready": not has_planned(graph),
@@ -85,7 +85,7 @@ def _resource_payload_has_planned(
 ) -> bool:
     groups: list[object] = [
         payload.get("plugins", ()),
-        payload.get("host_extensions", ()),
+
     ]
     base_lib = payload.get("base_lib", {})
     if isinstance(base_lib, Mapping):
@@ -101,7 +101,7 @@ def _resource_payload_has_planned(
 
 def _effective_execution_lock_payload(
     graph: GraphConfig,
-    node: NodeSpec,
+    node: NodeCallSpec,
     *,
     graph_lock_scope: str,
 ) -> dict[str, object] | None:

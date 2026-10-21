@@ -47,14 +47,14 @@ def _context(kind, definition, *, prefix="import sys\n", helper_effect=None):
         helper_text = "def close():\n    return " + ("open('never-open').read()" if helper_effect else "(1,)") + "\n"
         helper = PythonSourceFile.parse("/virtual/comprehension_helper.py", "comprehension_helper", helper_text)
         files += (helper,)
-    descriptor = NodeDescriptor(type_key="example.task", display_name="Task", description="Comprehension scope probe.",
-        version="1", flow_kind="process", contract=NodeContractDescriptor())
+    descriptor = NodeDescriptor(rulesets=(), id="example.task", display_name="Task", description="Comprehension scope probe.",
+        version="1", flow_kind="process", contract=NodeContractDescriptor(), node_type="vibeflow.node")
     nodes = (PythonSourceNode(descriptor, entry.path, "Task"),) if kind == "node" else ()
     sources = build_python_source_context(nodes, files)
     owners = tuple({"kind":kind, "id":"example.task", "role":"entry" if source is entry else "support",
                    "path":source.path, "symbol":"Task" if kind == "node" and source is entry else ""}
                    for source in files)
-    facts = {"source_context":sources, "node_catalog":(), "source_owners":owners}
+    facts = {"source_context":sources, "node_definitions":(), "source_owners":owners}
     if kind == "python_source":
         pairs = tuple((PythonSource(source.module, source.module + ".py", source.path, source.text), source)
                       for source in files)
@@ -63,7 +63,7 @@ def _context(kind, definition, *, prefix="import sys\n", helper_effect=None):
         facts.update(base_lib_file=entry, resource_symbol="")
     elif kind == "plugin":
         facts.update(resource_source_file=entry, resource_symbol="")
-    context = RuleContext(subject={"kind":kind, "id":"example.task", "type_key":"example.task"},
+    context = RuleContext(subject={"kind":kind, "id":"example.task", "definition_id":"example.task"},
                           facts=facts, target="python")
     return context, sources, entry, helper
 
@@ -157,11 +157,11 @@ def test_comprehension_input_ownership_uses_actual_outer_and_target_bindings(pla
         text = "def task(inputs):\n" + indent(statements, "    ")
         text += "class Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n"
     entry = PythonSourceFile.parse("/virtual/comprehension_inputs.py", "comprehension_inputs", text)
-    descriptor = NodeDescriptor(type_key="example.task", display_name="Task", description="Owned comprehension input probe.",
-        version="1", flow_kind="process", contract=NodeContractDescriptor())
+    descriptor = NodeDescriptor(rulesets=(), id="example.task", display_name="Task", description="Owned comprehension input probe.",
+        version="1", flow_kind="process", contract=NodeContractDescriptor(), node_type="vibeflow.node")
     sources = build_python_source_context((PythonSourceNode(descriptor, entry.path, "Task"),), (entry,))
-    context = RuleContext(subject={"kind":"node", "type_key":"example.task"}, target="python",
-        facts={"source_context":sources, "node_catalog":(), "source_owners":()})
+    context = RuleContext(subject={"kind":"node", "definition_id":"example.task"}, target="python",
+        facts={"source_context":sources, "node_definitions":(), "source_owners":()})
     result = input_writes(context, {}, {})
     assert bool(result.findings) == (placement == "method" and (label.endswith(".outside") or label.endswith(".first_iterable"))), (placement, label, result.findings)
 
@@ -234,11 +234,11 @@ def test_incremental_comprehension_walrus_preserves_real_input_aliases(form, via
     text = "def sink(payload):\n    return payload.pop('seed', None)\n" if via_helper else ""
     text += "class Task:\n    def run_pure(self, inputs, params):\n" + indent(statements + "return {}\n", "        ")
     entry = PythonSourceFile.parse("/virtual/comprehension_walrus_inputs.py", "comprehension_walrus_inputs", text)
-    descriptor = NodeDescriptor(type_key="example.task", display_name="Task", description="Walrus-owned input probe.",
-        version="1", flow_kind="process", contract=NodeContractDescriptor())
+    descriptor = NodeDescriptor(rulesets=(), id="example.task", display_name="Task", description="Walrus-owned input probe.",
+        version="1", flow_kind="process", contract=NodeContractDescriptor(), node_type="vibeflow.node")
     sources = build_python_source_context((PythonSourceNode(descriptor, entry.path, "Task"),), (entry,))
-    context = RuleContext(subject={"kind":"node", "type_key":"example.task"}, target="python",
-        facts={"source_context":sources, "node_catalog":(), "source_owners":()})
+    context = RuleContext(subject={"kind":"node", "definition_id":"example.task"}, target="python",
+        facts={"source_context":sources, "node_definitions":(), "source_owners":()})
     result = input_writes(context, {}, {})
     assert bool(result.findings) is False, (form, via_helper, owned, result.findings)
 
@@ -292,13 +292,13 @@ def test_incremental_helper_callsite_input_identity_respects_local_scopes(label,
     # imported or run, and this test does not construct real business inputs.
     compile(text, "/virtual/comprehension_helper_callsite.py", "exec")
     entry = PythonSourceFile.parse("/virtual/comprehension_helper_callsite.py", "comprehension_helper_callsite", text)
-    descriptor = NodeDescriptor(type_key="example.task", display_name="Task", description="Call-site input scope probe.",
-        version="1", flow_kind="process", contract=NodeContractDescriptor())
+    descriptor = NodeDescriptor(rulesets=(), id="example.task", display_name="Task", description="Call-site input scope probe.",
+        version="1", flow_kind="process", contract=NodeContractDescriptor(), node_type="vibeflow.node")
     sources = build_python_source_context((PythonSourceNode(descriptor, entry.path, "Task"),), (entry,))
     helper = next(symbol for symbol in sources.symbols if symbol.name == "sink")
     assert any(reference.kind == "call" and reference.target == helper.id for reference in sources.references)
-    context = RuleContext(subject={"kind":"node", "type_key":"example.task"}, target="python",
-        facts={"source_context":sources, "node_catalog":(), "source_owners":()})
+    context = RuleContext(subject={"kind":"node", "definition_id":"example.task"}, target="python",
+        facts={"source_context":sources, "node_definitions":(), "source_owners":()})
     result = input_writes(context, {}, {})
     mutations = tuple(item for item in result.findings if "mutate inputs" in item.message)
     assert bool(mutations) is False, (label, result.findings)

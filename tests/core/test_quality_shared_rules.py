@@ -9,7 +9,7 @@ import pytest
 from vibeflow.targets.shared.quality_support import (
     FileQuality,
     FunctionQuality,
-    ProjectQualityFacts,
+    SourceQualityFacts,
     QualityPolicy,
     QualityThresholds,
 )
@@ -46,7 +46,7 @@ def _file(**changes) -> FileQuality:
     ],
 )
 def test_shared_file_thresholds(change, value, rule, severity) -> None:
-    report = evaluate_standard_project_quality(ProjectQualityFacts(root="/tmp/quality", files=(_file(**{change: value}),)))
+    report = evaluate_standard_project_quality(SourceQualityFacts(root="/tmp/quality", files=(_file(**{change: value}),)))
     matching = [item for item in report.findings if item.rule_id == rule] if rule else []
     if rule is None:
         assert report.status == "PASS"
@@ -80,7 +80,7 @@ def test_shared_file_thresholds(change, value, rule, severity) -> None:
 def test_shared_function_thresholds(change, value, rule) -> None:
     function = FunctionQuality("run", 7, 8, 2, 0, 0, 0, "fingerprint")
     file = _file(functions=(replace(function, **{change: value}),))
-    report = evaluate_standard_project_quality(ProjectQualityFacts(root="/tmp/quality", files=(file,)))
+    report = evaluate_standard_project_quality(SourceQualityFacts(root="/tmp/quality", files=(file,)))
     finding = next(item for item in report.findings if item.rule_id == rule)
     assert finding.severity == "warning"
     assert finding.source_location["line"] == 7

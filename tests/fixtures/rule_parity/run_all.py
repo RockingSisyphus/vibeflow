@@ -37,7 +37,7 @@ def _environment(kernel, toolchain=None):
     environment.pop("PYTEST_PLUGINS", None)
     if toolchain:
         environment["VIBEFLOW_TEST_TOOLCHAIN_ROOT"] = str(toolchain)
-    environment.setdefault("npm_config_cache", "/tmp/vibeflow-npm-cache")
+    environment.setdefault("npm_config_cache", str(Path(os.environ.get("TMPDIR",tempfile.gettempdir())) / "vibeflow-npm-cache"))
     return environment
 
 

@@ -10,10 +10,10 @@ import shutil
 
 import pytest
 
-from vibeflow.core.flow import GraphConfig, NodeSpec
+from vibeflow.core.flow import GraphConfig, NodeCallSpec
 from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
 from vibeflow.targets.javascript.quality.rules import run_javascript_rules
-from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
+from vibeflow.tooling.project.resources import prepare_workflow_catalogs
 
 ROOT = Path(__file__).resolve().parents[3]
 MODEL = ('import {multiply} from "./model_helper.js";\n'
@@ -34,8 +34,6 @@ def source_project(tmp_path: Path) -> Path:
         pytest.skip("requires the pinned TypeScript/esbuild toolchain")
     project = tmp_path / "project"
     shutil.copytree(ROOT / "sandbox/javascript/domain_rules/project", project)
-    from tests.fixtures.support.plugins import copy_sdk_inputs
-    copy_sdk_inputs(ROOT / "sandbox/javascript/domain_rules/project", project)
     (project / "node_modules").symlink_to(toolchain / "node_modules", target_is_directory=True)
     (project / "nodes/model.ts").write_text(MODEL, encoding="utf-8")
     (project / "nodes/model_helper.ts").write_text(HELPER, encoding="utf-8")
@@ -52,10 +50,10 @@ def source_project(tmp_path: Path) -> Path:
     return project
 
 
-def _rule(project: Path, name: str, source: str, *, inputs=None, outputs=None) -> None:
-    (project / "rules" / (name + ".ts")).write_text(source, encoding="utf-8")
+def _rule(project: Path, name: str, source: str, *, inputs=None, outputs=None, level="node") -> None:
+    (project / "plugins/code_plugin/rules" / (name + ".ts")).write_text(source, encoding="utf-8")
     (sdk_resource(project, "rule", "test." + name)).write_text(json.dumps({
-        "kind": "rule", "id": "test." + name, "inputs": inputs or {}, "outputs": outputs or {},
+        "kind": "rule", "id": "test." + name, "level":level, "inputs": inputs or {}, "outputs": outputs or {},
         "implementations": [{"language": "typescript",
             "source": {"kind": "file", "ref": "rules/" + name + ".ts", "export": "check"}}]}), encoding="utf-8")
 
@@ -64,12 +62,12 @@ def _execute(project: Path, calls, relations=(), *, completed: bool = True):
     (sdk_resource(project, "ruleset", "test.source")).write_text(json.dumps({
         "kind": "ruleset", "id": "test.source", "calls": calls, "relations": relations,
         "entrypoints": {"static": [calls[-1]["id"]], "import": [], "run": []}}), encoding="utf-8")
-    catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/model.jsonc")
+    catalogs = prepare_workflow_catalogs(project / "configs/model.jsonc")
     import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=project, allowed_external=set(), node_ids=frozenset({"example.model"}))
-    report = run_javascript_rules(GraphConfig(nodes=(NodeSpec("model", "example.model"),), rulesets=()),
+    report = run_javascript_rules(GraphConfig(nodes=(NodeCallSpec("model", "example.model"),), rulesets=()),
                                   catalogs, project_root=project, package_root=project, target="node", import_policy=import_policy)
     if completed:
-        assert not report.findings, [finding.to_dict() for finding in report.findings]
+        assert not report.findings, json.dumps([finding.to_dict() for finding in report.findings])
     execution = next(result for result in report.results["example.model"] if result.plan.entrypoint == "static")
     assert execution.status == ("PASS" if completed else "ERROR")
     return execution
@@ -104,9 +102,9 @@ def test_real_rule_reads_all_public_source_services_and_exact_locations(source_p
     assert value["functions"] == [{key: item for key, item in symbol.items() if key != "qualname"}
                                   for symbol in value["symbols"] if symbol["kind"] == "FunctionDeclaration"]
     assert value["absent"] == []
-    assert value["ownership"]["node_types"] == ["example.model"]
+    assert value["ownership"]["node_definitions"] == ["example.model"]
     assert [(owner["kind"], owner["id"], owner["path"]) for owner in value["ownership"]["declared"]] == [("node", "example.model", model)]
-    assert value["helper"]["node_types"] == ["example.model"]
+    assert value["helper"]["node_definitions"] == ["example.model"]
     assert [(owner["kind"], owner["id"], owner["path"]) for owner in value["helper"]["declared"]] == [("base_lib", "example.model_helper", helper)]
 
 
@@ -114,15 +112,10 @@ def test_inherited_sdk_implementation_excludes_parent_node_declaration(source_pr
     path = source_project / "nodes/model.ts"
     path.write_text('import {defineNode} from "@vibeflow/plugin";\n'
         'function helper(value:number) {return value * 2;}\n'
-        'export const parent = defineNode({type_key:"PRIVATE_PARENT_DECLARATION", contract:{},\n'
+        'export const parent = defineNode({node_type:"vibeflow.node", id:"PRIVATE_PARENT_DECLARATION", contract:{},\n'
         '  run(inputs:any) {return {feature:helper(inputs["example.input"].value)};}\n'
-        '});\nexport const child = defineNode({...parent, type_key:"example.model"});\n')
-    node = json.loads(sdk_resource(source_project, "node", "example.model").read_text())
-    node["implementations"][0]["source"]["export"] = "child.run"
-    sdk_resource(source_project, "node", "example.model").write_text(json.dumps(node))
-    parent = {**node, "type_key":"test.parent", "rulesets":[]}
-    parent["implementations"] = [{**node["implementations"][0], "source":{"kind":"file", "ref":"nodes/model.ts", "export":"parent.run"}}]
-    sdk_resource(source_project, "node", "test.parent").write_text(json.dumps(parent))
+        '});\nexport const child = defineNode({...parent.descriptor, id:"example.model", rulesets:["test.source"], run:parent.run});\n')
+    sdk_resource(source_project, "node", "example.model").unlink()
     _rule(source_project, "inheritance", '''export function check(context) {
       const file=context.facts.source_files[0], text=context.sources.text(file);
       if(text.includes("PRIVATE_PARENT_DECLARATION") || !text.includes("feature:helper")) throw Error("wrong inherited boundary");
@@ -135,9 +128,8 @@ def test_inherited_sdk_implementation_excludes_parent_node_declaration(source_pr
 
 def test_explicit_empty_selections_preserve_native_syntax_errors(source_project):
     (source_project / "nodes/model.ts").write_text('export function run( {\n')
-    catalogs = load_workflow_catalogs(source_project, project_config=source_project / "vibeflow_project.jsonc",
-        workflow_config=source_project / "configs/model.jsonc")
-    report = run_javascript_rules(GraphConfig((NodeSpec("model", "example.model", rulesets=()),), rulesets=()),
+    catalogs = prepare_workflow_catalogs(source_project / "configs/model.jsonc")
+    report = run_javascript_rules(GraphConfig((NodeCallSpec("model", "example.model", rulesets=()),), rulesets=()),
         catalogs, project_root=source_project, package_root=source_project, target="node")
     errors = [finding for finding in report.findings if finding.code == "QUALITY.SYNTAX.JAVASCRIPT"]
     assert errors and errors[0].source_location["path"] == str(source_project / "nodes/model.ts")
@@ -149,12 +141,12 @@ MUTATIONS = '''
   function attempt(action) { try { action(); blocked.push(false); } catch(error) { blocked.push(error instanceof TypeError); } }
   const ast=context.sources.ast(file), symbols=context.sources.symbols(file), functions=context.sources.nodes(file,"FunctionDeclaration");
   const imports=context.sources.imports(file), reachable=context.sources.reachable(file), ownership=context.sources.ownership(file);
-  attempt(()=>context.facts.node_types["example.model"].metadata.nested.count=99);
+  attempt(()=>context.facts.node_definitions["example.model"].metadata.nested.count=99);
   attempt(()=>context.facts.sources[0].text="corrupt snapshot");
   attempt(()=>ast.children[0].text="corrupt AST"); attempt(()=>ast.children.push({}));
   attempt(()=>symbols[0].name="corrupt symbol"); attempt(()=>functions[0].name="corrupt function");
   attempt(()=>imports[0].resolved_path="corrupt import"); attempt(()=>reachable.push("corrupt path"));
-  attempt(()=>ownership.declared[0].id="corrupt owner"); attempt(()=>ownership.node_types.push("corrupt type"));
+  attempt(()=>ownership.declared[0].id="corrupt owner"); attempt(()=>ownership.node_definitions.push("corrupt type"));
   attempt(()=>context.sources.text=()=>"corrupt service");
 '''
 
@@ -166,7 +158,7 @@ def test_two_real_rules_cannot_mutate_shared_facts_records_or_source_results(sou
     _rule(source_project, "observer", 'export function check(context,inputs) {\n' + MUTATIONS + '''
       attempt(()=>inputs.seed.value.nested.count=99); attempt(()=>inputs.seed.value.nested.values.push(3));
       return {records:{evidence:{type_id:"test.observed.v1",value:{blocked,prior:inputs.seed.value,
-        count:context.facts.node_types["example.model"].metadata.nested.count,text:context.sources.text(file),
+        count:context.facts.node_definitions["example.model"].metadata.nested.count,text:context.sources.text(file),
         ast:context.sources.ast(file),names:context.sources.symbols(file).map(symbol=>symbol.qualname),
         functions:context.sources.nodes(file,"FunctionDeclaration").map(node=>node.name),
         imports:context.sources.imports(file),reachable:context.sources.reachable(file),ownership:context.sources.ownership(file)}}}};
@@ -188,13 +180,13 @@ def test_two_real_rules_cannot_mutate_shared_facts_records_or_source_results(sou
     assert observed["imports"][0]["resolved_path"] == str(source_project / "nodes/model_helper.ts")
     assert observed["reachable"] == [str(source_project / "nodes/model.ts"), str(source_project / "nodes/model_helper.ts")]
     assert observed["ownership"]["declared"][0]["id"] == "example.model"
-    assert observed["ownership"]["node_types"] == ["example.model"]
+    assert observed["ownership"]["node_definitions"] == ["example.model"]
 
 
 @pytest.mark.parametrize("failure", ["source", "export"])
 def test_real_rule_binding_errors_keep_declaration_implementation_and_owner(source_project: Path, failure: str) -> None:
     _rule(source_project, "missing", 'export function check() { return {findings:[]}; }\n')
-    module = source_project / "rules/missing.ts"
+    module = source_project / "plugins/code_plugin/rules/missing.ts"
     manifest = sdk_resource(source_project, "rule", "test.missing")
     if failure == "source":
         module.unlink()
@@ -207,8 +199,8 @@ def test_real_rule_binding_errors_keep_declaration_implementation_and_owner(sour
     assert execution.results["check"].state == "failed"
     finding = execution.findings[0].to_dict()
     assert finding["code"] == "RULE.EXECUTION" and finding["definition_id"] == "test.missing"
-    assert finding["source_location"]["path"] == str(source_project / "code_plugin.ts")
-    declaration_line = next(index for index, text in enumerate((source_project / "code_plugin.ts").read_text().splitlines(), 1) if '"id": "test.missing"' in text)
+    assert finding["source_location"]["path"] == str(source_project / "plugins/code_plugin/plugin.ts")
+    declaration_line = next(index for index, text in enumerate((source_project / "plugins/code_plugin/plugin.ts").read_text().splitlines(), 1) if '"id": "test.missing"' in text)
     assert finding["source_location"]["line"] == declaration_line
     assert finding["source_location"]["column"] == 14
     assert finding["object_id"] == "example.model"
@@ -236,17 +228,17 @@ def test_real_rule_dynamic_replacement_and_empty_are_independent_calls(source_pr
       return {records:{value:{type_id:"test.selected",value:{choice:"default",call:context.subject.call_spec.id}}}};
     }''', outputs={"value":"test.selected"})
     _rule(source_project, "dynamic", '''export function check(context) {
-      const forbidden=["graph","global_graph","node_catalog","catalogs"].filter(key=>key in context.facts);
+      const forbidden=["graph","global_graph","catalogs"].filter(key=>key in context.facts);
       return {records:{value:{type_id:"test.selected",value:{choice:"dynamic",call:context.subject.call_spec.id,forbidden,
-        visible:Object.keys(context.facts.node_types),text:context.sources.text(context.facts.source_files[0])}}}};
+        visible:Object.keys(context.facts.node_definitions),text:context.sources.text(context.facts.source_files[0])}}}};
     }''', outputs={"value":"test.selected"})
     sdk_resource(source_project,"ruleset","test.source").write_text(json.dumps({"kind":"ruleset","id":"test.source",
         "calls":[{"id":"check","rule_id":"test.default"}],"entrypoints":{"static":["check"],"import":[],"run":[]}}))
-    catalogs = load_workflow_catalogs(source_project, project_config=source_project / "vibeflow_project.jsonc", workflow_config=source_project / "configs/model.jsonc")
+    catalogs = prepare_workflow_catalogs(source_project / "configs/model.jsonc")
     policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=source_project, allowed_external=set(), node_ids=frozenset({"example.model"}))
-    graph = GraphConfig((NodeSpec("default", "example.model"),
-        NodeSpec("dynamic", "example.model", rulesets=({"rule_id":"test.dynamic"},)),
-        NodeSpec("disabled", "example.model", rulesets=())), rulesets=())
+    graph = GraphConfig((NodeCallSpec("default", "example.model"),
+        NodeCallSpec("dynamic", "example.model", rulesets=({"rule_id":"test.dynamic"},)),
+        NodeCallSpec("disabled", "example.model", rulesets=())), rulesets=())
     report = run_javascript_rules(graph, catalogs, project_root=source_project, package_root=source_project, target="node", import_policy=policy)
     assert not report.findings
     values = [record.value for result in report.results["example.model"] for returned in result.results.values()
@@ -271,23 +263,23 @@ def test_variable_declarations_on_the_same_line_are_sliced_by_symbol(source_proj
 
 @pytest.mark.parametrize("scope", ["current_graph", "effective_subtree"])
 def test_real_typescript_rule_gets_disjoint_responsibility_and_global_background(source_project, scope):
-    from vibeflow.core.flow import NodesetSpec
+    from vibeflow.core.flow import NodesetTypeSpec
     from vibeflow.targets.javascript.quality.rules import run_javascript_workflow_rules
     _rule(source_project,"range",'''export function check(context) {
-      if (context.facts.graph.nodesets.child?.graph.nodes.length) throw new Error("Default traversal crossed the boundary");
-      if (context.facts.global_graph.nodesets.child.graph.nodes.length !== 1) throw new Error("Global background is absent");
+      if (context.facts.graph.nodeset_types.child?.graph.nodes.length) throw new Error("Default traversal crossed the boundary");
+      if (context.facts.global_graph.nodeset_types.child.graph.nodes.length !== 1) throw new Error("Global background is absent");
       return {records:{range:{type_id:"test.range",value:{paths:context.scope.graph_paths,boundaries:context.scope.boundaries}}}};
-    }''',outputs={"range":"test.range"})
+    }''',outputs={"range":"test.range"},level="graph")
     sdk_resource(source_project,"ruleset","test.range").write_text(json.dumps({"kind":"ruleset","id":"test.range","graph_scope":scope,
         "calls":[{"id":"range","rule_id":"test.range"}],"entrypoints":{"import":["range"]}}))
     def definition(key, graph):
-        return NodesetSpec(key,key,key,(),(),graph)
-    child = definition("child",GraphConfig((NodeSpec("leaf","example.model",rulesets=()),)))
-    middle = definition("middle",GraphConfig((NodeSpec("inner","child"),),nodesets={"child":child}))
-    boundary = definition("boundary",GraphConfig((NodeSpec("inner","child"),),nodesets={"child":child},rulesets=()))
-    graph = GraphConfig((NodeSpec("first","middle"),NodeSpec("second","middle"),NodeSpec("boundary","boundary")),
-        nodesets={"child":child,"middle":middle,"boundary":boundary},rulesets=("test.range",))
-    catalogs = load_workflow_catalogs(source_project,project_config=source_project / "vibeflow_project.jsonc",workflow_config=source_project / "configs/model.jsonc")
+        return NodesetTypeSpec(key,key,key,(),(),graph)
+    child = definition("child",GraphConfig((NodeCallSpec("leaf","example.model",rulesets=()),)))
+    middle = definition("middle",GraphConfig((NodeCallSpec("inner","child"),),nodeset_types={"child":child}))
+    boundary = definition("boundary",GraphConfig((NodeCallSpec("inner","child"),),nodeset_types={"child":child},rulesets=()))
+    graph = GraphConfig((NodeCallSpec("first","middle"),NodeCallSpec("second","middle"),NodeCallSpec("boundary","boundary")),
+        nodeset_types={"child":child,"middle":middle,"boundary":boundary},rulesets=("test.range",))
+    catalogs = prepare_workflow_catalogs(source_project / "configs/model.jsonc")
     nodes = run_javascript_rules(graph,catalogs,project_root=source_project,package_root=source_project,phase="import",target="node")
     report = run_javascript_workflow_rules(graph,catalogs,compiled_by_path={},node_report=nodes,project_root=source_project,package_root=source_project,phase="import",target="node")
     assert not report.findings
@@ -299,12 +291,12 @@ def test_real_typescript_rule_gets_disjoint_responsibility_and_global_background
 
 
 def test_inherited_graph_definition_preserves_leaf_call_override(source_project):
-    from vibeflow.core.flow import NodesetSpec
-    inner = NodesetSpec("inner","Inner","Nested",(),(),GraphConfig((NodeSpec("leaf","example.model",rulesets=()),)))
-    outer = NodesetSpec("outer","Outer","Nested",(),(),GraphConfig((NodeSpec("middle","inner"),)))
-    graph = GraphConfig((NodeSpec("outer","outer"),),nodesets={"inner":inner,"outer":outer},rulesets=())
-    catalogs = load_workflow_catalogs(source_project,project_config=source_project / "vibeflow_project.jsonc",workflow_config=source_project / "configs/model.jsonc")
+    from vibeflow.core.flow import NodesetTypeSpec
+    inner = NodesetTypeSpec("inner","Inner","Nested",(),(),GraphConfig((NodeCallSpec("leaf","example.model",rulesets=()),)))
+    outer = NodesetTypeSpec("outer","Outer","Nested",(),(),GraphConfig((NodeCallSpec("middle","inner"),)))
+    graph = GraphConfig((NodeCallSpec("outer","outer"),),nodeset_types={"inner":inner,"outer":outer},rulesets=())
+    catalogs = prepare_workflow_catalogs(source_project / "configs/model.jsonc")
     report = run_javascript_rules(graph,catalogs,project_root=source_project,package_root=source_project,target="node")
     assert not report.findings
     assert report.results["example.model"] == ()
-    assert next(item for item in report.selections if item["type_key"] == "example.model")["call_path"] == ("outer","middle","leaf")
+    assert next(item for item in report.selections if item["definition_id"] == "example.model")["call_path"] == ("outer","middle","leaf")

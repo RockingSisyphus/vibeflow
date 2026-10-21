@@ -18,4 +18,4 @@ def resolve_node_selection(descriptor, call=None):
     defaults = node_defaults(descriptor)
     explicit = explicit_selection(call) if call is not None else None
     return (RuleSelection(explicit, "dynamic", call.id, defaults) if explicit is not None
-            else RuleSelection(defaults, "static", descriptor.type_key))
+            else RuleSelection(defaults, "static", getattr(descriptor, "ruleset_origin", descriptor.id)))

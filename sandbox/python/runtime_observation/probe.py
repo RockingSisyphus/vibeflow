@@ -32,7 +32,7 @@ BODY = '''        info = [{"metrics": {"loss": 0.125}}, {"message": "正在训�
 def observe(work, case_id):
     root = work / case_id
     write_project(root, "integer", 1)
-    source = root / "plugin.py"
+    source = root / "nodes/steps.py"
     code = source.read_text().replace('rulesets=["vibeflow.process"]', 'rulesets=["vibeflow.python_io"]')
     code = 'import os\nimport subprocess\nimport sys\nimport time\nimport threading\nfrom vibeflow.targets.python.sdk import update_run_info\n' + code
     code = code.replace('        value = params["cleanup_record_roots"]', BODY + (
@@ -41,7 +41,7 @@ def observe(work, case_id):
     status = work / "monitor.json"
     run_dir = work / "runs" / case_id
     argv = [sys.executable, "-B", "-m", "vibeflow", "run", "--config", str(root / "workflow.jsonc"),
-            "--workspace", str(root / "vibeflow_config.jsonc"), "--run-root", str(work / "runs"),
+            "--workspace", str(root.parent / "vibeflow_config.jsonc"), "--run-root", str(work / "runs"),
             "--run-id", case_id, "--status-interval", ".03", "--status-file", str(status)]
     if case_id == "startup_failure":
         argv[argv.index("--workspace") + 1] = str(root / "missing.jsonc")

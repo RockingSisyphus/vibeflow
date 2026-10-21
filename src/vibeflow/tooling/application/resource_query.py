@@ -3,7 +3,7 @@ import argparse
 import json
 
 from vibeflow.core.descriptors.contributions import RESOURCE_GROUPS
-from vibeflow.tooling.project.descriptor_loader import load_workflow_plugins
+from vibeflow.tooling.project.resources import prepare_workflow_resources
 from vibeflow.tooling.project.workspace_loader import load_project_workspace, load_workspace_config
 
 
@@ -17,7 +17,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         workspace = load_workspace_config(args.workspace) if args.workspace else load_project_workspace(args.config)
-        loaded = load_workflow_plugins(workspace, args.config)
+        loaded = prepare_workflow_resources(workspace, args.config)
         resources = []
         for kind, group in RESOURCE_GROUPS.items():
             if args.kind and kind != args.kind:
@@ -34,6 +34,6 @@ def main(argv=None):
     else:
         for item in payload.get("resources",[]):
             descriptor = item["descriptor"]
-            print(f'{descriptor["kind"]} {descriptor.get("id",descriptor.get("type_key"))}: {item["origin"]["plugin_id"]}')
+            print(f'{descriptor["kind"]} {descriptor.get("id",descriptor.get("type_key"))}: {item["origin"]["owner"]["id"]}')
         if payload["status"] == "ERROR": print(f'{payload["code"]}: {payload["error"]}')
     return int(payload["status"] == "ERROR")

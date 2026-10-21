@@ -6,7 +6,7 @@ from vibeflow.core.descriptors.source_bundle import implementation_sources, owne
 
 
 _GROUPS = {"node": "nodes", "base_lib": "base_libs", "plugin": "plugins",
-           "host_extension": "host_extensions", "rule": "rules"}
+            "rule": "rules"}
 
 
 def resource_structure_scopes(catalogs, root, *, language, resolve_module=None):
@@ -16,7 +16,7 @@ def resource_structure_scopes(catalogs, root, *, language, resolve_module=None):
         owners = []
         for kind, descriptor in ownership_resources(catalog):
             origin = catalog.origins.get((_GROUPS.get(kind), descriptor.id))
-            plugin_id = origin.plugin_id if origin else descriptor.id if kind == "plugin_declaration" else ""
+            plugin_id = origin.owner.plugin_id if origin else descriptor.id if kind == "plugin_declaration" else ""
             for implementation in descriptor.implementations:
                 family = "javascript" if implementation.language == "typescript" else implementation.language
                 if family != language:

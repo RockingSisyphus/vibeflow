@@ -8,11 +8,11 @@ from tests.targets.javascript.aot_fixtures import emit_fixture
 
 
 def lifecycle_plan():
-    terminal=lambda name:{"id":name,"type_used":"fixture.terminal","flow_kind":"terminal","is_terminal":True,
+    terminal=lambda name:{"id":name,"definition_id":"fixture.terminal","flow_kind":"terminal","is_terminal":True,
         "implementation":{"kind":"file","ref":"./nodes.mjs","export":"terminal"}}
     return {"entry_mode":"async","inputs":[{"key":"scenario","type":"scenario","required":True}],
         "outputs":[{"type":"value","cardinality":"exactly_one","as":"value"}],
-        "nodes":[terminal("start"),{"id":"worker","type_used":"fixture.worker","flow_kind":"process",
+        "nodes":[terminal("start"),{"id":"worker","definition_id":"fixture.worker","flow_kind":"process",
             "completion":"suspend","requires":[{"type":"scenario"}],"provides":[{"key":"value","type":"value"}],
             "implementation":{"kind":"file","ref":"./nodes.mjs","export":"worker"}},terminal("end")],
         "routes":[{"source":"start","target":"worker"},{"source":"worker","target":"end"}]}
@@ -156,9 +156,9 @@ events.push('notified');console.log(JSON.stringify({failure,events}));
 
 
 def test_branch_failure_cancels_siblings_and_waits_for_real_finally(tmp_path):
-    terminal=lambda name:{'id':name,'type_used':'native.boundary','flow_kind':'terminal','is_terminal':True,
+    terminal=lambda name:{'id':name,'definition_id':'native.boundary','flow_kind':'terminal','is_terminal':True,
         'implementation':{'kind':'file','ref':'./nodes.mjs','export':'terminal'}}
-    worker=lambda name:{'id':name,'type_used':'native.'+name,'flow_kind':'process','completion':'suspend',
+    worker=lambda name:{'id':name,'definition_id':'native.'+name,'flow_kind':'process','completion':'suspend',
         'implementation':{'kind':'file','ref':'./nodes.mjs','export':name}}
     plan={'entry_mode':'async','nodes':[terminal('start'),worker('slow'),worker('failure'),
         {**terminal('end'),'join_policy':'all'}],

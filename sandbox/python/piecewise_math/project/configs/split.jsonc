@@ -29,49 +29,49 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "piecewise.boundary",
+        "definition_id": "piecewise.boundary",
         "display_name": "start",
         "description": "start"
       },
       {
         "id": "u",
-        "type_used": "piecewise.sum_u",
+        "definition_id": "piecewise.sum_u",
         "display_name": "u",
         "description": "u"
       },
       {
         "id": "v",
-        "type_used": "piecewise.sum_v",
+        "definition_id": "piecewise.sum_v",
         "display_name": "v",
         "description": "v"
       },
       {
         "id": "compare",
-        "type_used": "piecewise.compare",
+        "definition_id": "piecewise.compare",
         "display_name": "compare",
         "description": "compare"
       },
       {
         "id": "left",
-        "type_used": "piecewise.left",
+        "definition_id": "piecewise.left",
         "display_name": "left",
         "description": "left"
       },
       {
         "id": "right",
-        "type_used": "piecewise.right",
+        "definition_id": "piecewise.right",
         "display_name": "right",
         "description": "right"
       },
       {
         "id": "left_end",
-        "type_used": "piecewise.left_end",
+        "definition_id": "piecewise.left_end",
         "display_name": "left_end",
         "description": "left_end"
       },
       {
         "id": "right_end",
-        "type_used": "piecewise.right_end",
+        "definition_id": "piecewise.right_end",
         "display_name": "right_end",
         "description": "right_end"
       }
@@ -160,14 +160,5 @@
         "cardinality": "exactly_one"
       }
     ]
-  },
-  "plugins": [
-    {
-      "source": {
-        "kind": "file",
-        "ref": "plugin.py",
-        "export": "plugin"
-      }
-    }
-  ]
+  }
 }

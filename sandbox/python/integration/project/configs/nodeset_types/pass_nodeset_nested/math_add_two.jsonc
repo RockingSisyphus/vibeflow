@@ -1,0 +1,96 @@
+{
+  "display_name": "Add Two",
+  "description": "Nested nodeset that runs add-one twice.",
+  "requires": [
+    {
+      "type": "value.in",
+      "cardinality": "exactly_one",
+      "display_name": "Value In"
+    }
+  ],
+  "provides": [
+    {
+      "key": "value.final",
+      "type": "value.final",
+      "display_name": "Value Final"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "value.in",
+        "type": "value.in",
+        "display_name": "Value In",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "definition_id": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
+      },
+      {
+        "id": "input",
+        "definition_id": "sandbox.value_input",
+        "display_name": "Input",
+        "description": "Runs input."
+      },
+      {
+        "id": "first",
+        "definition_id": "math.add_one",
+        "display_name": "First",
+        "description": "Runs first."
+      },
+      {
+        "delta": 1,
+        "id": "second",
+        "definition_id": "sandbox.add_out",
+        "display_name": "Second",
+        "description": "Runs second."
+      },
+      {
+        "id": "end",
+        "definition_id": "sandbox.final_value_end",
+        "display_name": "End",
+        "description": "Runs end."
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "input"
+      },
+      {
+        "from": "input",
+        "to": "first"
+      },
+      {
+        "from": "first",
+        "to": "second"
+      },
+      {
+        "from": "second",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "value.final",
+        "cardinality": "exactly_one",
+        "display_name": "Value Final"
+      }
+    ]
+  },
+  "type_key": "math.add_two",
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugins/code_plugin/plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
+}

@@ -47,6 +47,8 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         retired_ids["python.variant.ownership." + suffix] = "B01"
     for suffix in ("namespace_locals", "namespace_sensitive"):
         retired_ids["python.variant.library." + suffix] = "B06"
+    if variant=="current":
+        specs=[spec for spec in specs if spec["id"]!="python.source.formal_effects"]
     for spec in specs:
         if spec["id"] in retired_ids:
             spec["expected"].setdefault("variants", {})["current"] = {

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
-from vibeflow.core.flow import GraphConfig, NodeSpec, NodesetSpec, STATUS_PLANNED
+from vibeflow.core.flow import GraphConfig, NodeCallSpec, NodesetTypeSpec, STATUS_PLANNED
 from vibeflow.tooling.application.python.presentation.helpers import compile_for_render
 from vibeflow.tooling.application.python.presentation.mermaid import MERMAID_LAYOUT_DEFAULT, _escape_label, _resource_label, _safe_id, export_mermaid
 from vibeflow.tooling.presentation.mermaid import render_mermaid_svg
@@ -31,8 +31,8 @@ _MAX_GROUP_TITLE_CALL_IDS = 3
 @dataclass(frozen=True)
 class _NodesetInvocationGroup:
     kind: str
-    nodeset: NodesetSpec
-    nodes: tuple[NodeSpec, ...]
+    nodeset: NodesetTypeSpec
+    nodes: tuple[NodeCallSpec, ...]
 
 
 def _nodeset_fragments(
@@ -72,7 +72,7 @@ def _nodeset_fragments(
 
 def _render_nodeset_detail_fragment(
     title: str,
-    nodeset: NodesetSpec,
+    nodeset: NodesetTypeSpec,
     temp_dir: Path,
     *,
     registry: object | None,
@@ -163,8 +163,8 @@ def _render_nodeset_detail_fragment(
 
 def _direct_nodeset_call_groups(graph: GraphConfig) -> tuple[_NodesetInvocationGroup, ...]:
     order: list[tuple[str, str]] = []
-    nodesets: dict[tuple[str, str], NodesetSpec] = {}
-    nodes: dict[tuple[str, str], list[NodeSpec]] = {}
+    nodeset_types: dict[tuple[str, str], NodesetTypeSpec] = {}
+    nodes: dict[tuple[str, str], list[NodeCallSpec]] = {}
     for node in graph.nodes:
         invocation = invocation_for_node(graph, node)
         if invocation is None or not invocation.nodeset.expand:
@@ -172,11 +172,11 @@ def _direct_nodeset_call_groups(graph: GraphConfig) -> tuple[_NodesetInvocationG
         key = (invocation.kind, invocation.target)
         if key not in nodes:
             order.append(key)
-            nodesets[key] = invocation.nodeset
+            nodeset_types[key] = invocation.nodeset
             nodes[key] = []
         nodes[key].append(node)
     return tuple(
-        _NodesetInvocationGroup(kind=kind, nodeset=nodesets[(kind, target)], nodes=tuple(nodes[(kind, target)]))
+        _NodesetInvocationGroup(kind=kind, nodeset=nodeset_types[(kind, target)], nodes=tuple(nodes[(kind, target)]))
         for kind, target in order
     )
 
@@ -193,7 +193,7 @@ def _nodeset_group_fragment_title(group: _NodesetInvocationGroup) -> str:
     return f"{title} (calls: {len(group.nodes)} [{calls}], type_key: {group.nodeset.type_key})"
 
 
-def _nodeset_call_summary(node: NodeSpec) -> str:
+def _nodeset_call_summary(node: NodeCallSpec) -> str:
     details: list[str] = []
     if node.params:
         details.append(f"config={len(node.params)}")
@@ -204,7 +204,7 @@ def _nodeset_call_summary(node: NodeSpec) -> str:
     return f"{node.id}{{{','.join(details)}}}"
 
 
-def _nodeset_fragment_title(node: NodeSpec, nodeset: NodesetSpec) -> str:
+def _nodeset_fragment_title(node: NodeCallSpec, nodeset: NodesetTypeSpec) -> str:
     title = node.metadata.display_name or nodeset.display_name or node.id
     return f"{title} (id: {node.id}, type_key: {nodeset.type_key})"
 
@@ -394,7 +394,7 @@ def _resource_mermaid(root_label: str, resources: tuple[Mapping[str, object], ..
     child_class = {
         "base_lib": "baseLibResource",
         "plugin": "pluginResource",
-        "host_extension": "hostExtensionResource",
+
     }.get(kind, "pluginResource")
     lines = [
         "flowchart LR",

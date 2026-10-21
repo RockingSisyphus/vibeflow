@@ -21,17 +21,16 @@ window.VFShapes=(()=>{
     for(const row of rows){row.y=y;y+=row.kind==="title"?23:18;}
     return {rows,height:y+10};
   }
-  function measure(facts,types={},nodesets={}) {
-    const info=VFModel.nodeInfo(facts,{node_types:types,nodesets}),external=Boolean(info.typeInfo.external||facts.external||facts.info?.external);
+  function measure(facts,architecture={}) {
+    const info=VFModel.nodeInfo(facts,architecture),external=Boolean(info.definitionInfo.external||facts.external||facts.info?.external);
     const values=facts.presentation?.values||facts.effective_presentation?.values||{};
-    // Earlier v2 histories used the Mermaid spelling. New facts use the public name.
-    const requested=values.shape||"rect",canonical=requested==="diam"?"diamond":requested,shape=supported.has(canonical)?canonical:"rect";
-    const titleLines=wrap(title(facts),260,16),typeLines=wrap(facts.type_used||facts.type_key||facts.kind||"",260,12);
+    const requested=values.shape||"rect",canonical=requested,shape=supported.has(canonical)?canonical:"rect";
+    const titleLines=wrap(title(facts),260,16),typeLines=wrap(facts.definition_id||facts.kind||"",260,12);
     const contract=(facts.requires??info.contract.requires??[]).length+" 输入 · "+(facts.provides??info.contract.provides??[]).length+" 输出";
     const status=info.status;
     const rows=[...titleLines.map(t=>({text:t,kind:"title"})),...typeLines.map(t=>({text:t,kind:"type"})),
       {text:status==="planned"?"计划 · 尚未实现":external?"外部依赖":facts.invokes?(facts.invokes.kind==="loop_body"?"Loop":"Nodeset"):facts.flow_kind||facts.kind||"资源",kind:"status"},
-      {text:facts.type_used||facts.kind==="node"?contract:(facts.sources?.length?facts.sources.length+" 个来源":""),kind:"detail"}];
+      {text:facts.definition_id||facts.kind==="node"?contract:(facts.sources?.length?facts.sources.length+" 个来源":""),kind:"detail"}];
     if(facts.invokes)rows.push({text:info.expandable?"可右键展开内部结构":"暂无内部定义",kind:"detail"});
     for(const action of (facts.preview_operations||[]).slice(0,3))rows.push({text:VFModel.operationLabel(action)+(action.target?" · "+action.target:""),kind:"detail"});
     if(!facts.invokes&&facts.preview_expandable)rows.push({text:"双击或右键展开目标 workflow",kind:"detail"});

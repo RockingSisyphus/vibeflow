@@ -13,10 +13,10 @@ from vibeflow.tooling.application.python.workspace_service import validate_works
 
 
 SOURCE = '''from vibeflow.targets.python.sdk import Plugin,node,capability,data_schema
-@node(type_key="example.boundary",flow_kind="terminal",contract={},rulesets=["vibeflow.process"])
+@node(node_type='vibeflow.node', id="example.boundary",flow_kind="terminal",contract={},rulesets=["vibeflow.process"])
 class Boundary:
     def run_pure(self,inputs,params):return {}
-@node(type_key="example.work",contract={},rulesets=["vibeflow.process"],capabilities=[{"id":"vibeflow.workflow","operations":["self"]}])
+@node(node_type='vibeflow.node', id="example.work",contract={},rulesets=["vibeflow.process"],capabilities=[{"id":"vibeflow.workflow","operations":["self"]}])
 class Work:
     def run_pure(self,inputs,params,context):
         context.capabilities["vibeflow.workflow"]["self"]({})
@@ -24,16 +24,17 @@ class Work:
 interface=capability(id="vibeflow.workflow",targets=["python"],operations={"self":{"input_type":"example.request","output_type":"example.identity"}})
 request=data_schema(type_key="example.request",schema={"type":"object"})
 identity=data_schema(type_key="example.identity",schema={"type":"object"})
-plugin=Plugin(id="example",resources=[Boundary,Work,interface,request,identity])
+plugin=Plugin(id="example",resources=[interface,request,identity])
 '''
 
 
 def test_same_node_type_cannot_borrow_another_calls_grant_and_aot_saves_policy(tmp_path, monkeypatch):
-    workspace, config = project(tmp_path, SOURCE)
+    nodes, resources = SOURCE.split("interface=", 1)
+    workspace, config = project(tmp_path, nodes, plugin_source="from vibeflow.targets.python.sdk import Plugin,capability,data_schema\ninterface=" + resources)
     declaration = json.loads(config.read_text())
     grant = {"rule_id": "vibeflow.capability.allow", "params": {
         "capability": "vibeflow.workflow", "operations": ["self"]}}
-    nodes = [{"id": name, "type_used": key, "display_name": name, "description": name}
+    nodes = [{"id": name, "definition_id": key, "display_name": name, "description": name}
              for name, key in [("start", "example.boundary"), ("a", "example.work"),
                                ("b", "example.work"), ("end", "example.boundary")]]
     nodes[1]["rulesets"] = ["vibeflow.process", grant]

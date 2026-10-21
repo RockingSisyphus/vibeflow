@@ -5,18 +5,18 @@
         "display_name": "Start",
         "description": "Starts the async nodeset side task fixture.",
         "id": "start",
-        "type_used": "sandbox.start"
+        "definition_id": "sandbox.start"
       },
       {
         "display_name": "Seed Value",
         "description": "Produces value.in for the mainline and the async side nodeset.",
         "value": 4,
         "id": "seed",
-        "type_used": "sandbox.constant"
+        "definition_id": "sandbox.constant"
       },
       {
         "id": "side_task",
-        "type_used": "side.async_value",
+        "definition_id": "side.async_value",
         "display_name": "side_task",
         "description": "Executes the declared ordinary workflow node."
       },
@@ -25,13 +25,13 @@
         "description": "Continues the synchronous mainline without waiting for side_task.",
         "delta": 6,
         "id": "main_add",
-        "type_used": "sandbox.add"
+        "definition_id": "sandbox.add"
       },
       {
         "display_name": "End",
         "description": "Ends after the mainline output is available.",
         "id": "end",
-        "type_used": "sandbox.out_value_end",
+        "definition_id": "sandbox.out_value_end",
         "join_policy": "all"
       }
     ],
@@ -67,14 +67,14 @@
   },
   "nodeset_imports": [
     {
-      "path": "nodesets/pass_mainline_nodeset_task/side_task_value.jsonc"
+      "path": "nodeset_types/pass_mainline_nodeset_task/side_task_value.jsonc"
     }
   ],
   "plugins": [
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

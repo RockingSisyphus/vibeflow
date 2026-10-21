@@ -38,12 +38,13 @@ def write_node_plugin(root, registrations):
     body = [item for item in source.body if
             isinstance(item, ast.ClassDef) and item.name in selected or
             isinstance(item, ast.FunctionDef) and item.name == "V"]
-    implementation = root / "fixture_nodes.py"
+    (root / "nodes").mkdir(exist_ok=True)
+    implementation = root / "nodes/fixture_nodes.py"
     implementation.write_text(ast.unparse(ast.Module(body=body, type_ignores=[])) + "\n", encoding="utf-8")
     for key, class_name, schema, defaults in registrations:
-        declaration = configured_declaration(getattr(nodes, class_name + "_DECLARATION"), schema, defaults, type_key=key)
+        declaration = configured_declaration(getattr(nodes, class_name + "_DECLARATION"), schema, defaults, id=key)
         payload = declaration.to_dict()
         payload["implementations"] = [{"language": "python", "targets": ["python"], "completion": "immediate",
-                                      "source": {"kind": "file", "ref": "fixture_nodes.py", "export": class_name}}]
+                                      "source": {"kind": "file", "ref": "nodes/fixture_nodes.py", "export": class_name}}]
         declarations.append(payload)
     return write_plugin(root, declarations, target="python", plugin_id=f"fixture.{root.name}")

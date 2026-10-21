@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from vibeflow.targets.shared.quality_support import ProjectQualityFacts, QualityPolicy, QualityThresholds
+from vibeflow.targets.shared.quality_support import SourceQualityFacts, QualityPolicy, QualityThresholds
 from tests.fixtures.support.project_rules import evaluate_standard_project_quality
 from vibeflow.targets.shared.quality_support.implementation import analyze_call_graph
 from vibeflow.targets.javascript.build.toolchain import run_quality_facts_driver
@@ -19,13 +19,42 @@ from vibeflow.tooling.application.javascript.quality_scan import scan_javascript
 from vibeflow.targets.python.quality import PythonSource, analyze_python_source
 from vibeflow.tooling.application.cli import main as dispatch_main
 from vibeflow.tooling.application.javascript.cli import main
-from vibeflow.tooling.application.workspace_quality import _root_arguments
 from vibeflow.tooling.project.workspace_loader import load_workspace_config
 
 
 SANDBOX = Path(__file__).resolve().parents[3] / "sandbox/javascript/minimal"
 TOOLCHAIN = Path(os.environ.get("VIBEFLOW_TEST_TOOLCHAIN_ROOT", SANDBOX / "project"))
 
+
+_GREETING_NODE = {'rulesets': ['vibeflow.process'],
+ 'id': 'example.greet',
+ 'display_name': 'Build greeting',
+ 'description': 'Builds a greeting from a name and an injected clock.',
+ 'version': '1.0.0',
+ 'flow_kind': 'terminal',
+ 'contract': {'requires': [{'type': 'name.text',
+                            'cardinality': 'exactly_one',
+                            'display_name': 'Name'}],
+              'provides': [{'key': 'greeting',
+                            'type': 'greeting.text',
+                            'display_name': 'Greeting'}],
+              'params_schema': {'prefix': {'type': 'string'}},
+              'params_defaults': {'prefix': 'Hello'},
+              'input_semantics': {'name.text': ['Name input consumed by this '
+                                                'node.']},
+              'output_semantics': {'greeting': ['Greeting output produced by '
+                                                'this node.']}},
+ 'base_libs': ['example.text'],
+ 'capabilities': [{'id': 'example.clock', 'operations': ['now']}],
+ 'tags': ['example'],
+ 'node_type': 'vibeflow.node',
+ 'kind': 'node',
+ 'implementations': [{'language': 'typescript',
+                      'targets': ['browser', 'node'],
+                      'source': {'kind': 'file',
+                                 'ref': 'nodes/greet.ts',
+                                 'export': 'run'},
+                      'completion': 'suspend'}]}
 
 @pytest.fixture
 def quality_case(tmp_path: Path):
@@ -50,23 +79,22 @@ def quality_case(tmp_path: Path):
     return make
 
 
-def _cli(path: Path, capsys, *extra: str):
-    code = main(["quality-check", "--path", str(path), "--project-target", "javascript", "--json", *extra])
-    return code, json.loads(capsys.readouterr().out)
-
-
 def _project_case(tmp_path: Path) -> tuple[Path, Path, Path]:
     if not (TOOLCHAIN / "node_modules/typescript").is_dir():
         pytest.skip("pinned JavaScript sandbox toolchain is not installed")
     workspace = tmp_path / "workspace"
     shutil.copytree(SANDBOX, workspace, ignore=shutil.ignore_patterns("node_modules", "__pycache__", "*.pyc"))
-    from tests.fixtures.support.plugins import copy_sdk_inputs
-    copy_sdk_inputs(SANDBOX, workspace)
     project = workspace / "project"
     (project / "node_modules").symlink_to(TOOLCHAIN / "node_modules", target_is_directory=True)
+    from tests.fixtures.support.plugins import resource_declarations, write_plugin
+    values = [*resource_declarations(project), _GREETING_NODE]
+    source = project / "nodes/greet.ts"
+    source.write_text(source.read_text().split("export const resource_6Definition=")[0])
+    write_plugin(project, values, target="javascript", plugin_id="example.javascript.minimal")
+    (project / "root_rules.jsonc").write_text('{"rulesets":[]}')
     config = project / "vibeflow_project.jsonc"
     data = json.loads(config.read_text(encoding="utf-8"))
-    data["quality_enabled"] = True
+
     config.write_text(json.dumps(data), encoding="utf-8")
     return workspace / "vibeflow_config.jsonc", project, project / "configs/greeting.jsonc"
 
@@ -84,10 +112,12 @@ def _configure_rule_policy(project: Path, policy: dict[str, object]) -> None:
     file.write_text(json.dumps(data), encoding="utf-8")
 
 
-def _formal_findings(payload: dict[str, object], severity: str) -> list[dict[str, object]]:
-    result = list(payload.get("source_quality", {}).get("errors" if severity == "error" else "warnings", ()))
+def _formal_findings(payload, severity):
+    result = list(payload.get("errors" if severity == "error" else "warnings", ()))
     for report in payload.get("reports", ()):
-        result.extend(item for item in report.get("diagnostics", report.get("warnings", ())) if item.get("severity", "error") == severity)
+        for item in (*report.get("diagnostics", ()), *report.get("warnings", ())):
+            if item.get("severity", "error") == severity and item not in result:
+                result.append(item)
     return result
 
 
@@ -96,21 +126,21 @@ def _registered_rule_report(project: Path, *, policy_data=None, **_):
     from vibeflow.core.flow import GraphConfig
     from vibeflow.targets.javascript.quality.rules import run_javascript_rules
     from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
-    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
+    from vibeflow.tooling.project.resources import prepare_workflow_catalogs
     if policy_data is not None:
         _configure_rule_policy(project, policy_data)
-    catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/greeting.jsonc")
+    catalogs = prepare_workflow_catalogs(project / "configs/greeting.jsonc")
     import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=project, allowed_external=set())
     return run_javascript_rules(GraphConfig(nodes=(), rulesets=()), catalogs, project_root=project,
                                 package_root=project, import_policy=import_policy, include_registered=True)
 
 
 def _add_planned_chain(project: Path, config: Path, depth: int) -> None:
-    nodesets = project / "nodesets"
-    nodesets.mkdir(exist_ok=True)
+    nodeset_types = project / "nodeset_types"
+    nodeset_types.mkdir(exist_ok=True)
     paths = []
     for index in range(depth):
-        path = nodesets / f"depth-{index}.jsonc"
+        path = nodeset_types / f"depth-{index}.jsonc"
         child = f"example.depth.{index - 1}" if index else "example.future"
         path.write_text(json.dumps({
             "type_key": f"example.depth.{index}",
@@ -120,13 +150,13 @@ def _add_planned_chain(project: Path, config: Path, depth: int) -> None:
             "requires": [],
             "provides": [],
             "pipeline": {"nodes": [{
-                "id": "call", "type_used": child,
+                "id": "call", "definition_id": child,
                 "display_name": "Call child", "description": "Calls the next layer.",
                 "status": "planned", "flow_kind": "process",
                 "requires": [], "provides": [],
             }]},
         }), encoding="utf-8")
-        paths.append(f"../nodesets/{path.name}")
+        paths.append(f"../nodeset_types/{path.name}")
     data = json.loads(config.read_text(encoding="utf-8"))
     data["nodeset_imports"] = paths
     config.write_text(json.dumps(data), encoding="utf-8")
@@ -141,15 +171,12 @@ def test_unregistered_source_and_exclusions(quality_case, capsys) -> None:
         "src/auto.generated.tsx": "export const generated = 1;\n" + "\n" * 1000,
         "src/compact.min.mjs": "export const minified = 1;\n" + "\n" * 1000,
     })
-    code, payload = _cli(root, capsys)
-    assert code == 1 and payload["status"] == "FAIL", payload
-    source = payload["source_quality"]
-    assert {item["path"] for item in source["files"]} == {"src/large.ts", "tests/test.ts"}
-    assert any(item["rule_id"] == "QUALITY.FILE.MAX_LINES" and item["object_id"] == "src/large.ts" for item in source["errors"])
-    assert payload["reports"] == []
-    code, excluded = _cli(root, capsys, "--exclude-path", "src/large.ts", "--exclude-dir", "tests")
-    assert code == 0 and excluded["status"] == "PASS"
-    assert excluded["source_quality"]["summary"]["files"] == 0
+    report = scan_javascript_quality(root, package_root=root)
+    assert report.status == "FAIL"
+    assert {item.path for item in report.files} == {"src/large.ts", "tests/test.ts"}
+    assert any(item.code == "QUALITY.FILE.MAX_LINES" for item in report.findings)
+    excluded = scan_javascript_quality(root, package_root=root, excluded_dirs=(*__import__("vibeflow.targets.javascript.quality.source", fromlist=["DEFAULT_EXCLUDED_DIRS"]).DEFAULT_EXCLUDED_DIRS, "src", "tests"))
+    assert excluded.status == "PASS" and not excluded.files
 
 
 def test_source_facts_cover_syntax_typescript_types_and_internal_imports(quality_case) -> None:
@@ -221,7 +248,7 @@ def test_target_source_facts_do_not_assemble_default_rules(quality_case, monkeyp
 
 def test_application_source_scan_reuses_supplied_catalog_and_bindings(quality_case, monkeypatch):
     from vibeflow.targets.shared.rule_support.plugin import BuiltinPlugin
-    from vibeflow.tooling.project.descriptor_loader import load_builtin_plugins
+    from vibeflow.tooling.project.resources import load_builtin_plugins
     root = quality_case({"large.ts":"export const value = 1;\n" + "\n" * 500})
     contributed = []
     original = BuiltinPlugin.contributions
@@ -233,7 +260,7 @@ def test_application_source_scan_reuses_supplied_catalog_and_bindings(quality_ca
     cache = {}
     report = scan_javascript_quality(root, package_root=root, catalog=catalog, facts_cache=cache)
     assert contributed == ["vibeflow.core"]
-    assert report.checked_rulesets == ("vibeflow.quality.project",)
+    assert report.checked_rulesets == ("vibeflow.quality.source",)
     assert len(report.rule_executions) == 1
     assert any(item.code == "QUALITY.FILE.MAX_LINES" for item in report.findings)
     assert len(cache[str(root)].files) == len(report.files) == 1
@@ -250,7 +277,7 @@ def test_source_scan_does_not_configure_same_id_external_rule(quality_case):
         params_defaults={"max_file_lines": {"label": "external parameter"}})
     builder = ContributionBuilder("external.project")
     builder.add(rule)
-    builder.add(RulesetDescriptor("vibeflow.quality.project", (RuleCall("external", rule.id),)))
+    builder.add(RulesetDescriptor("vibeflow.quality.source", (RuleCall("external", rule.id),)))
     catalog = compose_contributions((builder.finish(),))
     observed = []
     def check(context, inputs, params):
@@ -337,7 +364,7 @@ def test_simple_python_and_javascript_facts_share_core_rule(quality_case) -> Non
         py_function.param_count, py_function.branches,
     ) == (1, 1)
     python_report = evaluate_standard_project_quality(
-        ProjectQualityFacts(root=str(root), files=(python.file,)),
+        SourceQualityFacts(root=str(root), files=(python.file,)),
         QualityPolicy(thresholds=thresholds),
     )
     assert javascript.status == "CONCERNS"
@@ -356,8 +383,8 @@ def test_dynamic_parameter_call_does_not_invent_internal_edge(quality_case) -> N
     facts = run_quality_facts_driver({
         "qualityRoot": str(root),
         "qualityFiles": [str(source)],
-        "qualityImplementations": [{
-            "type_key": "example.run", "path": str(source),
+        "qualityImplementations": [{'node_type': 'vibeflow.node',
+            'id': "example.run", "path": str(source),
             "export": "run", "kind": "node",
         }],
     }, package_root=root)
@@ -371,115 +398,65 @@ def test_source_threshold_boundary_and_independent_file(quality_case, capsys) ->
     report = scan_javascript_quality(root, package_root=root, thresholds=QualityThresholds(max_file_lines=500, warn_file_lines=500))
     assert report.status == "CONCERNS"
     assert {item.rule_id for item in report.findings} == {"QUALITY.FILE.WARN_LINES"}
-    code, payload = _cli(root / "exact.ts", capsys, "--max-lines", "499", "--warn-lines", "499")
-    assert code == 1 and payload["source_quality"]["summary"]["files"] == 1
+    report = scan_javascript_quality(root / "exact.ts", package_root=root, thresholds=QualityThresholds(max_file_lines=499, warn_file_lines=499))
+    assert report.status == "FAIL" and len(report.files) == 1
 
 
 def test_quality_warning_text_and_exit_code(quality_case, capsys) -> None:
     root = quality_case({"src/near.ts": "export const x = 1;\n" + "\n" * 449})
-    code = main(["quality-check", "--path", str(root), "--project-target", "javascript"])
+    from tests.fixtures.support.projects import register_root
+    register_root(root, "javascript")
+    (root / "root_rules.jsonc").write_text('{"rulesets":[{"rule_id":"vibeflow.root.files"}]}')
+    code = main(["quality-check", "--path", str(root)])
     output = capsys.readouterr().out
     assert code == 0
-    assert "JavaScript quality: CONCERNS" in output
+    assert "Project quality: CONCERNS" in output
     assert "QUALITY.FILE.WARN_LINES" in output
 
 
-def test_mixed_root_forwards_common_thresholds_and_exclusions(tmp_path: Path) -> None:
-    args = ["quality-check", "--workspace", str(tmp_path / "workspace.jsonc"), "--max-lines", "10", "--exclude-dir", "tests", "--enable-structure-limits", "--check-side-effects"]
-    forwarded = _root_arguments(args, path=tmp_path / "js", target="javascript", workspace_path=tmp_path / "workspace.jsonc")
-    assert forwarded[forwarded.index("--max-lines") + 1] == "10"
-    assert forwarded[forwarded.index("--exclude-dir") + 1] == "tests"
-    assert "--enable-structure-limits" in forwarded
-    assert "--check-side-effects" not in forwarded
 
 
-def test_mixed_workspace_cli_forwards_quality_limits_to_both_targets(tmp_path: Path, capsys) -> None:
+def test_mixed_workspace_root_rule_parameters_apply_to_both_targets(tmp_path, capsys):
     workspace, project, _ = _project_case(tmp_path)
     python_root = workspace.parent / "python-project"
     python_root.mkdir()
-    (python_root / "vibeflow_project.jsonc").write_text(json.dumps({
-        "project_target": "python", "quality_enabled": True,
-    }), encoding="utf-8")
-    (python_root / "tests").mkdir()
-    (python_root / "tests/large.py").write_text("value = 1\n" * 100, encoding="utf-8")
-    data = json.loads(workspace.read_text(encoding="utf-8"))
-    data["roots"].append({"id": "python-demo", "path": "python-project"})
-    workspace.write_text(json.dumps(data), encoding="utf-8")
-    code = dispatch_main([
-        "quality-check", "--workspace", str(workspace),
-        "--max-lines", "1", "--warn-lines", "1",
-        "--exclude-dir", "tests", "--json",
-    ])
+    (python_root / "vibeflow_project.jsonc").write_text('{"project_target":"python"}')
+    (python_root / "large.py").write_text("value = 1\n" * 100)
+    data = json.loads(workspace.read_text())
+    data["roots"].append({"id":"python-demo", "path":"python-project"})
+    workspace.write_text(json.dumps(data))
+    for root in (python_root, project):
+        (root / "root_rules.jsonc").write_text(json.dumps({"rulesets":[{"rule_id":"vibeflow.root.files"}],
+            "rule_params":{"vibeflow.root.files":{"max_file_lines":1,"warn_file_lines":1}}}))
+    assert dispatch_main(["quality-check", "--workspace", str(workspace), "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
-    assert code == 1 and payload["status"] == "FAIL", payload
-    by_target = {item["target"]: item["report"] for item in payload["roots"]}
-    assert set(by_target) == {"python", "javascript"}
-    assert by_target["javascript"]["source_quality"]["thresholds"]["max_file_lines"] == 1
-    assert by_target["python"]["source_quality"]["thresholds"]["max_file_lines"] == 1
-    assert "tests/large.py" not in {item["path"] for item in by_target["python"]["source_quality"]["files"]}
+    errors = [item for item in payload["errors"] if item["rule_id"] == "QUALITY.FILE.MAX_LINES"]
+    assert {item["root_id"] for item in errors} == {"python-demo", "js-demo"}
 
 
-def test_project_no_workflow_and_multiple_workflows_scan_source_once(tmp_path: Path, capsys, monkeypatch) -> None:
-    from vibeflow.targets.shared.rule_support.plugin import BuiltinPlugin
-    contributions = []
-    original = BuiltinPlugin.contributions
-    def counted(self, config=None):
-        contributions.append(self.id)
-        return original(self, config)
-    monkeypatch.setattr(BuiltinPlugin, "contributions", counted)
+def test_multiple_workflows_and_empty_root_collect_root_source_once(tmp_path, capsys, monkeypatch):
     workspace, project, config = _project_case(tmp_path)
-    extra = project / "unregistered.ts"
-    extra.write_text("export const x = 1;\n" + "\n" * 500, encoding="utf-8")
-    code = main(["quality-check", "--workspace", str(workspace), "--config", str(config), "--json"])
-    payload = json.loads(capsys.readouterr().out)
-    assert code == 1 and payload["status"] == "FAIL"
-    assert payload["source_quality"]["summary"]["files"] >= 3
-    assert len(payload["reports"]) == 1
-    assert payload["reports"][0]["status"] in {"PASS", "CONCERNS"}
-    assert contributions == ["vibeflow.core"]
-    contributions.clear()
-    second = config.with_name("second.jsonc")
-    shutil.copy2(config, second)
-    code = main(["quality-check", "--workspace", str(workspace), "--json"])
-    payload = json.loads(capsys.readouterr().out)
-    assert code == 1 and len(payload["reports"]) == 2
-    assert sum(item["path"] == "unregistered.ts" for item in payload["source_quality"]["files"]) == 1
-    assert contributions == ["vibeflow.core", "vibeflow.core"]
-    contributions.clear()
-    # SDK resource scope is supplied by this explicit workflow.
-    second.unlink()
-    config.unlink()
-    code = main(["quality-check", "--workspace", str(workspace), "--json"])
-    payload = json.loads(capsys.readouterr().out)
-    assert code == 1 and payload["reports"] == []
-    assert any(item["path"] == "unregistered.ts" for item in payload["source_quality"]["files"])
-    assert contributions == ["vibeflow.core"]
-
-
-def test_multiple_workflows_reuse_one_javascript_quality_facts_pass(
-    tmp_path: Path, capsys, monkeypatch,
-) -> None:
-    workspace, project, config = _project_case(tmp_path)
+    (project / "root_rules.jsonc").write_text('{"rulesets":[{"rule_id":"vibeflow.root.files"}]}')
     shutil.copy2(config, config.with_name("second.jsonc"))
-    from vibeflow.targets.javascript.build import quality_implementation as implementation
-    from vibeflow.targets.javascript.build import quality_source as source
-
-    calls: list[str] = []
-    original = source.run_quality_facts_driver
-
-    def counted(request, **kwargs):
-        calls.append(str(request["qualityRoot"]))
-        return original(request, **kwargs)
-
-    def unexpected(*args, **kwargs):
-        raise AssertionError("registered implementation facts were extracted again")
-
-    monkeypatch.setattr(source, "run_quality_facts_driver", counted)
-    monkeypatch.setattr(implementation, "run_quality_facts_driver", unexpected)
-    code = main(["quality-check", "--workspace", str(workspace), "--json"])
+    (project / "unregistered.ts").write_text("export const value=1;\n" + "\n" * 500)
+    from vibeflow.targets.javascript.build import quality_source
+    original = quality_source.collect_javascript_quality_facts
+    calls = []
+    def counted(root, **kwargs):
+        calls.append(Path(root))
+        return original(root, **kwargs)
+    monkeypatch.setattr(quality_source, "collect_javascript_quality_facts", counted)
+    assert main(["quality-check", "--workspace", str(workspace), "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
-    assert code == 0 and len(payload["reports"]) == 2, payload
-    assert calls == [str(project)]
+    assert len(payload["reports"]) == 2
+    assert calls == [project]
+    assert sum(item["rule_id"] == "QUALITY.FILE.MAX_LINES" for item in payload["errors"]) == 1
+    calls.clear()
+    config.unlink()
+    config.with_name("second.jsonc").unlink()
+    assert main(["quality-check", "--workspace", str(workspace), "--json"]) == 1
+    assert json.loads(capsys.readouterr().out)["reports"] == []
+    assert calls == [project]
 
 
 def test_generated_local_preview_is_not_application_source(tmp_path, capsys):
@@ -492,8 +469,9 @@ def test_generated_local_preview_is_not_application_source(tmp_path, capsys):
     code = main(["quality-check", "--workspace", str(workspace), "--json"])
     payload = json.loads(capsys.readouterr().out)
     assert code == 0, payload
-    assert payload["source_quality"]["files"]
-    assert not any("vibeflow-preview" in row["path"] for row in payload["source_quality"]["files"])
+    facts = scan_javascript_quality(project, package_root=project)
+    assert facts.files
+    assert not any("vibeflow-preview" in row.path for row in facts.files)
 
 
 @pytest.mark.parametrize("value", [0, True, 1.5, "5"])
@@ -503,7 +481,7 @@ def test_project_depth_field_rejects_invalid_value(tmp_path: Path, value) -> Non
     data = json.loads(path.read_text(encoding="utf-8"))
     data["javascript"]["nodeset_max_depth"] = value
     path.write_text(json.dumps(data), encoding="utf-8")
-    with pytest.raises(Exception, match="javascript.nodeset_max_depth"):
+    with pytest.raises(Exception, match="unknown fields"):
         load_workspace_config(workspace)
 
 
@@ -573,13 +551,13 @@ def test_registered_node_optional_limits_reach_javascript_quality_cli(
         _configure_rule_policy(project, {"complexity": {field: limit}})
         main(["quality-check", "--workspace", str(workspace), "--json"])
         payload = json.loads(capsys.readouterr().out)
-        return {**payload["source_quality"], "errors": _formal_findings(payload,"error")}
+        return {"errors": _formal_findings(payload,"error")}
 
     baseline = check(None)
     assert not any(item["rule_id"] == rule for item in baseline["errors"])
-    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
+    from vibeflow.tooling.project.resources import prepare_workflow_catalogs
     from vibeflow.targets.javascript.quality.implementation import registered_implementation_requests
-    catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/greeting.jsonc")
+    catalogs = prepare_workflow_catalogs(project / "configs/greeting.jsonc")
     owners, _ = registered_implementation_requests(
         catalogs, project_root=project, selected_files=(str(source),),
     )
@@ -600,22 +578,23 @@ def test_registered_node_optional_limits_reach_javascript_quality_cli(
     assert any(item["rule_id"] == rule for item in exceeded["errors"])
 
 
-def test_unregistered_source_changes_quality_only_not_validate_or_build(tmp_path: Path, capsys) -> None:
+def test_root_source_errors_refuse_quality_validate_and_build(tmp_path: Path, capsys) -> None:
     workspace, project, config = _project_case(tmp_path)
+    (project / "root_rules.jsonc").write_text('{"rulesets":[{"rule_id":"vibeflow.root.files"}]}')
     (project / "unregistered.ts").write_text("export const x = 1;\n" + "\n" * 500, encoding="utf-8")
-    code = main(["quality-check", "--workspace", str(workspace), "--config", str(config), "--json"])
+    code = main(["quality-check", "--workspace", str(workspace), "--json"])
     quality = json.loads(capsys.readouterr().out)
-    assert code == 1 and quality["source_quality"]["status"] == "FAIL"
+    assert code == 1 and any(f["rule_id"] == "QUALITY.FILE.MAX_LINES" for f in quality["errors"])
     code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--json"])
     validated = json.loads(capsys.readouterr().out)
-    assert code == 0 and validated["status"] in {"PASS", "CONCERNS"}
+    assert code == 1 and validated["code"] == "QUALITY.FILE.MAX_LINES"
     code = main([
         "build", "--workspace", str(workspace), "--config", str(config),
         "--target", "node", "--profile", "esm-module",
         "--out-dir", str(tmp_path / "output"),
     ])
     built = json.loads(capsys.readouterr().out)
-    assert code == 0 and built["status"] == "PASS"
+    assert code == 1 and built["code"] == "QUALITY.FILE.MAX_LINES"
 
 
 def test_nodeset_width_warning_reaches_validate_quality_and_build(tmp_path: Path, capsys) -> None:
@@ -630,7 +609,7 @@ def test_nodeset_width_warning_reaches_validate_quality_and_build(tmp_path: Path
         "provides": [],
         "pipeline": {"nodes": [{
             "id": f"step-{index}",
-            "type_used": "example.future",
+            "definition_id": "example.future",
             "display_name": f"Step {index}",
             "description": "Future step.",
             "status": "planned",
@@ -639,10 +618,10 @@ def test_nodeset_width_warning_reaches_validate_quality_and_build(tmp_path: Path
             "provides": [],
         } for index in range(11)]},
     }
-    nodeset = project / "nodesets/wide.jsonc"
+    nodeset = project / "nodeset_types/wide.jsonc"
     nodeset.parent.mkdir()
     nodeset.write_text(json.dumps(definition), encoding="utf-8")
-    data["nodeset_imports"] = ["../nodesets/wide.jsonc"]
+    data["nodeset_imports"] = ["../nodeset_types/wide.jsonc"]
     config.write_text(json.dumps(data), encoding="utf-8")
     definition["pipeline"]["nodes"].pop()
     nodeset.write_text(json.dumps(definition), encoding="utf-8")
@@ -652,7 +631,7 @@ def test_nodeset_width_warning_reaches_validate_quality_and_build(tmp_path: Path
         item["rule_id"] == "NODESET.SMELL.TOO_WIDE" for item in at_limit.get("warnings", ())
     )
     definition["pipeline"]["nodes"].append({
-        "id": "step-10", "type_used": "example.future", "display_name": "Step 10",
+        "id": "step-10", "definition_id": "example.future", "display_name": "Step 10",
         "description": "Future step.", "status": "planned", "flow_kind": "process",
         "requires": [], "provides": [],
     })
@@ -661,7 +640,7 @@ def test_nodeset_width_warning_reaches_validate_quality_and_build(tmp_path: Path
     validated = json.loads(capsys.readouterr().out)
     assert code == 0 and validated["status"] == "CONCERNS", validated
     assert any(item["rule_id"] == "NODESET.SMELL.TOO_WIDE" for item in validated["warnings"])
-    code = main(["quality-check", "--workspace", str(workspace), "--config", str(config), "--json"])
+    code = main(["quality-check", "--workspace", str(workspace), "--json"])
     checked = json.loads(capsys.readouterr().out)
     assert code == 0 and checked["status"] == "CONCERNS"
     assert any(item["rule_id"] == "NODESET.SMELL.TOO_WIDE" for item in checked["reports"][0]["warnings"])
@@ -675,7 +654,7 @@ def test_nodeset_width_warning_reaches_validate_quality_and_build(tmp_path: Path
     assert any(item["rule_id"] == "NODESET.SMELL.TOO_WIDE" for item in built["warnings"])
 
 
-def test_nodeset_depth_project_setting_reaches_validate_quality_and_build(tmp_path: Path, capsys) -> None:
+def test_nodeset_depth_rule_setting_reaches_validate_quality_and_build(tmp_path: Path, capsys) -> None:
     workspace, project, config = _project_case(tmp_path)
     _add_planned_chain(project, config, 4)
     code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--json"])
@@ -690,7 +669,7 @@ def test_nodeset_depth_project_setting_reaches_validate_quality_and_build(tmp_pa
     assert code == 1 and validated["code"] == "NODESET.NESTING.DEPTH_EXCEEDED"
     assert validated["diagnostics"][0]["details"]["actual_depth"] == 5
     assert len(validated["diagnostics"][0]["details"]["calls"]) == 4
-    code = main(["quality-check", "--workspace", str(workspace), "--config", str(config), "--json"])
+    code = main(["quality-check", "--workspace", str(workspace), "--json"])
     checked = json.loads(capsys.readouterr().out)
     assert code == 1 and checked["reports"][0]["code"] == "NODESET.NESTING.DEPTH_EXCEEDED"
     code = main([
@@ -700,10 +679,12 @@ def test_nodeset_depth_project_setting_reaches_validate_quality_and_build(tmp_pa
     ])
     built = json.loads(capsys.readouterr().out)
     assert code == 1 and built["code"] == "NODESET.NESTING.DEPTH_EXCEEDED"
-    project_config = project / "vibeflow_project.jsonc"
-    data = json.loads(project_config.read_text(encoding="utf-8"))
-    data["javascript"]["nodeset_max_depth"] = 5
-    project_config.write_text(json.dumps(data), encoding="utf-8")
+    from tests.fixtures.support.rule_inspection import depth_ruleset
+    from tests.fixtures.support.plugins import append_resource
+    append_resource(project,depth_ruleset(5).to_dict())
+    data=json.loads(config.read_text());data['rulesets']=['test.depth'];config.write_text(json.dumps(data))
+    for path in (project/'nodeset_types').glob('depth-*.jsonc'):
+        declaration=json.loads(path.read_text());declaration['rulesets']=['test.depth'];path.write_text(json.dumps(declaration))
     code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--json"])
     accepted = json.loads(capsys.readouterr().out)
     assert code == 0, accepted
@@ -715,7 +696,7 @@ def test_planned_nodeset_depth_respects_explicit_empty_boundary(tmp_path: Path, 
     code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--json"])
     rejected = json.loads(capsys.readouterr().out)
     assert code == 1 and rejected["code"] == "NODESET.NESTING.DEPTH_EXCEEDED"
-    boundary = project / "nodesets/depth-2.jsonc"
+    boundary = project / "nodeset_types/depth-2.jsonc"
     data = json.loads(boundary.read_text())
     data["rulesets"] = []
     boundary.write_text(json.dumps(data))
@@ -727,14 +708,14 @@ def test_planned_nodeset_depth_respects_explicit_empty_boundary(tmp_path: Path, 
 def test_planned_nodeset_recursion_reaches_javascript_cli(tmp_path: Path, capsys) -> None:
     workspace, project, config = _project_case(tmp_path)
     _add_planned_chain(project, config, 1)
-    definition = project / "nodesets/depth-0.jsonc"
+    definition = project / "nodeset_types/depth-0.jsonc"
     data = json.loads(definition.read_text(encoding="utf-8"))
-    data["pipeline"]["nodes"][0]["type_used"] = "example.depth.0"
+    data["pipeline"]["nodes"][0]["definition_id"] = "example.depth.0"
     definition.write_text(json.dumps(data), encoding="utf-8")
     code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--json"])
     validated = json.loads(capsys.readouterr().out)
     assert code == 1 and validated["code"] == "NODESET.RECURSION"
-    code = main(["quality-check", "--workspace", str(workspace), "--config", str(config), "--json"])
+    code = main(["quality-check", "--workspace", str(workspace), "--json"])
     checked = json.loads(capsys.readouterr().out)
     assert code == 1 and checked["reports"][0]["code"] == "NODESET.RECURSION"
 
@@ -782,7 +763,7 @@ def test_registered_base_lib_size_reaches_quality_and_validate(tmp_path: Path, c
     code = main(["validate", "--workspace", str(workspace), "--config", str(config), "--json"])
     validated = json.loads(capsys.readouterr().out)
     assert code == 1 and validated["code"] == "BASE_LIB.SOURCE.MAX_LINES"
-    code = main(["quality-check", "--workspace", str(workspace), "--config", str(config), "--json"])
+    code = main(["quality-check", "--workspace", str(workspace), "--json"])
     checked = json.loads(capsys.readouterr().out)
     assert code == 1
     assert any(item["rule_id"] == "BASE_LIB.SOURCE.MAX_LINES" for item in _formal_findings(checked, "error"))
@@ -808,7 +789,7 @@ def test_registered_node_base_lib_dependency_chain_uses_shared_policy(tmp_path: 
         encoding="utf-8",
     )
     from vibeflow.targets.shared.quality_support.policy_data import COMMON_POLICY_DATA
-    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
+    from vibeflow.tooling.project.resources import prepare_workflow_catalogs
 
     def check(steps: int):
         text_manifest = sdk_resource(project, 'base_lib', 'example.text')
@@ -836,7 +817,7 @@ def test_registered_node_base_lib_dependency_chain_uses_shared_policy(tmp_path: 
             sdk_resource(project, "base_lib", f"example.step{index}").write_text(
                 json.dumps(descriptor), encoding="utf-8",
             )
-        catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/greeting.jsonc")
+        catalogs = prepare_workflow_catalogs(project / "configs/greeting.jsonc")
         return _registered_rule_report(
             project, policy_data=COMMON_POLICY_DATA,
         )
@@ -845,7 +826,7 @@ def test_registered_node_base_lib_dependency_chain_uses_shared_policy(tmp_path: 
                if item.rule_id == "NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP"]
     assert len(warning) == 1 and warning[0].severity == "warning"
     assert warning[0].details["longest_chain_length"] == 5
-    code = main(["quality-check", "--workspace", str(workspace), "--config", str(config), "--json"])
+    code = main(["quality-check", "--workspace", str(workspace), "--json"])
     checked = json.loads(capsys.readouterr().out)
     assert code == 0 and any(
         item["rule_id"] == "NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP"
@@ -870,7 +851,7 @@ def test_registered_node_base_lib_dependency_chain_uses_shared_policy(tmp_path: 
         "warn_dependency_chain_length": 5, "max_dependency_chain_length": 6,
     }})
     code = main([
-        "quality-check", "--workspace", str(workspace), "--config", str(config),
+        "quality-check", "--workspace", str(workspace),
         "--json",
     ])
     customized = json.loads(capsys.readouterr().out)
@@ -940,8 +921,8 @@ def test_registered_node_source_limits_preserve_exact_boundaries(tmp_path: Path)
     source = project / "nodes/greet.ts"
     original = source.read_text(encoding="utf-8")
     from vibeflow.targets.shared.quality_support.policy_data import COMMON_POLICY_DATA
-    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
-    catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/greeting.jsonc")
+    from vibeflow.tooling.project.resources import prepare_workflow_catalogs
+    catalogs = prepare_workflow_catalogs(project / "configs/greeting.jsonc")
 
     def findings(text: str):
         source.write_text(text, encoding="utf-8")
@@ -982,8 +963,8 @@ def test_registered_base_lib_optional_limits_reach_javascript_quality(
     )
     from copy import deepcopy
     from vibeflow.targets.shared.quality_support.policy_data import COMMON_POLICY_DATA
-    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
-    catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc", workflow_config=project / "configs/greeting.jsonc")
+    from vibeflow.tooling.project.resources import prepare_workflow_catalogs
+    catalogs = prepare_workflow_catalogs(project / "configs/greeting.jsonc")
     facts = run_quality_facts_driver({
         "qualityRoot": str(project), "qualityFiles": [str(source)],
     }, package_root=project)
@@ -1015,12 +996,14 @@ def test_structure_roles_use_descriptor_ownership_not_directory_name(tmp_path: P
         "import { value } from './helper.js';\n" + registered.read_text(encoding="utf-8") + "\nvoid value;\n",
         encoding="utf-8",
     )
-    code = main(["quality-check", "--workspace", str(workspace), "--config", str(config), "--json"])
+    code = main(["quality-check", "--workspace", str(workspace), "--json"])
     checked = json.loads(capsys.readouterr().out)
     assert code == 1
-    structural = [item for item in checked["source_quality"]["errors"]
-                  if item["rule_id"] == "QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT"]
-    assert [item["object_id"] for item in structural] == ["nodes/greet.ts -> nodes/helper.ts"]
+    structural = [item for item in _formal_findings(checked,"error")]
+    structural = [item for item in structural
+                  if item["rule_id"] == "VF_IMPORT_OWNER"]
+    assert structural, json.dumps(checked)
+    assert all(item["object_id"] == "example.greet" for item in structural)
     assert structural[0]["source_location"]["line"] == 1
 
 
@@ -1030,22 +1013,25 @@ def test_selected_metrics_keep_one_file_and_sdk_declaration_attribution(tmp_path
     manifest = sdk_resource(project, 'node', 'example.greet')
     second = sdk_resource(project, "node", "example.greet.second")
     data = json.loads(manifest.read_text(encoding="utf-8"))
-    data["type_key"] = "example.greet.second"
+    data["id"] = "example.greet.second"
     second.write_text(json.dumps(data), encoding="utf-8")
+    workflow = json.loads(config.read_text())
+    workflow["pipeline"]["nodes"].append({"id":"second","definition_id":"example.greet.second", "display_name":"Second", "description":"Another call to the same source"})
+    config.write_text(json.dumps(workflow))
     source = project / "nodes/greet.ts"
     source.write_text(source.read_text(encoding="utf-8").replace("  return ", "  // Local implementation\n" * 501 + "  return "), encoding="utf-8")
     code = main(["quality-check", "--workspace", str(workspace), "--json"])
     payload = json.loads(capsys.readouterr().out)
     assert code == 1 and len(payload["reports"]) == 1
-    files = payload["source_quality"]["files"]
-    assert sum(item["path"] == "nodes/greet.ts" for item in files) == 1
+    files = scan_javascript_quality(project, package_root=project).files
+    assert sum(item.path == "nodes/greet.ts" for item in files) == 1
     node_errors = [item for item in _formal_findings(payload,"error") if item["rule_id"] == "NODE.PURITY.SOURCE_TOO_LARGE"]
     assert {item["object_id"] for item in node_errors} == {
         "example.greet",
         "example.greet.second",
     }
     shutil.copy2(SANDBOX / "project/configs/greeting.jsonc", config)
-    code = main(["quality-check", "--workspace", str(workspace), "--config", str(config), "--json"])
+    code = main(["quality-check", "--workspace", str(workspace), "--json"])
     payload = json.loads(capsys.readouterr().out)
     assert code == 1
     assert payload["reports"][0]["code"] == "NODE.PURITY.SOURCE_TOO_LARGE"

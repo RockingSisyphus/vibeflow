@@ -4,13 +4,13 @@
 
 ## Node 与固定插件
 
-`plugins/text.py`：
+`nodes/text.py`：
 
 ```python
 from vibeflow.targets.python.sdk import Plugin, node, data_schema, update_run_info
 
 @node(
-    type_key="example.normalize_text",
+    id="example.normalize_text", node_type="vibeflow.node",
     display_name="Normalize text",
     description="Normalizes whitespace in supplied text.",
     rulesets=["vibeflow.process"],
@@ -30,9 +30,10 @@ class NormalizeText:
         }])
         return {"normalized_text": normalized_text}
 
+# 以下 Schema 放到 plugins/schemas/plugin.py，不与业务 Node 混放。
 raw = data_schema(type_key="text.raw", schema={"type": "string"})
 normalized = data_schema(type_key="text.normalized", schema={"type": "string"})
-plugin = Plugin(id="example.text", resources=[NormalizeText, raw, normalized],
+plugin = Plugin(id="example.text", resources=[raw, normalized],
                 declaration_rulesets=["vibeflow.plugin_declaration"])
 ```
 
@@ -40,16 +41,16 @@ workflow 保留 JSONC 和原生连边，下面是插件选择与 Node 调用片�
 
 ```jsonc
 {
-  "plugins": [{"source": {"kind": "file", "ref": "plugins/text.py"}}],
+  "plugins": [{"source": {"kind": "file", "ref": "plugins/schemas/plugin.py"}}],
   "pipeline": {
-    "nodes": [{"id": "normalize", "type_used": "example.normalize_text",
+    "nodes": [{"id": "normalize", "definition_id": "example.normalize_text",
       "display_name": "Normalize", "description": "Normalize the input"}],
     "edges": []
   }
 }
 ```
 
-插件 source 的文件路径相对所属项目 root；可通过 `root` 选择另一个已登记 workspace root。默认导出名为 `plugin`，也支持显式 `export` 和已安装模块的 `source.kind: "module"/"package"`。
+插件 source 的文件路径相对所属项目 root；使用 `scope: "project"` 选择项目共享包，默认只选择本 root 的包；不能引用其他 root 的私有 Plugin。默认导出名为 `plugin`，也支持显式 `export` 和已安装模块的 `source.kind: "module"/"package"`。
 
 返回对象的 key 与 `provides[].key` 一致；调用点 `params` 使用声明的参数 schema/defaults。`@node` 保存契约、规则选择、默认展示以及实现类的源码位置。
 
@@ -69,7 +70,7 @@ Node 通过 `rulesets` 选择审查约束。类型声明提供默认；调用 Co
 
 `@rule` 声明普通 `check(context, inputs, params)` 函数；`ruleset` 使用 `RuleCall/RuleRelation` 或同模型的字典组合。把函数及 Ruleset 放入插件的 `resources`。SourceContext 查询、具名 records 和覆盖关系见 [规则接口](rules-and-nodes.md)。
 
-`base_lib`、`data_schema`、`capability` 和 `host_extension` 也产生固定资源定义。HostExtension 的运行协议由 JS/TS Target 提供；Python SDK 可贡献显式 JS 实现声明。
+独立 `base_lib` 从标准目录发现；`data_schema`、`capability`、NodeType、Rule 和 Ruleset 由 Plugin 整包贡献。业务 Node 不加入 Plugin 的 resources。
 
 ## 多文件实现与辅助库
 
@@ -85,12 +86,12 @@ Node 通过 `rulesets` 选择审查约束。类型声明提供默认；调用 Co
 from vibeflow.targets.python.sdk import node, SourceLocator
 
 late_node = node(
-    type_key="example.late", contract={}, rulesets=["vibeflow.process"],
+    id="example.late", node_type="vibeflow.node", contract={}, rulesets=["vibeflow.process"],
     source=SourceLocator(kind="file", ref="nodes/late.py", export="LateNode"),
 )
 ```
 
-插件入口先加载固定定义，其直接导入按 Python 的模块机制初始化。显式延迟实现接受所选 import 规则后再绑定；检查失败时，尚未加载的实现及闭包保持未加载。完整流程见[插件加载与检查](plugins-and-integrations.md#加载与检查)。
+插件入口先加载固定定义，其直接导入按 Python 的模块机制初始化。显式延迟实现接受所选 import 规则后再绑定；检查失败时，尚未加载的实现及闭包保持未加载。完整流程见[插件加载与检查](plugins-and-integrations.md#原生加载与生命周期)。
 
 ```bash
 python run.py validate --config python_project/configs/main.jsonc
@@ -152,4 +153,4 @@ python candidate-bundle/run.py delegate-cli -- --help
 
 业务标准流与退出码使用原 delegated CLI 协议；框架诊断写入 run 日志。构建保留原静态审查的 CONCERNS 和 planned stub 开发标记，不把它们改成 PASS。`--replace` 仅替换仍归本工具所有的完整构建目录。
 
-新计划为 Workflow ABI v9，构建元数据为 `vibeflow.aot-build.v3`；共同头保存工作流、ABI、入口和文件，`target_metadata` 保存该语言的 profile、工具链与绑定定位。旧计划或 manifest 不作兼容解码，请用当前源码重新构建；已有独立 JS 产物仍可继续使用其随附运行代码。
+新计划为 Workflow ABI v10，构建元数据为 `vibeflow.aot-build.v4`；共同头保存工作流、ABI、入口和文件，`target_metadata` 保存该语言的 profile、工具链与绑定定位。旧计划或 manifest 不作兼容解码，请用当前源码重新构建；已有独立 JS 产物仍可继续使用其随附运行代码。

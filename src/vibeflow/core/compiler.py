@@ -11,12 +11,12 @@ from vibeflow.core.constants import (
 )
 from vibeflow.core.contracts import provider_keys
 from vibeflow.core.flow import (
-    LOOP_NODE_TYPES,
+    LOOP_DEFINITION_IDS,
     STATUS_PLANNED,
     EdgeSpec,
     GraphConfig,
-    NodeSpec,
-    NodesetSpec,
+    NodeCallSpec,
+    NodesetTypeSpec,
 )
 from vibeflow.core.mainline import MainlineFinding, analyze_mainline
 from vibeflow.core.models import (
@@ -77,7 +77,7 @@ class GraphCompiler:
         *,
         implementation_facts: ImplementationFacts | None = None,
         target_features: TargetFeatureSet | None = None,
-        known_nodesets: set[str] | None = None,
+        known_nodeset_types: set[str] | None = None,
         owner: str = "pipeline",
     ) -> CompiledGraph:
         return compile_core(
@@ -85,8 +85,8 @@ class GraphCompiler:
                 graph=graph,
                 implementation_facts=implementation_facts or ImplementationFacts(),
                 target_features=target_features or TargetFeatureSet(),
-                known_nodesets=frozenset(
-                    known_nodesets if known_nodesets is not None else graph.nodesets
+                known_nodeset_types=frozenset(
+                    known_nodeset_types if known_nodeset_types is not None else graph.nodeset_types
                 ),
                 owner=owner,
             )
@@ -101,13 +101,13 @@ def compile_core(request: CoreCompileRequest) -> CoreCompilation:
         request.graph,
         implementations=implementations,
     )
-    nodesets = set(request.known_nodesets or graph.nodesets)
+    nodeset_types = set(request.known_nodeset_types or graph.nodeset_types)
     nodes_by_name = {node.id: node for node in graph.nodes}
     _validate_resolved_node_contracts(graph, implementations=implementations)
-    _validate_node_types(
+    _validate_node_definitions(
         tuple(graph.nodes),
         implementations=implementations,
-        nodesets=nodesets,
+        nodeset_types=nodeset_types,
     )
     providers = _collect_providers(
         graph,
@@ -119,28 +119,28 @@ def compile_core(request: CoreCompileRequest) -> CoreCompilation:
     flow_kinds = _node_flow_kinds(
         nodes_by_name,
         implementations=implementations,
-        nodesets=nodesets,
+        nodeset_types=nodeset_types,
     )
     effect_scopes = _node_effect_scopes(
         nodes_by_name,
         flow_kinds=flow_kinds,
         implementations=implementations,
-        nodesets=nodesets,
+        nodeset_types=nodeset_types,
     )
     implemented_global_state_locks = _implemented_global_state_lock_keys(
         graph,
         implementations=implementations,
-        known_nodesets=nodesets,
+        known_nodeset_types=nodeset_types,
     )
     implemented_global_state_nodes = frozenset(implemented_global_state_locks)
     implemented_execution_lock_nodes = _implemented_execution_lock_paths(
         graph,
-        known_nodesets=nodesets,
+        known_nodeset_types=nodeset_types,
     )
     contains_global_state = bool(implemented_global_state_nodes)
     _validate_execution_lock_nesting(
         graph,
-        known_nodesets=nodesets,
+        known_nodeset_types=nodeset_types,
         owner=request.owner,
     )
     _validate_target_features(
@@ -228,7 +228,7 @@ def _resolve_effective_graph(
     from Target facts, while nodeset calls inherit their public nodeset contract.
     Planned and system nodes retain the explicit contracts parsed from config.
 
-    A graph's ``nodesets`` mapping is a symbol table, not a child collection.
+    A graph's ``nodeset_types`` mapping is a symbol table, not a child collection.
     Every parsed nodeset body intentionally sees the same table for forward
     references.  Resolve the root and each definition exactly once, then attach
     one shared resolved symbol table to every state.  No state depends on a
@@ -236,9 +236,9 @@ def _resolve_effective_graph(
     nor correct here.
     """
 
-    definition_by_key = dict(graph.nodesets)
-    facts_by_type = {fact.type_key: fact for fact in implementations.nodes}
-    resolved_registry: dict[str, NodesetSpec] = {}
+    definition_by_key = dict(graph.nodeset_types)
+    facts_by_definition = {fact.definition_id: fact for fact in implementations.nodes}
+    resolved_registry: dict[str, NodesetTypeSpec] = {}
 
     # Bottom-up DP table.  ``None`` is the root state; every other key is the
     # unique nodeset definition state identified by its type_key.
@@ -256,9 +256,9 @@ def _resolve_effective_graph(
             nodes=_resolve_effective_nodes(
                 source_graph.nodes,
                 definition_by_key=definition_by_key,
-                facts_by_type=facts_by_type,
+                facts_by_definition=facts_by_definition,
             ),
-            nodesets=resolved_registry,
+            nodeset_types=resolved_registry,
         )
 
     for type_key, nodeset in definition_by_key.items():
@@ -271,19 +271,19 @@ def _resolve_effective_graph(
 
 
 def _resolve_effective_nodes(
-    nodes: tuple[NodeSpec, ...],
+    nodes: tuple[NodeCallSpec, ...],
     *,
-    definition_by_key: dict[str, NodesetSpec],
-    facts_by_type: dict[str, ImplementationFact],
-) -> tuple[NodeSpec, ...]:
+    definition_by_key: dict[str, NodesetTypeSpec],
+    facts_by_definition: dict[str, ImplementationFact],
+) -> tuple[NodeCallSpec, ...]:
     """Evaluate the contract transition for one DP graph state."""
 
-    resolved_nodes: list[NodeSpec] = []
+    resolved_nodes: list[NodeCallSpec] = []
     for node in nodes:
-        if node.status == STATUS_PLANNED or node.type_used in LOOP_NODE_TYPES:
+        if node.status == STATUS_PLANNED or node.definition_id in LOOP_DEFINITION_IDS:
             resolved_nodes.append(node)
             continue
-        nodeset = definition_by_key.get(node.type_used)
+        nodeset = definition_by_key.get(node.definition_id)
         if nodeset is not None:
             resolved_nodes.append(
                 replace(
@@ -293,7 +293,7 @@ def _resolve_effective_nodes(
                 )
             )
             continue
-        fact = facts_by_type.get(node.type_used)
+        fact = facts_by_definition.get(node.definition_id)
         if fact is None:
             resolved_nodes.append(node)
             continue
@@ -319,7 +319,7 @@ def _validate_resolved_node_contracts(
     if id(graph) in visited:
         return
     visited.add(id(graph))
-    for type_key, nodeset in graph.nodesets.items():
+    for type_key, nodeset in graph.nodeset_types.items():
         if type_key in visited_nodesets:
             continue
         visited_nodesets.add(type_key)
@@ -374,35 +374,35 @@ def _validate_target_features(
         )
 
 
-def _validate_node_types(
-    nodes: tuple[NodeSpec, ...],
+def _validate_node_definitions(
+    nodes: tuple[NodeCallSpec, ...],
     *,
     implementations: ImplementationFacts,
-    nodesets: set[str],
+    nodeset_types: set[str],
 ) -> None:
     if implementations.strict:
-        for type_key in nodesets:
+        for type_key in nodeset_types:
             if implementations.get(type_key) is None:
                 continue
             raise GraphCompileError(
-                f"type_key '{type_key}' is defined by both a Python node and a nodeset",
-                "NODE.TYPE.CONFLICT",
-                details={"type_key": type_key, "sources": ["python_node", "nodeset"]},
+                f"definition_id '{type_key}' is defined by both a business Node and a NodesetType",
+                "NODE.DEFINITION.CONFLICT",
+                details={"definition_id": type_key, "sources": ["node", "nodeset_type"]},
             )
     if not implementations.strict:
         return
     for node in nodes:
         if node.status == STATUS_PLANNED:
             continue
-        if node.type_used in LOOP_NODE_TYPES:
+        if node.definition_id in LOOP_DEFINITION_IDS:
             continue
-        if node.type_used in nodesets:
+        if node.definition_id in nodeset_types:
             continue
-        if implementations.get(node.type_used) is None:
+        if implementations.get(node.definition_id) is None:
             raise GraphCompileError(
-                f"node '{node.id}' has unknown type_used '{node.type_used}'",
-                "NODE.TYPE.UNKNOWN",
-                details={"node": node.id, "type_used": node.type_used},
+                f"node '{node.id}' has unknown definition_id '{node.definition_id}'",
+                "NODE.DEFINITION.UNKNOWN",
+                details={"node": node.id, "definition_id": node.definition_id},
             )
 
 
@@ -474,7 +474,7 @@ def _validate_effective_edge_roles(
         )
 
 
-def explicit_flow_cycles(nodes_by_name: dict[str, NodeSpec], edges: tuple[EdgeSpec, ...], *, owner: str = "pipeline") -> tuple[dict[str, object], ...]:
+def explicit_flow_cycles(nodes_by_name: dict[str, NodeCallSpec], edges: tuple[EdgeSpec, ...], *, owner: str = "pipeline") -> tuple[dict[str, object], ...]:
     adjacency: dict[str, list[str]] = {name: [] for name in nodes_by_name}
     for edge in edges:
         if edge.source in nodes_by_name and edge.target in nodes_by_name:
@@ -493,7 +493,7 @@ def explicit_flow_cycles(nodes_by_name: dict[str, NodeSpec], edges: tuple[EdgeSp
 
 
 def _validate_no_explicit_cycles(
-    nodes_by_name: dict[str, NodeSpec],
+    nodes_by_name: dict[str, NodeCallSpec],
     edges: tuple[EdgeSpec, ...],
     *,
     owner: str,
@@ -548,23 +548,23 @@ def _validate_routing_edge_conditions(edges: tuple[EdgeSpec, ...], *, flow_kinds
 
 
 def _node_flow_kinds(
-    nodes_by_name: dict[str, NodeSpec],
+    nodes_by_name: dict[str, NodeCallSpec],
     *,
     implementations: ImplementationFacts,
-    nodesets: set[str],
+    nodeset_types: set[str],
 ) -> dict[str, str]:
     kinds: dict[str, str] = {}
     for name, spec in nodes_by_name.items():
         if spec.status == STATUS_PLANNED:
             kinds[name] = spec.flow_kind
             continue
-        if spec.type_used in LOOP_NODE_TYPES:
+        if spec.definition_id in LOOP_DEFINITION_IDS:
             kinds[name] = FLOW_KIND_PREDEFINED
             continue
-        if spec.type_used in nodesets:
+        if spec.definition_id in nodeset_types:
             kinds[name] = FLOW_KIND_PREDEFINED
             continue
-        implementation = implementations.get(spec.type_used)
+        implementation = implementations.get(spec.definition_id)
         if implementation is None:
             kinds[name] = ""
             continue
@@ -573,24 +573,24 @@ def _node_flow_kinds(
 
 
 def _node_effect_scopes(
-    nodes_by_name: dict[str, NodeSpec],
+    nodes_by_name: dict[str, NodeCallSpec],
     *,
     flow_kinds: dict[str, str],
     implementations: ImplementationFacts,
-    nodesets: set[str],
+    nodeset_types: set[str],
 ) -> dict[str, str]:
     scopes: dict[str, str] = {}
     for node_id, spec in nodes_by_name.items():
         fallback = "unavailable" if spec.status == STATUS_PLANNED else "unconstrained"
         if (
             spec.status == STATUS_PLANNED
-            or spec.type_used in LOOP_NODE_TYPES
+            or spec.definition_id in LOOP_DEFINITION_IDS
 
-            or spec.type_used in nodesets
+            or spec.definition_id in nodeset_types
         ):
             scopes[node_id] = fallback
             continue
-        implementation = implementations.get(spec.type_used)
+        implementation = implementations.get(spec.definition_id)
         scopes[node_id] = (
             implementation.effect_scope
             if implementation is not None and implementation.effect_scope
@@ -634,7 +634,7 @@ def _implemented_global_state_lock_keys(
     graph: GraphConfig,
     *,
     implementations: ImplementationFacts,
-    known_nodesets: set[str],
+    known_nodeset_types: set[str],
 ) -> dict[str, str]:
     """Return effective lock keys for executable global-state nodes.
 
@@ -647,8 +647,8 @@ def _implemented_global_state_lock_keys(
     return _collect_implemented_global_state_lock_keys(
         graph,
         implementations=implementations,
-        known_nodesets=known_nodesets,
-        nodeset_registry=graph.nodesets,
+        known_nodeset_types=known_nodeset_types,
+        nodeset_registry=graph.nodeset_types,
         path=(),
         inherited_lock_key="",
         active_nodesets=frozenset(),
@@ -659,19 +659,19 @@ def _collect_implemented_global_state_lock_keys(
     graph: GraphConfig,
     *,
     implementations: ImplementationFacts,
-    known_nodesets: set[str],
-    nodeset_registry: dict[str, NodesetSpec],
+    known_nodeset_types: set[str],
+    nodeset_registry: dict[str, NodesetTypeSpec],
     path: tuple[str, ...],
     inherited_lock_key: str,
     active_nodesets: frozenset[str],
 ) -> dict[str, str]:
     local_registry = dict(nodeset_registry)
-    local_registry.update(graph.nodesets)
-    available_nodesets = set(known_nodesets) | set(local_registry)
+    local_registry.update(graph.nodeset_types)
+    available_nodeset_types = set(known_nodeset_types) | set(local_registry)
     flow_kinds = _node_flow_kinds(
         {node.id: node for node in graph.nodes},
         implementations=implementations,
-        nodesets=available_nodesets,
+        nodeset_types=available_nodeset_types,
     )
     graph_lock_key = (
         graph.execution_lock.key if graph.execution_lock is not None else ""
@@ -702,7 +702,7 @@ def _collect_implemented_global_state_lock_keys(
             _collect_implemented_global_state_lock_keys(
                 nodeset.graph,
                 implementations=implementations,
-                known_nodesets=available_nodesets,
+                known_nodeset_types=available_nodeset_types,
                 nodeset_registry=local_registry,
                 path=node_path,
                 inherited_lock_key=effective_lock_key,
@@ -715,13 +715,13 @@ def _collect_implemented_global_state_lock_keys(
 def _implemented_execution_lock_paths(
     graph: GraphConfig,
     *,
-    known_nodesets: set[str],
+    known_nodeset_types: set[str],
 ) -> frozenset[str]:
     return frozenset(
         _collect_implemented_execution_lock_paths(
             graph,
-            known_nodesets=known_nodesets,
-            nodeset_registry=graph.nodesets,
+            known_nodeset_types=known_nodeset_types,
+            nodeset_registry=graph.nodeset_types,
             path=(),
             active_nodesets=frozenset(),
         )
@@ -731,18 +731,18 @@ def _implemented_execution_lock_paths(
 def _validate_execution_lock_nesting(
     graph: GraphConfig,
     *,
-    known_nodesets: set[str],
+    known_nodeset_types: set[str],
     owner: str,
     inherited_key: str = "",
-    nodeset_registry: dict[str, NodesetSpec] | None = None,
+    nodeset_registry: dict[str, NodesetTypeSpec] | None = None,
     path: tuple[str, ...] = (),
     active_nodesets: frozenset[str] = frozenset(),
 ) -> None:
     """Require nested lock scopes to reuse their active ancestor key."""
 
     local_registry = dict(nodeset_registry or {})
-    local_registry.update(graph.nodesets)
-    available_nodesets = set(known_nodesets) | set(local_registry)
+    local_registry.update(graph.nodeset_types)
+    available_nodeset_types = set(known_nodeset_types) | set(local_registry)
     graph_key = graph.execution_lock.key if graph.execution_lock is not None else ""
     active_key = _nested_execution_lock_key(
         inherited_key,
@@ -773,7 +773,7 @@ def _validate_execution_lock_nesting(
             continue
         _validate_execution_lock_nesting(
             nodeset.graph,
-            known_nodesets=available_nodesets,
+            known_nodeset_types=available_nodeset_types,
             owner=owner,
             inherited_key=nested_key,
             nodeset_registry=local_registry,
@@ -807,14 +807,14 @@ def _nested_execution_lock_key(
 def _collect_implemented_execution_lock_paths(
     graph: GraphConfig,
     *,
-    known_nodesets: set[str],
-    nodeset_registry: dict[str, NodesetSpec],
+    known_nodeset_types: set[str],
+    nodeset_registry: dict[str, NodesetTypeSpec],
     path: tuple[str, ...],
     active_nodesets: frozenset[str],
 ) -> set[str]:
     local_registry = dict(nodeset_registry)
-    local_registry.update(graph.nodesets)
-    available_nodesets = set(known_nodesets) | set(local_registry)
+    local_registry.update(graph.nodeset_types)
+    available_nodeset_types = set(known_nodeset_types) | set(local_registry)
     found: set[str] = set()
     for node in graph.nodes:
         if not _node_is_executable(
@@ -838,7 +838,7 @@ def _collect_implemented_execution_lock_paths(
         found.update(
             _collect_implemented_execution_lock_paths(
                 nodeset.graph,
-                known_nodesets=available_nodesets,
+                known_nodeset_types=available_nodeset_types,
                 nodeset_registry=local_registry,
                 path=node_path,
                 active_nodesets=active_nodesets | {target},
@@ -848,26 +848,26 @@ def _collect_implemented_execution_lock_paths(
 
 
 def _executed_nodeset_target(
-    node: NodeSpec,
-    nodeset_registry: dict[str, NodesetSpec],
+    node: NodeCallSpec,
+    nodeset_registry: dict[str, NodesetTypeSpec],
 ) -> str:
-    if node.type_used in nodeset_registry:
-        return node.type_used
-    if node.type_used in LOOP_NODE_TYPES:
+    if node.definition_id in nodeset_registry:
+        return node.definition_id
+    if node.definition_id in LOOP_DEFINITION_IDS:
         return node.loop.body
     return ""
 
 
 def _node_is_executable(
-    node: NodeSpec,
+    node: NodeCallSpec,
     graph: GraphConfig,
     *,
-    nodeset_registry: dict[str, NodesetSpec] | None = None,
+    nodeset_registry: dict[str, NodesetTypeSpec] | None = None,
 ) -> bool:
     if node.status == STATUS_PLANNED:
         return False
     local_registry = dict(nodeset_registry or {})
-    local_registry.update(graph.nodesets)
+    local_registry.update(graph.nodeset_types)
     target = _executed_nodeset_target(node, local_registry)
     if not target:
         return True

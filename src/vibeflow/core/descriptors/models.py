@@ -341,27 +341,29 @@ class CapabilityRequirementDescriptor:
 
 @dataclass(frozen=True)
 class NodeDescriptor:
-    type_key: str
+    id: str
     display_name: str
     description: str
     version: str
     flow_kind: str
     contract: NodeContractDescriptor
+    node_type: str
     implementations: tuple[ImplementationDescriptor, ...] = ()
     base_libs: tuple[str, ...] = ()
     capabilities: tuple[CapabilityRequirementDescriptor, ...] = ()
     author: str | None = None
     tags: tuple[str, ...] = ()
     external: bool = False
-    rulesets: tuple[str, ...] = ()
+    rulesets: tuple | None = None
     presentation: Mapping[str, Any] = field(default_factory=dict)
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        _required_text(self.node_type, field_name="node.node_type")
         object.__setattr__(
             self,
-            "type_key",
-            _required_text(self.type_key, field_name="node.type_key"),
+            "id",
+            _required_text(self.id, field_name="node.id"),
         )
         object.__setattr__(
             self,
@@ -429,14 +431,10 @@ class NodeDescriptor:
             _string_tuple(self.tags, field_name="node.tags"),
         )
         from vibeflow.core.rules.selection.models import selection_refs
-        object.__setattr__(self, "rulesets", selection_refs(self.rulesets, field_name="node.rulesets"))
+        object.__setattr__(self, "rulesets", selection_refs(self.rulesets, optional=True, field_name="node.rulesets"))
         from vibeflow.core.descriptors.presentation import normalize_presentation
         object.__setattr__(self, "presentation", normalize_presentation(self.presentation, field_name="node.presentation"))
         object.__setattr__(self, "metadata", freeze_mapping(self.metadata, field_name="node.metadata"))
-
-    @property
-    def id(self) -> str:
-        return self.type_key
 
     @property
     def required_base_libs(self) -> tuple[str, ...]:
@@ -451,7 +449,8 @@ class NodeDescriptor:
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
             "kind": "node",
-            "type_key": self.type_key,
+            "node_type": self.node_type,
+            "id": self.id,
             "display_name": self.display_name,
             "description": self.description,
             "version": self.version,
@@ -491,14 +490,7 @@ def _validate_implementation_coverage(
             seen[target] = implementation
 
 
-from vibeflow.core.descriptors._resource_models import (  # noqa: E402
-    BaseLibDescriptor,
-    CapabilityDescriptor,
-    CapabilityOperationDescriptor,
-    DataSchemaDescriptor,
-    HostExtensionDescriptor,
-    PluginDescriptor,
-)
+from vibeflow.core.descriptors._resource_models import BaseLibDescriptor, CapabilityDescriptor, CapabilityOperationDescriptor, DataSchemaDescriptor, PluginDescriptor
 
 CapabilityOperation = CapabilityOperationDescriptor
 CapabilityRequirement = CapabilityRequirementDescriptor

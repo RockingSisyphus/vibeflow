@@ -89,7 +89,7 @@ def registered_implementation_requests(
                 key = (descriptor.id, str(source), export)
                 if key not in descriptors:
                     descriptors[key] = descriptor
-                    ownership.append({"type_key":descriptor.id, "path":str(source), "export":export,
+                    ownership.append({"id":descriptor.id, "path":str(source), "export":export,
                                       "kind":kind, "role":role})
     return ownership, descriptors
 
@@ -144,7 +144,7 @@ def evaluate_registered_facts(
         relative = str(fact["path"])
         absolute = str((project_root / relative).resolve())
         kind = str(fact["kind"])
-        key = (str(fact["type_key"]), absolute, str(fact["export"]))
+        key = (str(fact["id"]), absolute, str(fact["export"]))
         descriptor = descriptors.get(key)
         file = files.get(relative)
         if descriptor is None or file is None:
@@ -202,7 +202,7 @@ def evaluate_registered_facts(
                 rule_id=item.rule_id,
                 severity=item.severity,
                 object_type=kind,
-                object_id=str(fact["type_key"]),
+                object_id=str(fact["id"]),
                 source_location={"path": absolute, "line": 1},
                 message=item.message,
                 suggested_fix_type=item.suggested_fix_type,

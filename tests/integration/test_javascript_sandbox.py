@@ -81,7 +81,7 @@ def test_typescript_sandbox_positive_projects_prepare_real_aot_plans(
 
     assert prepared.used_base_libs == base_libs
     assert prepared.used_capabilities == capabilities
-    assert prepared.used_node_types
+    assert prepared.used_node_ids
     assert prepared.plan.blocks
     bindings = prepared.javascript_bindings
     assert bindings is not None
@@ -156,17 +156,17 @@ def test_platform_module_failures_remain_native_when_rules_are_unselected(
         prepare_project_build(request)
     assert any(item["definition_id"] in {"vibeflow.no_side_effects", "vibeflow.import_side_effects"}
                for item in governed.value.diagnostics)
-    plugin = project / "code_plugin.ts"
+    plugin = project / "nodes/code_plugin_declarations.ts"
     original = plugin.read_text(encoding="utf-8")
     lines = original.splitlines(keepends=True)
     type_key = f"sandbox.invalid.{Path(config_name).stem}"
-    index = next(index for index, line in enumerate(lines) if f'"type_key": "{type_key}"' in line)
+    index = next(index for index, line in enumerate(lines) if f'"id": "{type_key}"' in line)
     import re
     lines[index] = re.sub(r'"rulesets": \[[^\]]*\]', '"rulesets": []', lines[index])
     plugin.write_text("".join(lines), encoding="utf-8")
     try:
         prepared = prepare_project_build(request)
-        assert prepared.used_node_types == (f"sandbox.invalid.{Path(config_name).stem}", "sandbox.terminal")
+        assert prepared.used_node_ids == (f"sandbox.invalid.{Path(config_name).stem}", "sandbox.terminal")
         with pytest.raises(AotBuildError) as platform:
             build_project_aot(request)
         assert platform.value.code == "VF_ESBUILD"

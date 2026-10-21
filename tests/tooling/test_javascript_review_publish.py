@@ -30,22 +30,28 @@ def _review_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         document_path=architecture,
     )
     root = SimpleNamespace(
+        id="project", project_target="javascript", project_config={},
         path=root_path,
         config_path=root_path / "vibeflow_project.jsonc",
         architecture_documents=(spec,),
     )
     workspace = SimpleNamespace(
+        root=tmp_path, roots=(root,),
         path=tmp_path / "vibeflow_config.jsonc",
         root_for_path=lambda path: root if Path(path).resolve() == config else None,
     )
     workspace.path.write_text('{"roots":[]}\n', encoding="utf-8")
     root.config_path.write_text('{}\n', encoding="utf-8")
     monkeypatch.setattr(workspace_loader, "load_workspace_config", lambda _path: workspace)
+    # Publication tests isolate prepared governance from the mocked audit result.
+    from vibeflow.tooling.project import preparation
+    monkeypatch.setattr(preparation, "ProjectPreparation", lambda *a, **k: SimpleNamespace(
+        review=lambda **k: SimpleNamespace(architecture_path=tmp_path / "PROJECT_ARCHITECTURE.jsonc")))
     rendered_architecture = ARCHITECTURE_DOCUMENT_HEADER + json.dumps(
         {
             "project_target": "javascript",
             "workflow": {},
-            "nodesets": {},
+            "nodeset_types": {},
             "node_types": {},
             "resources": {},
         },
@@ -275,7 +281,7 @@ def test_quality_discovery_ignores_nodesets_and_architecture_documents(
             {
                 "project_target": "javascript",
                 "workflow": {},
-                "nodesets": {},
+                "nodeset_types": {},
                 "node_types": {},
                 "resources": {},
             }
@@ -292,10 +298,9 @@ def test_quality_discovery_ignores_nodesets_and_architecture_documents(
         )
     )
 
-    discovered = cli._quality_configs(
-        workspace,
-        explicit_config=None,
-        explicit_path=str(root),
-    )
+    from vibeflow.tooling.project.inventory import inventory_project
+    workspace.root = root.parent
+    workspace.roots[0].id = "project"
+    discovered = tuple(item.path for item in inventory_project(workspace).workflows)
 
     assert discovered == (workflow.resolve(),)

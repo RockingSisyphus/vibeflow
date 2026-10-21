@@ -10,10 +10,10 @@ from vibeflow.tooling.project.graph_config import parse_graph_config
 
 
 def graph_document():
-    return {"pipeline": {"nodes": [{"id": "root", "type_used": "example.node", "display_name": "Call", "description": "An explicit call instance."}]},
-            "nodesets": [
+    return {"pipeline": {"nodes": [{"id": "root", "definition_id": "example.node", "display_name": "Call", "description": "An explicit call instance."}]},
+            "nodeset_types": [
                 {"type_key": "example.stage", "display_name": "Stage", "description": "An imported scope.",
-                 "requires": [], "provides": [], "pipeline": {"nodes": [{"id": "child", "type_used": "example.node", "display_name": "Call", "description": "An explicit call instance."}]}},
+                 "requires": [], "provides": [], "pipeline": {"nodes": [{"id": "child", "definition_id": "example.node", "display_name": "Call", "description": "An explicit call instance."}]}},
                 {"type_key": "example.planned", "display_name": "Planned", "description": "A planned scope.",
                  "requires": [], "provides": [], "status": "planned"}]}
 
@@ -23,7 +23,7 @@ def test_application_defaults_missing_root_imported_and_planned_scopes():
     original = deepcopy(document)
     graph = parse_graph_config(document)
     assert graph.rulesets is None
-    assert all(item.graph.rulesets is None for item in graph.nodesets.values())
+    assert all(item.graph.rulesets is None for item in graph.nodeset_types.values())
     _, defaults = builtin_rule_resources()
     tasks = graph_rule_tasks(graph, {item.id:item for item in defaults})
     assert {task.reference for task in tasks} == {"vibeflow.workflow"}
@@ -33,16 +33,16 @@ def test_application_defaults_missing_root_imported_and_planned_scopes():
 def test_application_preserves_explicit_empty_and_custom_selections():
     document = graph_document()
     document["rulesets"] = []
-    document["nodesets"][0]["rulesets"] = ["example.review"]
-    document["nodesets"][1]["rulesets"] = []
+    document["nodeset_types"][0]["rulesets"] = ["example.review"]
+    document["nodeset_types"][1]["rulesets"] = []
     graph = parse_graph_config(document)
     assert graph.rulesets == ()
-    assert graph.nodesets["example.stage"].graph.rulesets == ("example.review",)
-    assert graph.nodesets["example.planned"].graph.rulesets == ()
+    assert graph.nodeset_types["example.stage"].graph.rulesets == ("example.review",)
+    assert graph.nodeset_types["example.planned"].graph.rulesets == ()
 
 
 def test_rule_defaults_do_not_mutate_business_params():
-    opaque = {"nodesets": [{"label": "ordinary user value"}]}
+    opaque = {"nodeset_types": [{"label": "ordinary user value"}]}
     document = graph_document()
     document["pipeline"]["nodes"][0]["payload"] = opaque
     original = deepcopy(document)
@@ -55,7 +55,7 @@ def test_rule_defaults_do_not_mutate_business_params():
 @pytest.mark.parametrize("scope", ["root", "nodeset"])
 def test_explicit_invalid_selections_reach_core_validation(selection, scope):
     document = graph_document()
-    selected = document if scope == "root" else document["nodesets"][0]
+    selected = document if scope == "root" else document["nodeset_types"][0]
     selected["rulesets"] = selection
     with pytest.raises(GraphConfigError, match="rulesets"):
         parse_graph_config(document)

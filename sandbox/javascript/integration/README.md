@@ -23,7 +23,7 @@ Positive workflows:
   nodeset;
 - `project/configs/nested_override.jsonc` applies a qualified config override
   to one of two sibling nested `math` nodes and proves it does not leak;
-- `project/configs/nested_async.jsonc` nests two nodesets around a deferred
+- `project/configs/nested_async.jsonc` nests two nodeset_types around a deferred
   result and a detached task, then verifies qualified task paths, cleanup
   timeout location, and successful reuse after cleanup failure;
 - `project/configs/loop.jsonc` carries a number through a bounded three-step

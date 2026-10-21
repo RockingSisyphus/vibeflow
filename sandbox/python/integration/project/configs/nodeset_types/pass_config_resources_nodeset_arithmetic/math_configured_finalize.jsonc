@@ -1,0 +1,104 @@
+{
+  "display_name": "Configured Finalize",
+  "description": "Scales a resource arithmetic value and finalizes it with nodeset call config.",
+  "requires": [
+    {
+      "type": "calc.resource",
+      "cardinality": "exactly_one",
+      "display_name": "Calc Resource"
+    }
+  ],
+  "provides": [
+    {
+      "key": "calc.final",
+      "type": "calc.final",
+      "display_name": "Calc Final"
+    }
+  ],
+  "global_config": {
+    "config": {
+      "factor": 2,
+      "offset": 1
+    },
+    "allow_config_override": false
+  },
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "calc.resource",
+        "type": "calc.resource",
+        "display_name": "Calc Resource",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "definition_id": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
+      },
+      {
+        "factor": 100,
+        "id": "scale",
+        "definition_id": "sandbox.resource_scale",
+        "display_name": "Scale",
+        "description": "Runs scale."
+      },
+      {
+        "id": "use_scaled",
+        "definition_id": "semantic.use_scaled",
+        "display_name": "Use Scaled",
+        "description": "Runs use_scaled."
+      },
+      {
+        "offset": -100,
+        "id": "finalize",
+        "definition_id": "semantic.finalize",
+        "display_name": "Finalize",
+        "description": "Runs finalize."
+      },
+      {
+        "id": "end",
+        "definition_id": "semantic.final_end",
+        "display_name": "End",
+        "description": "Runs end."
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "scale"
+      },
+      {
+        "from": "scale",
+        "to": "use_scaled"
+      },
+      {
+        "from": "use_scaled",
+        "to": "finalize"
+      },
+      {
+        "from": "finalize",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "calc.final",
+        "cardinality": "exactly_one",
+        "display_name": "Calc Final"
+      }
+    ]
+  },
+  "type_key": "math.configured_finalize",
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugins/code_plugin/plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
+}

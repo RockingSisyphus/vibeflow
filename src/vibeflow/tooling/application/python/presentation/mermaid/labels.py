@@ -6,7 +6,7 @@ from typing import Any, Mapping
 
 from vibeflow.tooling.application.python.presentation.review_model import nodeset_for_node
 from vibeflow.tooling.application.python.presentation.review_model import display_source_path, edge_roles, edge_transfers, mapping_items, rendered_resources_payload
-from vibeflow.core.flow import GraphConfig, NodeSpec, NodesetSpec
+from vibeflow.core.flow import GraphConfig, NodeCallSpec, NodesetTypeSpec
 from vibeflow.tooling.presentation.mermaid.style import (
     mermaid_shape_for_flow_kind,
 )
@@ -21,11 +21,11 @@ def _nodeset_node_ids(graph: GraphConfig, node_ids: Mapping[str, str]) -> dict[s
             result[nodeset.type_key] = node_ids[node.id]
     return result
 
-def _expanded_nodeset_title(node: NodeSpec, nodeset: NodesetSpec) -> str:
+def _expanded_nodeset_title(node: NodeCallSpec, nodeset: NodesetTypeSpec) -> str:
     title = node.metadata.display_name or nodeset.display_name or node.id or nodeset.type_key
     return f"{title} (id: {node.id}, type_key: {nodeset.type_key})"
 
-def _node_metadata_lines(node: NodeSpec) -> tuple[str, ...]:
+def _node_metadata_lines(node: NodeCallSpec) -> tuple[str, ...]:
     lines: list[str] = []
     metadata = node.metadata
     if metadata.description:
@@ -97,8 +97,6 @@ def _resource_label(resource: Mapping[str, object], *, kind: str, show_semantics
         identity_lines.append(f"id: {resource_id_text}")
     if kind == "base_lib":
         identity_lines.append("type: base_lib")
-    elif kind == "host_extension":
-        identity_lines.append("type: host_extension")
     else:
         plugin_type = str(resource.get("type", info_map.get("type", ""))).strip()
         if plugin_type:
@@ -137,12 +135,8 @@ def _resource_label(resource: Mapping[str, object], *, kind: str, show_semantics
             meta_lines.append(f"version: {version}")
         if description:
             meta_lines.append(f"desc: {description}")
-        if kind in {"plugin", "host_extension"}:
-            fields = (
-                ("targets", "provides", "dependencies")
-                if kind == "host_extension"
-                else ("targets", "dependencies")
-            )
+        if kind in {"plugin"}:
+            fields = ("targets", "dependencies")
             for field in fields:
                 values = resource.get(field, ())
                 if isinstance(values, (list, tuple)) and values:
@@ -153,7 +147,7 @@ def _resource_label(resource: Mapping[str, object], *, kind: str, show_semantics
                         )
                     )
         if (
-            kind in {"plugin", "host_extension"}
+            kind in {"plugin"}
             and isinstance(config_keys, list)
             and config_keys
         ):

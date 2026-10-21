@@ -6,7 +6,7 @@ from copy import deepcopy
 from pathlib import Path
 
 
-NODE = {"id": "work", "type_used": "parity.work", "display_name": "Work", "description": "One unit of work."}
+NODE = {"id": "work", "definition_id": "parity.work", "display_name": "Work", "description": "One unit of work."}
 
 
 def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None) -> list[dict]:
@@ -45,10 +45,10 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         ("nodes_empty", pipeline(nodes=[]), "NODES_NON_EMPTY"),
         ("node_object", pipeline(nodes=[None]), "NODE_OBJECT"),
         ("node_id", changed_node(id=""), "NODE_MISSING_ID"),
-        ("node_type", changed_node(type_used=""), "NODE_MISSING_TYPE"),
+        ("node_type", changed_node(definition_id=""), "NODE_MISSING_TYPE"),
         ("legacy_name", changed_node(name="old"), "NODE_LEGACY_NAME"),
         ("legacy_type", changed_node(type="old"), "NODE_LEGACY_TYPE"),
-        ("legacy_nodeset_type", changed_node(type_used="nodeset.old"), "NODE_LEGACY_NODESET_TYPE"),
+        ("legacy_nodeset_type", changed_node(definition_id="nodeset.old"), "NODE_LEGACY_NODESET_TYPE"),
         ("node_title", changed_node(display_name=""), "NODE_METADATA_REQUIRED"),
         ("node_description", changed_node(description=""), "NODE_METADATA_REQUIRED"),
         ("node_config", changed_node(config=[]), "NODE_CONFIG_OBJECT"),
@@ -82,7 +82,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     emit("lock.normal", pipeline(execution_lock={"key": "parity.resource"}))
     emit("roles.normal", pipeline(edges=[{"from": "work", "to": "work", "schedule": True, "transfer": False}]))
     for name, extra, code in [
-        ("inline_nodesets", {"nodesets": []}, "CONFIG.NODESETS.INLINE_REMOVED"),
+        ("inline_nodesets", {"nodeset_types": []}, "CONFIG.NODESETS.INLINE_REMOVED"),
         ("removed_boundary", {"boundary": {}}, "CONFIG.BOUNDARY.REMOVED"),
         ("removed_loops", {"pipeline": {**pipeline()["pipeline"], "loops": []}}, "CONFIG.LOOPS.REMOVED"),
         ("base_object", {"base_lib": []}, "CONFIG.SCHEMA.BASE_LIB"),
@@ -93,19 +93,16 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         ("global_values", {"global_config": {"values": []}}, "CONFIG.SCHEMA.GLOBAL_CONFIG_VALUES"),
         ("plugin_list", {"plugins": {}}, "CONFIG.SCHEMA.PLUGINS_LIST"),
         ("plugin_object", {"plugins": [1]}, "CONFIG.SCHEMA.PLUGIN_OBJECT"),
-        ("host_list", {"host_extensions": {}}, "CONFIG.SCHEMA.HOST_EXTENSIONS_LIST"),
-        ("host_id", {"host_extensions": [""]}, "CONFIG.SCHEMA.HOST_EXTENSION_ID"),
-        ("host_enabled", {"host_extensions": [{"id": "parity.host", "enabled": "yes"}]}, "CONFIG.SCHEMA.HOST_EXTENSION_ENABLED"),
-        ("host_duplicate", {"host_extensions": ["parity.host", "parity.host"]}, "CONFIG.SCHEMA.HOST_EXTENSION_DUPLICATE"),
+        ("host_list", {"host_extensions": {}}, "CONFIG.HOST_EXTENSION.RETIRED"),
     ]:
         if variant == "current" and name == "plugin_object":
             code = "PLUGIN.SELECTION.MIGRATION"
         elif variant == "current" and name == "base_paths":
             code = "CONFIG.BASE_LIB.REGISTRATION_REMOVED"
         emit(name, {**pipeline(), **extra}, (code,), family="config.resources", classification="approved_change" if name in {"plugin_object", "base_paths"} and variant == "current" else "preserved")
-    emit("resources.normal", {**pipeline(), "plugins": ([{"source":{"kind":"file","ref":"plugin.py"}}] if variant == "current" else ["parity.plugin"]), "host_extensions": ["parity.host"],
+    emit("resources.normal", {**pipeline(), "plugins": ([{"source":{"kind":"file","ref":"plugin.py"}}] if variant == "current" else ["parity.plugin"]),
                              "base_lib": ({"modules": ["support.math"]} if variant == "current" else {"paths": ["support"], "modules": ["support.math"]}), "global_config": {"values": {"size": 1}}}, family="config.resources")
-    io = {**NODE, "type_used": "vibeflow.io", "requires": [],
+    io = {**NODE, "definition_id": "vibeflow.io", "requires": [],
           "provides": [{"key":"value","type":"parity.value","display_name":"Value"}], "io":{"operation":"receive"}}
     emit("system_io.normal", pipeline(nodes=[io]), family="config.contract")
     planned = {**NODE, "status": "planned", "flow_kind": "process", "requires": [], "provides": []}

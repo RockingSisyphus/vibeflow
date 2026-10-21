@@ -7,7 +7,7 @@ from vibeflow.targets.python.runtime.block_compiler import CompiledBlock
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.contracts import DataProvider, DataRequirement, provider_keys, requirement_types
 from vibeflow.core.flow import EdgeSpec, GraphConfig, LoopSpec, ExecutionLockSpec, STATUS_IMPLEMENTED, STATUS_PLANNED
-from vibeflow.targets.python.nodetypes.protocols import PureNode
+from vibeflow.targets.python.sdk.protocols import PureNode
 from vibeflow.targets.python.project.bindings import PythonBindingPlan
 from vibeflow.core.planned import PLANNED_BEHAVIOR_PYTHON_STUB, PlannedBehavior, blocking_planned_behavior
 from vibeflow.targets.python.project.registry import NodeRegistry
@@ -17,7 +17,7 @@ from vibeflow.core.config.scope import ConfigScope
 @dataclass(frozen=True)
 class NodeFrame:
     id: str
-    type_used: str
+    definition_id: str
     node: PureNode | None
     requires: tuple[DataRequirement, ...]
     provides: tuple[DataProvider, ...]
@@ -34,7 +34,7 @@ class NodeFrame:
     is_loop: bool = False
     join_policy: str = ""
     max_concurrency: int = 8
-    nodeset_type_key: str = ""
+    nodeset_type_id: str = ""
     exports: tuple[DataProvider, ...] = ()
     loop_spec: LoopSpec = field(default_factory=LoopSpec)
     execution_lock: ExecutionLockSpec | None = None
@@ -45,18 +45,6 @@ class NodeFrame:
     planned_stub_path: str = ""
     planned_stub_hash: str = ""
     capability_policy: Mapping[str, object] = field(default_factory=dict)
-
-    @property
-    def name(self) -> str:
-        return self.id
-
-    @property
-    def node_type(self) -> str:
-        return self.type_used
-
-    @property
-    def nodeset_name(self) -> str:
-        return self.nodeset_type_key
 
     @property
     def is_planned_stub(self) -> bool:
@@ -106,7 +94,7 @@ class ExecutionPlan:
         self,
         *,
         workflow_id: str | None = None,
-        source_by_type: Mapping[str, object] | None = None,
+        source_by_definition: Mapping[str, object] | None = None,
         pipeline_inputs: object | None = None,
         pipeline_outputs: object | None = None,
     ):
@@ -124,7 +112,7 @@ class ExecutionPlan:
         return workflow_plan_from_execution_plan(
             self,
             workflow_id=workflow_id,
-            source_by_type=source_by_type,
+            source_by_definition=source_by_definition,
             pipeline_inputs=pipeline_inputs,
             pipeline_outputs=pipeline_outputs,
         )

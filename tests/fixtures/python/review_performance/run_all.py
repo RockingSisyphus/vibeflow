@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[4]
 sys.dont_write_bytecode = True
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "src"))
 from tests.fixtures.python.review_performance.fixtures import write_project, register_architecture
 
 
@@ -49,7 +50,7 @@ def scenarios(representative=False):
 
 
 def command_arguments(command, project):
-    result = [command, '--workspace', str(project/'vibeflow_config.jsonc')]
+    result = [command, '--workspace', str(project.parent/'vibeflow_config.jsonc')]
     if command != 'quality-check':
         result += ['--config', str(project/'workflow.jsonc')]
     if command in ('validate','quality-check'):
@@ -113,7 +114,7 @@ def verify(identifier, options, command, observation, project, *, baseline):
 
 
 def observe(identifier, options, command, args, index=0):
-    project = args.work / (identifier+f'-{index}')
+    project = args.work / (identifier+f'-{index}') / 'project'
     write_project(project, **{key:value for key,value in options.items() if key != 'preload'})
     # review/quality exercise the registered canonical Architecture document.
     if command in ('review','quality-check') or options.get('preload'):
@@ -138,7 +139,7 @@ def inspect_products(project, args):
     style = node['presentation']
     if style['values']['fill'] != '#d6eaff' or style['values']['shape'] != 'rounded' or style['sources']['fill'] != 'node':
         failures.append('canonical Architecture presentation differs from the declaration')
-    descriptor = document['node_types']['perf.step.0']
+    descriptor = document['node_definitions']['perf.step.0']
     if 'group0.py' not in json.dumps(descriptor) or 'perf.calls' not in json.dumps(descriptor):
         failures.append('canonical Architecture lost implementation or ruleset sources')
     mermaid = (project/'graph.mmd').read_text() if (project/'graph.mmd').exists() else ''

@@ -16,6 +16,7 @@ class DriverSession:
         from vibeflow.targets.javascript.resources import materialized_resources
         self.stack=ExitStack()
         resources=self.stack.enter_context(materialized_resources())
+        self.resources=resources
         self.stderr=self.stack.enter_context(tempfile.TemporaryFile(mode="w+t",encoding="utf-8"))
         try:
             self.process=subprocess.Popen([node_command,str(resources/"toolchain_driver.mjs"),"--session"],
