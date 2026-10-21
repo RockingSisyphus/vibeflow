@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vibeflow.local/schema/node_type.schema.json",
+  "title": "VibeFlow NodeType shell",
+  "type": "object",
+  "required": [
+    "kind",
+    "id"
+  ],
+  "properties": {
+    "kind": {
+      "const": "node_type"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "display_name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "rulesets": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "object",
+            "required": [
+              "rule_id"
+            ],
+            "properties": {
+              "rule_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "params": {
+                "type": "object"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "uniqueItems": true
+    },
+    "presentation": {
+      "$ref": "node.schema.json#/$defs/presentation"
+    }
+  },
+  "additionalProperties": false
+}

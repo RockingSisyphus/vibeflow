@@ -83,7 +83,7 @@ const result = runWorkflow(inputs, {
 });
 ```
 
-异步入口 `runWorkflowAsync` 使用相同选项。Host 使用 `createWorkflowHost(options)` 接入同一配置：创建时为 `starting`，启动后持续为 `running`，多次工作流调用共用该 Host 的文件和信息缓存，停止后写入最终状态；创建、启动或停止异常写为 `failed`。被业务捕获的单次调用异常记录在内核事件中，Host 会话继续运行。
+异步入口 `runWorkflowAsync` 使用相同选项。每次 workflow 调用独立记录 `starting`、`running` 和真实终态，信息缓存不跨调用共享。宿主将普通 Capability API 和取消信号传入调用；建立监听、接收消息和关闭资源由图中的显式 Node 完成。
 
 SDK Node 的 `run(inputs, params, context)` 使用运行器提供的第三个参数；把下面的方法放入声明了相同输入输出的 `defineNode` 对象：
 
@@ -101,12 +101,12 @@ run(inputs, params, context) {
 
 Node.js 构建自动写入文件，并通过独立线程维持文件更新时间，包含主事件循环被同步业务计算占用的阶段。`console` 和 `process.stdout/stderr.write` 进入业务日志，并继续输出到终端。直接继承操作系统文件描述符的子进程输出由调用方接回标准流后保存。
 
-浏览器和底层纯源码生成接口通过 `onStatus(status)` 提供相同快照，由 Host 接入存储或外部监控；浏览器定时回调按其事件循环调度。浏览器构建不包含 Node 文件系统适配器。`onTrace` 继续提供原有运行事件。
+浏览器和底层纯源码生成接口通过 `onStatus(status)` 提供相同快照，由宿主接入存储或外部监控；浏览器定时回调按其事件循环调度。浏览器构建不包含 Node 文件系统适配器。`onTrace` 继续提供原有运行事件。
 
 ## 监控判读
 
-独立工作流正常结束写为 `succeeded`；执行异常、取消或非零委托退出写为 `failed`。Host 正常停止写为 `succeeded`，生命周期异常写为 `failed`。`info` 只描述业务进度，不改变内核状态。进程被强制终止、机器断电或存储不可写时，最后文件可能仍是 `running`；监控程序可结合更新时间和自身进程检查判断是否失联。
+独立工作流正常结束写为 `succeeded`；执行异常、取消或非零委托退出写为 `failed`。Node、Plugin 或显式清理抛出的异常按本次 workflow 的实际结果记录。`info` 只描述业务进度，不改变内核状态。进程被强制终止、机器断电或存储不可写时，最后文件可能仍是 `running`；监控程序可结合更新时间和自身进程检查判断是否失联。
 
 普通节点的并发分发、显式汇合、取消与实际收尾合同见[普通图并发](graph-concurrency.md)。
 
-`stopping` 表示停止已请求但所属执行或资源仍在收尾。任务、Host.stop、插件释放和执行锁均以实际收尾完成为结束边界；取消对等待的关注不会冒充退出。
+`stopping` 表示停止已请求但所属执行或资源仍在收尾。并发分支、节点清理、插件释放和执行锁均以实际收尾完成为结束边界；取消对等待的关注不会冒充退出。

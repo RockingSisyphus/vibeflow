@@ -37,7 +37,6 @@ EMITTED_FIELDS = (
     "plan_sha256",
     "implementation_modules",
     "implementation_bindings",
-    "host_extensions",
 )
 
 
@@ -73,8 +72,8 @@ def _bound_emission(prepared: object) -> object:
         "loop.jsonc",
         "async_capability.jsonc",
         "detached.jsonc",
-        "host_extension.jsonc",
-        "permanent_port_host.jsonc",
+        "explicit_lifecycle.jsonc",
+        "permanent_mailbox_loop.jsonc",
     ),
 )
 def test_real_projects_emit_deterministic_bound_modules(
@@ -87,12 +86,7 @@ def test_real_projects_emit_deterministic_bound_modules(
     (example / "project/node_modules").symlink_to(toolchain / "node_modules", target_is_directory=True)
     prepared = prepare_project_build(
         ProjectBuildRequest(
-            workspace=(
-                example / "vibeflow_host_config.jsonc"
-                if config_name
-                in {"host_extension.jsonc", "permanent_port_host.jsonc"}
-                else example / "vibeflow_config.jsonc"
-            ),
+            workspace=example / "vibeflow_config.jsonc",
             config=example / "project/configs" / config_name,
             out_dir=tmp_path / config_name,
             target="node",

@@ -20,10 +20,10 @@ def python_project(root):
     schemas = "\n".join(f's{i}=data_schema(type_key={key!r},schema={value!r})'
         for i, (key, value) in enumerate(WORKFLOW_SCHEMA_TYPES.items()))
     source = '''from vibeflow.targets.python.sdk import Plugin,node,capability,data_schema
-@node(type_key="peer.boundary",flow_kind="terminal",contract={},rulesets=["vibeflow.process"])
+@node(node_type='vibeflow.node', id="peer.boundary",flow_kind="terminal",contract={},rulesets=["vibeflow.process"])
 class Boundary:
     def run_pure(self,inputs,params):return {}
-@node(type_key="peer.work",rulesets=["vibeflow.process"],
+@node(node_type='vibeflow.node', id="peer.work",rulesets=["vibeflow.process"],
       capabilities=[{"id":"vibeflow.workflow","operations":["self","send","receive"]}],
       contract={"provides":[{"key":"out","type":"number","display_name":"Result"}],"output_semantics":{"out":["Tripled message"]}})
 class Work:
@@ -34,12 +34,13 @@ class Work:
         api["send"]({"id":message["sender"],"port":"reply","payload":{"value":value,"self":api["self"]({})["id"]}})
         return {"out":value}
 '''
-    source += f"\ninterface=capability(**{descriptor!r})\n" + schemas
-    source += "\nplugin=Plugin(id='peer',resources=[Boundary,Work,interface," + ",".join(f"s{i}" for i in range(len(WORKFLOW_SCHEMA_TYPES))) + "])\n"
-    workspace, config = project(root, source)
+    plugin_source = "from vibeflow.targets.python.sdk import Plugin,capability,data_schema\n"
+    plugin_source += f"interface=capability(**{descriptor!r})\n" + schemas
+    plugin_source += "\nplugin=Plugin(id='peer',resources=[interface," + ",".join(f"s{i}" for i in range(len(WORKFLOW_SCHEMA_TYPES))) + "])\n"
+    workspace, config = project(root, source, plugin_source=plugin_source)
     data = json.loads(config.read_text())
     data["rulesets"] = ["vibeflow.workflow", {"rule_id": "vibeflow.capability.restrict"}]
-    data["pipeline"] = {"nodes": [{"id": key, "type_used": node, "display_name": key, "description": key}
+    data["pipeline"] = {"nodes": [{"id": key, "definition_id": node, "display_name": key, "description": key}
         for key, node in [("start", "peer.boundary"), ("work", "peer.work"), ("end", "peer.boundary")]],
         "edges": [["start", "work"], ["work", "end"]],
         "outputs": [{"type": "number", "as": "result", "cardinality": "exactly_one", "display_name": "Result"}]}
@@ -74,7 +75,7 @@ export async function work(inputs,params,context){
     cap = workflow_capability_descriptor().to_dict()
     plan, bindings = plan_fixture({"entry_mode": "async", "schemas": {**WORKFLOW_SCHEMA_TYPES, "number": {"type": "number"}},
         "capabilities": [cap], "nodes": [
-            {"id": key, "type_used": key, "is_terminal": key != "work", "flow_kind": "process" if key == "work" else "terminal",
+            {"id": key, "definition_id": key, "is_terminal": key != "work", "flow_kind": "process" if key == "work" else "terminal",
              "implementation": {"kind": "file", "ref": "./nodes.mjs", "export": "work" if key == "work" else "boundary"},
              **({"completion": "suspend", "provides": [{"key": "out", "type": "number"}],
                  "capabilities": [{"id": "vibeflow.workflow", "operations": operations}]} if key == "work" else {})}
@@ -138,7 +139,7 @@ def test_ordinary_workflow_node_calls_other_target_sends_receives_and_waits(tmp_
     def python_command(root, *, caller=False, aot=False):
         workspace, config = python_project(root)
         if caller:
-            plugin = root / "plugin.py"
+            plugin = root / "nodes/steps.py"
             source = plugin.read_text().replace('["self","send","receive"]', '["self","send","receive","call","wait"]')
             source = source.replace('        message=api["receive"]({"port":"request"})',
                 '        peer=api["call"]({"target":"peer"})\n        api["send"]({"id":peer["id"],"port":"request","payload":{"value":7}})\n        message=api["receive"]({"port":"reply"})\n        api["wait"]({"id":peer["id"]})')

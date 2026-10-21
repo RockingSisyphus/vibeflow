@@ -125,7 +125,7 @@ def _assign_layers(nodes: dict[str, AsciiNode], edges: list[AsciiEdge]) -> None:
 def _order_layers(nodes: dict[str, AsciiNode], edges: list[AsciiEdge], back_edges: set[AsciiEdge]) -> dict[int, list[str]]:
     layers: dict[int, list[str]] = {}
     for node in nodes.values():
-        layers.setdefault(node.layer, []).append(node.name)
+        layers.setdefault(node.layer, []).append(node.id)
     forward_edges = [edge for edge in edges if edge not in back_edges]
     for _ in range(4):
         for layer in sorted(layers):

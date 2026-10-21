@@ -16,7 +16,7 @@ from vibeflow.core.compiler import (
     explicit_flow_cycles,
 )
 from vibeflow.core.flow import (
-    LOOP_NODE_TYPES,
+    LOOP_DEFINITION_IDS,
     STATUS_PLANNED,
     GraphConfig,
 )
@@ -52,7 +52,7 @@ class GraphCompiler:
         *,
         registry: Any | None = None,
         catalog: Any | None = None,
-        known_nodesets: set[str] | None = None,
+        known_nodeset_types: set[str] | None = None,
         plugin_registry: CompilerPluginRegistry | None = None,
         owner: str = "pipeline",
         call_path: tuple[str, ...] = (),
@@ -62,7 +62,7 @@ class GraphCompiler:
             graph,
             registry=registry,
             catalog=catalog,
-            known_nodesets=known_nodesets,
+            known_nodeset_types=known_nodeset_types,
             plugin_registry=plugin_registry,
             owner=owner,
             call_path=call_path,
@@ -75,7 +75,7 @@ class GraphCompiler:
         *,
         registry: Any | None = None,
         catalog: Any | None = None,
-        known_nodesets: set[str] | None = None,
+        known_nodeset_types: set[str] | None = None,
         plugin_registry: CompilerPluginRegistry | None = None,
         owner: str = "pipeline",
         call_path: tuple[str, ...] = (),
@@ -89,9 +89,9 @@ class GraphCompiler:
             )
         type_source = catalog if catalog is not None else registry
         _call_compiler_plugins(plugin_registry, "before_compile", graph)
-        nodesets = known_nodesets or set(graph.nodesets)
+        nodeset_types = known_nodeset_types or set(graph.nodeset_types)
         if implementation_facts is None:
-            implementation_facts = _adapt_implementation_facts(graph, source=type_source, nodesets=nodesets)
+            implementation_facts = _adapt_implementation_facts(graph, source=type_source, nodeset_types=nodeset_types)
         elif not isinstance(implementation_facts, ImplementationFacts):
             raise GraphCompileError("implementation_facts must be an ImplementationFacts snapshot")
         compilation = compile_core(
@@ -107,7 +107,7 @@ class GraphCompiler:
                         }
                     ),
                 ),
-                known_nodesets=frozenset(nodesets),
+                known_nodeset_types=frozenset(nodeset_types),
                 owner=owner,
             ),
         )
@@ -134,7 +134,7 @@ class GraphCompiler:
         if registry is not None and catalog is not None:
             raise GraphCompileError("fact preparation accepts either registry or catalog, not both")
         return _adapt_implementation_facts(graph, source=catalog if catalog is not None else registry,
-                                           nodesets=set(graph.nodesets))
+                                           nodeset_types=set(graph.nodeset_types))
 
     def _refresh_rule_facts(self, compilation: CoreCompilation, *, registry, call_path=()) -> CoreCompilation:
         """Update review metadata while retaining the compiler stage artifact.
@@ -144,7 +144,7 @@ class GraphCompiler:
         Compiler hooks own their stage's other compiled fields.
         """
         facts = ImplementationFacts(tuple(replace(fact,
-            effect_scope=registry.effect_scope(fact.type_key),
+            effect_scope=registry.effect_scope(fact.definition_id),
             )
             for fact in compilation.workflow.implementation_facts.nodes),
             strict=compilation.workflow.implementation_facts.strict)
@@ -152,7 +152,7 @@ class GraphCompiler:
         compiled = compilation.compiled_graph
         scopes = dict(compiled.effect_scopes)
         for node in graph.nodes:
-            fact = facts.get(node.type_used)
+            fact = facts.get(node.definition_id)
             if node.status != STATUS_PLANNED and fact is not None:
                 scopes[node.id] = getattr(registry, "call_effect_scopes", {}).get((*call_path, node.id), fact.effect_scope or "unconstrained")
         return replace(compilation, workflow=replace(compilation.workflow, implementation_facts=facts),
@@ -163,12 +163,12 @@ def _adapt_implementation_facts(
     graph: GraphConfig,
     *,
     source: Any | None,
-    nodesets: set[str],
+    nodeset_types: set[str],
 ) -> ImplementationFacts:
     if source is None:
         return ImplementationFacts()
-    nodeset_types = set(nodesets)
-    nodeset_types.update(graph.nodesets)
+    nodeset_types = set(nodeset_types)
+    nodeset_types.update(graph.nodeset_types)
     relevant: set[str] = set()
     visited: set[int] = set()
 
@@ -176,16 +176,16 @@ def _adapt_implementation_facts(
         if id(current) in visited:
             return
         visited.add(id(current))
-        nodeset_types.update(current.nodesets)
+        nodeset_types.update(current.nodeset_types)
         relevant.update(
-            node.type_used
+            node.definition_id
             for node in current.nodes
             if node.status != STATUS_PLANNED
-            and node.type_used not in LOOP_NODE_TYPES
+            and node.definition_id not in LOOP_DEFINITION_IDS
 
-            and node.type_used not in nodeset_types
+            and node.definition_id not in nodeset_types
         )
-        for nodeset in current.nodesets.values():
+        for nodeset in current.nodeset_types.values():
             collect(nodeset.graph)
 
     collect(graph)
@@ -215,7 +215,7 @@ def _implementation_fact(type_key: str, registered: Any, *, effect_scope: str = 
         source_ref = _text_attribute(source, "ref")
         source_export = _text_attribute(source, "export")
     return ImplementationFact(
-        type_key=type_key,
+        definition_id=type_key,
         flow_kind=flow_kind,
         effect_scope=effect_scope,
 

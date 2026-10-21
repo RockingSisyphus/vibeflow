@@ -1,0 +1,6 @@
+import {defineCapability,defineDataSchema} from "@vibeflow/plugin";
+export const portCapability=defineCapability({"id": "vibeflow.port", "targets": ["node", "browser"], "display_name": "VibeFlow Port", "description": "Host-provided receive/send queue boundary.", "operations": {"receive": {"input_type": "vibeflow.port.receive.request", "output_type": "vibeflow.port.receive.result", "completion": "suspend"}, "send": {"input_type": "vibeflow.port.send.request", "output_type": "vibeflow.port.send.result", "completion": "immediate"}}});
+export const portSchema0=defineDataSchema({"type_key": "vibeflow.port.receive.request", "schema": {"type": "object", "required": ["port"], "properties": {"port": {"type": "string"}}, "additionalProperties": false}});
+export const portSchema1=defineDataSchema({"type_key": "vibeflow.port.receive.result", "schema": {"type": "object", "required": ["value"], "properties": {"value": {}}, "additionalProperties": false}});
+export const portSchema2=defineDataSchema({"type_key": "vibeflow.port.send.request", "schema": {"type": "object", "required": ["port", "value"], "properties": {"port": {"type": "string"}, "value": {}}, "additionalProperties": false}});
+export const portSchema3=defineDataSchema({"type_key": "vibeflow.port.send.result", "schema": {"type": "null"}});

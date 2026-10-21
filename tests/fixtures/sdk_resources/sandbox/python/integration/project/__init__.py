@@ -1,1 +1,0 @@
-"""Integration sandbox project package."""

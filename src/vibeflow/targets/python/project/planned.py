@@ -7,7 +7,7 @@ import inspect
 from typing import Mapping
 
 from vibeflow.core.findings import HealthFinding
-from vibeflow.targets.python.nodetypes.protocols import EFFECT_SCOPE_NONE
+from vibeflow.targets.python.sdk.protocols import EFFECT_SCOPE_NONE
 from vibeflow.targets.python.quality.source_analysis.ast_facts import import_aliases
 from vibeflow.targets.python.rules.node.effect_policy import (
     call_violation,

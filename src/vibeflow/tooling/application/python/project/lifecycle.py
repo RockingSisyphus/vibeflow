@@ -9,7 +9,7 @@ from vibeflow.targets.python.project.plugins import PluginRegistry, create_lifec
 def lifecycle_registry(registry, *, workflow_id, config_path, plugin_types=("compiler", "runtime")):
     """Create instances at the native compile/run boundary, not declaration time."""
     result = PluginRegistry()
-    loaded = registry.loaded_plugins
+    loaded = registry.prepared_resources
     created = []
     try:
         for selection in loaded.lifecycle_selections:

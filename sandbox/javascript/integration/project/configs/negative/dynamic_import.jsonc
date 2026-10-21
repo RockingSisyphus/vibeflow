@@ -11,19 +11,19 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts the isolated dynamic import fixture."
       },
       {
         "id": "invalid",
-        "type_used": "sandbox.invalid.dynamic_import",
+        "definition_id": "sandbox.invalid.dynamic_import",
         "display_name": "Dynamic import",
         "description": "Must fail because the dynamic import cannot be resolved statically."
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends the isolated dynamic import fixture."
       }
@@ -51,7 +51,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

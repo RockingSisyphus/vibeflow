@@ -22,38 +22,18 @@ def call(capsys, arguments):
     return code, json.loads(capsys.readouterr().out)
 
 
-@pytest.mark.parametrize("kind", ["rule", "ruleset"])
-def test_cross_root_resource_conflicts_are_formal_diagnostics_with_both_origins(project, capsys, kind):
-    other = project.root / "other"
-    other.mkdir(parents=True)
-    original = resource_ref(project.project, kind, "example.number_provider" if kind == "rule" else "example.rule_graph")
-    document = project.read(original)
-    document["description"] = "A conflicting declaration in another project root."
-    selection = write_plugin(other, [document], target="python", plugin_id="other.resources")
-    if kind == "rule":
-        (other / "rules").mkdir()
-        (other / "rules/provider.py").write_text((project.project / "rules/provider.py").read_text())
-    project.write(other / "vibeflow_project.jsonc", {"project_target": "python"})
-    workspace = project.read(project.workspace)
-    workspace["roots"].append({"id": "other-python", "path": "other"})
-    project.write(project.workspace, workspace)
-    graph_config = project.read(project.config)
-    graph_config["plugins"].append({**selection, "root": "other-python"})
-    project.write(project.config, graph_config)
-    code, payload = call(capsys, ["validate", *project.common_arguments(), "--json"])
+def test_another_roots_private_plugin_cannot_be_selected(project, capsys):
+    config = project.read(project.config)
+    config["plugins"].append({"root":"other-python", "source":{"kind":"file","ref":"plugins/private/plugin.py"}})
+    project.write(project.config, config)
+    code, payload = call(capsys,["validate",*project.common_arguments(),"--json"])
     assert code == 1, payload
-    finding = next(item for item in payload["errors"] if item["code"] == "RULE.RESOURCE.CONFLICT")
-    assert finding["details"]["resource_id"] == document["id"]
-    assert finding["details"]["source"] == str(other / "code_plugin.py")
-    assert finding["details"]["previous_source"] == str(project.project / "code_plugin.py")
-    assert finding["source_location"]["path"] == str(other / "code_plugin.py")
-    assert finding["source_location"]["line"] > 0
-    assert finding["details"]["origins"]["previous"]["plugin_id"] != finding["details"]["origins"]["current"]["plugin_id"]
+    assert "root" in json.dumps(payload)
     assert not project.events()
 
 
 def test_parameterized_import_call_rule_keeps_real_workflow_facts_at_lazy_binding(project, capsys):
-    provider = project.project / "rules/provider.py"
+    provider = project.project / "plugins/code_plugin/rules/provider.py"
     provider.write_text('''import json
 from pathlib import Path
 
@@ -77,7 +57,7 @@ def check(context, inputs, params):
     config["pipeline"]["nodes"][1]["config"] = {"factor": 5}
     project.write(project.config, config)
     business = project.root / "business-result.txt"
-    source = project.project / "rule_graph_nodes.py"
+    source = project.project / "nodes/rule_graph_nodes.py"
     source.write_text("from pathlib import Path\n" + source.read_text().replace(
         '        return {"result": inputs["example.input"]["value"] * 2 + 1}',
         '        value = inputs["example.input"]["value"] * 2 + 1\n'

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping, TypeAlias
 
 
-WORKFLOW_ABI_VERSION = "vibeflow.workflow.v9"
+WORKFLOW_ABI_VERSION = "vibeflow.workflow.v10"
 _CARDINALITIES = frozenset({"exactly_one", "optional_one", "all"})
 _BLOCK_KINDS = frozenset({"workflow", "nodeset", "loop"})
 _CONDITION_OPERATORS = frozenset({"==", "!="})
@@ -293,7 +293,7 @@ class LoopPlan:
 @dataclass(frozen=True)
 class NodeCallPlan:
     id: str
-    type_used: str
+    definition_id: str
     implementation: SourceRef
     requires: tuple[DataRequirementPlan, ...]
     provides: tuple[DataProviderPlan, ...]
@@ -306,7 +306,7 @@ class NodeCallPlan:
     is_terminal: bool
     is_nodeset: bool
     is_loop: bool
-    nodeset_type_key: str
+    nodeset_type_id: str
     child_block: str
     exports: tuple[DataProviderPlan, ...]
     allow_config_override: bool = False
@@ -352,7 +352,7 @@ class NodeCallPlan:
     def to_dict(self) -> dict[str, object]:
         return {
             "id": self.id,
-            "type_used": self.type_used,
+            "definition_id": self.definition_id,
             "implementation": self.implementation.to_dict(),
             "requires": [item.to_dict() for item in self.requires],
             "provides": [item.to_dict() for item in self.provides],
@@ -366,7 +366,7 @@ class NodeCallPlan:
             "is_terminal": self.is_terminal,
             "is_nodeset": self.is_nodeset,
             "is_loop": self.is_loop,
-            "nodeset_type_key": self.nodeset_type_key,
+            "nodeset_type_id": self.nodeset_type_id,
             "child_block": self.child_block,
             "exports": [item.to_dict() for item in self.exports],
             "allow_config_override": self.allow_config_override,

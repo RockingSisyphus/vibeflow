@@ -12,7 +12,7 @@ window.VFModel = (()=>{
         result[entryKey]={...body,key:entryKey,facts:{...body.facts,selected_entry:name,nodes:nodes.filter(n=>active.has(n.id)),
           edges:(body.facts.edges||[]).filter(e=>active.has(e.from)&&active.has(e.to)),inputs:entry.inputs,outputs:entry.outputs}};
       }
-      for(const [name,definition] of Object.entries(architecture.nodesets||{}))if(definition.body){
+      for(const [name,definition] of Object.entries(architecture.nodeset_types||{}))if(definition.body){
         const childKey=namespace+"nodeset:"+name;
         result[childKey]={key:childKey,namespace,architecture,identity,kind:"nodeset",facts:definition.body,direction:"DOWN"};
       }
@@ -34,23 +34,31 @@ window.VFModel = (()=>{
         error:target?.preview_error||(!target?"未声明目标 workflow":!all[key]?"本次未准备此目标或入口的事实":"")};
     });
   }
+  function resourceView(body,kinds){
+    const selected=new Set(kinds),resources=body.facts.nodes;
+    const packages=new Set(resources.filter(r=>r.kind==="plugin_declaration").map(r=>r.resource_id));
+    const nodes=resources.filter(r=>selected.has(r.kind)&&!(r.kind==="base_lib"&&r.owner?.kind==="plugin")&&!(r.kind==="plugin"&&packages.has(r.plugin_id)));
+    const ids=new Set(nodes.map(r=>r.id));
+    return {...body,facts:{nodes,edges:body.facts.edges.filter(e=>ids.has(e.from)&&ids.has(e.to))}};
+  }
   function operationLabel(action){
     if(action.operation==="call")return action.wait===true?"启动 workflow · 等待结束":"启动 workflow · 不等待结束";
     return ({self:"本实例身份",wait:"等待实例结束",send:"发送消息 · 不等待处理",receive:"接收消息 · 等待",kill:"停止实例 · 确认终态"})[action.operation]||action.operation;
   }
   const roleNames={mainline:"流程主线",schedule:"触发调度",transfer:"允许数据传递",data_bypass:"仅传递数据"};
   function nodeInfo(facts,architecture={}) {
-    const type=architecture.node_types?.[facts.type_used||facts.type_key]||null;
-    const definition=facts.invokes?architecture.nodesets?.[facts.invokes.target]||null:null;
-    const resource=architecture.implementation_graph?.resources?.["node:"+(facts.type_used||facts.type_key)]||null;
-    const typeInfo=type?.info||type||{},contract=facts.contract||type?.contract||resource?.contract||{};
+    const nodeDefinition=architecture.node_definitions?.[facts.definition_id]||null;
+    const nodeType=architecture.node_types?.[nodeDefinition?.node_type]||null;
+    const definition=facts.invokes?architecture.nodeset_types?.[facts.invokes.target]||null:null;
+    const resource=architecture.implementation_graph?.resources?.["node:"+facts.definition_id]||null;
+    const definitionInfo=nodeDefinition?.info||nodeDefinition||{},contract=facts.contract||nodeDefinition?.contract||resource?.contract||{};
     const status=[facts.status,facts.invokes?.target_status,definition?.status].includes("planned")?"planned":facts.status||"implemented";
     const nodes=definition?.body?.nodes;
-    return {call:facts,type,typeInfo,definition,resource,
+    return {call:facts,nodeDefinition,nodeType,definitionInfo,definition,resource,
       status,plannedBehavior:facts.planned_behavior??definition?.planned_behavior,
       expandable:Boolean(facts.preview_expandable||nodes&&(Array.isArray(nodes)?nodes.length:Object.keys(nodes).length)),
-      description:facts.role?.description||facts.description||facts.info?.description||typeInfo.description||definition?.description||"",
-      contract,config:type?.config||{schema:contract.params_schema||{},defaults:contract.params_defaults||{}}};
+      description:facts.role?.description||facts.description||facts.info?.description||definitionInfo.description||definition?.description||"",
+      contract,config:nodeDefinition?.config||{schema:contract.params_schema||{},defaults:contract.params_defaults||{}}};
   }
   function edgeInfo(facts,nodes=[],architecture={},topology={}) {
     const source=nodes.find(n=>n.id===facts.from),target=nodes.find(n=>n.id===facts.to);
@@ -89,5 +97,5 @@ window.VFModel = (()=>{
       script.onerror=()=>finish(()=>reject(new Error("无法加载 "+url)));document.head.append(script);
     });
   }
-  return {bodies,childOptions,operationLabel,nodeInfo,edgeInfo,graphEdges,edgeLabel,loadScript};
+  return {bodies,childOptions,resourceView,operationLabel,nodeInfo,edgeInfo,graphEdges,edgeLabel,loadScript};
 })();

@@ -62,14 +62,15 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
             raise ValueError('GRAPH.PLANNED.NODE_IN_RUN: planned nodes cannot run; implement them or enable allow_planned_stub for python_stub')
         native_plan = bind_python_workflow(prepared,registry=environment.registry,runtime_options=options,instantiate=False,select_entry=False)
         framework = Path(__file__).resolve().parents[3]
-        roots = tuple(root for root in workspace.roots if root.project_target == 'python')
-        destinations = {root.id:'project/' + root.id for root in roots}
-        used = {call.type_used for block in prepared.workflow.blocks for call in block.nodes
+        owner = workspace.root_for_path(config)
+        roots = (owner,)
+        destinations = {owner.path.resolve(): 'roots/' + owner.id, workspace.root.resolve(): 'shared'}
+        used = {call.definition_id for block in prepared.workflow.blocks for call in block.nodes
             if not(call.is_nodeset or call.is_loop or call.status == 'planned')}
         from vibeflow.tooling.application.python.build_dependencies import implementation_packages, copy_implementation_packages
         dependency_roots, dependency_resources = implementation_packages(environment.registry, used,
-            roots=tuple(root.path.resolve() for root in roots), framework=framework)
-        mappings = sorted([(root.path.resolve(),destinations[root.id]) for root in roots]
+            roots=tuple(destinations), framework=framework)
+        mappings = sorted(list(destinations.items())
             + list(dependency_roots) + [(framework,'_framework/vibeflow')],key=lambda item:len(str(item[0])),reverse=True)
 
         def relative(path):
@@ -94,38 +95,33 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
         prepared = replace(prepared,workflow=map_plan_sources(prepared.workflow,
             lambda source:replace(source,ref=relocate(source.ref)) if source.kind not in {'native','catalog'} and Path(source.ref).is_absolute() else source))
 
-        records = {record['id']:record for record in environment.registry.loaded_plugins.records}
+        records = {record['id']:record for record in environment.registry.prepared_resources.records}
         def plugin_reference(plugin_id):
             record = records[plugin_id]
             source = thaw_json(record['source'])
             if source['kind'] == 'file' and Path(source['ref']).is_absolute():
                 source['ref'] = '@bundle/' + relative(source['ref'])
-            return {'source':source,'root':destinations[record['root']]}
+            base = workspace.root if record.get('scope') == 'project' else workspace.root_by_id(record['root']).path
+            return {'source':source,'root':destinations[base.resolve()]}
 
         registry = environment.registry
         nodes = []
         for key in sorted(used):
             descriptor = registry.descriptor(key)
-            origin = registry.loaded_plugins.catalogs.origins.get(('nodes',key))
-            if ('node',key) in registry.direct_bindings and origin and origin.plugin_id in records:
-                binding = {'plugin':plugin_reference(origin.plugin_id)}
-            else:
-                path, symbol, _, load_root = registry.source_locations[key]
-                module = ".".join(path.relative_to(load_root).with_suffix("").parts)
-                binding = {'path':relative(path),'export':symbol,'module':module,
-                           'load_root':relative(load_root)}
+            path, symbol, _, load_root = registry.source_locations[key]
+            binding = {'path':relative(path),'export':symbol,'load_root':relative(load_root)}
             info = registry.source_info(key)
             nodes.append({'descriptor':descriptor_value(descriptor),'binding':binding,
                 'source':relocate(info.path),'source_line':info.line})
         plugins = []
-        for selection in registry.loaded_plugins.lifecycle_selections:
+        for selection in registry.prepared_resources.lifecycle_selections:
             if selection.get('status') == 'planned':
                 continue
-            descriptor = registry.loaded_plugins.catalogs.plugins.require(selection['id'])
+            descriptor = registry.prepared_resources.catalogs.plugins.require(selection['id'])
             if descriptor.plugin_type != 'runtime':
                 continue
-            origin = registry.loaded_plugins.catalogs.origins[('plugins',descriptor.id)]
-            item = {'descriptor':descriptor_value(descriptor),'plugin':plugin_reference(origin.plugin_id),
+            origin = registry.prepared_resources.catalogs.origins[('plugins',descriptor.id)]
+            item = {'descriptor':descriptor_value(descriptor),'plugin':plugin_reference(origin.owner.plugin_id),
                 'config':thaw_json(selection['config'])}
             if ('plugin',descriptor.id) not in registry.direct_bindings:
                 from vibeflow.tooling.application.python.project.declarations import _implementation_path
@@ -158,7 +154,10 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
         data = dict(delegate_health=delegate_health.to_dict(), delegate_health_by_entry=delegate_entries,
             workflow=prepared.workflow.to_dict(),graphs=encode_snapshot(prepared.graphs,relocate=relocate),
             compiled=encode_snapshot(prepared.compiled),globals=encode_snapshot(prepared.globals),overrides=encode_snapshot(prepared.overrides),
-            source_roots=list(dict.fromkeys([*destinations.values(),*(destination for _,destination in dependency_roots)])),nodes=nodes,plugins=plugins,blocks=blocks,
+            source_roots=list(dict.fromkeys([*destinations.values(),*(destination for _,destination in dependency_roots)])),
+            source_import_roots={relative(root):[relative(path) for path in namespace.roots]
+                                 for root,namespace in registry.source_namespaces.items()},
+            nodes=nodes,plugins=plugins,blocks=blocks,
             config_path=relative(config),runtime_options=asdict(options),health=health.to_dict())
         from vibeflow.tooling.application.python.build_files import python_bundle_files, copy_python_framework
         files = python_bundle_files(workspace, environment.registry, config,

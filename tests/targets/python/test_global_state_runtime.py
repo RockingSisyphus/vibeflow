@@ -91,7 +91,7 @@ class _ProtectedTaskState:
         cls.finished = threading.Event()
 
 
-NormalGateNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.normal_gate', display_name='Normal Gate', description='Blocks a normal root for lock coordination tests.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.process",))
+NormalGateNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.normal_gate', display_name='Normal Gate', description='Blocks a normal root for lock coordination tests.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(), rulesets=("vibeflow.process",))
 
 class NormalGateNode:
 
@@ -101,7 +101,7 @@ class NormalGateNode:
         return {}
 
 
-ParallelProbeNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.parallel_probe', display_name='Parallel Probe', description='Measures overlapping root execution.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.process",))
+ParallelProbeNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.parallel_probe', display_name='Parallel Probe', description='Measures overlapping root execution.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(), rulesets=("vibeflow.process",))
 
 class ParallelProbeNode:
 
@@ -111,7 +111,7 @@ class ParallelProbeNode:
         return {}
 
 
-GlobalProbeNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.global_probe', display_name='Global Probe', description='Touches ambient interpreter state for runtime lock tests.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.global_state",))
+GlobalProbeNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.global_probe', display_name='Global Probe', description='Touches ambient interpreter state for runtime lock tests.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(), rulesets=("vibeflow.global_state",))
 
 class GlobalProbeNode:
 
@@ -121,7 +121,7 @@ class GlobalProbeNode:
         return {}
 
 
-BlockingNormalNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.blocking_normal', display_name='Blocking Normal', description='Holds one shared root admission.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.process",))
+BlockingNormalNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.blocking_normal', display_name='Blocking Normal', description='Holds one shared root admission.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(), rulesets=("vibeflow.process",))
 
 class BlockingNormalNode:
 
@@ -132,7 +132,7 @@ class BlockingNormalNode:
         return {}
 
 
-HoldingGlobalNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.holding_global', display_name='Holding Global', description='Holds the exclusive global-state admission.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.global_state",))
+HoldingGlobalNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.holding_global', display_name='Holding Global', description='Holds the exclusive global-state admission.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(), rulesets=("vibeflow.global_state",))
 
 class HoldingGlobalNode:
 
@@ -143,7 +143,7 @@ class HoldingGlobalNode:
         return {}
 
 
-FollowingNormalNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.following_normal', display_name='Following Normal', description='Attempts shared admission behind a waiting writer.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.process",))
+FollowingNormalNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.following_normal', display_name='Following Normal', description='Attempts shared admission behind a waiting writer.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(), rulesets=("vibeflow.process",))
 
 class FollowingNormalNode:
 
@@ -153,7 +153,7 @@ class FollowingNormalNode:
         return {}
 
 
-GlobalFailureNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.global_failure', display_name='Global Failure', description='Fails after ambient state may have changed.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.global_state",))
+GlobalFailureNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.global_failure', display_name='Global Failure', description='Fails after ambient state may have changed.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(), rulesets=("vibeflow.global_state",))
 
 class GlobalFailureNode:
 
@@ -162,7 +162,7 @@ class GlobalFailureNode:
         raise RuntimeError("global boom")
 
 
-GlobalInterruptNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.global_interrupt', display_name='Global Interrupt', description='Simulates cancellation after ambient state may have changed.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.global_state",))
+GlobalInterruptNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.global_interrupt', display_name='Global Interrupt', description='Simulates cancellation after ambient state may have changed.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(), rulesets=("vibeflow.global_state",))
 
 class GlobalInterruptNode:
 
@@ -171,7 +171,7 @@ class GlobalInterruptNode:
         raise KeyboardInterrupt("global cancelled")
 
 
-GlobalNoopNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.global_noop', display_name='Global Noop', description='Marks a root as global-state protected without delaying it.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.global_state",))
+GlobalNoopNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.global_noop', display_name='Global Noop', description='Marks a root as global-state protected without delaying it.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(), rulesets=("vibeflow.global_state",))
 
 class GlobalNoopNode:
 
@@ -180,7 +180,7 @@ class GlobalNoopNode:
         return {}
 
 
-GlobalWorkerLeftNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.global_worker_left', display_name='Global Worker Left', description='Runs one managed global-state worker.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('worker.left', 'worker.left', display_name='worker.left'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('worker.left', 'worker.left', display_name='worker.left'),)}), rulesets=("vibeflow.global_state",))
+GlobalWorkerLeftNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.global_worker_left', display_name='Global Worker Left', description='Runs one managed global-state worker.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('worker.left', 'worker.left', display_name='worker.left'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('worker.left', 'worker.left', display_name='worker.left'),)}), rulesets=("vibeflow.global_state",))
 
 class GlobalWorkerLeftNode:
 
@@ -190,7 +190,7 @@ class GlobalWorkerLeftNode:
         return {"worker.left": True}
 
 
-GlobalWorkerRightNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.global_worker_right', display_name='Global Worker Right', description='Runs another managed global-state worker.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('worker.right', 'worker.right', display_name='worker.right'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('worker.right', 'worker.right', display_name='worker.right'),)}), rulesets=("vibeflow.global_state",))
+GlobalWorkerRightNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.global_worker_right', display_name='Global Worker Right', description='Runs another managed global-state worker.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('worker.right', 'worker.right', display_name='worker.right'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('worker.right', 'worker.right', display_name='worker.right'),)}), rulesets=("vibeflow.global_state",))
 
 class GlobalWorkerRightNode:
 
@@ -200,7 +200,7 @@ class GlobalWorkerRightNode:
         return {"worker.right": True}
 
 
-OrdinaryWorkerNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.ordinary_worker', display_name='Ordinary Worker', description='Runs one ordinary managed result worker.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('worker.left', 'worker.left', display_name='worker.left'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('worker.left', 'worker.left', display_name='worker.left'),)}), rulesets=("vibeflow.process",))
+OrdinaryWorkerNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.ordinary_worker', display_name='Ordinary Worker', description='Runs one ordinary managed result worker.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('worker.left', 'worker.left', display_name='worker.left'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('worker.left', 'worker.left', display_name='worker.left'),)}), rulesets=("vibeflow.process",))
 
 class OrdinaryWorkerNode:
 
@@ -209,7 +209,7 @@ class OrdinaryWorkerNode:
         return {"worker.left": True}
 
 
-WorkerLeftJoinNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.worker_left_join', display_name='Worker Left Join', description='Joins one ordinary worker result.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('worker.left', 'exactly_one', display_name='worker.left'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('worker.left', 'exactly_one', display_name='worker.left'),)}), rulesets=("vibeflow.process",))
+WorkerLeftJoinNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.worker_left_join', display_name='Worker Left Join', description='Joins one ordinary worker result.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('worker.left', 'exactly_one', display_name='worker.left'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('worker.left', 'exactly_one', display_name='worker.left'),)}), rulesets=("vibeflow.process",))
 
 class WorkerLeftJoinNode:
 
@@ -218,7 +218,7 @@ class WorkerLeftJoinNode:
         return {}
 
 
-ProtectedSlowResultNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.protected_slow_result', display_name='Protected Slow Result', description='Waits so failure cleanup must retain an inherited lease.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('protected.result', 'protected.result', display_name='protected.result'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('protected.result', 'protected.result', display_name='protected.result'),)}), rulesets=("vibeflow.process",))
+ProtectedSlowResultNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.protected_slow_result', display_name='Protected Slow Result', description='Waits so failure cleanup must retain an inherited lease.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('protected.result', 'protected.result', display_name='protected.result'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('protected.result', 'protected.result', display_name='protected.result'),)}), rulesets=("vibeflow.process",))
 
 class ProtectedSlowResultNode:
 
@@ -232,7 +232,7 @@ class ProtectedSlowResultNode:
             _ProtectedTaskState.finished.set()
 
 
-ProtectedJoinNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.protected_join', display_name='Protected Join', description='Joins a protected result and a second branch.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('protected.result', 'exactly_one', display_name='protected.result'), DataRequirement('value.out', 'exactly_one', display_name='value.out')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('protected.result', 'exactly_one', display_name='protected.result'), DataRequirement('value.out', 'exactly_one', display_name='value.out'))}), rulesets=("vibeflow.process",))
+ProtectedJoinNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.protected_join', display_name='Protected Join', description='Joins a protected result and a second branch.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('protected.result', 'exactly_one', display_name='protected.result'), DataRequirement('value.out', 'exactly_one', display_name='value.out')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('protected.result', 'exactly_one', display_name='protected.result'), DataRequirement('value.out', 'exactly_one', display_name='value.out'))}), rulesets=("vibeflow.process",))
 
 class ProtectedJoinNode:
 
@@ -241,7 +241,7 @@ class ProtectedJoinNode:
         return {}
 
 
-CoordinatedFailureNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.coordinated_failure', display_name='Coordinated Failure', description='Fails only after the sibling protected worker has started.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('value.out', 'value.out', display_name='value.out'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.out', 'value.out', display_name='value.out'),)}), rulesets=("vibeflow.process",))
+CoordinatedFailureNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.coordinated_failure', display_name='Coordinated Failure', description='Fails only after the sibling protected worker has started.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('value.out', 'value.out', display_name='value.out'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.out', 'value.out', display_name='value.out'),)}), rulesets=("vibeflow.process",))
 
 class CoordinatedFailureNode:
 
@@ -251,7 +251,7 @@ class CoordinatedFailureNode:
         raise RuntimeError("coordinated boom")
 
 
-UnrelatedDetachedNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.unrelated_detached', display_name='Unrelated Detached', description="Waits outside a sibling node's named lock scope.", version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.process",))
+UnrelatedDetachedNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.unrelated_detached', display_name='Unrelated Detached', description="Waits outside a sibling node's named lock scope.", version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(), rulesets=("vibeflow.process",))
 
 class UnrelatedDetachedNode:
 
@@ -265,7 +265,7 @@ class UnrelatedDetachedNode:
             _ProtectedTaskState.finished.set()
 
 
-WorkerJoinNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.worker_join', display_name='Worker Join', description='Joins both managed worker results before root completion.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('worker.left', 'exactly_one', display_name='worker.left'), DataRequirement('worker.right', 'exactly_one', display_name='worker.right')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('worker.left', 'exactly_one', display_name='worker.left'), DataRequirement('worker.right', 'exactly_one', display_name='worker.right'))}), rulesets=("vibeflow.process",))
+WorkerJoinNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.worker_join', display_name='Worker Join', description='Joins both managed worker results before root completion.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('worker.left', 'exactly_one', display_name='worker.left'), DataRequirement('worker.right', 'exactly_one', display_name='worker.right')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('worker.left', 'exactly_one', display_name='worker.left'), DataRequirement('worker.right', 'exactly_one', display_name='worker.right'))}), rulesets=("vibeflow.process",))
 
 class WorkerJoinNode:
 
@@ -274,7 +274,7 @@ class WorkerJoinNode:
         return {}
 
 
-DelayedResultNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.delayed_result', display_name='Delayed Result', description='Occupies the sole managed worker before a late global task.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('late.normal', 'late.normal', display_name='late.normal'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('late.normal', 'late.normal', display_name='late.normal'),)}), rulesets=("vibeflow.process",))
+DelayedResultNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.delayed_result', display_name='Delayed Result', description='Occupies the sole managed worker before a late global task.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('late.normal', 'late.normal', display_name='late.normal'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('late.normal', 'late.normal', display_name='late.normal'),)}), rulesets=("vibeflow.process",))
 
 class DelayedResultNode:
 
@@ -284,7 +284,7 @@ class DelayedResultNode:
         return {"late.normal": True}
 
 
-LateGlobalResultNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.late_global_result', display_name='Late Global Result', description='Starts only while failure cleanup drains managed work.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('late.global', 'late.global', display_name='late.global'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('late.global', 'late.global', display_name='late.global'),)}), rulesets=("vibeflow.global_state",))
+LateGlobalResultNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.late_global_result', display_name='Late Global Result', description='Starts only while failure cleanup drains managed work.', version='0.1.0', flow_kind='global_state', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('late.global', 'late.global', display_name='late.global'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('late.global', 'late.global', display_name='late.global'),)}), rulesets=("vibeflow.global_state",))
 
 class LateGlobalResultNode:
 
@@ -293,7 +293,7 @@ class LateGlobalResultNode:
         return {"late.global": True}
 
 
-LateJoinNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.late_join', display_name='Late Join', description='Provides a provable join path for cleanup tasks.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('late.normal', 'exactly_one', display_name='late.normal'), DataRequirement('late.global', 'exactly_one', display_name='late.global'), DataRequirement('value.out', 'exactly_one', display_name='value.out')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('late.normal', 'exactly_one', display_name='late.normal'), DataRequirement('late.global', 'exactly_one', display_name='late.global'), DataRequirement('value.out', 'exactly_one', display_name='value.out'))}), rulesets=("vibeflow.process",))
+LateJoinNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.late_join', display_name='Late Join', description='Provides a provable join path for cleanup tasks.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('late.normal', 'exactly_one', display_name='late.normal'), DataRequirement('late.global', 'exactly_one', display_name='late.global'), DataRequirement('value.out', 'exactly_one', display_name='value.out')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('late.normal', 'exactly_one', display_name='late.normal'), DataRequirement('late.global', 'exactly_one', display_name='late.global'), DataRequirement('value.out', 'exactly_one', display_name='value.out'))}), rulesets=("vibeflow.process",))
 
 class LateJoinNode:
 
@@ -302,7 +302,7 @@ class LateJoinNode:
         return {}
 
 
-EarlyQuickResultNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.early_quick_result', display_name='Early Quick Result', description='Completes the branch whose terminal ends the root early.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('early.quick', 'early.quick', display_name='early.quick'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('early.quick', 'early.quick', display_name='early.quick'),)}), rulesets=("vibeflow.process",))
+EarlyQuickResultNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.early_quick_result', display_name='Early Quick Result', description='Completes the branch whose terminal ends the root early.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('early.quick', 'early.quick', display_name='early.quick'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('early.quick', 'early.quick', display_name='early.quick'),)}), rulesets=("vibeflow.process",))
 
 class EarlyQuickResultNode:
 
@@ -312,7 +312,7 @@ class EarlyQuickResultNode:
         return {"early.quick": True}
 
 
-EarlySlowResultNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.early_slow_result', display_name='Early Slow Result', description='Keeps an unselected result branch active during early termination.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('early.slow', 'early.slow', display_name='early.slow'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('early.slow', 'early.slow', display_name='early.slow'),)}), rulesets=("vibeflow.process",))
+EarlySlowResultNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.early_slow_result', display_name='Early Slow Result', description='Keeps an unselected result branch active during early termination.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('early.slow', 'early.slow', display_name='early.slow'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('early.slow', 'early.slow', display_name='early.slow'),)}), rulesets=("vibeflow.process",))
 
 class EarlySlowResultNode:
 
@@ -326,7 +326,7 @@ class EarlySlowResultNode:
             _ProtectedTaskState.finished.set()
 
 
-EarlyQuickEndNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.early_quick_end', display_name='Early Quick End', description='Ends the root after consuming only the quick branch.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('early.quick', 'exactly_one', display_name='early.quick'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('early.quick', 'exactly_one', display_name='early.quick'),)}), rulesets=("vibeflow.process",))
+EarlyQuickEndNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.early_quick_end', display_name='Early Quick End', description='Ends the root after consuming only the quick branch.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('early.quick', 'exactly_one', display_name='early.quick'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('early.quick', 'exactly_one', display_name='early.quick'),)}), rulesets=("vibeflow.process",))
 
 class EarlyQuickEndNode:
 
@@ -335,7 +335,7 @@ class EarlyQuickEndNode:
         return {}
 
 
-EarlySlowEndNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.early_slow_end', display_name='Early Slow End', description='Provides the statically visible join path for the slow branch.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('early.slow', 'exactly_one', display_name='early.slow'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('early.slow', 'exactly_one', display_name='early.slow'),)}), rulesets=("vibeflow.process",))
+EarlySlowEndNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.early_slow_end', display_name='Early Slow End', description='Provides the statically visible join path for the slow branch.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('early.slow', 'exactly_one', display_name='early.slow'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('early.slow', 'exactly_one', display_name='early.slow'),)}), rulesets=("vibeflow.process",))
 
 class EarlySlowEndNode:
 
@@ -443,6 +443,8 @@ def test_global_state_scope_runs_under_every_python_execution_mode(
     assert kinds.index("global_state_enter") < kinds.index("global_state_exit")
     assert not {"lock_wait", "lock_acquired", "lock_released"} & set(kinds)
     entered = next(event for event in events if event["kind"] == "global_state_enter")
+    assert entered["type"] == "test.global_probe"
+    assert entered["node"] == "work"
     assert entered["details"]["domain"] is None
     assert entered["details"]["scope"] is None
 
@@ -605,7 +607,7 @@ def test_nested_graph_lock_is_traced_as_block_scope(tmp_path: Path) -> None:
     lock_key = "project.child-block"
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 {
                     "type_key": "test.locked_child",
                     "display_name": "Locked Child",
@@ -1013,7 +1015,7 @@ def test_dynamic_nested_runtime_rejects_a_different_user_lock_and_releases(
         root_lock=inner_key,
     )
 
-    DynamicNestedRuntimeNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.dynamic_nested_runtime', display_name='Dynamic Nested Runtime', description='Attempts to acquire another user domain through a nested runtime.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.process",))
+    DynamicNestedRuntimeNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.dynamic_nested_runtime', display_name='Dynamic Nested Runtime', description='Attempts to acquire another user domain through a nested runtime.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(), rulesets=("vibeflow.process",))
 
     class DynamicNestedRuntimeNode:
 
@@ -1074,16 +1076,16 @@ def test_dynamic_nested_runtime_rejects_a_different_user_lock_and_releases(
 
 
 def test_inherited_root_protection_drains_nested_failure_tasks_before_release(tmp_path: Path) -> None:
-    from vibeflow.core.flow import GraphConfig,NodeSpec,NodesetSpec,EdgeSpec,ExecutionLockSpec
+    from vibeflow.core.flow import GraphConfig,NodeCallSpec,NodesetTypeSpec,EdgeSpec,ExecutionLockSpec
     key="project.nested-protected"
     registry=_registry()
     register_node(registry,ProtectedSlowResultNode_DECLARATION,ProtectedSlowResultNode)
     register_node(registry,CoordinatedFailureNode_DECLARATION,CoordinatedFailureNode)
     body=_parallel_graph(registry,{"slow":_node_call("slow","test.protected_slow_result","Owns cleanup"),
         "bad":_node_call("bad","test.coordinated_failure","Fails after the sibling starts")})
-    definition=NodesetSpec("test.child","Child","Nested failure",(),(),body)
-    graph=GraphConfig(nodes=(NodeSpec("start","test.start"),NodeSpec("child","test.child"),NodeSpec("end","test.start")),
-        edges=(EdgeSpec("start","child"),EdgeSpec("child","end")),nodesets={"test.child":definition},execution_lock=ExecutionLockSpec(key))
+    definition=NodesetTypeSpec("test.child","Child","Nested failure",(),(),body)
+    graph=GraphConfig(nodes=(NodeCallSpec("start","test.start"),NodeCallSpec("child","test.child"),NodeCallSpec("end","test.start")),
+        edges=(EdgeSpec("start","child"),EdgeSpec("child","end")),nodeset_types={"test.child":definition},execution_lock=ExecutionLockSpec(key))
     outer=PipelineRuntime(graph,registry=registry,run_dir=tmp_path/"outer")
     competitor=_runtime("test.following_normal",tmp_path/"competitor",root_lock=key)
     _ProtectedTaskState.reset();_WriterPreferenceState.reset()

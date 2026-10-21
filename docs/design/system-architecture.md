@@ -18,7 +18,7 @@ Tooling → targets/python ──────┐
 - **Coordination**：本机协议、客户端、邮箱、启动握手和实例状态；不解释业务图，不建立运行组，也不托管子进程清理。Target 宿主适配接入各自执行器，命令与配置编排留在 Tooling。
 - **Tooling**：workspace 与 workflow 文件、选中插件装配、CLI、架构展示和 Target-specific Application 编排。
 
-Core 接收可移植声明、源码定位与事实；Target 持有 callable、worker 对象及工具链配置。依赖沿图中方向流动，内部 NodeRegistry 为 Python 实现绑定服务；用户资源由代码插件贡献。
+Core 接收可移植声明、源码定位与事实；Target 持有 callable、worker 对象及工具链配置。依赖沿图中方向流动，内部 NodeRegistry 为 Python 实现绑定服务；业务 Node 与独立 BaseLib 从标准目录发现，Plugin 整包贡献类型、规则及私有支持资源。
 
 内置与外部贡献经过同一校验、冻结、来源记录和冲突处理，一次合并为 Catalog。默认资源不会由 Core evaluator 或 Target adapter 再次注入。绑定保留 canonical Descriptor，只补充实际路径、导出对象、配置和实例，不转换为旧 Registry metadata。实现由贡献来源及实现身份解析，内置 ID 没有执行优先权。
 
@@ -27,7 +27,7 @@ Core 接收可移植声明、源码定位与事实；Target 持有 callable、wo
 Core 在拓扑分析前解析调用契约：
 
 - implemented Node 从唯一权威的 NodeDescriptor 继承，Registry 只绑定实现，不读取实现类内的元数据；
-- Nodeset 调用从定义继承；
+- Nodeset 调用从 NodesetType 定义继承；
 - planned 与系统调用使用 Config 契约。
 
 编译结果携带有效图和编译拓扑。Runtime、AOT、review、Architecture 和静态检查消费同一份有效事实，避免调用点与类型登记形成两套真相。
@@ -36,7 +36,7 @@ Core 在拓扑分析前解析调用契约：
 
 ## 公共计划
 
-Workflow ABI 为 `vibeflow.workflow.v9`。公共计划只保存稳定 ID、可移植值、端口、路由、合流、普通图 Block、Loop、SourceRef、effect scope 与 execution-lock 事实。Target BindingPlan 保存语言实现。
+Workflow ABI 为 `vibeflow.workflow.v10`。公共计划只保存稳定 ID、可移植值、端口、路由、合流、普通图 Block、Loop、SourceRef、effect scope 与 execution-lock 事实。Target BindingPlan 保存语言实现。
 
 Python 和 JavaScript Target 使用相同 Core 语义，但分别声明可执行 feature。Target 不支持的 implemented 语义以稳定 finding 拒绝；planned 内容仍可进入架构审核。
 
@@ -44,39 +44,39 @@ Python 和 JavaScript Target 使用相同 Core 语义，但分别声明可执行
 
 公开规则模型位于 `vibeflow.core.rules`。`selection/static` 与 `selection/dynamic` 只读选择来源，`selection/resolve.py` 统一默认、继承与完整替代，`planning.py` 统一调用路径、范围与接管边界；Targets 负责语言事实与绑定。内置及所选 Plugin 的 `workflow_default` Ruleset 贡献根默认，不向 Config 递归注入规则。
 
-各 Target 的 `rules/graph/` 和 `rules/node/` 分别保存图检查、节点源码检查的声明与实现，`rulesets/` 保存组合与默认，`nodetypes/` 保存现有节点声明与语言接口。`quality/` 负责事实、上下文、检查组织与报告。语言差异直接写在各自定义中；内置 Plugin 装配不再修改另一语言的组合。根目录 `repo_check/` 是独立仓库自检工具，不属于产品资源。
+各 Target 的 `rules/graph/` 和 `rules/node/` 分别保存图检查、节点源码检查的声明与实现，`rulesets/` 保存组合与默认，`resources/` 保存公开 SDK 和语言运行资源。`quality/` 负责事实、上下文、检查组织与报告。语言差异直接写在各自定义中；内置 Plugin 装配不再修改另一语言的组合。根目录 `repo_check/` 是独立仓库自检工具，不属于产品资源。
 
-Node 类型声明提供局部默认，调用 Config 缺省使用默认、非空完整替代、`[]` 取消当前调用的局部选择。Workflow 缺省使用静态默认；Nodeset 缺省继承，显式选择接管内部。Node 局部与所属图规则共同生效。父图保留子调用外部契约，内部由子选择负责。
+NodeType 提供局部默认，业务 Node 可以显式替换，调用 Config 缺省使用默认、非空完整替代、`[]` 取消当前调用的局部选择。Workflow 缺省使用静态默认；NodesetType 缺省继承，显式选择接管内部。Node 局部与所属图规则共同生效。父图保留子调用外部契约，内部由子选择负责。
 
 图 Rule 的背景资料与负责范围分开：`current_graph` 逐图检查，`effective_subtree` 在范围入口执行一次，显式子选择停止遍历。每个完整 Ruleset 依赖计划只有一种图范围，Records 只在显式同范围依赖中传递。范围规划先避免重叠，再由统一执行器复用等价 source 计算。
 
 Node 公开上下文只含当前声明、调用、实现/继承实现及实际 helper 闭包，不含其他 Node、全图或 Catalog。源码、AST、引用和归属遵守同一符号边界，保留真实位置。Target 内部继续分析真实模块初始化和资源归属；原生解析、绑定、编译错误独立于规则选择。
 
-Rule ABI 为 `vibeflow.rule.v2`，入口是 `check(context, inputs, params)`；Plugin ABI 保持 `vibeflow.plugin.v3`。内置 Workflow 由明确的分析、叶检查、汇总和 Records 依赖组成，保留统一执行器和诊断。公开上下文只读，可信扩展仍可访问文件系统，不构成安全沙箱。设计理由、范围示例、目录职责与回归依据见 [Rule 机制设计](rule-system.md)；插件定义与使用见 [用户规则手册](../../distribution/docs/user/rules-and-nodes.md)，升级见 [迁移手册](../../distribution/docs/user/rule-system-migration.md)。
+Rule ABI 为 `vibeflow.rule.v3`，入口是 `check(context, inputs, params)`；Plugin ABI 保持 `vibeflow.plugin.v4`。内置 Workflow 由明确的分析、叶检查、汇总和 Records 依赖组成，保留统一执行器和诊断。公开上下文只读，可信扩展仍可访问文件系统，不构成安全沙箱。设计理由、范围示例、目录职责与回归依据见 [Rule 机制设计](rule-system.md)；插件定义与使用见 [用户规则手册](../../distribution/docs/user/rules-and-nodes.md)，升级见 [迁移手册](../../distribution/docs/user/rule-system-migration.md)。
 
 ## 插件装配与多文件源码
 
 Tooling 先读取原始 workflow 的插件选择；Target 加载受信插件入口及其直接导入，取得固定资源和实现绑定。`ContributionBuilder` 校验并冻结为 `PluginContributions`，内置资源与选中贡献合并为本次 Catalog，再解析工作流引用。加载和声明错误是装配根因；后续阶段在资源集合有效后进行。不同 workflow 的 Catalog、配置和生命周期实例相互隔离。
 
-四类资源将 `implementation_files` 归一化为 ImplementationDescriptor 的显式源码引用，SDK 路径相对声明模块。Target 保存声明、入口、支撑文件、独立库、符号及真实导入边，并区分引用关系和所有权。Host 与生命周期 Plugin 用 base_libs 引用库；Host dependencies 保留其他宿主实例依赖语义。
+可执行资源将 `implementation_files` 归一化为 ImplementationDescriptor 的显式源码引用，SDK 路径相对声明模块。Target 保存声明、入口、支撑文件、独立库、符号及真实导入边，并区分引用关系和所有权。业务 Node 与生命周期 Plugin 用 base_libs 引用库；Plugin 私有库及支持代码必须留在自身包内。
 
 PluginContributions 同时保存插件包声明来源。declaration_rulesets 审查包声明，Plugin rulesets 审查 compiler/runtime 实现。各资源明确选择自己的规则；共享文件分别按所属资源检查，默认 maintainability 使用逐文件指标和 500 行上限。AOT 根据实际运行引用打包代码，登记的未使用文件仍作为审查资料。
 
 ## 架构事实
 
-Architecture 从真实 Config、Nodeset、插件资源及编译事实确定性生成。结构变更写入真实 source，再重新生成；新鲜度检查比较 canonical bytes。
+Architecture 从真实 Config、NodesetType、业务资源及编译事实确定性生成。结构变更写入真实 source，再重新生成；新鲜度检查比较 canonical bytes。
 
-Node、BaseLib、Plugin 与 Host 共用展示解析，按 native → resource → status → use 合并并记录逐字段来源。资源选择覆盖颜色，声明指定形状与图标；执行身份、效果约束和状态标记独立保存。
+NodeType、业务 Node、BaseLib 与 Plugin 共用展示解析，按 native → resource → status → use 合并并记录逐字段来源。资源选择覆盖颜色，声明指定形状与图标；执行身份、效果约束和状态标记独立保存。
 
-两端在 Tooling 的 Target 展示适配器中将已检查、编译的结果组装为完整架构事实；共享 presentation 序列化 Architecture、保存 v2 快照及历史索引。review、build 与 Python 源码运行默认导出数据并安装浏览工具，不启动 Mermaid。AOT 执行不检查源码或生成报告。
+两端在 Tooling 的 Target 展示适配器中将已检查、编译的结果组装为完整架构事实；共享 presentation 序列化 Architecture、保存 v3 快照及历史索引。review、build 与 Python 源码运行默认导出数据并安装浏览工具，不启动 Mermaid。AOT 执行不检查源码或生成报告。
 
-HTML 唯一源码位于 tools/workflow-viewer，通过配置的 dataRoot 按需加载本地注册脚本，自主绘制可变形状卡片及连线；流程、BaseLib、Plugin、Host Extension 和 workflow 关联分别投影已有事实。网页不解析业务配置，也不读取原 SVG 的内部结构。形状和颜色保留公共样式词汇；Mermaid 方言及格式化仅在可选渲染器内转换。详见[本地预览维护说明](../maintainers/local-preview.md)。
+HTML 唯一源码位于 tools/workflow-viewer，通过配置的 dataRoot 按需加载本地注册脚本，自主绘制可变形状卡片及连线；流程、BaseLib、Plugin 和 workflow 关联分别投影已有事实。网页不解析业务配置，也不读取原 SVG 的内部结构。形状和颜色保留公共样式词汇；Mermaid 方言及格式化仅在可选渲染器内转换。详见[本地预览维护说明](../maintainers/local-preview.md)。
 
-用户项目 SVG 从实际 Workflow 调用与配置资源选择生成。Plugin、BaseLib、Host 使用目录父节点连接本次使用的资源；Node 位于业务调用处。公开图形层不接收 Catalog 定义图、源码文件依赖图或规则实现图作为业务架构。
+用户项目 SVG 从实际 Workflow 调用与配置资源选择生成。Plugin、BaseLib 使用各自资源分区展示本次使用的资源；Node 位于业务调用处。公开图形层不接收 Catalog 定义图、源码文件依赖图或规则实现图作为业务架构。
 
 Architecture JSONC 的 implementation_graph 保存当前项目的资源、源码角色、归属、真实导入、库依赖、插件贡献和有效规则。这些资料用于源码审核、来源查询与架构新鲜度校验，不直接投影为 SVG。Core/Target 内部开发信息与用户项目展示边界独立；统一 SDK 注册不会改变图形读者或展示层级。
 
-`review-rules` 加载选中插件取得声明，展开规则计划；框架不调用 Rule、Node、Host 或生命周期工厂。插件直接导入可能已初始化业务模块，源码服务如实记录 loaded/not_loaded/unknown。尚未加载的延迟实现先执行所选 import 检查，再由 Target 绑定。
+`review-rules` 加载选中插件取得声明，展开规则计划；框架不调用 Rule、业务 Node 或生命周期工厂。插件直接导入可能已初始化业务模块，源码服务如实记录 loaded/not_loaded/unknown。尚未加载的延迟实现先执行所选 import 检查，再由 Target 绑定。
 
 公开状态范围模型位于 Core/Tooling 共享边界，使 Python 与 JavaScript presenter 使用相同 coverage ID，同时只报告本次命令实际完成的检查。
 
@@ -87,11 +87,11 @@ Architecture JSONC 的 implementation_graph 保存当前项目的资源、源码
 
 ## 双语言计划与 AOT
 
-`core.graph_calls` 统一实际调用身份、子图、Loop、配置继承。Rule 在相同身份之上补充未调用定义的审查范围；它们不会成为执行调用。Block Compiler 生成可序列化及读取的 WorkflowPlan/BlockPlan，实际并发执行由 Target 的通用图调度器持有。ABI v9 不携带旧 async/result_key 并发字段。
+`core.graph_calls` 统一实际调用身份、子图、Loop、配置继承。Rule 在相同身份之上补充未调用定义的审查范围；它们不会成为执行调用。Block Compiler 生成可序列化及读取的 WorkflowPlan/BlockPlan，实际并发执行由 Target 的通用图调度器持有。ABI v10 不携带旧 async/result_key 并发字段。
 
 Python 将准备与装配分开：静态阶段保存共同计划及有限的原生图/编译记录，运行阶段绑定类、独立参数容器、活对象和现有 PipelineRuntime。源码与目录 bundle 共用装配函数。生成块在调用时读取追踪和 Hook 选项，不为各 profile 复制编译逻辑。无法生成块的结构保留原动态调度。
 
-Python 的文件收集、加载 API 与 CLI 属于 Tooling；框架通过包资源读取，因此源码、wheel 和 ZIP 发行采用同一构建入口。两种 Target 共用暂存、原子发布、构建结果与 v3 元数据；JS 保留 emitter、esbuild、Node/Browser runtime。加载只解析格式、ABI 和运行所需字段，不重新扫描源码或校验文件哈希。
+Python 的文件收集、加载 API 与 CLI 属于 Tooling；框架通过包资源读取，因此源码、wheel 和 ZIP 发行采用同一构建入口。两种 Target 共用暂存、原子发布、构建结果与 v4 元数据；JS 保留 emitter、esbuild、Node/Browser runtime。加载只解析格式、ABI 和运行所需字段，不重新扫描源码或校验文件哈希。
 
 命名入口和目标的纯解析位于 `core/workflows`，入口范围与调用授权写入公共计划。授权由显式 Rule Record 折叠，不由 `flow_kind` 或外观产生；Python 上下文与 JS 生成模块执行同一有效权限。端口收发改为普通 SDK Node，执行器和计划不再保留原生 IO 分支。
 
@@ -99,4 +99,4 @@ Python 的文件收集、加载 API 与 CLI 属于 Tooling；框架通过包资�
 
 `tooling/application/presentation_targets.py` 负责工作区定位及当次目标事实准备，跨 Target 通过命令边界加载；它不属于快照存储模块。各 Target 适配器提供架构事实，`tooling/presentation/preview/` 只负责格式、索引和快照写入。数据发布与网页安装分开，默认路径不调用 Mermaid。
 
-独立 HTML 唯一维护源在 `tools/workflow-viewer/`，只消费公开 v2 数据及配置；本地根入口是安装产物。JavaScript 的通信客户端与宿主源码集中在 `targets/javascript/resources/coordination/`，发行时仍交付原公开模块路径。
+独立 HTML 唯一维护源在 `tools/workflow-viewer/`，只消费公开 v3 数据及配置；本地根入口是安装产物。JavaScript 的通信客户端与宿主源码集中在 `targets/javascript/resources/coordination/`，发行时仍交付原公开模块路径。

@@ -19,13 +19,15 @@
 
 Core 的 `core/rules/` 负责公共 Rule/Ruleset 模型、资源选择、范围规划、依赖组合、执行与结果复用，不提供具体内置规则、阈值或质量检查算法。
 
-Python 和 JavaScript Target 分别维护 `rules/`、`rulesets/`、`nodetypes/`：
+Python 和 JavaScript Target 分别维护 `rules/`、`rulesets/`；Python SDK 代码位于 `sdk/`，JavaScript SDK 与运行脚本位于 `resources/`：
 
-- `rules/graph/` 定义和实现图级检查；`rules/node/` 定义和实现节点源码检查；`rules/project.py` 定义项目源码质量检查。
+- `rules/graph/` 定义和实现图级检查；`rules/node/` 定义和实现节点源码检查；`rules/source_quality.py` 提供 Target 源码检查声明；project/root 治理声明及其公共算法归 shared/rule_support/governance.py。
 - `rulesets/` 定义组合、依赖、阶段入口、Workflow 默认；各 Target 自己表达支持范围，不在装配时修改另一语言的 Ruleset。
-- `nodetypes/` 保存现有节点声明与语言接口；SDK 保持原公开入口，节点仍经 Plugin 贡献资源，不新增隐式默认。
+- `sdk/` 与 `resources/` 按语言保存公开 SDK 及运行支持；NodeType 定义外观和默认规则，业务 Node 从 project/root 的 nodes/ 发现，Plugin 不能贡献业务 Node。
 - Target 的 `quality/` 提供事实、上下文、执行组织和报告，具体规则判断归 `rules/`。
-- `targets/shared/quality_support/` 和 `rule_support/` 提供共用算法、事实数据、Record 契约与装配辅助，不登记 Rule 或 Ruleset，也不依赖具体 Target。
+- `targets/shared/quality_support/` 和 `rule_support/` 提供共用算法、事实数据、Record 契约与装配辅助，包含共用纯算法与 project/root 治理声明，不依赖具体 Target。
+
+`tooling/project/` 按清单、resources 准备与 governance 编排组织项目准备；模型不执行文件 IO。完整项目审查生成 PROJECT_ARCHITECTURE.jsonc，workflow 架构登记由 architecture_registration 单独处理。
 
 CLI 的结果范围与内置检查说明由 `tooling/application/result_scope.py` 维护，不进入 Core。
 

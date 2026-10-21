@@ -19,20 +19,7 @@ from vibeflow.core.descriptors.values import (
     required_string as _required_string,
     string_list as _string_list,
 )
-from vibeflow.core.descriptors.models import (
-    BaseLibDescriptor,
-    CapabilityDescriptor,
-    CapabilityOperationDescriptor,
-    CapabilityRequirementDescriptor,
-    DataSchemaDescriptor,
-    DescriptorModelError,
-    HostExtensionDescriptor,
-    ImplementationDescriptor,
-    NodeContractDescriptor,
-    NodeDescriptor,
-    PluginDescriptor,
-    SourceLocator,
-)
+from vibeflow.core.descriptors.models import BaseLibDescriptor, CapabilityDescriptor, CapabilityOperationDescriptor, CapabilityRequirementDescriptor, DataSchemaDescriptor, DescriptorModelError, ImplementationDescriptor, NodeContractDescriptor, NodeDescriptor, PluginDescriptor, SourceLocator
 from vibeflow.core.config.node import normalize_node_config_spec
 from vibeflow.core.rules.models import RuleDescriptor, RulesetDescriptor
 
@@ -46,7 +33,6 @@ def decode_resource(
     | BaseLibDescriptor
     | DataSchemaDescriptor
     | CapabilityDescriptor
-    | HostExtensionDescriptor
     | PluginDescriptor
     | RuleDescriptor
     | RulesetDescriptor
@@ -66,12 +52,18 @@ def decode_resource(
     if kind in {"rule", "ruleset"}:
         from vibeflow.core.descriptors.rule_decode import parse_rule, parse_ruleset
         return (parse_rule if kind == "rule" else parse_ruleset)(data)
+    if kind == "node_type":
+        from vibeflow.core.descriptors.node_types import NodeTypeDescriptor
+        _check_fields(data, allowed={"kind", "id", "display_name", "description", "rulesets", "presentation"}, field="node_type")
+        return NodeTypeDescriptor(id=_required_string(data.get("id"), field="node_type.id"),
+            display_name=_optional_string(data.get("display_name")), description=_optional_string(data.get("description")),
+            rulesets=data.get("rulesets", ()), presentation=_mapping_or_empty(data.get("presentation"), field="node_type.presentation"))
     parser: dict[str, Callable[[Mapping[str, Any]], object]] = {
         "node": _parse_node,
         "base_lib": _parse_base_lib,
         "data_schema": _parse_data_schema,
         "capability": _parse_capability,
-        "host_extension": _parse_host_extension,
+
         "plugin": _parse_plugin,
     }
     try:
@@ -89,7 +81,8 @@ def _parse_node(data: Mapping[str, Any]) -> NodeDescriptor:
         data,
         allowed={
             "kind",
-            "type_key",
+            "id",
+            "node_type",
             "display_name",
             "description",
             "version",
@@ -109,7 +102,8 @@ def _parse_node(data: Mapping[str, Any]) -> NodeDescriptor:
     )
     raw_contract = _required_mapping(data.get("contract"), field="node.contract")
     return NodeDescriptor(
-        type_key=_required_string(data.get("type_key"), field="node.type_key"),
+        node_type=_required_string(data.get("node_type"), field="node.node_type"),
+        id=_required_string(data.get("id"), field="node.id"),
         display_name=_required_string(
             data.get("display_name"),
             field="node.display_name",
@@ -138,7 +132,7 @@ def _parse_node(data: Mapping[str, Any]) -> NodeDescriptor:
         capabilities=_parse_capability_requirements(
             data.get("capabilities", ()),
         ),
-        rulesets=data.get("rulesets", ()),
+        rulesets=data.get("rulesets"),
         presentation=_mapping_or_empty(data.get("presentation"), field="node.presentation"),
         metadata=_mapping_or_empty(data.get("metadata"), field="node.metadata"),
     )
@@ -465,60 +459,7 @@ def _parse_capability(data: Mapping[str, Any]) -> CapabilityDescriptor:
     )
 
 
-def _parse_host_extension(
-    data: Mapping[str, Any],
-) -> HostExtensionDescriptor:
-    _check_fields(
-        data,
-        allowed={
-            "rulesets",
-            "presentation",
-            "base_libs",
-            "kind",
-            "id",
-            "targets",
-            "display_name",
-            "description",
-            "version",
-            "implementations",
-            "provides",
-            "dependencies",
-            "external_packages",
-        },
-        field="host_extension",
-    )
-    return HostExtensionDescriptor(
-        presentation=_mapping_or_empty(data.get("presentation"), field="host_extension.presentation"),
-        base_libs=_string_list(data.get("base_libs", ()), field="host_extension.base_libs"),
-        rulesets=data.get("rulesets", ()),
-        id=_required_string(
-            data.get("id"),
-            field="host_extension.id",
-        ),
-        targets=_string_list(
-            data.get("targets"),
-            field="host_extension.targets",
-        ),
-        display_name=_optional_string(data.get("display_name")),
-        description=_optional_string(data.get("description")),
-        version=_optional_string(data.get("version")),
-        implementations=_parse_implementations(
-            data.get("implementations"),
-            field="host_extension.implementations",
-        ),
-        provides=_string_list(
-            data.get("provides", ()),
-            field="host_extension.provides",
-        ),
-        dependencies=_string_list(
-            data.get("dependencies", ()),
-            field="host_extension.dependencies",
-        ),
-        external_packages=_string_list(
-            data.get("external_packages", ()),
-            field="host_extension.external_packages",
-        ),
-    )
+
 
 
 def _parse_plugin(data: Mapping[str, Any]) -> PluginDescriptor:

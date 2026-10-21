@@ -6,7 +6,7 @@ from typing import Any
 import weakref
 import atexit
 
-from vibeflow.core.descriptors.contributions import PluginContributions, ResourceDeclaration, ResourceOrigin
+from vibeflow.core.descriptors.contributions import PluginContributions, ResourceDeclaration, ResourceOrigin, ResourceOwner
 from vibeflow.core.descriptors.decode import decode_resource
 from vibeflow.targets.javascript.build.plugin_session import JavascriptPluginSession
 
@@ -25,7 +25,7 @@ class JavascriptPluginDefinition:
 
     def __post_init__(self):
         resources = tuple(ResourceDeclaration(descriptor,
-            ResourceOrigin(self.id, location.get("path", self.source), location.get("line"),
+            ResourceOrigin(ResourceOwner("plugin", self.id), location.get("path", self.source), location.get("line"),
                            location.get("column"), location.get("symbol", "")))
             for descriptor, location in self.resources)
         object.__setattr__(self, "_fixed_contributions", PluginContributions(
@@ -64,7 +64,7 @@ def contribution_session(catalog, group, resource_id):
     if origin is None:
         return None
     return next((definition.session for definition in _definitions.get(id(catalog), ())
-                 if definition.id == origin.plugin_id), None)
+                 if definition.id == origin.owner.plugin_id), None)
 
 
 @atexit.register
@@ -79,9 +79,9 @@ def _close_definitions():
     finish_cleanup(None, errors)
 
 
-def load_plugin(source, *, root, project_config, node_command="node"):
+def load_plugin(source, *, root, project_config, node_command="node", toolchain_root=None):
     javascript = project_config.get("javascript", {})
-    package_root = (Path(root) / javascript.get("package_root", ".")).resolve()
+    package_root = (Path(toolchain_root or root) / javascript.get("package_root", ".")).resolve()
     if source.kind == "file":
         module = (Path(root) / source.ref).resolve()
     elif source.kind in {"module", "package"}:
@@ -137,3 +137,34 @@ process.stdout.write(entry);
     except Exception as exc:
         session.__exit__(type(exc), exc, exc.__traceback__)
         raise
+
+
+def discover_resources(directory, *, project_config, package_root, node_command="node"):
+    """Read exported ordinary SDK resources without manufacturing a Plugin."""
+    from vibeflow.core.descriptors.declarations import ResourceDefinition, ResourceDiscovery
+    from vibeflow.core.descriptors.contributions import resource_kind
+    package_root = (Path(package_root) / project_config.get("javascript", {}).get("package_root", ".")).resolve()
+    found, states = [], {}
+    candidates = [(path, kind) for group, kind in (("nodes", "node"), ("base_lib", "base_lib"))
+                  for path in sorted((Path(directory) / group).rglob("*"))
+                  if path.is_file() and path.suffix in {".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"}
+                  and not path.name.endswith((".d.ts", ".d.mts", ".d.cts"))]
+    if not candidates:
+        return ResourceDiscovery()
+    with JavascriptPluginSession(node_command=node_command) as session:
+        for path, kind in candidates:
+            result = session.resource_declarations(module=path.resolve(), package_root=package_root)
+            states.update({path:"unknown" for path in result.get("included_sources", ())})
+            states.update({path:"loaded" for path in result.get("loaded_sources", ())})
+            for item in result["resources"]:
+                try:
+                    descriptor = decode_resource(item["descriptor"])
+                except ValueError as error:
+                    error.location=dict(item['origin'])
+                    raise
+                if resource_kind(descriptor) != kind:
+                    raise ValueError(f"{path}: declarations under {path.parent.name}/ must be {kind} resources")
+                origin = item["origin"]
+                found.append(ResourceDefinition(descriptor, path=origin["path"], line=origin.get("line"),
+                                                symbol=origin.get("symbol", "")))
+    return ResourceDiscovery(tuple(found), states)

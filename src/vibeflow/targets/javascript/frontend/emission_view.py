@@ -94,7 +94,7 @@ class _BoundContext:
         binding: JavascriptCallBinding,
     ) -> None:
         location = ".".join(path)
-        if binding.type_key != node.type_used:
+        if binding.definition_id != node.definition_id:
             raise AotPlanError(
                 f"JavaScript binding type mismatch at '{location}'"
             )
@@ -196,8 +196,8 @@ class BoundNodeView:
     def id(self) -> str:
         return self._source.id
     @property
-    def type_used(self) -> str:
-        return self._source.type_used
+    def definition_id(self) -> str:
+        return self._source.definition_id
     @property
     def flow_kind(self) -> str:
         return self._source.flow_kind
@@ -229,7 +229,7 @@ class BoundNodeView:
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = dict(
             id=self.id,
-            type_used=self.type_used,
+            definition_id=self.definition_id,
             requires=[item.to_dict() for item in self.requires],
             provides=[item.to_dict() for item in self.provides],
             params=dict(self.params),

@@ -8,13 +8,13 @@ import pytest
 from vibeflow.core.descriptors import RuleImplementationDescriptor, SourceLocator
 from vibeflow.core.rules import RuleDescriptor
 from vibeflow.core.descriptors.decode import decode_resource as parse_descriptor_manifest
-from vibeflow.core.descriptors import ContributionBuilder, ResourceOrigin, compose_contributions
+from vibeflow.core.descriptors import ContributionBuilder, ResourceOrigin, ResourceOwner, compose_contributions
 from vibeflow.tooling.presentation.node_presentation import resolve_presentation
 
 
 def node(**values):
-    return parse_descriptor_manifest({
-        "kind": "node", "type_key": "model.affine", "display_name": "Affine",
+    return parse_descriptor_manifest({'node_type': 'vibeflow.node',
+        "kind": "node", 'id': "model.affine", "display_name": "Affine",
         "description": "A single affine transform", "version": "1.0",
         "flow_kind": "process", "contract": {}, **values,
     })
@@ -25,11 +25,11 @@ def write(path: Path, value: dict):
     path.write_text(json.dumps(value), encoding="utf-8")
 
 
-def test_node_owns_selection_and_missing_selection_is_unconstrained():
-    assert node().rulesets == ()
+def test_node_missing_selection_inherits_type_and_explicit_empty_cancels():
+    assert node( ).rulesets is None
     assert node(rulesets=[]).rulesets == ()
     assert node(rulesets=["custom"]).rulesets == ("custom",)
-    assert node().to_dict()["rulesets"] == []
+    assert "rulesets" not in node().to_dict()
     with pytest.raises(ValueError, match="unknown fields.*category"):
         node(category="model")
 
@@ -62,9 +62,11 @@ def test_code_contributions_retain_resource_selection_and_source(tmp_path):
         node(rulesets=["model.blocks"]).to_dict(),
     ]
     builder = ContributionBuilder("model.package")
-    for index, value in enumerate(definitions):
-        builder.add(parse_descriptor_manifest(value), origin=ResourceOrigin("model.package", str(tmp_path / "model.py"), index + 1))
-    catalogs = compose_contributions((builder.finish(),))
+    for index, value in enumerate(definitions[:2]):
+        builder.add(parse_descriptor_manifest(value), origin=ResourceOrigin(ResourceOwner("plugin", "model.package"), str(tmp_path / "model.py"), index + 1))
+    from vibeflow.core.descriptors.contributions import ResourceDeclaration
+    catalogs = compose_contributions((builder.finish(),), resources=(ResourceDeclaration(
+        parse_descriptor_manifest(definitions[2]),ResourceOrigin(ResourceOwner("root","app","app"),str(tmp_path / "nodes/model.py"),3)),))
     assert catalogs.rules.require("model.block").outputs["blocks"] == "model.blocks.v1"
     assert catalogs.nodes.require("model.affine").rulesets == ("model.blocks",)
     assert catalogs.origins[("nodes", "model.affine")].line == 3
@@ -91,7 +93,7 @@ def test_rule_has_one_implementation_per_execution_family():
 def test_workflow_ruleset_selection_is_validated_without_loading_implementations(selection, valid):
     from vibeflow.tooling.project.config_schema import collect_config_schema_findings
     document = {"rulesets": selection, "pipeline": {"nodes": [{
-        "id": "block", "type_used": "model.block", "display_name": "Block",
+        "id": "block", "definition_id": "model.block", "display_name": "Block",
         "description": "A declaration-only schema check.",
     }]}}
     findings = collect_config_schema_findings(document)

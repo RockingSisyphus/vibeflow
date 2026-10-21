@@ -48,7 +48,6 @@ MERMAID_DIR = REPORT_DIR / "mermaid"
 SVG_DIR = REPORT_DIR / "svg"
 COMPILED_BLOCK_DIR = REPORT_DIR / "compiled_blocks"
 RUN_ROOT = WORK_ROOT / "runs"
-POLICY_PATH = PROJECT_DIR / "kernel_policy.jsonc"
 WORKSPACE_PATH = FIXTURE_WORKSPACE_PATH
 REVIEW_ARCHITECTURE_DIR = PROJECT_DIR / "review_artifacts"
 REVIEW_ARCHITECTURE_PATH = REVIEW_ARCHITECTURE_DIR / "ARCHITECTURE.jsonc"
@@ -286,9 +285,9 @@ VALID_RUN_CASES = [
 
 
 INVALID_CASES = [
-    {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "MissingInfoNode", "type": "bad.missing_info", "expect": "type_key"},
+    {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "MissingInfoNode", "type": "bad.missing_info", "expect": "id"},
     {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "InfoWrongTypeNode", "type": "bad.info_type", "expect": "display_name"},
-    {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "EmptyTypeKeyNode", "type": "bad.empty", "expect": "type_key"},
+    {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "EmptyTypeKeyNode", "type": "bad.empty", "expect": "id"},
     {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "MissingContractNode", "type": "bad.missing_contract", "expect": "contract"},
     {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "DuplicateKeysNode", "type": "bad.duplicate_keys", "expect": "duplicate"},
     {"kind": "inspect_node", "module": "illegal_nodes/metadata_contract_cases.py", "class": "MissingSemanticsNode", "type": "bad.missing_semantics", "expect": "semantics"},
@@ -338,7 +337,7 @@ INVALID_CASES = [
         "config": "fail_async_result_key_missing.jsonc",
         "expect": "GRAPH.ASYNC.MIGRATION",
     },
-    {"kind": "run", "config": "fail_unknown_node.jsonc", "expect": "NODE.TYPE.UNKNOWN"},
+    {"kind": "run", "config": "fail_unknown_node.jsonc", "expect": "NODE.DEFINITION.UNKNOWN"},
     {"kind": "config", "config": "fail_removed_loop_registration.jsonc", "expect": "CONFIG.LOOPS.REMOVED"},
     {"kind": "run", "config": "fail_nodeset_key_leak.jsonc", "expect": "NODESET.PROVIDES.UNKNOWN_KEY"},
     {"kind": "run", "config": "fail_nodeset_recursion.jsonc", "expect": "NODESET.RECURSION"},
@@ -464,7 +463,7 @@ def _run_addition_case(name: str) -> CaseResult:
 
 def _configure_runtime(work_root: Path) -> None:
     global WORK_ROOT, PROJECT_DIR, CONFIG_DIR, REPORT_DIR, ASCII_DIR
-    global MERMAID_DIR, SVG_DIR, COMPILED_BLOCK_DIR, RUN_ROOT, POLICY_PATH
+    global MERMAID_DIR, SVG_DIR, COMPILED_BLOCK_DIR, RUN_ROOT
     global WORKSPACE_PATH, REVIEW_ARCHITECTURE_DIR, REVIEW_ARCHITECTURE_PATH
     global REVIEW_DIR
     global EXTERNAL_DEDUP_REVIEW_CONFIG_PATH
@@ -482,13 +481,18 @@ def _configure_runtime(work_root: Path) -> None:
     WORKSPACE_PATH = WORK_ROOT / "vibeflow_config.jsonc"
     shutil.copy2(FIXTURE_WORKSPACE_PATH, WORKSPACE_PATH)
     CONFIG_DIR = PROJECT_DIR / "configs"
+    # Broken workflows are case inputs, not members of the positive review project.
+    negative_configs = WORK_ROOT / "negative_configs"
+    negative_configs.mkdir()
+    for path in CONFIG_DIR.glob("fail*.jsonc"):
+        shutil.move(path, negative_configs / path.name)
+    (WORK_ROOT / "project_rules.jsonc").write_text('{"rulesets":[]}')
     REPORT_DIR = WORK_ROOT / "reports"
     ASCII_DIR = REPORT_DIR / "ascii"
     MERMAID_DIR = REPORT_DIR / "mermaid"
     SVG_DIR = REPORT_DIR / "svg"
     COMPILED_BLOCK_DIR = REPORT_DIR / "compiled_blocks"
     RUN_ROOT = WORK_ROOT / "runs"
-    POLICY_PATH = PROJECT_DIR / "kernel_policy.jsonc"
     REVIEW_ARCHITECTURE_DIR = PROJECT_DIR / "review_artifacts"
     REVIEW_ARCHITECTURE_PATH = REVIEW_ARCHITECTURE_DIR / "ARCHITECTURE.jsonc"
     REVIEW_DIR = REPORT_DIR / "review"
@@ -982,9 +986,38 @@ def _node_declaration(descriptor, contract, *, schema=None, defaults=None):
 
 
 def _project_registry():
+    """Assemble every explicitly declared probe Node for direct engine checks."""
     from vibeflow.tooling.project.workspace_loader import load_workspace_config
     from vibeflow.tooling.application.python.project.declarations import declared_python_registry
-    return declared_python_registry(load_workspace_config(WORKSPACE_PATH),config_path=PROJECT_DIR / 'configs/pass_nodeset_nested.jsonc')
+    from vibeflow.targets.python.sdk.discovery import discover_resources
+    from vibeflow.tooling.project.config_loader import load_raw_config_document
+    discovered = discover_resources(PROJECT_DIR, source_roots=(PROJECT_DIR,))
+    identifiers = [item.descriptor.id for item in discovered.resources
+                   if item.descriptor.to_dict()["kind"] == "node"]
+    selections = {}
+    for path in CONFIG_DIR.glob("pass*.jsonc"):
+        for item in load_raw_config_document(path).data.get("plugins", ()):
+            selections[json.dumps(item, sort_keys=True)] = item
+    with tempfile.TemporaryDirectory(dir=PROJECT_DIR / "stubs", prefix="registry-") as directory:
+        path = Path(directory) / "probe.jsonc"
+        path.write_text(json.dumps({"plugins":list(selections.values()), "pipeline":{"nodes":[
+            {"id":f"probe{i}", "definition_id":identity, "display_name":identity, "description":"Explicit probe resource"}
+            for i, identity in enumerate(identifiers)]}}))
+        return declared_python_registry(load_workspace_config(WORKSPACE_PATH), config_path=path)
+
+
+def _case_config(filename):
+    path = CONFIG_DIR / filename
+    if path.exists():
+        return path
+    directory = WORK_ROOT / "negative_cases" / Path(filename).stem
+    project = directory / "project"
+    if not project.exists():
+        shutil.copytree(PROJECT_DIR, project)
+        shutil.copy2(WORKSPACE_PATH, directory / "vibeflow_config.jsonc")
+        (directory / "project_rules.jsonc").write_text('{"rulesets":[]}')
+        shutil.copy2(WORK_ROOT / "negative_configs" / filename, project / "configs" / filename)
+    return project / "configs" / filename
 
 
 def _node_source_report(type_key, *, policy=None):
@@ -1087,9 +1120,9 @@ def _import_rule_findings(entry: Path, *, project_root: Path, source_roots=()):
     )
     from vibeflow.targets.python.project.source_closure import collect_python_source_facts
 
-    descriptor = NodeDescriptor(type_key="sandbox.preflight", display_name="Preflight",
+    descriptor = NodeDescriptor(id="sandbox.preflight", display_name="Preflight",
          description="Import-rule acceptance fixture.", version="0.1.0",
-        flow_kind="process", rulesets=("vibeflow.process",), contract=NodeContractDescriptor())
+        flow_kind="process", rulesets=("vibeflow.process",), contract=NodeContractDescriptor(), node_type="vibeflow.node")
     facts = collect_python_source_facts(entry, project_root=project_root, source_roots=tuple(source_roots))
     context = build_python_source_context(
         (PythonSourceNode(descriptor, str(entry), "SandboxNode"),),
@@ -1099,7 +1132,7 @@ def _import_rule_findings(entry: Path, *, project_root: Path, source_roots=()):
     plan = compile_ruleset("vibeflow.process", rules={item.id:item for item in rules},
         rulesets={item.id:item for item in rulesets}, entrypoint="import")
     return execute_rule_plan(plan, RuleContext(facts={"source_context":context},
-        subject={"type_key":descriptor.type_key,"descriptor":descriptor,"kind":"node"},
+        subject={'node_type': 'vibeflow.node', 'id':descriptor.id,"descriptor":descriptor,"kind":"node"},
         target="python", phase="import"), handlers={key:value for (kind,key),value in builtin_plugin().bindings().items() if kind == "rule"}).findings
 
 
@@ -1172,7 +1205,7 @@ def _run_global_state_protected_async_compile_case() -> CaseResult:
     rejected=[]
     for mode in ("result_key","detached"):
         try:
-            parse_graph_config({"pipeline":{"nodes":[{"id":"work","type_used":"sandbox.constant",
+            parse_graph_config({"pipeline":{"nodes":[{"id":"work","definition_id":"sandbox.constant",
                 "display_name":"Work","description":"Removed concurrency entry","async":mode}]}})
         except GraphConfigError as error:
             assert "GRAPH.ASYNC.MIGRATION" in str(error),str(error)
@@ -1194,19 +1227,19 @@ def _global_state_runtime_graph(
         "nodes": [
             {
                 "id": "start",
-                "type_used": "sandbox.start",
+                "definition_id": "sandbox.start",
                 "display_name": "Start",
                 "description": "Starts the lock probe.",
             },
             {
                 "id": "work",
-                "type_used": node_type,
+                "definition_id": node_type,
                 "display_name": "Work",
                 "description": "Runs the lock probe.",
             },
             {
                 "id": "end",
-                "type_used": "sandbox.start",
+                "definition_id": "sandbox.start",
                 "display_name": "End",
                 "description": "Ends the lock probe.",
             },
@@ -1230,13 +1263,13 @@ def _normal_runtime_graph():
                 "nodes": [
                     {
                         "id": "start",
-                        "type_used": "sandbox.start",
+                        "definition_id": "sandbox.start",
                         "display_name": "Start",
                         "description": "Starts the normal root.",
                     },
                     {
                         "id": "end",
-                        "type_used": "sandbox.start",
+                        "definition_id": "sandbox.start",
                         "display_name": "End",
                         "description": "Ends the normal root.",
                     },
@@ -1359,7 +1392,7 @@ def _thread_probe_graph():
 
     probe: dict[str, Any] = {
         "id": "probe",
-        "type_used": "sandbox.thread_probe",
+        "definition_id": "sandbox.thread_probe",
         "display_name": "Thread probe",
         "description": "Reports the Python thread used to execute this node.",
     }
@@ -1369,14 +1402,14 @@ def _thread_probe_graph():
                 "nodes": [
                     {
                         "id": "start",
-                        "type_used": "sandbox.thread_start",
+                        "definition_id": "sandbox.thread_start",
                         "display_name": "Thread probe start",
                         "description": "Starts the thread execution fixture.",
                     },
                     probe,
                     {
                         "id": "end",
-                        "type_used": "sandbox.thread_end",
+                        "definition_id": "sandbox.thread_end",
                         "display_name": "Thread probe end",
                         "description": "Joins the thread probe result.",
                     },
@@ -1402,21 +1435,21 @@ def _thread_probe_registry():
     from vibeflow.targets.python.project import NodeRegistry
     from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 
-    ThreadProbeNode_DECLARATION = _node_declaration(NodeDescriptor(type_key='sandbox.thread_probe', display_name='Thread probe', description='Reports the current Python thread.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('thread.name', 'thread.name', display_name='thread.name'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('thread.name', 'thread.name', display_name='thread.name'),)}))
+    ThreadProbeNode_DECLARATION = _node_declaration(NodeDescriptor(id='sandbox.thread_probe', display_name='Thread probe', description='Reports the current Python thread.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('thread.name', 'thread.name', display_name='thread.name'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('thread.name', 'thread.name', display_name='thread.name'),)}))
     class ThreadProbeNode:
 
         def run_pure(self, inputs, params):
             del inputs, params
             return {"thread.name": threading.current_thread().name}
 
-    ThreadStartNode_DECLARATION = _node_declaration(NodeDescriptor(type_key='sandbox.thread_start', display_name='Thread probe start', description='Starts the thread execution fixture.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor())
+    ThreadStartNode_DECLARATION = _node_declaration(NodeDescriptor(id='sandbox.thread_start', display_name='Thread probe start', description='Starts the thread execution fixture.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor())
     class ThreadStartNode:
 
         def run_pure(self, inputs, params):
             del inputs, params
             return {}
 
-    ThreadEndNode_DECLARATION = _node_declaration(NodeDescriptor(type_key='sandbox.thread_end', display_name='Thread probe end', description='Ends after joining a thread probe result.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('thread.name', 'exactly_one', display_name='thread.name'),), provides=(DataProvider('thread.result', 'thread.result', display_name='thread.result'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('thread.name', 'exactly_one', display_name='thread.name'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('thread.result', 'thread.result', display_name='thread.result'),)}))
+    ThreadEndNode_DECLARATION = _node_declaration(NodeDescriptor(id='sandbox.thread_end', display_name='Thread probe end', description='Ends after joining a thread probe result.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('thread.name', 'exactly_one', display_name='thread.name'),), provides=(DataProvider('thread.result', 'thread.result', display_name='thread.result'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('thread.name', 'exactly_one', display_name='thread.name'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('thread.result', 'thread.result', display_name='thread.result'),)}))
     class ThreadEndNode:
 
         def run_pure(self, inputs, params):
@@ -1473,7 +1506,6 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     )
     from vibeflow.tooling.project.config_loader import load_config_document
     from vibeflow.tooling.project.config_schema import collect_config_schema_findings
-    from vibeflow.tooling.application.python.project.effective_policy import resolve_effective_policy
 
 
 
@@ -1482,7 +1514,7 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         from nodes import legal_global_state_nodes
 
         legal_global_state_nodes.reset_global_state_probe()
-    config_path = CONFIG_DIR / str(case["config"])
+    config_path = _case_config(str(case["config"]))
     document = load_config_document(config_path)
     schema_findings = collect_config_schema_findings(document.data)
     if schema_findings:
@@ -1493,11 +1525,10 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     from vibeflow.core.findings import HealthReport
     workspace = load_workspace_config(WORKSPACE_PATH)
     environment = build_workspace_environment(workspace, config_path=config_path)
-    policy_result = resolve_effective_policy(document.data, config_path=config_path, explicit_policy_path=POLICY_PATH)
     node_registry = environment.registry
     runtime_options = RuntimeOptions(**case["runtime_options"]) if "runtime_options" in case else None
     with python_check_scope(node_registry):
-        prepared = _prepare_workspace_graph(config_path, workspace=workspace, env=environment, policy_override=policy_result)
+        prepared = _prepare_workspace_graph(config_path, workspace=workspace, env=environment)
         if isinstance(prepared, HealthReport):
             raise AssertionError(f"assembly failed: {prepared.to_dict()}")
         graph, resources = prepared.graph, prepared.resources
@@ -1543,11 +1574,10 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     initial = case["initial_factory"]() if "initial_factory" in case else case.get("initial", {})
     hook_marker = REPORT_DIR / "plugin_hooks.jsonl"
     hook_count_before = len(hook_marker.read_text(encoding="utf-8").splitlines()) if hook_marker.exists() else 0
+    loaded_before = set(sys.modules)
     run_result = run_checked(
         config_path,
-        registry=node_registry,
         initial=initial,
-        policy_path=POLICY_PATH,
         run_root=RUN_ROOT,
         run_id=name,
         runtime_options=runtime_options,
@@ -1559,17 +1589,12 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         if actual != expected:
             raise AssertionError(f"{key} expected {expected!r}, got {actual!r}")
     if case.get("reset_global_state_probe"):
-        from nodes import legal_global_state_nodes
-
-        if legal_global_state_nodes.GLOBAL_STATE_VALUE != "configured":
-            raise AssertionError(
-                "global-state probe did not persist its process-local state"
-            )
-        if legal_global_state_nodes.GLOBAL_STATE_RUNS != 1:
-            raise AssertionError(
-                "global-state structural examples must not execute; expected "
-                f"one runtime call, got {legal_global_state_nodes.GLOBAL_STATE_RUNS}"
-            )
+        source = (PROJECT_DIR / "nodes/legal_global_state_nodes.py").resolve()
+        modules = [module for name, module in tuple(sys.modules.items()) if name not in loaded_before
+                   and getattr(module, "__file__", None) and Path(module.__file__).resolve() == source]
+        actual = [module for module in modules if getattr(module, "GLOBAL_STATE_VALUE", None) == "configured"]
+        if len(actual) != 1 or actual[0].GLOBAL_STATE_RUNS != 1:
+            raise AssertionError("the owned runtime module must persist exactly one probe execution")
     for key in case.get("expected_absent_outputs", ()):
         if run_result.context.exists(str(key)):
             raise AssertionError(f"{key} should be absent, got {run_result.context.get(str(key))!r}")
@@ -1845,7 +1870,7 @@ def _assert_execution_plan(case: dict[str, Any], plan) -> None:
                     f"{list(expected)!r}, got {actual!r}"
                 )
         if case.get("expected_workflow_global_state"):
-            if portable.abi_version != "vibeflow.workflow.v9":
+            if portable.abi_version != "vibeflow.workflow.v10":
                 raise AssertionError(
                     f"expected WorkflowPlan v9, got {portable.abi_version!r}"
                 )
@@ -1945,7 +1970,7 @@ def _assert_run_mermaid(case: dict[str, Any], run_dir: Path) -> None:
     expected=case.get("expected_run_fact_values",())
     if not expected:return
     architecture=preview_architecture(run_dir)
-    facts={"workflow":architecture["workflow"],"nodesets":architecture["nodesets"],
+    facts={"workflow":architecture["workflow"],"nodeset_types":architecture["nodeset_types"],
            "resources":architecture.get("implementation_graph",{}).get("resources",{})}
     text=json.dumps(facts,ensure_ascii=False)
     missing=[v for v in expected if v not in text]
@@ -2028,19 +2053,25 @@ def _run_invalid_case(case: dict[str, Any], base_lib_report):
 
 def _inspect_invalid_node(case: dict[str, Any], kind: str) -> CaseResult:
     from vibeflow.targets.python.rules.node.policy import PurityPolicy
-    from vibeflow.tooling.project.descriptor_loader import load_workflow_plugins, DescriptorLoadError
+    from vibeflow.tooling.project.resources import prepare_workflow_resources, ResourcePreparationError
     from vibeflow.tooling.project.workspace_loader import load_workspace_config
     negative = PROJECT_DIR / "negative_plugins" / (str(case["class"]) + ".py")
     if negative.exists():
-        config = negative.with_suffix(".workflow.jsonc")
-        config.write_text(json.dumps({"plugins":[{"source":{"kind":"file","ref":negative.relative_to(PROJECT_DIR).as_posix()}}]}))
-        try:
-            load_workflow_plugins(load_workspace_config(WORKSPACE_PATH), config)
-        except DescriptorLoadError as exc:
-            if str(case["expect"]).lower() not in str(exc).lower():
-                raise AssertionError(f"expected declaration error {case['expect']}: {exc}") from exc
-            return CaseResult(f"invalid:inspect_node:{case['class']}", "PASS", str(exc))
-        raise AssertionError("invalid SDK declaration was accepted")
+        from tests.fixtures.support.projects import project_root
+        with tempfile.TemporaryDirectory(prefix="invalid-node-") as directory:
+            root = project_root(directory)
+            (root / "nodes").mkdir()
+            shutil.copy2(negative, root / "nodes" / negative.name)
+            config = root / "workflow.jsonc"
+            config.write_text(json.dumps({"pipeline":{"nodes":[{"id":"bad", "definition_id":case["type"],
+                "display_name":"Invalid declaration", "description":"Must be rejected"}]}}))
+            try:
+                prepare_workflow_resources(load_workspace_config(Path(directory) / "vibeflow_config.jsonc"), config)
+            except (ResourcePreparationError, ValueError) as exc:
+                if str(case["expect"]).lower() not in str(exc).lower():
+                    raise AssertionError(f"expected declaration error {case['expect']}: {exc}") from exc
+                return CaseResult(f"invalid:inspect_node:{case['class']}", "PASS", str(exc))
+            raise AssertionError("invalid SDK declaration was accepted")
     policy = PurityPolicy(max_source_lines=500, warn_source_lines=None)
     if kind == "inspect_node_small_source":
         policy = PurityPolicy(max_source_lines=10)
@@ -2058,18 +2089,18 @@ def _inspect_invalid_node(case: dict[str, Any], kind: str) -> CaseResult:
 
 
 def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
-    from vibeflow.core import DataProvider, DataRequirement, EdgeSpec, GraphConfig, NodeSpec
+    from vibeflow.core import DataProvider, DataRequirement, EdgeSpec, GraphConfig, NodeCallSpec
     from vibeflow.targets.python.project import NodeRegistry
     from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
     from vibeflow.targets.python.runtime.engine import PipelineRuntime
 
-    RuntimeStartNode_DECLARATION = _node_declaration(NodeDescriptor(type_key='sandbox.runtime_start', display_name='Runtime Start', description='runtime test start', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(examples=({'inputs': {}, 'params': {}},)))
+    RuntimeStartNode_DECLARATION = _node_declaration(NodeDescriptor(id='sandbox.runtime_start', display_name='Runtime Start', description='runtime test start', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(examples=({'inputs': {}, 'params': {}},)))
     class RuntimeStartNode:
 
         def run_pure(self, inputs, params):
             return {}
 
-    RuntimeEndNode_DECLARATION = _node_declaration(NodeDescriptor(type_key='sandbox.runtime_end', display_name='Runtime End', description='runtime test end', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('bad.out', 'exactly_one', display_name='bad.out'),), input_semantics={'bad.out': ('bad output',)}, examples=({'inputs': {'bad.out': 1}, 'params': {}},)))
+    RuntimeEndNode_DECLARATION = _node_declaration(NodeDescriptor(id='sandbox.runtime_end', display_name='Runtime End', description='runtime test end', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('bad.out', 'exactly_one', display_name='bad.out'),), input_semantics={'bad.out': ('bad output',)}, examples=({'inputs': {'bad.out': 1}, 'params': {}},)))
     class RuntimeEndNode:
 
         def run_pure(self, inputs, params):
@@ -2082,9 +2113,9 @@ def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
     registry.register(_project_registry().descriptor(str(case["type"])), cls)
     graph = GraphConfig(
         nodes=(
-            NodeSpec(id="start", type_used="sandbox.runtime_start"),
-            NodeSpec(id="bad", type_used=str(case["type"]), provides=(DataProvider("bad.out", "bad.out", display_name="bad.out"),)),
-            NodeSpec(id="end", type_used="sandbox.runtime_end", requires=(DataRequirement("bad.out", "exactly_one", display_name="bad.out"),)),
+            NodeCallSpec(id="start", definition_id="sandbox.runtime_start"),
+            NodeCallSpec(id="bad", definition_id=str(case["type"]), provides=(DataProvider("bad.out", "bad.out", display_name="bad.out"),)),
+            NodeCallSpec(id="end", definition_id="sandbox.runtime_end", requires=(DataRequirement("bad.out", "exactly_one", display_name="bad.out"),)),
         ),
         edges=(EdgeSpec("start", "bad"), EdgeSpec("bad", "end")),
     )
@@ -2098,14 +2129,14 @@ def _runtime_invalid_node(case: dict[str, Any]) -> CaseResult:
 
 
 def _health_invalid_node(case: dict[str, Any]) -> CaseResult:
-    from vibeflow.core import DataProvider, GraphConfig, NodeSpec
+    from vibeflow.core import DataProvider, GraphConfig, NodeCallSpec
     from vibeflow.targets.python.project import NodeRegistry
     from vibeflow.targets.python.rules.node.policy import PurityPolicy
     from vibeflow.targets.python.quality.workflow import validate_graph_health
     from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
 
     registry = _project_registry()
-    graph = GraphConfig(nodes=(NodeSpec(id="bad", type_used=str(case["type"]), provides=(DataProvider("bad.out", "bad.out", display_name="bad.out"),)),))
+    graph = GraphConfig(nodes=(NodeCallSpec(id="bad", definition_id=str(case["type"]), provides=(DataProvider("bad.out", "bad.out", display_name="bad.out"),)),))
     policy = PurityPolicy(
         warn_dependency_chain_length=2,
         max_dependency_chain_length=4,
@@ -2166,7 +2197,7 @@ def _bad_base_lib_report():
 def _invalid_config(case: dict[str, Any]) -> CaseResult:
     from vibeflow.tooling.application.python.cli.config import validate_config_path
 
-    report = validate_config_path(CONFIG_DIR / str(case["config"]), policy_path=POLICY_PATH)
+    report = validate_config_path(_case_config(str(case["config"])))
     if report.status not in {"FAIL", "ERROR"}:
         raise AssertionError(f"config case was not rejected: {report.status}")
     _assert_report_has_rule([item.to_dict() for item in (*report.errors, *report.warnings)], str(case["expect"]))
@@ -2175,7 +2206,7 @@ def _invalid_config(case: dict[str, Any]) -> CaseResult:
 
 def _concern_config(case: dict[str, Any]) -> CaseResult:
     from vibeflow.tooling.application.python.cli.config import validate_config_path
-    report = validate_config_path(CONFIG_DIR / str(case["config"]), policy_path=POLICY_PATH)
+    report = validate_config_path(_case_config(str(case["config"])))
     if report.status not in {"CONCERNS", "FAIL", "ERROR"}:
         raise AssertionError(f"concern case had status {report.status}")
     findings = [item.to_dict() for item in (*report.errors, *report.warnings)]
@@ -2192,15 +2223,14 @@ def _concern_config(case: dict[str, Any]) -> CaseResult:
 
 def _invalid_run(case: dict[str, Any]) -> CaseResult:
     from vibeflow.targets.python.runtime.options import RuntimeOptions
-    from vibeflow.tooling.application.python.runner import CheckedRunError, run_checked
+    from vibeflow.tooling.application.python.execution import CheckedRunError
+    from vibeflow.tooling.application.python.runner import run_checked
 
     try:
         runtime_options = RuntimeOptions(**case["runtime_options"]) if "runtime_options" in case else None
         run_checked(
-            CONFIG_DIR / str(case["config"]),
-            registry=_project_registry(),
+            _case_config(str(case["config"])),
             initial={"value.in": 0, "io.result": 1},
-            policy_path=POLICY_PATH,
             run_root=RUN_ROOT,
             run_id=f"expected_fail_{Path(str(case['config'])).stem}",
             runtime_options=runtime_options,
@@ -2227,10 +2257,8 @@ def _invalid_runtime_run(case: dict[str, Any]) -> CaseResult:
     initial = case["initial_factory"]() if "initial_factory" in case else case.get("initial", {})
     try:
         run_checked(
-            CONFIG_DIR / str(case["config"]),
-            registry=_project_registry(),
+            _case_config(str(case["config"])),
             initial=initial,
-            policy_path=POLICY_PATH,
             run_root=RUN_ROOT,
             run_id=f"expected_runtime_fail_{Path(str(case['config'])).stem}",
             runtime_options=runtime_options,

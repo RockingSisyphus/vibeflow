@@ -11,10 +11,10 @@ class RuntimeTraceMixin:
     def _record_type_resolution(self, frame: NodeFrame, requirement: DataRequirement, matches: list[DataEnvelope]) -> None:
         self._record_runtime_event(
             "type_resolve",
-            frame.name,
-            frame.node_type,
+            frame.id,
+            frame.definition_id,
             details={
-                "consumer": frame.name,
+                "consumer": frame.id,
                 "required_type": requirement.type,
                 "cardinality": requirement.cardinality,
                 "matched_count": len(matches),
@@ -64,7 +64,7 @@ class RuntimeTraceMixin:
         self,
         kind: str,
         node_name: str,
-        node_type: str,
+        definition_id: str,
         *,
         input_summary: Mapping[str, object] | None = None,
         output_summary: Mapping[str, object] | None = None,
@@ -76,7 +76,7 @@ class RuntimeTraceMixin:
             return
         if self.runtime_options.trace == "boundary" and kind not in {"run_start", "run_end", "business_exit", "nodeset_enter", "nodeset_exit", "nodeset_failed", "loop_enter", "loop_exit", "loop_block_enter", "loop_block_exit", "loop_failed", "node_failed", "planned_stub", "block_enter", "block_exit", "block_failed", "type_resolve", "lock_wait", "lock_acquired", "lock_released", "global_state_enter", "global_state_exit", "global_state_may_have_changed"}:
             return
-        event: dict[str, object] = {"kind": kind, "node": node_name, "type": node_type}
+        event: dict[str, object] = {"kind": kind, "node": node_name, "type": definition_id}
         if input_summary is not None:
             event["input_summary"] = dict(input_summary)
         if output_summary is not None:
@@ -100,7 +100,7 @@ class RuntimeTraceMixin:
             self._record_runtime_event(kind, "pipeline", "pipeline")
 
     def _merge_child_trace(self, frame: NodeFrame, child_trace: RuntimeTrace) -> None:
-        self.trace.merge_child((frame.name,), child_trace)
+        self.trace.merge_child((frame.id,), child_trace)
 
     def _trace_event_path(self, path: tuple[str, ...]) -> tuple[str, ...]:
         return (*self._trace_path_prefix, *path)

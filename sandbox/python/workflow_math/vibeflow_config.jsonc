@@ -1,1 +1,8 @@
-{"roots":[{"id":"workflow_math","path":"project"}]}
+{
+  "roots": [
+    {
+      "id": "workflow_math",
+      "path": "project"
+    }
+  ]
+}

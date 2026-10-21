@@ -22,7 +22,7 @@ def _project(tmp_path):
         f"from pathlib import Path\nPath({str(marker)!r}).write_text('ran')\nraise RuntimeError('must not import')\n")
     config = tmp_path / "main.jsonc"
     config.write_text(json.dumps({"plugins": [selection], "rulesets": [], "pipeline": {"nodes": [{
-        "id": "seed", "type_used": "test.seed", "display_name": "Seed",
+        "id": "seed", "definition_id": "test.seed", "display_name": "Seed",
         "description": "Inspect the declared rules without executing the seed."}]}}))
     return config, marker
 
@@ -91,7 +91,7 @@ def test_rule_review_preserves_repeated_nodeset_invocation_paths_and_scope_selec
     (tmp_path / "stage.jsonc").write_text(json.dumps(nodeset))
     data["nodeset_imports"] = ["stage.jsonc"]
     data["pipeline"]["nodes"] = [
-        {"id": name, "type_used": "project.stage",
+        {"id": name, "definition_id": "project.stage",
          "display_name": name, "description": "Invoke the shared definition at a distinct call path."}
         for name in ("first", "second")
     ]
@@ -108,16 +108,16 @@ def test_rule_review_preserves_repeated_nodeset_invocation_paths_and_scope_selec
 
 
 @pytest.mark.parametrize("target,section", [("python", "runtime"), ("javascript", "javascript")])
-def test_rule_review_uses_project_depth_defaults_and_preserves_local_override(tmp_path, target, section):
+def test_rule_review_uses_rule_depth_defaults_and_preserves_local_override(tmp_path, target, section):
     config, marker = _project(tmp_path)
     project_config = tmp_path / "vibeflow_project.jsonc"
     project = json.loads(project_config.read_text())
-    project.update({"project_target": target, section: {"nodeset_max_depth": 7}})
+    project.update({"project_target": target})
     project_config.write_text(json.dumps(project))
     append_resource(tmp_path, {
         "kind": "ruleset", "id": "example.depth", "graph_scope":"effective_subtree",
         "calls": [{"id": "base", "ruleset_id": "vibeflow.workflow"}],
-        "relations": [{"source": "$self", "target": "base/nodesets", "kind": "overrides",
+        "relations": [{"source": "$self", "target": "base/nodeset_types", "kind": "overrides",
                        "params": {"nodeset_max_depth": 9}}],
     })
     _select_target(tmp_path, config, target)
@@ -125,8 +125,8 @@ def test_rule_review_uses_project_depth_defaults_and_preserves_local_override(tm
     data["rulesets"] = ["vibeflow.workflow", "example.depth"]
     config.write_text(json.dumps(data))
     plans = effective_rule_plans(config)["workflow"]
-    assert next(call for call in plans[0]["calls"] if call["rule_id"] == "vibeflow.workflow.nodesets")["params"]["nodeset_max_depth"] == 7
-    assert next(call for call in plans[1]["calls"] if call["rule_id"] == "vibeflow.workflow.nodesets")["params"]["nodeset_max_depth"] == 9
+    assert next(call for call in plans[0]["calls"] if call["rule_id"] == "vibeflow.workflow.nodeset_types")["params"]["nodeset_max_depth"] == 4
+    assert next(call for call in plans[1]["calls"] if call["rule_id"] == "vibeflow.workflow.nodeset_types")["params"]["nodeset_max_depth"] == 9
     assert not marker.exists()
 
 
@@ -145,12 +145,10 @@ def test_rule_review_source_defaults_match_target_and_local_parameters(tmp_path,
     _select_target(tmp_path, config, target)
     data = json.loads(config.read_text())
     data["rulesets"] = ["example.files"]
-    if target == "python":
-        data["policy"] = {"node_source": {"max_lines": 17}}
     config.write_text(json.dumps(data))
     payload = effective_rule_plans(config)
     defaults = payload["project_rule_defaults"]
-    assert defaults["vibeflow.quality.files"]["max_file_lines"] == (17 if target == "python" else 500)
+    assert defaults["vibeflow.quality.files"]["max_file_lines"] == 500
     conventions = defaults["vibeflow.quality.structure"]["structure_conventions"]
     assert conventions["source_extension"] == (".py" if target == "python" else ".ts")
     assert payload["workflow"][0]["calls"][0]["params"]["max_file_lines"] == 13

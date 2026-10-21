@@ -33,7 +33,7 @@ PLUGIN_ERROR_CODES = {
         "VF_AOT_PLUGIN_PLANNED_DEPENDENCY"
     ),
 }
-PLUGIN_ABI_VERSION = "vibeflow.plugin.v3"
+PLUGIN_ABI_VERSION = "vibeflow.plugin.v4"
 
 
 class JavascriptPluginError(ValueError):
@@ -117,6 +117,7 @@ def parse_javascript_plugin_selection(
         data,
         {
             "id",
+            "scope",
             "status",
             "type",
             "targets",

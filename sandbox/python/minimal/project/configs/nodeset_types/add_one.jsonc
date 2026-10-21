@@ -1,0 +1,70 @@
+{
+  "display_name": "Example Add One",
+  "description": "Composite nodeset that adds one to value.in.",
+  "requires": [
+    {
+      "type": "value.in",
+      "cardinality": "exactly_one",
+      "display_name": "Value In"
+    }
+  ],
+  "provides": [
+    {
+      "key": "value.out",
+      "type": "value.out",
+      "display_name": "Value Out"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "value.in",
+        "type": "value.in",
+        "display_name": "Value In",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "display_name": "Start",
+        "description": "Starts the add-one nodeset.",
+        "id": "start",
+        "definition_id": "example.start"
+      },
+      {
+        "display_name": "Add One",
+        "description": "Adds one to the incoming value.",
+
+
+        "delta": 1,
+        "id": "add_one",
+        "definition_id": "example.add"
+      },
+      {
+        "display_name": "End",
+        "description": "Consumes the add-one nodeset output.",
+
+        "id": "end",
+        "definition_id": "example.end"
+      }
+    ],
+    "edges": [
+      [
+        "start",
+        "add_one"
+      ],
+      [
+        "add_one",
+        "end"
+      ]
+    ],
+    "outputs": [
+      {
+        "type": "value.out",
+        "cardinality": "exactly_one",
+        "display_name": "Value Out"
+      }
+    ]
+  },
+  "type_key": "example.add_one"
+}

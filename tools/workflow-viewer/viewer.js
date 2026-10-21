@@ -1,4 +1,4 @@
-/* Offline preview protocol v2. No fetch, server, source execution or directory enumeration. */
+/* Offline preview protocol v3. No fetch, server, source execution or directory enumeration. */
 "use strict";
 (() => {
   const $ = id => document.getElementById(id);
@@ -7,7 +7,7 @@
   let entry="";
   const ns = "http://www.w3.org/2000/svg", elk = typeof ELK === "undefined" ? null : new ELK();
   const configured=window.VibeFlowViewerConfig;
-  const dataRoot=configured?.dataRoot?new URL(configured.dataRoot,document.baseURI):null;
+  const dataRoot=configured?.dataRoot?new URL(configured.dataRoot,$("viewer-config")?.src||document.baseURI):null;
   if(dataRoot&&!dataRoot.pathname.endsWith("/"))dataRoot.pathname+="/";
   const resourceUrl=path=>{if(!dataRoot)throw new Error("缺少 dataRoot 配置");return new URL(path,dataRoot).href;};
   let current = null, data = null, view = "flow", mode = "structured", generation = 0;
@@ -24,7 +24,7 @@
       const target=document.currentScript?.previewRecords||records,prior=target.get(value.id);
       if(!prior||(value.revision||0)>=(prior.revision||0))target.set(value.id,value);
     },
-    snapshot(value) { if(value.version!==2)throw new Error("不支持旧快照格式；请重新生成");snapshots.set(value.id,value); },
+    snapshot(value) { if(value.version!==3)throw new Error("不支持旧快照格式；请重新生成");snapshots.set(value.id,value); },
     // The renderer registry also permits future view kinds without changing the tab bar.
     registerRenderer(name, renderer) { renderers.set(name, renderer); }
   };
@@ -233,7 +233,7 @@
       for(const facts of factsNodes(body)){
         const segment=encodeURIComponent(facts.id),path=prefix?prefix+"/"+segment:segment;
         const localPath=[...localPrefix,facts.id];
-        const rank=path===query?0:facts.id===query?1:facts.type_used===query?2:
+        const rank=path===query?0:facts.id===query?1:facts.definition_id===query?2:
           path.toLowerCase()===lower||facts.id.toLowerCase()===lower?3:path.toLowerCase().includes(lower)?4:Infinity;
         if(rank<score){best={path,choices};score=rank;}
         for(const option of VFModel.childOptions(facts,body,localPath,data.bodies))if(!option.error){

@@ -15,18 +15,23 @@ CONTRACT = '{provides:[{key:"result",type:"number",display_name:"Result"}],outpu
 def fixture(root, kind, variant):
     if variant.startswith("path_"):
         variant = variant.removeprefix("path_")
-    for member in (root / "src").iterdir():
-        member.unlink()
-    config(root, lambda data: data.update(host_extensions=[], rulesets=[]))
+    import shutil
+    for name in ("nodes","base_lib","plugins"):
+        shutil.rmtree(root/name)
+        (root/name).mkdir()
+    package = root / "plugins/demo"
+    package.mkdir()
+    config(root, lambda data: data.update(rulesets=[]))
+    source_path = root / {"node":"nodes/identity.ts", "base_lib":"base_lib/identity.ts", "rule":"plugins/demo/identity.ts"}[kind]
     member = {"node": "run", "rule": "check", "base_lib": "implementation"}[kind]
     symbol = {"node": "model", "rule": "policy", "base_lib": "library"}[kind]
     safe = ('export const safe={run(){return {result:7};}};\n' if kind == "node" else
             'export function safeCheck(){return {findings:[]};}\n' if kind == "rule" else
             'export function safeImplementation(){return 7;}\n')
     safe_symbol = {"node": "safe.run", "rule": "safeCheck", "base_lib": "safeImplementation"}[kind]
-    (root / "src/safe.ts").write_text(safe)
+    source_path.with_name("safe.ts").write_text(safe)
     export = "Alias." + member if variant == "alias" else symbol + "." + member
-    ref = str(root / "src" / ("safe.ts" if variant in {"other_file", "delayed"} else "plugin.ts"))
+    ref = str(source_path.with_name("safe.ts") if variant in {"other_file", "delayed"} else source_path)
     if variant in {"other_file", "delayed", "other_symbol"}:
         export = safe_symbol
     locator = {"kind": "file", "ref": ref, "export": export}
@@ -35,29 +40,37 @@ def fixture(root, kind, variant):
          **({} if kind == "rule" else {"targets": ["node", "browser"], "completion": "immediate"})}])
     source = 'import {definePlugin,defineNode,defineRule,defineRuleset,defineBaseLib,defineDataSchema} from "@vibeflow/plugin";\n'
     source += safe if variant == "other_symbol" else ""
-    source += 'export const start=defineNode({type_key:"demo.start",flow_kind:"terminal",rulesets:[],contract:{},run(){return {};}});\n'
-    source += 'export const number=defineDataSchema({type_key:"number",schema:{type:"number"}});\n'
+    (root / "nodes/start.ts").write_text('import {defineNode} from "@vibeflow/plugin";\nexport const start=defineNode({node_type:"vibeflow.node",id:"demo.start",flow_kind:"terminal",rulesets:[],contract:{},run(){return {};}});\n')
     callable = "" if variant == "delayed" else (
         ',run(){return {result:7};}' if kind == "node" else
         ',check(){return {findings:[]};}' if kind == "rule" else
         ',implementation(){return 7;}')
-    resources = ["start", "number", "model"]
+    resources = ["number"]
     if kind == "node":
-        source += 'export const model=defineNode({type_key:"demo.model",rulesets:[],contract:' + CONTRACT + explicit + callable + '});\n'
+        source += 'export const model=defineNode({node_type:"vibeflow.node",id:"demo.model",rulesets:[],contract:' + CONTRACT + explicit + callable + '});\n'
     elif kind == "rule":
         source += 'export const policy=defineRule({id:"audit.policy",scope:"source"' + explicit + callable + '});\n'
         source += 'export const checks=defineRuleset({id:"audit.checks",calls:[{id:"check",rule_id:"audit.policy"}],entrypoints:{static:["check"]}});\n'
-        source += 'export const model=defineNode({type_key:"demo.model",rulesets:["audit.checks"],contract:' + CONTRACT + ',run(){return {result:7};}});\n'
+        source += 'export const model=defineNode({node_type:"vibeflow.node",id:"demo.model",rulesets:["audit.checks"],contract:' + CONTRACT + ',run(){return {result:7};}});\n'
         resources += ["policy", "checks"]
     else:
         source += 'export const library=defineBaseLib({id:"audit.library",rulesets:[]' + explicit + callable + '});\n'
         # Delayed libraries have no direct property; their native binding is still valid.
-        source += 'export const model=defineNode({type_key:"demo.model",rulesets:[],base_libs:["audit.library"],contract:' + CONTRACT + ',run(){return {result:7};}});\n'
+        source += 'export const model=defineNode({node_type:"vibeflow.node",id:"demo.model",rulesets:[],base_libs:["audit.library"],contract:' + CONTRACT + ',run(){return {result:7};}});\n'
         resources.append("library")
     if variant == "alias":
         source += 'export const Alias=' + symbol + ';\n'
-    source += 'export const plugin=definePlugin({id:"demo",resources:[' + ','.join(resources) + ']});\n'
-    (root / "src/plugin.ts").write_text(source)
+    if kind != "node":
+        model_start = source.index('export const model=')
+        model_end = source.index('\n',model_start)+1
+        (root / "nodes/model.ts").write_text('import {defineNode} from "@vibeflow/plugin";\n'+source[model_start:model_end])
+        source = source[:model_start]+source[model_end:]
+    source_path.write_text(source)
+    imported = 'import {policy,checks} from "./identity.ts";\n' if kind == "rule" else ''
+    plugin = 'import {definePlugin,defineDataSchema} from "@vibeflow/plugin";\n' + imported
+    plugin += 'export const number=defineDataSchema({type_key:"number",schema:{type:"number"}});\n'
+    plugin += 'export const plugin=definePlugin({id:"demo",resources:[' + ','.join(r for r in resources if r != "library") + ']});\n'
+    (package / "plugin.ts").write_text(plugin)
 
 
 def observe(work: Path, kernel: Path, toolchain: Path | None, renderer: Path | None):

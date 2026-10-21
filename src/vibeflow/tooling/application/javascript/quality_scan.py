@@ -3,9 +3,9 @@ from collections.abc import Iterable, MutableMapping
 from dataclasses import replace
 from pathlib import Path
 
-from vibeflow.targets.javascript.rules.project import bound_project_quality_defaults
+from vibeflow.targets.javascript.rules.source_quality import bound_source_quality_defaults
 from vibeflow.core.descriptors.contributions import contribution_facts
-from vibeflow.targets.shared.quality_support import ProjectQualityFacts, QualityReport, evaluate_project_quality
+from vibeflow.targets.shared.quality_support import SourceQualityFacts, QualityReport, evaluate_source_quality
 from vibeflow.core.rules import RuleContext
 from vibeflow.targets.javascript.build.quality_source import (
     DEFAULT_EXCLUDED_DIRS, collect_javascript_quality_facts, javascript_quality_policy,
@@ -13,7 +13,7 @@ from vibeflow.targets.javascript.build.quality_source import (
 )
 from vibeflow.targets.javascript.build.toolchain import DriverQualityResult
 from vibeflow.targets.shared.bindings import native_binding
-from vibeflow.tooling.project.descriptor_loader import load_builtin_plugins
+from vibeflow.tooling.project.resources import load_builtin_plugins
 
 
 def scan_javascript_quality(
@@ -38,12 +38,12 @@ def scan_javascript_quality(
         structure_limits=structure_limits, structure_roles=structure_roles)
     handlers = {item.id: native_binding(catalog, "rule", item.id) for item in catalog.rules}
     declared = {item.id: item for item in catalog.rules}
-    defaults = bound_project_quality_defaults(handlers, policy, rules=declared, origins=catalog.origins)
+    defaults = bound_source_quality_defaults(handlers, policy, rules=declared, origins=catalog.origins)
     rules = {item.id: replace(item, params_defaults={**item.params_defaults, **defaults.get(item.id, {})})
              for item in catalog.rules}
-    project_facts = ProjectQualityFacts(str(selected if selected.is_dir() else selected.parent),
+    project_facts = SourceQualityFacts(str(selected if selected.is_dir() else selected.parent),
         tuple(_file_fact(item) for item in facts.files), tuple(_finding_fact(item) for item in facts.findings))
-    return evaluate_project_quality(project_facts, policy, rulesets=("vibeflow.quality.project",),
+    return evaluate_source_quality(project_facts, policy, rulesets=("vibeflow.quality.source",),
         rules=rules, ruleset_catalog=catalog.rulesets, handlers=handlers,
         context=RuleContext(facts=contribution_facts(catalog),
             subject={"kind":"source", "id":project_facts.root}, target="javascript"))

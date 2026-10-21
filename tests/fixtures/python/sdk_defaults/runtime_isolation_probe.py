@@ -31,7 +31,7 @@ def observe(root, mode, selection):
     defaults = {"a": [{"b": []}]}
     override = {"a": [{"b": ["configured"]}]}
     write_project(root, "object", defaults)
-    source = root / "plugin.py"
+    source = root / "nodes/steps.py"
     source.write_text(source.read_text().replace(
         '        value = params["cleanup_record_roots"]\n'
         '        return {"result": {"value": value, "native_type": type(value).__name__}}', BODY))
@@ -39,7 +39,7 @@ def observe(root, mode, selection):
         workflow = json.loads((root / "workflow.jsonc").read_text())
         workflow["pipeline"]["nodes"][1]["config"] = {"cleanup_record_roots": override}
         (root / "workflow.jsonc").write_text(json.dumps(workflow))
-    workspace = load_workspace_config(root / "vibeflow_config.jsonc")
+    workspace = load_workspace_config(root.parent / "vibeflow_config.jsonc")
     graph, _, registry, _, health = load_workspace_graph_for_export(
         root / "workflow.jsonc", workspace=workspace, validate_health=True)
     if health is not None:

@@ -57,7 +57,7 @@ def test_nodeset_imports_expand_for_validate_inspect_mermaid_and_run(tmp_path, c
     assert cli_main(["export-mermaid", "--config", str(config_path), "--expand-nodesets"]) == 0
     assert "flow__add" in capsys.readouterr().out
 
-    result = run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="nodeset-import")
+    result = run_checked(config_path, run_root=tmp_path / "runs", run_id="nodeset-import")
     assert result.context.get("value.out")["value"] == 5
     health = json.loads((result.run_dir / "health_report.json").read_text(encoding="utf-8"))
     assert health["info"]["nodeset_imports"][0]["path"] == str(imports_path.resolve())
@@ -71,18 +71,18 @@ def test_nodeset_imports_reject_missing_duplicate_and_empty_sources(tmp_path) ->
     assert empty_error.value.rule_id == "CONFIG.READ"
 
     config_path = tmp_path / "workflow.jsonc"
-    config_path.write_text('{"nodeset_imports": ["empty.jsonc"], "pipeline": {"nodes": [{"id": "seed", "type_used": "test.seed"}]}}', encoding="utf-8")
+    config_path.write_text('{"nodeset_imports": ["empty.jsonc"], "pipeline": {"nodes": [{"id": "seed", "definition_id": "test.seed"}]}}', encoding="utf-8")
     with pytest.raises(ConfigLoadError) as empty_import:
         load_config_document(config_path)
     assert empty_import.value.rule_id == "CONFIG.NODESET_IMPORT.EMPTY"
 
-    imports_path = tmp_path / "nodesets.jsonc"
-    imports_path.write_text(json.dumps(_nodeset_config("dup.flow", pipeline={"nodes": [{"id": "seed", "type_used": "test.seed"}]})), encoding="utf-8")
+    imports_path = tmp_path / "nodeset_types.jsonc"
+    imports_path.write_text(json.dumps(_nodeset_config("dup.flow", pipeline={"nodes": [{"id": "seed", "definition_id": "test.seed"}]})), encoding="utf-8")
     config_path.write_text(
         json.dumps(
             {
-                "nodeset_imports": ["nodesets.jsonc", "nodesets.jsonc"],
-                "pipeline": {"nodes": [{"id": "flow", "type_used": "dup.flow"}]},
+                "nodeset_imports": ["nodeset_types.jsonc", "nodeset_types.jsonc"],
+                "pipeline": {"nodes": [{"id": "flow", "definition_id": "dup.flow"}]},
             }
         ),
         encoding="utf-8",
@@ -93,7 +93,7 @@ def test_nodeset_imports_reject_missing_duplicate_and_empty_sources(tmp_path) ->
 
 
 def test_nodeset_imports_cache_reused_documents_within_one_load(tmp_path, monkeypatch) -> None:
-    imports_path = tmp_path / "nodesets.jsonc"
+    imports_path = tmp_path / "nodeset_types.jsonc"
     imports_path.write_text(
         json.dumps(
             _nodeset_config("math.add_one", pipeline=_input_add_pipeline(), requires=["value.in"], provides=["value.out"], exports=["value.out"])
@@ -105,8 +105,8 @@ def test_nodeset_imports_cache_reused_documents_within_one_load(tmp_path, monkey
         json.dumps(
             {
                 "nodeset_imports": [
-                    {"path": "nodesets.jsonc"},
-                    {"path": "nodesets.jsonc"},
+                    {"path": "nodeset_types.jsonc"},
+                    {"path": "nodeset_types.jsonc"},
                 ],
                 "pipeline": {"nodes": [_node_call("flow", "math.add_one", "Calls imported flow.")]},
             }

@@ -1,8 +1,8 @@
 # 快速开始
 
-当前源码使用 **Workflow ABI v9**。从旧版本升级时，重新构建 AOT；原生 `type_used:"vibeflow.io"` / `io` 配置须迁移为普通 SDK 端口节点。命名入口、调用授权与跨 workflow 通信见[多入口与通信](workflow-coordination.md)。
+当前源码使用 **Workflow ABI v10**。从旧版本升级时，重新构建 AOT；原生 `definition_id:"vibeflow.io"` / `io` 配置须迁移为普通 SDK 端口节点。命名入口、调用授权与跨 workflow 通信见[多入口与通信](workflow-coordination.md)。
 
-1.0.0 及更早版本还须完成[普通图并发迁移](graph-concurrency.md#从旧任务接口迁移)。AOT manifest v3 不代表旧 Workflow ABI 兼容。预览快照 v2 保持可读；更早的图元快照需重新生成。对旧 JavaScript v2 历史重新执行 `review`，可补齐计划节点行为。更新浏览工具会保留用户配置和已有历史。
+项目至少注册一个独立子目录 root，不能使用无 root 或同目录模式。当前 AOT v4、预览快照 v3；旧配置与产物需重新构建/生成，不提供读取兼容。布局、共享资源和治理选择见[项目治理](project-governance.md)。
 
 默认审查交付[离线 HTML 预览](local-preview.md)，SVG 使用 `review --with-svg` 按需生成。AOT 执行不生成预览报告。
 
@@ -34,10 +34,10 @@ Architecture 是生成的审查视图。结构变更落在真实 source 中，�
 python run.py architecture --config python_project/configs/main.jsonc --output python_project/ARCHITECTURE.jsonc
 python run.py validate --config python_project/configs/main.jsonc
 python run.py run --config python_project/configs/main.jsonc --input python_project/probe_input.json
-python run.py quality --path python_project
+python run.py quality-check --workspace vibeflow_config.jsonc
 ```
 
-Node、Rule 和 BaseLib 使用 Python 插件 SDK 声明，见 [Python 开发](python-development.md)。最小项目的固定插件在 `python_project/plugins/code_plugin.py`，由 workflow 的 `plugins` 选择。
+业务 Node 和独立 BaseLib 从标准目录发现，Rule 与 NodeType 由 Plugin 提供；均使用 Python SDK 声明，见 [Python 开发](python-development.md)。最小项目的固定插件在 `python_project/plugins/code_plugin/plugin.py`，由 workflow 的 `plugins` 选择。
 
 ## JavaScript 最短路径
 
@@ -51,7 +51,7 @@ python run.py build --config javascript_project/configs/main.jsonc --target node
 node javascript_project/scripts/workflow_execution_probe.mjs
 ```
 
-Node、DataSchema 和生成入口见 [JavaScript/TypeScript 开发](javascript-development.md)。最小项目的固定插件在 `javascript_project/plugins/code_plugin.ts`，资源使用 `@vibeflow/plugin` 声明。
+Node、DataSchema 和生成入口见 [JavaScript/TypeScript 开发](javascript-development.md)。最小项目的固定插件在 `javascript_project/plugins/code_plugin/plugin.ts`，资源使用 `@vibeflow/plugin` 声明。
 
 ## 按任务继续阅读
 
@@ -60,7 +60,7 @@ Node、DataSchema 和生成入口见 [JavaScript/TypeScript 开发](javascript-d
 | 修改 pipeline、edge、输入输出 | [Workflow 与 Config](workflow-and-config.md) |
 | 开发 Python Node 或 BaseLib | [Python 开发](python-development.md) |
 | 开发 JS/TS Node 或 AOT 入口 | [JavaScript 开发](javascript-development.md) |
-| 开发 Nodeset 或 Loop | [Nodeset 与 Loop](nodesets-and-loops.md) |
+| 开发 Nodeset 或 Loop | [Nodeset 与 Loop](nodeset-types-and-loops.md) |
 | 编写 Rule、组合 Ruleset 或选择检查约束 | [Rule 与 Node](rules-and-nodes.md) |
 | 开发 Plugin 或宿主能力 | [Plugin 与集成](plugins-and-integrations.md) |
 | 拆分实现文件、设置样式或查看资源依赖 | [多文件资源](multifile-resources.md) |

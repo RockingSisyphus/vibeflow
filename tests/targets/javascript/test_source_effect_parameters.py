@@ -6,22 +6,21 @@ import pytest
 
 from tests.fixtures.support.plugins import resource
 from tests.targets.javascript.test_domain_rules import domain_project
-from vibeflow.core.flow import GraphConfig, NodeSpec
+from vibeflow.core.flow import GraphConfig, NodeCallSpec
 from vibeflow.core.rules import RuleContext
 from vibeflow.targets.javascript.build.driver_session import DriverScope
 from vibeflow.targets.javascript.build.analysis_service import JavascriptAnalysis
 from vibeflow.targets.javascript.rules.plugin import javascript_rule_bindings
 from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
 from vibeflow.targets.javascript.quality.rules import run_javascript_rules
-from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
+from vibeflow.tooling.project.resources import prepare_workflow_catalogs
 
 
-def _review(project, *, hosts=frozenset()):
-    catalogs = load_workflow_catalogs(project, project_config=project / "vibeflow_project.jsonc",
-                                     workflow_config=project / "configs/model.jsonc")
+def _review(project):
+    catalogs = prepare_workflow_catalogs(project / "configs/model.jsonc")
     policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=project,
-                                             allowed_external=set(), node_ids=frozenset({"example.transform"}), host_extension_ids=hosts)
-    return run_javascript_rules(GraphConfig(nodes=(NodeSpec("transform", "example.transform"),), rulesets=()),
+                                             allowed_external=set(), node_ids=frozenset({"example.transform"}))
+    return run_javascript_rules(GraphConfig(nodes=(NodeCallSpec("transform", "example.transform"),), rulesets=()),
                                 catalogs, project_root=project, package_root=project, target="node", import_policy=policy)
 
 
@@ -137,7 +136,7 @@ def test_sdk_global_state_allows_literal_module_state_and_its_mutation(domain_pr
                  and item.source_location.get("path") == str(source)]) == denied
 
 
-@pytest.mark.parametrize("kind", ["node", "base_lib", "plugin", "host_extension"])
+@pytest.mark.parametrize("kind", ["node", "base_lib", "plugin"])
 def test_same_effect_parameters_apply_to_each_real_resource_owner(domain_project, kind):
     _, project = domain_project
     source = project / "nodes/transform.ts"
@@ -166,10 +165,10 @@ def test_native_clock_and_random_permissions_remain_bounded(domain_project, scop
 def test_scoped_npm_package_policy_uses_the_full_package_root(domain_project):
     _, project = domain_project
     source = project / "nodes/transform.ts"
-    context = RuleContext(subject={"kind":"node","type_key":"example.transform"},target="javascript",facts={
+    context = RuleContext(subject={'node_type': 'vibeflow.node', "kind":"node","definition_id":"example.transform"},target="javascript",facts={
         "source_files":[str(source)],"sources":[{"path":str(source),"text":'import {value} from "@scope/pkg/sub"; export function run(){return value;}'}],
         "analysis_cache":JavascriptAnalysis(),"package_root":str(project),
-        "import_policy":{"owners":[{"path":str(source),"kind":"node","id":"example.transform","export":"run"}],"allowedExternalPackages":["@scope/pkg"]}})
+        "import_policy":{"owners":[{'node_type': 'vibeflow.node', "path":str(source),"kind":"node","id":"example.transform","export":"run"}],"allowedExternalPackages":["@scope/pkg"]}})
     check = javascript_rule_bindings()["vibeflow.import_side_effects"]
     with DriverScope():
         assert check(context, {}, {"effect_scope":"none","policy":{"imports":{"banned_roots":["@scope/pkg"]}}}).findings
@@ -195,10 +194,10 @@ def test_shared_driver_cache_does_not_share_effect_or_policy_decisions(domain_pr
     source = project / "nodes/transform.ts"
     text = 'import {readFile} from "node:fs"; export function run(){console.log("hello");void readFile;return {};}'
     cache = JavascriptAnalysis()
-    context = RuleContext(subject={"kind":"node", "type_key":"example.transform"}, target="javascript", facts={
+    context = RuleContext(subject={"kind":"node", "definition_id":"example.transform"}, target="javascript", facts={
         "source_files":[str(source)], "sources":[{"path":str(source),"text":text}],
         "analysis_cache":cache, "package_root":str(project),
-        "import_policy":{"owners":[{"path":str(source),"kind":"node","id":"example.transform","export":"run"}]}})
+        "import_policy":{"owners":[{'node_type': 'vibeflow.node', "path":str(source),"kind":"node","id":"example.transform","export":"run"}]}})
     check = javascript_rule_bindings()["vibeflow.no_side_effects"]
     with DriverScope():
         for params, denied in [
@@ -237,24 +236,6 @@ def test_namespace_builtin_mutation_keeps_its_hard_constraint(domain_project, sc
     assert any(item.code == "VF_MODULE_STATE" for item in _review(project).findings)
 
 
-def test_sdk_shared_module_uses_each_selected_factory_and_its_real_support_closure(domain_project):
-    _, project = domain_project
-    source = _select(project, {"effect_scope":"none","policy":{}}, '')
-    source.write_text('import {hostSession} from "./host_support.ts";\n'
-        'export function run(){return {output:7};}\n'
-        'export function createHost(){return hostSession();}\n')
-    (project / "nodes/host_support.ts").write_text('export function hostSession(){'
-        'void (globalThis as any).__hostQueue;return {capabilities:{},start(){},stop(){}};}\n')
-    resource(project, "host_extension", "test.host").write_text(json.dumps({"kind":"host_extension","id":"test.host",
-        "targets":["node"],"provides":[],"rulesets":["vibeflow.host_extension"],
-        "implementations":[{"language":"typescript","targets":["node"],"source":{"kind":"file","ref":"nodes/transform.ts","export":"createHost"},
-                            "implementation_files":[{"kind":"file","ref":"nodes/host_support.ts"}]}]}))
-    report = _review(project, hosts=frozenset({"test.host"}))
-    assert not [item for item in report.findings if item.definition_id == "vibeflow.no_side_effects"]
-    # Import layering still evaluates the complete declaration module: only
-    # effect execution follows the resource's selected factory and helpers.
-    assert all(item.code == "VF_IMPORT_LAYER" for item in report.findings)
-    assert "host_extension:test.host" in report.results
 
 
 @pytest.mark.parametrize("node_scope,library_scope", [("none","python_io"),("python_io","none")])

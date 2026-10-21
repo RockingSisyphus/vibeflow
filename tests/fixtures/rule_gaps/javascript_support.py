@@ -4,7 +4,7 @@ Only standard-library modules are imported before the isolated runner chooses
 the kernel. Resources are authored directly through fixed SDK plugins.
 """
 from __future__ import annotations
-from tests.fixtures.support.plugins import resource as resource_ref, copy_sdk_inputs, append_resource
+from tests.fixtures.support.plugins import resource as resource_ref, append_resource
 
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
@@ -64,7 +64,6 @@ def new_project(work_root: Path, name: str, toolchain_root: Path | None) -> Proj
     root = work_root / name
     shutil.copytree(ROOT / "sandbox/javascript/rule_graph", root,
                     ignore=shutil.ignore_patterns("node_modules", "__pycache__", "*.pyc", ".artifacts", "dist", "runs"))
-    copy_sdk_inputs(ROOT / "sandbox/javascript/rule_graph", root)
     result = Project(root)
     toolchain = Path(toolchain_root or os.environ.get("VIBEFLOW_TEST_TOOLCHAIN_ROOT", ROOT / "sandbox/javascript/minimal/project"))
     if not (toolchain / "node_modules/typescript").is_dir():
@@ -86,14 +85,13 @@ def new_project(work_root: Path, name: str, toolchain_root: Path | None) -> Proj
         data["params_defaults"]["marker"] = str(result.marker)
         write_json(path, data)
     data = read_json(result.project / "vibeflow_project.jsonc")
-    data["quality_enabled"] = True
     data["architecture"] = {"documents": [{"workflow": "configs/calculate.jsonc", "document": "ARCHITECTURE.jsonc"}]}
     write_json(result.project / "vibeflow_project.jsonc", data)
     return result
 
 
 def select_provider_and_consumer(project: Project, provider_source: str) -> None:
-    (project.project / "rules/provider.ts").write_text(provider_source, encoding="utf-8")
+    (project.project / "plugins/code_plugin/rules/provider.ts").write_text(provider_source, encoding="utf-8")
     provider = resource_ref(project.project, 'rule', 'example.number_provider')
     data = read_json(provider)
     data["outputs"] = {"value": VALUE_TYPE}
@@ -102,7 +100,7 @@ def select_provider_and_consumer(project: Project, provider_source: str) -> None
     data = read_json(checker)
     data["inputs"] = {"value": VALUE_TYPE}
     write_json(checker, data)
-    (project.project / "rules/checker.ts").write_text('''import {appendFileSync} from "node:fs";
+    (project.project / "plugins/code_plugin/rules/checker.ts").write_text('''import {appendFileSync} from "node:fs";
 export function check(context, inputs, params) {
   const proof = {handler:"consumer", phase:context.phase, received:inputs.value.value, type_id:inputs.value.type_id};
   appendFileSync(params.marker, JSON.stringify(proof)+"\\n");
@@ -151,7 +149,7 @@ def command(project: Project, name: str, *options: str, label: str | None = None
     output, errors = StringIO(), StringIO()
     try:
         with redirect_stdout(output), redirect_stderr(errors):
-            code = main([name, *project.arguments(), *options])
+            code = main([name, *(["--workspace",str(project.workspace)] if name=="quality-check" else project.arguments()), *options])
         payload = json.loads(output.getvalue())
     except BaseException as error:
         code = 2
@@ -168,13 +166,11 @@ def command(project: Project, name: str, *options: str, label: str | None = None
     return observed, payload
 
 
-def execute_business(project: Project, payload: dict[str, Any], *, host: bool = False) -> dict[str, Any]:
+def execute_business(project: Project, payload: dict[str, Any]) -> dict[str, Any]:
     entry = payload.get("entry")
     if not entry or not Path(entry).is_file():
         return {"business_executed": False}
-    invocation = ('const host=workflow.createWorkflowHost();await host.start();'
-                  'const result=await (host.runWorkflowAsync??host.runWorkflow)({value:3});await host.stop();') if host else (
-                  'const result=await (workflow.runWorkflowAsync??workflow.runWorkflow)({value:3});')
+    invocation = 'const result=await (workflow.runWorkflowAsync??workflow.runWorkflow)({value:3});'
     script = ('import {pathToFileURL} from "node:url";globalThis.__gapEvents=[];'
               'const workflow=await import(pathToFileURL(' + json.dumps(entry) + '));'
               'const eventsAfterImport=[...globalThis.__gapEvents];' + invocation +
@@ -222,70 +218,3 @@ def add_helper(project: Project, kind: str) -> Path:
                                        "source":{"kind":"file","ref":helper.relative_to(project.project).as_posix()}}]}
     append_resource(project.project, declaration)
     return helper
-
-
-NATIVE_GROUPS = ("base_lib", "data_schemas", "capabilities", "host_extensions", "plugins")
-
-
-def sdk_native_resources(project: Project) -> dict[str, Path]:
-    """Contribute all native groups through one SDK plugin, then use them."""
-    node = resource_ref(project.project, 'node', 'example.calculate')
-    data = read_json(node)
-    data.update(rulesets=[], base_libs=["gaps.helper"], capabilities=[{"id":"gaps.math", "operations":["offset"]}])
-    write_json(node, data)
-    (project.project / "nodes/calculation.ts").write_text('''import {double} from "../base_lib/math.js";
-export function calculate(inputs, params, context) {
-  return {result:context.capabilities["gaps.math"].offset(double(inputs["example.input"].value))};
-}
-''')
-    for directory in ("base_lib", "host_extensions", "plugins"):
-        (project.project / directory).mkdir()
-    (project.project / "base_lib/math.ts").write_text("export function double(value:number):number { return value * 2; }\n")
-    (project.project / "host_extensions/math.ts").write_text('''export function createHostExtension() {
-  const events=(globalThis as unknown as {__gapEvents:string[]}).__gapEvents;
-  events.push("host:create");
-  return {capabilities:{"gaps.math":{offset(value:number):number {
-    events.push("capability:offset"); return value+1;
-  }}}, start(){events.push("host:start");}, stop(){events.push("host:stop");}};
-}
-''')
-    (project.project / "plugins/runtime.ts").write_text('''export function createPlugin(context) {
-  if(context.abiVersion!=="vibeflow.plugin.v3") throw new Error("Wrong Plugin ABI");
-  const events=(globalThis as unknown as {__gapEvents:string[]}).__gapEvents;
-  events.push("plugin:create");
-  return {beforeRun(){events.push("plugin:beforeRun");},afterRun(){events.push("plugin:afterRun");},
-          dispose(){events.push("plugin:dispose");}};
-}
-''')
-    implementation = lambda ref, export="": {"language":"typescript", "targets":["node","browser"],
-                                            "source":{"kind":"file","ref":ref, **({"export":export} if export else {})}}
-    resources = {
-        "base_lib": {"kind":"base_lib", "id":"gaps.helper", "display_name":"Bundled numeric helper", "description":"A bundled numeric helper.",
-                     "implementations":[implementation("base_lib/math.ts")]},
-        "capabilities": {"kind":"capability", "id":"gaps.math", "targets":["node","browser"],
-                         "operations":{"offset":{"input_type":"example.input", "output_type":"example.output", "completion":"immediate"}}},
-        "host_extensions": {"kind":"host_extension", "id":"gaps.host", "targets":["node","browser"],
-                            "implementations":[implementation("host_extensions/math.ts","createHostExtension")], "provides":["gaps.math"]},
-        "plugins": {"kind":"plugin", "id":"gaps.runtime", "type":"runtime", "targets":["node","browser"],
-                    "implementations":[implementation("plugins/runtime.ts","createPlugin")],
-                    "config":{"schema":{"type":"object","additionalProperties":False},"defaults":{}}},
-    }
-    paths = {}
-    for group, declaration in resources.items():
-        append_resource(project.project, declaration)
-        paths[group] = resource_ref(project.project, declaration["kind"], declaration.get("id", declaration.get("type_key")))
-    paths["data_schemas"] = resource_ref(project.project, "data_schema", "example.input")
-    config = read_json(project.config)
-    config.update(plugins=[{"source": {"kind": "file", "ref": "code_plugin.ts", "export": "plugin"}}], host_extensions=["gaps.host"])
-    write_json(project.config, config)
-    return paths
-
-
-def loaded_native_groups(project: Project) -> dict[str, Any]:
-    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
-    catalogs = load_workflow_catalogs(project.project,workflow_config=project.config)
-    checks = {"base_lib":catalogs.base_libs.get("gaps.helper"), "data_schemas":catalogs.schemas.get("example.input"),
-              "capabilities":catalogs.capabilities.get("gaps.math"), "host_extensions":catalogs.host_extensions.get("gaps.host"),
-              "plugins":catalogs.plugins.get("gaps.runtime")}
-    return {"native_groups_loaded":all(checks.values()),
-            "sdk_only":"descriptors" not in read_json(project.project / "vibeflow_project.jsonc") and any(item.get("source",{}).get("ref")=="code_plugin.ts" for item in read_json(project.config).get("plugins",[]))}

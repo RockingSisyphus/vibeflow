@@ -7,7 +7,7 @@ from vibeflow.tooling.project.graph_config import parse_graph_config
 def _global_state_graph(*, lock_scope: str = ""):
     state_node = {
         "id": "state",
-        "type_used": "sandbox.global_state_probe",
+        "definition_id": "sandbox.global_state_probe",
         "display_name": "Global State",
         "description": "Mutates audited process-local state.",
     }
@@ -15,14 +15,14 @@ def _global_state_graph(*, lock_scope: str = ""):
         "nodes": [
             {
                 "id": "start",
-                "type_used": "test.start",
+                "definition_id": "test.start",
                 "display_name": "Start",
                 "description": "Starts the flow.",
             },
             state_node,
             {
                 "id": "end",
-                "type_used": "test.out_end",
+                "definition_id": "test.out_end",
                 "display_name": "End",
                 "description": "Ends after the state value is ready.",
             },
@@ -53,7 +53,14 @@ def _global_state_health(*, lock_scope: str = ""):
     from vibeflow.tooling.application.python.project.declarations import declared_python_registry,collect_workflow_source_context
     from tests.fixtures.support.strict_support_runtime_nodes import OutEndNode,OutEndNode_DECLARATION,StartNode,StartNode_DECLARATION
     project=Path(__file__).resolve().parents[3]/"sandbox/python/integration/project"
+    from tests.fixtures.support.plugins import resource_declarations
+    from vibeflow.core.descriptors.decode import decode_resource
     registry=declared_python_registry(load_project_workspace(project), project / "configs/pass_training_nodeset_object_flow.jsonc")
+    value = next(item for item in resource_declarations(project) if item.get("id") == "sandbox.global_state_probe")
+    registry.register(decode_resource(value))
+    descriptor = registry.descriptor("sandbox.global_state_probe")
+    implementation = descriptor.implementations[0].source
+    registry.source_locations[descriptor.id] = (project / implementation.ref, implementation.export, "project", project)
     registry.register(StartNode_DECLARATION,StartNode)
     registry.register(OutEndNode_DECLARATION,OutEndNode)
     graph=_global_state_graph(lock_scope=lock_scope)

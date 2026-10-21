@@ -52,7 +52,7 @@ def test_python_shared_call_respects_both_dispatch_limits(tmp_path):
     for name, implementation in implementations.items():
         registry.register(NodeDescriptor("shared." + name, name, name, "1",
             "terminal" if name in {"start", "end"} else "process",
-            contract=NodeContractDescriptor(), rulesets=()), implementation)
+            contract=NodeContractDescriptor(), rulesets=(), node_type="vibeflow.node"), implementation)
         nodes.append(_call(name, "shared." + name,
             **({"config": {"max_concurrency": 1}} if name in {"left", "right"} else {}),
             join_policy="all" if name == "end" else "any_active"))
@@ -75,7 +75,7 @@ def test_python_shared_call_respects_both_dispatch_limits(tmp_path):
 def test_javascript_shared_call_respects_both_dispatch_limits(tmp_path):
     nodes = []
     for name in ("start", "left", "right", "a", "b", "shared", "end"):
-        nodes.append(dict(id=name, type_used="shared." + name,
+        nodes.append(dict(id=name, definition_id="shared." + name,
             flow_kind="terminal" if name in {"start", "end"} else "process",
             is_terminal=name in {"start", "end"}, join_policy="all" if name == "end" else "any_active",
             max_concurrency=1 if name in {"left", "right"} else 8,

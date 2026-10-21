@@ -47,7 +47,7 @@ class PreparedPythonPresentation:
         self._remember_definitions(self.graph)
 
     def _remember_definitions(self, graph: GraphConfig) -> None:
-        for key, definition in graph.nodesets.items():
+        for key, definition in graph.nodeset_types.items():
             self._keys[id(definition.graph)] = key
 
     def graph_for(self, graph: GraphConfig) -> tuple[GraphConfig, CompiledGraph]:
@@ -107,7 +107,7 @@ def prepare_python_presentation(
             compilation = compiler.compile_with_findings(graph, implementation_facts=facts)
             graph, compiled = compilation.workflow.graph, compilation.compiled_graph
     source_context = getattr(registry, "source_context_snapshot", None)
-    if registry is not None and hasattr(registry, "loaded_plugins") and source_context is None:
+    if registry is not None and hasattr(registry, "prepared_resources") and source_context is None:
         from vibeflow.tooling.application.python.project.declarations import collect_workflow_source_context
 
         source_context = collect_workflow_source_context(registry, graph)
@@ -122,7 +122,7 @@ def prepare_python_presentation(
     prepared._inputs.append(input_graph)
     prepared._remember_definitions(input_graph)
     from vibeflow.core.compiler import GraphCompileError
-    for key, definition in prepared.graph.nodesets.items():
+    for key, definition in prepared.graph.nodeset_types.items():
         if definition.graph.nodes:
             try:
                 prepared.graph_for(definition.graph)
@@ -136,7 +136,7 @@ def prepare_python_presentation(
 
 def _implementation_source_records(registry, graph, sources, *, source_config_available):
     """Complete presentation source facts while the command session is active."""
-    if not hasattr(registry, "loaded_plugins") or not source_config_available:
+    if not hasattr(registry, "prepared_resources") or not source_config_available:
         return ()
     from vibeflow.core.descriptors.source_bundle import source_resources
     from vibeflow.targets.python.project.check_session import current_python_check
@@ -148,7 +148,7 @@ def _implementation_source_records(registry, graph, sources, *, source_config_av
     parsed = session.parsed_sources if session is not None else None
     collected = {file.path:file for file in sources.files}
     source_facts = {}
-    for kind, descriptor in source_resources(registry.loaded_plugins.catalogs):
+    for kind, descriptor in source_resources(registry.prepared_resources.catalogs):
         if kind not in {"plugin", "plugin_declaration"}:
             continue
         for _, entry, _ in resource_paths(descriptor, graph.root_path, registry.source_roots):
@@ -182,6 +182,6 @@ def _registry_snapshot(registry: object, source_context: object | None) -> objec
     object.__setattr__(snapshot, "source_roots", tuple(getattr(registry, "source_roots", ())))
     object.__setattr__(snapshot, "source_context_snapshot", source_context)
     object.__setattr__(snapshot, "review_findings", tuple(getattr(registry, "review_findings", ())))
-    if hasattr(registry, "loaded_plugins"):
-        object.__setattr__(snapshot, "loaded_plugins", registry.loaded_plugins)
+    if hasattr(registry, "prepared_resources"):
+        object.__setattr__(snapshot, "prepared_resources", registry.prepared_resources)
     return snapshot

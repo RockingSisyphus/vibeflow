@@ -29,9 +29,9 @@ def _spec(target, form, variant="normal", branch="left"):
     else:
         metrics.update(domain_definition_ids=["example.model_definition"], domain_owner_types=[node_type],
                        domain_call_paths=paths, domain_source_files=[
-                           "domain_nodes.py" if variant == "missing_model" and target == "python" else
+                           "nodes/domain_nodes.py" if variant == "missing_model" and target == "python" else
                            "nodes/model.ts" if variant == "missing_model" else
-                           "domain_helpers/illegal_model.py" if target == "python" else "nodes/transform_helper.ts"])
+                           "base_lib/domain_helpers/illegal_model.py" if target == "python" else "nodes/transform_helper.ts"])
     expected = {"should_accept": normal, "codes": [] if normal else [{"code": code, "severity": "error"}],
                 "metrics": metrics}
     if not normal:

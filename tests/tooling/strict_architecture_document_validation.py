@@ -27,7 +27,7 @@ def test_architecture_document_check_accepts_only_exact_canonical_text(tmp_path)
     workflow = tmp_path / "main.jsonc"
     workflow.write_text("{}", encoding="utf-8")
     document = tmp_path / "ARCHITECTURE.jsonc"
-    payload = {"workflow": {"source": "main.jsonc"}, "nodesets": {}, "node_types": {}, "resources": {}}
+    payload = {"workflow": {"source": "main.jsonc"}, "nodeset_types": {}, "node_types": {}, "node_definitions": {}, "resources": {}}
     expected = _expected(payload)
     document.write_text(expected, encoding="utf-8")
 
@@ -45,7 +45,7 @@ def test_architecture_document_check_reports_missing_header_jsonc_and_stale(tmp_
     workflow = tmp_path / "main.jsonc"
     workflow.write_text("{}", encoding="utf-8")
     document = tmp_path / "ARCHITECTURE.jsonc"
-    payload = {"workflow": {"source": "main.jsonc"}, "nodesets": {}, "node_types": {}, "resources": {}}
+    payload = {"workflow": {"source": "main.jsonc"}, "nodeset_types": {}, "node_types": {}, "node_definitions": {}, "resources": {}}
     expected = _expected(payload)
 
     missing = _check(document, payload, expected, workflow=workflow)
@@ -77,7 +77,7 @@ def test_architecture_document_check_reports_missing_header_jsonc_and_stale(tmp_
 
 def test_architecture_document_is_raw_readable_but_not_executable_config(tmp_path) -> None:
     path = tmp_path / "main.architecture.jsonc"
-    payload = {"workflow": {}, "nodesets": {}, "node_types": {}, "resources": {}}
+    payload = {"project_target":"python", "workflow": {}, "nodeset_types": {}, "node_types": {}, "node_definitions": {}, "resources": {}}
     path.write_text(_expected(payload), encoding="utf-8")
 
     assert load_raw_config_document(path).data == payload
@@ -115,7 +115,7 @@ def _source_payload():
         "workflow": {"source": "main.jsonc"},
         "implementation_graph": {
             "files": {"file:demo": {"path": "node.py", "load_state": "not_loaded", "owners": [
-                {"kind": "node", "id": "demo", "role": "entry", "symbol": "Demo"}]}},
+                {'node_type': 'vibeflow.node', "kind": "node", "id": "demo", "role": "entry", "symbol": "Demo"}]}},
             "resources": {"node:demo": {
                 "rulesets": ["vibeflow.process"],
                 "effective_rules": {"static": [{"ruleset_id": "vibeflow.process"}]},

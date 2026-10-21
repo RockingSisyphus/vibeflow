@@ -53,6 +53,7 @@ def collect_javascript_quality_facts(
     *,
     package_root: Path | str,
     registered_catalogs: object | None = None,
+    implementation_owners: Iterable[Mapping] = (),
     excluded_dirs: Iterable[str] = DEFAULT_EXCLUDED_DIRS,
     node_command: str = "node",
     facts_cache: MutableMapping[str, DriverQualityResult] | None = None,
@@ -62,7 +63,7 @@ def collect_javascript_quality_facts(
     selected = Path(root).expanduser().resolve()
     files = tuple(_iter_source_files(selected, set(excluded_dirs)))
     project_root = selected if selected.is_dir() else selected.parent
-    ownership = []
+    ownership = list(implementation_owners)
     catalogs = registered_catalogs if isinstance(registered_catalogs, tuple) else (registered_catalogs,)
     for catalog in catalogs:
         if catalog is None:

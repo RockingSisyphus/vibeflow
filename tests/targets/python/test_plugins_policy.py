@@ -104,11 +104,13 @@ def test_planned_plugin_is_not_imported_instantiated_or_registered(
     )
 
     from vibeflow.tooling.project.workspace_loader import load_project_workspace
-    from vibeflow.tooling.project.descriptor_loader import load_workflow_plugins
+    from vibeflow.tooling.project.resources import prepare_workflow_resources
+    from tests.fixtures.support.projects import register_root
+    register_root(tmp_path)
     (tmp_path / "vibeflow_project.jsonc").write_text('{"project_target":"python"}')
     config = tmp_path / "main.jsonc"
-    config.write_text(__import__("json").dumps({"plugins":[{"source":{"kind":"file","ref":"planned_plugin.py"},"status":"planned","id":"future"}], "pipeline":{"nodes":[]}}))
-    loaded = load_workflow_plugins(load_project_workspace(config),config)
+    config.write_text(__import__("json").dumps({"plugins":[{"source":{"kind":"file","ref":"planned_plugin.py"},"status":"planned","id":"future"}], "pipeline":{"nodes":[{"id":"future","definition_id":"planned.future","status":"planned","flow_kind":"process","requires":[],"provides":[],"display_name":"Future","description":"Unimplemented node"}]}}))
+    loaded = prepare_workflow_resources(load_project_workspace(config),config)
     assert loaded.catalogs.plugins.available() == ()
     assert loaded.records[0]["loaded"] is False
     assert not marker.exists()
@@ -117,7 +119,7 @@ def test_planned_plugin_is_not_imported_instantiated_or_registered(
 def test_numeric_rule_defaults_are_pure_and_do_not_mutate_other_checks() -> None:
     first = target_policy.default_effective_policy()
     second = target_policy.default_effective_policy()
-    target_policy.merge_policy(first.data, {"node_source": {"max_lines": 20}})
+    first.data["node_source"]["max_lines"]=20
     assert first.to_purity_policy().max_source_lines == 20
     assert second.to_purity_policy().max_source_lines == 500
     assert first.sources == ("kernel.default_policy",)

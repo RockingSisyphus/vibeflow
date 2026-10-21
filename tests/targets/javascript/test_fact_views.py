@@ -14,12 +14,12 @@ def test_worker_encoding_does_not_trigger_project_analysis():
 def test_javascript_views_track_source_ownership_configuration_and_extras():
     adapter = JavascriptFacts('node')
     facts = {'sources':[{'path':'same.ts','text':'export const x=1;'}],
-        'source_owners':[{'path':'same.ts','kind':'node','id':'left'}],
+        'source_owners':[{'node_type': 'vibeflow.node', 'path':'same.ts','kind':'node','id':'left'}],
         'import_policy':{'allow':['left']},'plugins':{'limit':1}}
     first = adapter.capture(facts)
     assert adapter.capture(facts) is first
     for changed in ({'sources':[{'path':'same.ts','text':'export const x=2;'}]},
-        {'source_owners':[{'path':'same.ts','kind':'node','id':'right'}]},
+        {'source_owners':[{'node_type': 'vibeflow.node', 'path':'same.ts','kind':'node','id':'right'}]},
         {'import_policy':{'allow':['right']}},{'plugins':{'limit':2}}):
         assert adapter.capture({**facts,**changed}).identity != first.identity
     extra = SimpleNamespace(value=1)

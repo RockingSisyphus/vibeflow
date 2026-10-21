@@ -3,13 +3,13 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.start",
+        "definition_id": "sandbox.start",
         "display_name": "start",
         "description": "Ordinary graph result visibility example"
       },
       {
         "id": "slow",
-        "type_used": "semantic.slow_async_value",
+        "definition_id": "semantic.slow_async_value",
         "display_name": "slow",
         "description": "Ordinary graph result visibility example",
         "config": {
@@ -18,21 +18,21 @@
       },
       {
         "id": "seed",
-        "type_used": "sandbox.constant",
+        "definition_id": "sandbox.constant",
         "display_name": "seed",
         "description": "Ordinary graph result visibility example",
         "value": 4
       },
       {
         "id": "add",
-        "type_used": "sandbox.add",
+        "definition_id": "sandbox.add",
         "display_name": "add",
         "description": "Ordinary graph result visibility example",
         "delta": 5
       },
       {
         "id": "end",
-        "type_used": "sandbox.out_value_end",
+        "definition_id": "sandbox.out_value_end",
         "display_name": "end",
         "description": "Ordinary graph result visibility example",
         "join_policy": "all"
@@ -72,7 +72,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

@@ -62,7 +62,7 @@ def test_tooling_path_adapter_keeps_core_parser_filesystem_free(
     from vibeflow.tooling.project.graph_config import parse_graph_config
 
     document = {
-        "pipeline": {"nodes": [{"id": "node", "type_used": "test.node", "display_name": "Node", "description": "Exercises the path adapter."}]}
+        "pipeline": {"nodes": [{"id": "node", "definition_id": "test.node", "display_name": "Node", "description": "Exercises the path adapter."}]}
     }
     relative = Path("relative-project-root")
     core_graph = parse_graph_config_data(

@@ -38,7 +38,7 @@ from vibeflow.targets.python.runtime import (
 EXECUTION_MODES = ("plan", "block", "compiled")
 
 
-_DoubleNode_DECLARATION = node_declaration(NodeDescriptor(type_key='integration.double', display_name='Double', description='Doubles a received number.', version='1.0.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('number', 'exactly_one', display_name='number'),), provides=(DataProvider('answer', 'answer', display_name='answer'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('number', 'exactly_one', display_name='number'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('answer', 'answer', display_name='answer'),)}), rulesets=("vibeflow.process",))
+_DoubleNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='integration.double', display_name='Double', description='Doubles a received number.', version='1.0.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('number', 'exactly_one', display_name='number'),), provides=(DataProvider('answer', 'answer', display_name='answer'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('number', 'exactly_one', display_name='number'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('answer', 'answer', display_name='answer'),)}), rulesets=("vibeflow.process",))
 
 class _DoubleNode:
 
@@ -114,7 +114,7 @@ def test_real_binding_sidecar_covers_nodes_nodesets_and_loops(
     nested = PipelineRuntime(
         parse_graph_config(
             {
-                "nodesets": [
+                "nodeset_types": [
                     _nodeset_config(
                         "math.add_one",
                         requires=["value.in"],
@@ -229,7 +229,7 @@ def test_planned_stub_binding_is_hashed_and_loaded_only_when_run(
     binding = runtime._plan.binding_plan.binding(("stub",))
     frame = runtime._plan.frame("stub")
     assert binding.path == ("stub",)
-    assert binding.type_key == "planned.stub"
+    assert binding.definition_id == "planned.stub"
     assert binding.implementation == str(stub_path.resolve())
     assert not callable(binding.implementation)
     assert binding.effective_params["delta"] == 4
@@ -352,11 +352,11 @@ def test_python_port_semantics_and_trace_match_all_execution_modes(
             "pipeline": {
                 "entry_mode": "async",
                 "nodes": [
-                    {"id":"start", "type_used":"fixture.port.boundary", "display_name":"Start", "description":"Enter port workflow"},
-                    {"id":"end", "type_used":"fixture.port.boundary", "display_name":"End", "description":"Finish port workflow"},
+                    {"id":"start", "definition_id":"fixture.port.boundary", "display_name":"Start", "description":"Enter port workflow"},
+                    {"id":"end", "definition_id":"fixture.port.boundary", "display_name":"End", "description":"Finish port workflow"},
                     {
                         "id": "receive",
-                        "type_used": "fixture.port.receive",
+                        "definition_id": "fixture.port.receive",
                         "display_name": "Receive number",
                         "description": "Receives the number used by this integration workflow.",
                         "config": {"port": "math.in"},
@@ -369,7 +369,7 @@ def test_python_port_semantics_and_trace_match_all_execution_modes(
                     ),
                     {
                         "id": "send",
-                        "type_used": "fixture.port.send",
+                        "definition_id": "fixture.port.send",
                         "display_name": "Send answer",
                         "description": "Sends the doubled answer from this integration workflow.",
                         "config": {"port": "math.out"},

@@ -65,7 +65,7 @@ def _project(tmp_path: Path) -> Path:
 
 def _plan(entry: Path, *, entry_mode: str, completion: str) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "test.project-negative",
         "entry_mode": entry_mode,
         "inputs": [],
@@ -73,7 +73,7 @@ def _plan(entry: Path, *, entry_mode: str, completion: str) -> dict[str, object]
         "nodes": [
             {
                 "id": "run",
-                "type_used": "test.entry",
+                "definition_id": "test.entry",
                 "implementation": {
                     "kind": "file",
                     "ref": str(entry),
@@ -112,8 +112,8 @@ CASES = (
             "other.ts": "export const forbidden = 1;\n",
         },
         owners=(
-            {"path": "entry.ts", "kind": "node", "id": "test.entry"},
-            {"path": "other.ts", "kind": "node", "id": "test.other"},
+            {'node_type': 'vibeflow.node', "path": "entry.ts", "kind": "node", "id": "test.entry"},
+            {'node_type': 'vibeflow.node', "path": "other.ts", "kind": "node", "id": "test.other"},
         ),
     ),
     NegativeCase(
@@ -126,8 +126,8 @@ CASES = (
             "other.ts": "export const forbidden = 1;\n",
         },
         owners=(
-            {"path": "entry.ts", "kind": "node", "id": "test.entry"},
-            {"path": "other.ts", "kind": "node", "id": "test.other"},
+            {'node_type': 'vibeflow.node', "path": "entry.ts", "kind": "node", "id": "test.entry"},
+            {'node_type': 'vibeflow.node', "path": "other.ts", "kind": "node", "id": "test.other"},
         ),
     ),
     NegativeCase(
@@ -140,8 +140,8 @@ CASES = (
             "other.ts": "export const forbidden = 1;\n",
         },
         owners=(
-            {"path": "entry.ts", "kind": "node", "id": "test.entry"},
-            {"path": "other.ts", "kind": "node", "id": "test.other"},
+            {'node_type': 'vibeflow.node', "path": "entry.ts", "kind": "node", "id": "test.entry"},
+            {'node_type': 'vibeflow.node', "path": "other.ts", "kind": "node", "id": "test.other"},
         ),
     ),
     NegativeCase(
@@ -155,9 +155,9 @@ CASES = (
             "other.ts": "export const forbidden = 1;\n",
         },
         owners=(
-            {"path": "entry.ts", "kind": "node", "id": "test.entry"},
+            {'node_type': 'vibeflow.node', "path": "entry.ts", "kind": "node", "id": "test.entry"},
             {"path": "base.ts", "kind": "base_lib", "id": "test.base"},
-            {"path": "other.ts", "kind": "node", "id": "test.other"},
+            {'node_type': 'vibeflow.node', "path": "other.ts", "kind": "node", "id": "test.other"},
         ),
         node_base_libs={"test.entry": ["test.base"]},
     ),
@@ -170,7 +170,7 @@ CASES = (
             "entry.ts": 'import ts from "typescript";\nexport function run() { void ts; return {}; }\n',
         },
         owners=(
-            {"path": "entry.ts", "kind": "node", "id": "test.entry"},
+            {'node_type': 'vibeflow.node', "path": "entry.ts", "kind": "node", "id": "test.entry"},
         ),
     ),
     NegativeCase(
@@ -183,7 +183,7 @@ CASES = (
             "../outside.ts": "export const outside = 1;\n",
         },
         owners=(
-            {"path": "entry.ts", "kind": "node", "id": "test.entry"},
+            {'node_type': 'vibeflow.node', "path": "entry.ts", "kind": "node", "id": "test.entry"},
         ),
     ),
     NegativeCase(
@@ -195,7 +195,7 @@ CASES = (
             "entry.ts": "const ready = Promise.resolve(1);\nexport function run() { void ready; return {}; }\n",
         },
         owners=(
-            {"path": "entry.ts", "kind": "node", "id": "test.entry"},
+            {'node_type': 'vibeflow.node', "path": "entry.ts", "kind": "node", "id": "test.entry"},
         ),
     ),
     NegativeCase(
@@ -207,7 +207,7 @@ CASES = (
             "entry.ts": "export async function run() {\n  void Promise.resolve(1);\n  return {};\n}\n",
         },
         owners=(
-            {"path": "entry.ts", "kind": "node", "id": "test.entry"},
+            {'node_type': 'vibeflow.node', "path": "entry.ts", "kind": "node", "id": "test.entry"},
         ),
         entry_mode="async",
         completion="suspend",
@@ -221,7 +221,7 @@ CASES = (
             "entry.ts": 'export function run() { addEventListener("message", () => {}); return {}; }\n',
         },
         owners=(
-            {"path": "entry.ts", "kind": "node", "id": "test.entry"},
+            {'node_type': 'vibeflow.node', "path": "entry.ts", "kind": "node", "id": "test.entry"},
         ),
     ),
     NegativeCase(
@@ -233,7 +233,7 @@ CASES = (
             "entry.ts": "let count = 0;\nexport function run() { count += 1; return {}; }\n",
         },
         owners=(
-            {"path": "entry.ts", "kind": "node", "id": "test.entry"},
+            {'node_type': 'vibeflow.node', "path": "entry.ts", "kind": "node", "id": "test.entry"},
         ),
     ),
 )
@@ -291,7 +291,7 @@ def test_project_string_evaluation_is_not_a_security_policy(tmp_path: Path) -> N
     checked = run_rule_check_driver({
         "typecheckFiles": [str(entry)],
         "ruleTopics": ["architecture", "imports", "purity", "completion", "module_state"],
-        "importPolicy": {"owners": [{"path": str(entry), "kind": "node", "id": "test.entry",
+        "importPolicy": {"owners": [{'node_type': 'vibeflow.node', "path": str(entry), "kind": "node", "id": "test.entry",
                                     "export": "run", "completion": "immediate"}]},
     }, package_root=project)
     assert checked.findings == ()
@@ -310,7 +310,7 @@ def test_failed_replace_preserves_every_existing_output_byte(tmp_path: Path) -> 
         profile="single-esm",
         import_policy={
             "owners": [
-                {
+                {'node_type': 'vibeflow.node',
                     "path": str(entry),
                     "kind": "node",
                     "id": "test.entry",
@@ -356,7 +356,7 @@ def test_native_timer_and_listener_ownership_uses_actual_binding(tmp_path,body,f
     entry.write_text('export async function run(inputs:any,params:any,context:any){'+body+'return {};}\n')
     checked=run_rule_check_driver({
         "typecheckFiles":[str(entry)],"ruleTopics":["completion"],
-        "importPolicy":{"owners":[{"path":str(entry),"kind":"node","id":"test.entry","export":"run","completion":"suspend"}]},
+        "importPolicy":{"owners":[{'node_type': 'vibeflow.node', "path":str(entry),"kind":"node","id":"test.entry","export":"run","completion":"suspend"}]},
     },package_root=project)
     codes={item.get('code') for item in checked.findings}
     assert ('VF_NODE_RESOURCE_UNOWNED' in codes) is forbidden,checked.findings

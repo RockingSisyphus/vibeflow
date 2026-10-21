@@ -1,0 +1,80 @@
+{
+  "pipeline": {
+    "entry_mode": "sync",
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.number",
+        "display_name": "Number",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "definition_id": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Starts the Host Extension fixture."
+      },
+      {
+        "id": "open",
+        "definition_id": "sandbox.math_open",
+        "display_name": "Open math session",
+        "description": "Initialize the application-provided math API."
+      },
+      {
+        "id": "double",
+        "definition_id": "sandbox.api_double",
+        "display_name": "Host double",
+        "description": "Call the application-provided math API."
+      },
+      {
+        "id": "close",
+        "definition_id": "sandbox.math_close",
+        "display_name": "Close math session",
+        "description": "Close the math API through an explicit workflow Node."
+      },
+      {
+        "id": "end",
+        "definition_id": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Ends the Host Extension fixture."
+      }
+    ],
+    "edges": [
+      [
+        "start",
+        "open"
+      ],
+      [
+        "open",
+        "double"
+      ],
+      [
+        "double",
+        "close"
+      ],
+      [
+        "close",
+        "end"
+      ]
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.math.result",
+        "cardinality": "exactly_one",
+        "display_name": "Result",
+        "as": "result"
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugins/code_plugin/plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
+}

@@ -12,7 +12,7 @@ from pathlib import Path
 
 def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None) -> list[dict]:
     from vibeflow.core.contracts import DataProvider, DataRequirement
-    from vibeflow.core.flow import EdgeSpec, GraphConfig, NodeMetadata, NodeSpec, NodesetSpec
+    from vibeflow.core.flow import EdgeSpec, GraphConfig, NodeMetadata, NodeCallSpec, NodesetTypeSpec
     from vibeflow.targets.python.project.registry import NodeRegistry
     if variant == "current":
         from vibeflow.tooling.application.python.project.declarations import default_python_registry as NodeRegistry
@@ -29,10 +29,10 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         metadata = NodeMetadata() if missing_metadata else NodeMetadata(name, "Declared native IO boundary.")
         if variant == "baseline":
             from vibeflow.core.flow import IoSpec
-            return NodeSpec(name, "vibeflow.io", io=IoSpec(operation), metadata=metadata,
+            return NodeCallSpec(name, "vibeflow.io", io=IoSpec(operation), metadata=metadata,
                 provides=(DataProvider(signal, signal, display_name="Received value"),) if operation == "receive" else (),
                 requires=(DataRequirement(signal, "exactly_one", display_name="Sent value"),) if operation == "send" else ())
-        return NodeSpec(name, "probe.boundary."+operation+"."+signal, flow_kind="terminal", metadata=metadata,
+        return NodeCallSpec(name, "probe.boundary."+operation+"."+signal, flow_kind="terminal", metadata=metadata,
             provides=(DataProvider(signal, signal, display_name="Received value"),) if operation == "receive" else (),
             requires=(DataRequirement(signal, "exactly_one", display_name="Sent value"),) if operation == "send" else ())
 
@@ -68,7 +68,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             elif topic == "flow":
                 body = GraphConfig((io("start", "receive"), io("end", "send"), io("orphan", "receive", signal="orphan.signal")), (EdgeSpec("start", "end"),), **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
             elif topic == "process_orphan":
-                orphan = NodeSpec("orphan","probe.boundary.orphan",flow_kind="process",
+                orphan = NodeCallSpec("orphan","probe.boundary.orphan",flow_kind="process",
                     metadata=NodeMetadata("Orphan","Disconnected ordinary data producer."),
                     provides=(DataProvider("orphan.signal","orphan.signal",display_name="Unused data"),))
                 body = replace(healthy(),nodes=(*healthy().nodes,orphan))
@@ -76,12 +76,12 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
                 body = healthy()
             required = (DataRequirement("root.signal", "exactly_one", display_name="Root value"),)
             provided = (DataProvider("child.signal", "child.signal", display_name="Child value"),)
-            child = NodesetSpec("probe.child", "Child", "Declared source-free block with default workflow review.", required, provided, body)
+            child = NodesetTypeSpec("probe.child", "Child", "Declared source-free block with default workflow review.", required, provided, body)
             graph = healthy()
             if used:
-                stage = NodeSpec("stage", child.type_key, metadata=NodeMetadata("Stage", "Calls the declared child."), requires=required, provides=provided)
+                stage = NodeCallSpec("stage", child.type_key, metadata=NodeMetadata("Stage", "Calls the declared child."), requires=required, provides=provided)
                 graph = GraphConfig((io("start", "receive", signal="root.signal"), stage, io("end", "send")), (EdgeSpec("start", "stage"), EdgeSpec("stage", "end")), **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
-            graph = replace(graph, nodesets={child.type_key: child})
+            graph = replace(graph, nodeset_types={child.type_key: child})
             try:
                 from tests.fixtures.rule_parity.core.support import boundary_registry
                 registry = boundary_registry(graph, NodeRegistry()) if variant == "current" else NodeRegistry()
@@ -116,7 +116,7 @@ def _source_consumption_cases(work_root: Path, variant: str) -> list[dict]:
     import importlib.util
     import sys
     from vibeflow.core.contracts import DataProvider, DataRequirement
-    from vibeflow.core.flow import EdgeSpec, ExecutionLockSpec, GraphConfig, NodeMetadata, NodeSimilarity, NodeSpec
+    from vibeflow.core.flow import EdgeSpec, ExecutionLockSpec, GraphConfig, NodeMetadata, NodeSimilarity, NodeCallSpec
     from vibeflow.targets.python.project.registry import NodeRegistry
     if variant == "current":
         from vibeflow.tooling.application.python.project.declarations import default_python_registry as NodeRegistry
@@ -145,7 +145,7 @@ def _source_consumption_cases(work_root: Path, variant: str) -> list[dict]:
             required = (DataRequirement(required_type, "exactly_one", display_name="Received value"),)
             provided = (DataProvider(output_key, output_key, display_name="Computed value"),)
             if variant == "baseline":
-                source = "from vibeflow.targets.python.nodetypes.protocols import NodeInfo, NodeContract\nfrom vibeflow.core.contracts import DataProvider, DataRequirement\n" + source
+                source = "from vibeflow.targets.python.sdk.protocols import NodeInfo, NodeContract\nfrom vibeflow.core.contracts import DataProvider, DataRequirement\n" + source
                 source += f"    NODE_INFO = NodeInfo({key!r}, 'Node', 'probe', 'Declared source fact.', '1.0', {kind!r})\n"
                 source += (f"    CONTRACT = NodeContract(requires=(DataRequirement({required_type!r}, 'exactly_one', display_name='Received value'),), "
                     f"provides=(DataProvider({output_key!r}, {output_key!r}, display_name='Computed value'),), "
@@ -166,11 +166,11 @@ def _source_consumption_cases(work_root: Path, variant: str) -> list[dict]:
                 from vibeflow.core.descriptors.models import ImplementationDescriptor, NodeContractDescriptor, NodeDescriptor, SourceLocator
                 from vibeflow.targets.python.quality.source_context import PythonSourceCall, PythonSourceFile, PythonSourceNode, build_python_source_context
                 descriptor = NodeDescriptor(key, "Node", "Declared source fact.", "1.0", kind,
-                    NodeContractDescriptor(requires=required, provides=provided,
+                    contract=NodeContractDescriptor(requires=required, provides=provided,
                         input_semantics={required_type: ("Received value",)}, output_semantics={output_key: ("Computed value",)},
                         examples=({"inputs": {required_type: 1}, "params": {}},)),
-                    (ImplementationDescriptor("python", ("python",), SourceLocator("file", str(path), name)),),
-                    rulesets=("vibeflow.global_state",) if kind == "global_state" else ("vibeflow.process",))
+                    implementations=(ImplementationDescriptor("python", ("python",), SourceLocator("file", str(path), name)),),
+                    rulesets=("vibeflow.global_state",) if kind == "global_state" else ("vibeflow.process",), node_type="vibeflow.node")
                 registry.register(descriptor, source=str(path))
                 node_id = "work" + str(index)
                 selected.append(PythonSourceNode(descriptor, str(path), name, calls=(("pipeline", node_id),)))
@@ -180,13 +180,13 @@ def _source_consumption_cases(work_root: Path, variant: str) -> list[dict]:
             signal = "root.signal" if operation == "receive" else "node" + str(len(kinds) - 1) + ".signal"
             if variant == "baseline":
                 from vibeflow.core.flow import IoSpec
-                return NodeSpec(name, "vibeflow.io", io=IoSpec(operation), metadata=NodeMetadata(name, "Historical native boundary."),
+                return NodeCallSpec(name, "vibeflow.io", io=IoSpec(operation), metadata=NodeMetadata(name, "Historical native boundary."),
                     provides=(DataProvider(signal, signal, display_name="Received value"),) if operation == "receive" else (),
                     requires=(DataRequirement(signal, "exactly_one", display_name="Sent value"),) if operation == "send" else ())
-            return NodeSpec(name, "probe.boundary."+operation+"."+signal, flow_kind="terminal", metadata=NodeMetadata(name, "Explicit terminal boundary."),
+            return NodeCallSpec(name, "probe.boundary."+operation+"."+signal, flow_kind="terminal", metadata=NodeMetadata(name, "Explicit terminal boundary."),
                 provides=(DataProvider(signal, signal, display_name="Received value"),) if operation == "receive" else (),
                 requires=(DataRequirement(signal, "exactly_one", display_name="Sent value"),) if operation == "send" else ())
-        nodes = (io("start", "receive"), *(NodeSpec("work" + str(index), "probe.node" + str(index),
+        nodes = (io("start", "receive"), *(NodeCallSpec("work" + str(index), "probe.node" + str(index),
             metadata=NodeMetadata("Work", "Declared source call."),
             similar_to=NodeSimilarity("work0", "copy", "Intentional equivalent implementation.") if mode == "similar" and index else NodeSimilarity())
             for index in range(len(kinds))), io("end", "send"))

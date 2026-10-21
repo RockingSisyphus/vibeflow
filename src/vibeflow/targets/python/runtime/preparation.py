@@ -9,7 +9,7 @@ from vibeflow.block_compiler import WorkflowPlan, compile_graph_plan
 from vibeflow.block_compiler.compiler import _block_id
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.config.scope import normalize_config_scope, scoped_node_params
-from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, STATUS_PLANNED
+from vibeflow.core.flow import GraphConfig, LOOP_DEFINITION_IDS, STATUS_PLANNED
 from vibeflow.core.models import TargetFeatureSet
 from vibeflow.core.planned import effective_planned_behavior
 from vibeflow.core.graph_calls import graph_call_subjects
@@ -36,7 +36,7 @@ def prepare_python_workflow(graph, compiled, *, registry, global_config=None, no
         overrides = normalize_node_config_overrides(node_config_overrides or {})
     except ValueError as error:
         raise PipelineRuntimeError(str(error)) from error
-    facts = _adapt_implementation_facts(graph, source=registry, nodesets=set(graph.nodesets))
+    facts = _adapt_implementation_facts(graph, source=registry, nodeset_types=set(graph.nodeset_types))
     graphs, compilations, globals_by_block, parameters, overrides_by_block = {}, {}, {}, {}, {}
     subjects = graph_call_subjects(graph, global_config=global_config, node_config_overrides=overrides)
     for subject in subjects:
@@ -54,11 +54,11 @@ def prepare_python_workflow(graph, compiled, *, registry, global_config=None, no
         local_overrides = dict(subject.overrides)
         overrides_by_block[key] = local_overrides
         for spec in current.nodes:
-            nodeset = current.nodesets.get(spec.loop.body if spec.type_used in LOOP_NODE_TYPES else spec.type_used)
+            nodeset = current.nodeset_types.get(spec.loop.body if spec.definition_id in LOOP_DEFINITION_IDS else spec.definition_id)
             if effective_planned_behavior(spec, nodeset).kind == 'python_stub':
                 parameters[(*path, spec.id)] = {**spec.params, **local_overrides.get(spec.id, {})}
                 continue
-            composite = spec.type_used in current.nodesets or spec.type_used in LOOP_NODE_TYPES
+            composite = spec.definition_id in current.nodeset_types or spec.definition_id in LOOP_DEFINITION_IDS
             if composite:
                 parameters[(*path, spec.id)] = scheduling_config(
                     {**spec.params, **local_overrides.get(spec.id, {})}
@@ -67,9 +67,9 @@ def prepare_python_workflow(graph, compiled, *, registry, global_config=None, no
             if spec.status == STATUS_PLANNED:
                 parameters[(*path, spec.id)] = {**spec.params, **local_overrides.get(spec.id, {})}
                 continue
-            config_spec = registry.get_config_spec(spec.type_used)
+            config_spec = registry.get_config_spec(spec.definition_id)
             scoped = scoped_node_params(spec.params, scope, declared_keys=set(config_spec.schema))
-            parameters[(*path, spec.id)] = registry.merge_config(spec.type_used,
+            parameters[(*path, spec.id)] = registry.merge_config(spec.definition_id,
                 {**scoped, **local_overrides.get(spec.id, {})})
     try:
         workflow = compile_graph_plan(graph, compiled, implementation_facts=facts,
@@ -128,12 +128,12 @@ def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_reg
         frames = {}
         for call in block.nodes:
             spec = specs[call.id]
-            nodeset = graph.nodesets.get(call.nodeset_type_key)
+            nodeset = graph.nodeset_types.get(call.nodeset_type_id)
             behavior = effective_planned_behavior(spec, nodeset)
             implementation = None
             accepts_context = False
             if instantiate and not (call.is_nodeset or call.is_loop or behavior.kind == 'python_stub'):
-                implementation_type = registry.get(call.type_used)
+                implementation_type = registry.get(call.definition_id)
                 implementation = implementation_type()
                 accepts_context = len(signature(implementation.run_pure).parameters) == 3
             stub_path, stub_hash = '', ''
@@ -151,7 +151,7 @@ def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_reg
                 params = business_config({**spec.params, **prepared.globals[block_id], **prepared.overrides[block_id].get(call.id,{})})
             bound_params = params if (call.is_nodeset or call.is_loop) and behavior.kind != 'python_stub' else attach_global_config(params, prepared.globals[block_id])
             frames[call.id] = NodeFrame(
-                id=call.id, type_used=call.type_used, node=implementation,
+                id=call.id, definition_id=call.definition_id, node=implementation,
                 requires=spec.requires, provides=spec.provides,
                 params=bound_params, max_concurrency=call.max_concurrency,
                 incoming=tuple(e for e in compiled.resolved_schedule_edges if e.target == call.id),
@@ -161,7 +161,7 @@ def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_reg
                 flow_kind=call.flow_kind, is_terminal=call.is_terminal,
                 is_nodeset=call.is_nodeset, is_loop=call.is_loop,
                 status=call.status, effect_scope='unconstrained' if behavior.kind == 'python_stub' else call.effect_scope, join_policy=call.join_policy,
-                nodeset_type_key=call.nodeset_type_key, exports=tuple(getattr(nodeset,'provides',())),
+                nodeset_type_id=call.nodeset_type_id, exports=tuple(getattr(nodeset,'provides',())),
                 loop_spec=spec.loop, execution_lock=spec.execution_lock,
                 subplan=bind(call.child_block) if call.child_block else None,
                 accepts_context=accepts_context, planned_behavior=behavior,

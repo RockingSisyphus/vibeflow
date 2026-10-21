@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 from tests.targets.python.test_aot_bundle import build
-from tests.targets.python.test_code_plugins import EXECUTABLE, executable_project
+from tests.targets.python.test_code_plugins import EXECUTABLE, PLUGIN_SOURCE, executable_project
 from vibeflow.tooling.application.python.build import PythonBuildRequest, build_python_aot
 from vibeflow.tooling.application.python.bundle import load_bundle, PythonBundle
 from vibeflow.targets.python.sdk.plugin import Plugin
@@ -32,7 +32,7 @@ def test_warm_runtime_does_not_reparse_facts_or_rebuild_plugin_index(tmp_path, m
     second = bundle.create_runtime(run_dir=tmp_path / 'second')
     for runtime in (first, second):
         assert runtime.run({}).get('result')['value'] == 7
-    assert len(calls) == 1
+    assert not calls  # Ordinary Nodes no longer bootstrap a Plugin for their binding.
     assert first.registry is not second.registry
     assert first._frames['demo'].node is not second._frames['demo'].node
 
@@ -44,7 +44,7 @@ def test_cached_metadata_preserves_config_and_lifecycle_instance_isolation(tmp_p
         'assert not self.used\n        self.used = True\n        return {"result": params["delta"]}')
     source = source.replace('contract={"provides":',
         'contract={"params_schema":{"delta":{"type":"number"}},"params_defaults":{"delta":1},"provides":')
-    source = source.replace('plugin=Plugin(', f'''
+    plugin = PLUGIN_SOURCE.replace('plugin=Plugin(', f'''
 from pathlib import Path
 class Monitor:
     def __init__(self): self.used = False
@@ -55,7 +55,7 @@ class Monitor:
         with Path({str(marker)!r}).open('a') as stream: stream.write('disposed\\n')
 def create(context): return Monitor()
 plugin=Plugin(runtime=create,''')
-    path = build(tmp_path, source)
+    path = build(tmp_path, source, plugin_source=plugin)
     bundle = load_bundle(path)
     for i, expected in enumerate((3, 9, 1)):
         overrides = {'demo': {'delta': expected}} if i < 2 else None
@@ -73,7 +73,7 @@ def test_same_named_modules_stay_with_their_bundle_after_a_b_a_switch(tmp_path):
         source.mkdir()
         (source / 'support.py').write_text(f'VALUE = {value}\n')
         code = EXECUTABLE.replace('return {"result": 7}', 'from support import VALUE\n        return {"result": VALUE}')
-        code = code.replace('@node(type_key="demo",', '@node(type_key="demo",implementation_files=["support.py"],')
+        code = code.replace('@node(node_type="demo.shell", id="demo",', '@node(node_type="demo.shell", id="demo",implementation_files=["../support.py"],')
         workspace, config = executable_project(source, code)
         build_python_aot(PythonBuildRequest(workspace, config, root / 'bundle'))
         bundles.append(load_bundle(root / 'bundle'))
@@ -108,3 +108,28 @@ def test_preparation_probe_builds_a_current_abi_sample(tmp_path):
     assert report["abi"] == WORKFLOW_ABI_VERSION
     assert len(report["samples"]) == 2 and report["runtime_instances_reused"] is False
     assert not any(row["function"] in {"_descriptor", "decode_resource", "bindings"} for row in report["profile_counts"])
+
+
+def test_concurrent_first_runs_share_plugin_definition_but_not_lifecycle_instances(tmp_path, monkeypatch):
+    plugin = PLUGIN_SOURCE.replace('plugin=Plugin(', '''
+class Monitor:
+    def __init__(self): self.used = False
+    def before_run(self, context):
+        assert not self.used
+        self.used = True
+def create(context): return Monitor()
+plugin=Plugin(runtime=create,''')
+    bundle = load_bundle(build(tmp_path, plugin_source=plugin))
+    original, bootstraps = Plugin.bindings, []
+    def bindings(owner):
+        bootstraps.append(owner)
+        return original(owner)
+    monkeypatch.setattr(Plugin, 'bindings', bindings)
+    def invoke(index):
+        runtime = bundle.create_runtime(run_dir=tmp_path / f'concurrent-{index}')
+        assert runtime.run({}).get('result')['value'] == 7
+        return runtime
+    with ThreadPoolExecutor(max_workers=4) as workers:
+        runtimes = list(workers.map(invoke, range(8)))
+    assert len(bootstraps) == 1
+    assert len({id(runtime._runtime_plugins[0]) for runtime in runtimes}) == 8

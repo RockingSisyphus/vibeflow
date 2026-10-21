@@ -1,0 +1,52 @@
+{
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugins/demo/plugin.ts"
+      }
+    }
+  ],
+  "rulesets": [
+    "vibeflow.workflow"
+  ],
+  "pipeline": {
+    "nodes": [
+      {
+        "id": "start",
+        "definition_id": "demo.start",
+        "display_name": "Start",
+        "description": "Starts the computation"
+      },
+      {
+        "id": "model",
+        "definition_id": "demo.model",
+        "display_name": "Model",
+        "description": "Computes one functional model block"
+      },
+      {
+        "id": "end",
+        "definition_id": "demo.start",
+        "display_name": "End",
+        "description": "Finishes the computation"
+      }
+    ],
+    "edges": [
+      [
+        "start",
+        "model"
+      ],
+      [
+        "model",
+        "end"
+      ]
+    ],
+    "outputs": [
+      {
+        "type": "number",
+        "display_name": "Result",
+        "cardinality": "exactly_one"
+      }
+    ]
+  }
+}

@@ -36,7 +36,7 @@ def test_formal_cli_and_actual_node_receive_native_json(tmp_path, case_id, schem
     write_project(root, schema_type, value)
     validation = execute(root, "validate", tmp_path)
     assert validation["status"] == "PASS", validation
-    workspace = load_workspace_config(root / "vibeflow_config.jsonc")
+    workspace = load_workspace_config(root.parent / "vibeflow_config.jsonc")
     result = run_workspace_checked(root / "workflow.jsonc", workspace=workspace, run_root=tmp_path / "runs")
     output = result.context.get("inspection")["value"]
     assert output["native_type"] == type(value).__name__

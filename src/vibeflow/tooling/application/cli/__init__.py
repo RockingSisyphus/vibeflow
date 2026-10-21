@@ -47,6 +47,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if command == "coordination":
         from vibeflow.tooling.application.coordination import main as coordination_main
         return coordination_main(raw_args[1:])
+    if command == "quality-check":
+        from vibeflow.tooling.application.project_quality import main as quality_main
+        return quality_main(raw_args[1:])
     if command == "preview":
         from vibeflow.tooling.presentation.preview.cli import main as preview_main
         return preview_main(raw_args[1:])
@@ -218,19 +221,7 @@ def _option_value(args: list[str], name: str) -> str:
 
 
 def _dispatch_mixed_workspace(command: str, args: list[str]) -> int:
-    if command != "quality-check":
-        return _print_error(
-            "CLI.PROJECT_TARGET.MISMATCH",
-            f"{command} must resolve to exactly one project root",
-        )
-    try:
-        from vibeflow.tooling.application.workspace_quality import main as quality_main
-    except ImportError:
-        return _print_error(
-            "CLI.PROJECT_TARGET.MISMATCH",
-            "quality-check for a mixed-target workspace is not available",
-        )
-    return quality_main(args)
+    return _print_error("CLI.PROJECT_TARGET.MISMATCH", f"{command} must resolve to exactly one project root")
 
 
 def _is_target_specific_help(command: str, args: list[str]) -> bool:
@@ -301,7 +292,7 @@ def _show_shared_command_help(command: str) -> int:
                 help="expand nodeset and loop-body detail",
             )
             parser.add_argument(
-                "--collapse-nodesets",
+                "--collapse-nodeset_types",
                 dest="expand_nodesets",
                 action="store_false",
                 help="keep nodeset and loop-body calls collapsed",

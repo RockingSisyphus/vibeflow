@@ -40,7 +40,7 @@ def _binding(
 ) -> PythonCallBinding:
     return PythonCallBinding(
         path=path,
-        type_key="fixture.python",
+        definition_id="fixture.python",
         implementation=implementation,
         effective_params=params or {},
         source=SourceRef(
@@ -208,7 +208,7 @@ def test_portable_block_plan_never_contains_python_binding_objects() -> None:
     )
     call = NodeCallPlan(
         id="step",
-        type_used="fixture.python",
+        definition_id="fixture.python",
         implementation=source,
         requires=(),
         provides=(),
@@ -221,7 +221,7 @@ def test_portable_block_plan_never_contains_python_binding_objects() -> None:
         is_terminal=False,
         is_nodeset=False,
         is_loop=False,
-        nodeset_type_key="",
+        nodeset_type_id="",
         child_block="",
         exports=(),
     )

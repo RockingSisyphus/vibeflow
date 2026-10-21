@@ -11,7 +11,7 @@ def local_sources(sources, node, call=None):
     root = sources.symbol(node.path, node.symbol)
     selected = {item.id for item in sources.symbols
                 if item.path == node.path and (item.name == node.symbol or item.name.startswith(node.symbol + "."))}
-    selected.update(item.id for item in sources.helpers(node.type_key))
+    selected.update(item.id for item in sources.helpers(node.definition_id))
     if root is not None:
         selected.update(item.id for item in sources.class_members(root).values())
     # Inherited methods are part of this implementation even when the base
@@ -20,7 +20,7 @@ def local_sources(sources, node, call=None):
     ancestors = {(item.path, item.name.rpartition(".")[0]) for item in sources.symbols
         if item.id in inherited and not item.name.startswith(node.symbol + ".")}
     selected.update(item.id for item in sources.symbols if (item.path, item.name) in ancestors)
-    foreign = tuple((item.path, item.symbol) for item in sources.nodes if item.type_key != node.type_key
+    foreign = tuple((item.path, item.symbol) for item in sources.nodes if item.definition_id != node.definition_id
         and (item.path, item.symbol) not in ancestors)
     symbols = tuple(item for item in sources.symbols if item.id in selected and not any(
         item.path == path and (item.name == name or item.name.startswith(name + ".")) for path, name in foreign))
@@ -94,7 +94,7 @@ def local_sources(sources, node, call=None):
         imports.extend(item for item in sources.imports if item.path == source.path and item.line in visible_lines)
     return PythonSourceContext((replace(node, calls=()),), tuple(files), symbols,
         tuple(item for item in sources.references if item.source in identities),
-        tuple(item for item in sources.ownership if item.type_key == node.type_key and item.symbol_id in identities),
+        tuple(item for item in sources.ownership if item.definition_id == node.definition_id and item.symbol_id in identities),
         (), tuple(imports))
 
 
@@ -105,7 +105,7 @@ def node_context(sources, node, call, *, phase, identity, extra_facts=None, loca
         facts["call"] = call
     # Explicit adapter facts may describe this Node; never expose shared catalogs.
     facts.update(extra_facts or {})
-    return RuleContext(facts=facts, subject={"kind": "node", "type_key": node.type_key,
+    return RuleContext(facts=facts, subject={"kind": "node", "definition_id": node.definition_id,
         "descriptor": node.descriptor, "source_identity": identity,
         **({"owner": call.owner, "call_id": call.node_id, "call_path": call.call_path} if call is not None else {})},
         scope={"files": tuple(item.path for item in local.files)}, phase=phase, target="python")
@@ -137,13 +137,13 @@ def graph_sources(sources, subjects):
     """Responsibility view; the complete command snapshot remains background."""
     if sources is None:
         return None
-    types = {node.type_used for subject in subjects for node in subject.graph.nodes}
-    nodes = tuple(node for node in sources.nodes if node.type_key in types)
+    types = {node.definition_id for subject in subjects for node in subject.graph.nodes}
+    nodes = tuple(node for node in sources.nodes if node.definition_id in types)
     paths = {file.path for node in nodes for file in sources.import_closure(node.path)}
     calls = {(*subject.call_path,node.id) for subject in subjects for node in subject.graph.nodes}
     return PythonSourceContext(nodes, tuple(file for file in sources.files if file.path in paths),
         tuple(symbol for symbol in sources.symbols if symbol.path in paths),
         tuple(reference for reference in sources.references if reference.source.rpartition(":")[0] in paths),
-        tuple(owner for owner in sources.ownership if owner.type_key in types),
+        tuple(owner for owner in sources.ownership if owner.definition_id in types),
         tuple(call for call in sources.calls if call.call_path in calls),
         tuple(item for item in sources.imports if item.path in paths))

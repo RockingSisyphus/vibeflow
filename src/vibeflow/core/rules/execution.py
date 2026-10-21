@@ -144,6 +144,11 @@ class _Execution:
         self.source_cache = source_cache
 
     def prepare(self, invocation: RuleInvocation) -> tuple[Any, Mapping[str, RuleRecord], str | None] | None:
+        level = self.context.scope.get("level", "node")
+        if invocation.rule.level != level:
+            self.accept(invocation, RuleResult(findings=(_finding(invocation, "RULE.LEVEL.MISMATCH",
+                f"{invocation.rule.level} rule cannot run with {level} facts"),), state="unavailable"))
+            return None
         unavailable = [key for key in invocation.dependencies if self.results[key].state != "completed"]
         if unavailable:
             self.accept(invocation, RuleResult(findings=(_finding(invocation, "RULE.INPUT.UNAVAILABLE",

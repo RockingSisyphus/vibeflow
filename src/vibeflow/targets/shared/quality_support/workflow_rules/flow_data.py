@@ -23,13 +23,13 @@ def append_data_contract_warnings(
     owner: str = "pipeline",
     runtime_flow_kinds: Mapping[str, str] | None = None,
 ) -> None:
-    nodes_by_name = {node.name: node for node in graph.nodes}
-    incoming = {node.name: set() for node in graph.nodes}
-    outgoing = {node.name: set() for node in graph.nodes}
+    nodes_by_name = {node.id: node for node in graph.nodes}
+    incoming = {node.id: set() for node in graph.nodes}
+    outgoing = {node.id: set() for node in graph.nodes}
     for edge in compiled.resolved_transfer_edges:
         incoming.setdefault(edge.target, set()).add(edge.source)
         outgoing.setdefault(edge.source, set()).add(edge.target)
-    condition_keys_by_source: dict[str, set[str]] = {node.name: set() for node in graph.nodes}
+    condition_keys_by_source: dict[str, set[str]] = {node.id: set() for node in graph.nodes}
     for edge in compiled.resolved_transfer_edges:
         parsed = _parse_when(edge.when)
         if parsed is not None:
@@ -53,8 +53,8 @@ def append_data_contract_warnings(
 
 
 def _append_missing_provider_warnings(node, graph, nodes_by_name, incoming, state, initial, paths, *, owner: str) -> None:
-    direct = [nodes_by_name[name] for name in sorted(incoming.get(node.name, ())) if name in nodes_by_name]
-    input_types = {item.type for item in graph.inputs} if node.name in initial else set()
+    direct = [nodes_by_name[name] for name in sorted(incoming.get(node.id, ())) if name in nodes_by_name]
+    input_types = {item.type for item in graph.inputs} if node.id in initial else set()
     direct_source_details = _provider_source_details(direct)
     direct_provider_types = sorted({provider["type"] for source in direct_source_details for provider in source["provides"]})
     for requirement in node.requires:
@@ -75,8 +75,8 @@ def _append_missing_provider_warnings(node, graph, nodes_by_name, incoming, stat
                 _data_finding(
                     "GRAPH.DATA.MISSING_DIRECT_PROVIDER",
                     requirement.type,
-                    f"node '{node.name}' requires type '{requirement.type}' but no direct incoming flow predecessor or entry input provides it",
-                    node=node.name,
+                    f"node '{node.id}' requires type '{requirement.type}' but no direct incoming flow predecessor or entry input provides it",
+                    node=node.id,
                     severity="error",
                     details=base_details,
                 )
@@ -84,35 +84,35 @@ def _append_missing_provider_warnings(node, graph, nodes_by_name, incoming, stat
             continue
         if requirement.cardinality in {CARDINALITY_EXACTLY_ONE, CARDINALITY_OPTIONAL_ONE} and len(matches) > 1:
             matched_sources = [_source_name(item, direct) for item in matches]
-            if paths.sources_exclusive(node.name, matched_sources):
+            if paths.sources_exclusive(node.id, matched_sources):
                 continue
             finding = _data_finding(
                 "GRAPH.DATA.TYPE_CARDINALITY_AMBIGUOUS",
                 requirement.type,
-                f"node '{node.name}' requires type '{requirement.type}' with {requirement.cardinality} but {len(matches)} direct sources may provide it",
-                node=node.name,
+                f"node '{node.id}' requires type '{requirement.type}' with {requirement.cardinality} but {len(matches)} direct sources may provide it",
+                node=node.id,
                 details={**base_details, "matched_sources": matched_sources},
             )
-            if _sources_are_cyclic_alternatives(node.name, matched_sources, graph):
+            if _sources_are_cyclic_alternatives(node.id, matched_sources, graph):
                 state.warnings.append(finding)
-            elif _direct_sources_are_unconditional(node.name, incoming.get(node.name, ()), graph):
+            elif _direct_sources_are_unconditional(node.id, incoming.get(node.id, ()), graph):
                 state.errors.append(_replace_severity(finding, "error"))
             else:
                 state.warnings.append(finding)
 
 def _append_unconsumed_provider_warnings(node, graph, compiled, outgoing, condition_keys_by_source, state, *, owner: str) -> None:
-    nodes_by_name = {item.name: item for item in graph.nodes}
-    downstream = [nodes_by_name[name] for name in sorted(outgoing.get(node.name, ())) if name in nodes_by_name]
-    is_end = compiled.flow_kinds.get(node.name) == FLOW_KIND_TERMINAL and not outgoing.get(node.name)
+    nodes_by_name = {item.id: item for item in graph.nodes}
+    downstream = [nodes_by_name[name] for name in sorted(outgoing.get(node.id, ())) if name in nodes_by_name]
+    is_end = compiled.flow_kinds.get(node.id) == FLOW_KIND_TERMINAL and not outgoing.get(node.id)
     if is_end:
         return
     downstream_required_types = {
-        child.name: sorted({requirement.type for requirement in child.requires})
+        child.id: sorted({requirement.type for requirement in child.requires})
         for child in downstream
     }
     exported_types = {output.type for output in graph.outputs}
     for provider in node.provides:
-        if provider.key in condition_keys_by_source.get(node.name, set()):
+        if provider.key in condition_keys_by_source.get(node.id, set()):
             continue
         if provider.type in exported_types:
             continue
@@ -121,13 +121,13 @@ def _append_unconsumed_provider_warnings(node, graph, compiled, outgoing, condit
                 _data_finding(
                     "GRAPH.DATA.UNCONSUMED_PROVIDER",
                     provider.key,
-                    f"node '{node.name}' provides key '{provider.key}' type '{provider.type}' but no direct downstream flow successor requires that type",
-                    node=node.name,
+                    f"node '{node.id}' provides key '{provider.key}' type '{provider.type}' but no direct downstream flow successor requires that type",
+                    node=node.id,
                     details={
                         "owner": owner,
                         "provider_key": provider.key,
                         "provider_type": provider.type,
-                        "downstream_nodes": sorted(outgoing.get(node.name, ())),
+                        "downstream_nodes": sorted(outgoing.get(node.id, ())),
                         "downstream_required_types": downstream_required_types,
                         "pipeline_output_types": sorted(exported_types),
                     },
@@ -153,7 +153,7 @@ def _source_name(provider, direct) -> str:
         return "pipeline.input"
     for node in direct:
         if provider in node.provides:
-            return node.name
+            return node.id
     return str(getattr(provider, "key", provider))
 
 def _replace_severity(finding: HealthFinding, severity: str) -> HealthFinding:

@@ -32,7 +32,7 @@ def _write_node_declarations(project: Path, source: str, declarations: tuple[tup
         document = node_document(type_key=key, class_name=class_name, contract=contract, rulesets=rulesets)
         document["flow_kind"] = flow_kind
         document["implementations"][0]["source"]["ref"] = source
-        document["implementations"][0]["implementation_files"] = ["lazy_helper.py"]
+        document["implementations"][0]["implementation_files"] = [{"kind":"file","ref":"lazy_helper.py"}]
         values.append(document)
     return write_plugin(project, values, target="python")
 
@@ -209,7 +209,7 @@ def test_built_run_keeps_javascript_roots_out_of_lazy_python_imports(
         json.dumps(
             {
                 "project_target": "javascript",
-                "quality_enabled": False,
+
             }
         ),
         encoding="utf-8",
@@ -218,7 +218,7 @@ def test_built_run_keeps_javascript_roots_out_of_lazy_python_imports(
         json.dumps(
             {
                 "project_target": "python",
-                "quality_enabled": False,
+
             }
         ),
         encoding="utf-8",
@@ -260,19 +260,19 @@ def test_built_run_keeps_javascript_roots_out_of_lazy_python_imports(
                     "nodes": [
                         {
                             "id": "start",
-                            "type_used": "lazy.start",
+                            "definition_id": "lazy.start",
                             "display_name": "Start",
                             "description": "Starts the lazy import workflow.",
                         },
                         {
                             "id": "lazy",
-                            "type_used": "lazy.value",
+                            "definition_id": "lazy.value",
                             "display_name": "Lazy Value",
                             "description": "Imports the Python root helper lazily.",
                         },
                         {
                             "id": "end",
-                            "type_used": "lazy.end",
+                            "definition_id": "lazy.end",
                             "display_name": "End",
                             "description": "Ends the lazy import workflow.",
                             "similar_to": {
@@ -300,7 +300,6 @@ def test_built_run_keeps_javascript_roots_out_of_lazy_python_imports(
     workspace_path.write_text(
         json.dumps(
             {
-                "policy": {},
                 "roots": [
                     {"id": "javascript-project", "path": str(javascript_project)},
                     {"id": "python-project", "path": str(python_project)},
@@ -362,7 +361,6 @@ def test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_co
     (custom / "vibeflow_config.jsonc").write_text(
         json.dumps(
             {
-                "policy": {},
                 "roots": [{"id": "custom", "path": "project"}],
             }
         ),
@@ -372,7 +370,7 @@ def test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_co
         json.dumps(
             {
                 "project_target": "python",
-                "quality_enabled": False,
+
             }
         ),
         encoding="utf-8",
@@ -420,16 +418,16 @@ def test_built_delegate_cli_uses_explicit_workspace_for_lazy_imports_and_logs_co
                     "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                     "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit"}],
                     "nodes": [
-                        {"id": "start", "type_used": "custom.start", "display_name": "Start", "description": "Starts the custom delegated CLI workflow."},
+                        {"id": "start", "definition_id": "custom.start", "display_name": "Start", "description": "Starts the custom delegated CLI workflow."},
                         {
                             "id": "exit",
-                            "type_used": "custom.exit",
+                            "definition_id": "custom.exit",
                             "display_name": "Exit",
                             "description": "Loads the custom project helper and returns its exit code.",
                         },
                         {
                             "id": "end",
-                            "type_used": "custom.end",
+                            "definition_id": "custom.end",
                             "display_name": "End",
                             "description": "Consumes the delegated CLI exit code.",
                         },

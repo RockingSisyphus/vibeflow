@@ -5,20 +5,17 @@
   "type": "object",
   "required": [
     "kind",
-    "type_key",
+    "id",
     "display_name",
     "description",
     "version",
     "flow_kind",
-    "contract"
+    "contract",
+    "node_type"
   ],
   "properties": {
     "kind": {
       "const": "node"
-    },
-    "type_key": {
-      "type": "string",
-      "minLength": 1
     },
     "display_name": {
       "type": "string",
@@ -115,6 +112,14 @@
     },
     "metadata": {
       "type": "object"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "node_type": {
+      "type": "string",
+      "minLength": 1
     }
   },
   "additionalProperties": false,

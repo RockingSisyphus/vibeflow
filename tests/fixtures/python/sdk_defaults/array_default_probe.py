@@ -12,13 +12,13 @@ from vibeflow.targets.python.sdk import Plugin, node
 
 
 @node(
-    type_key="probe.array_default",
+    id="probe.array_default",
     contract={
         "params_schema": {"value": {"type": "array"}},
         "params_defaults": {"value": []},
     },
     rulesets=["vibeflow.process"],
-)
+ node_type="vibeflow.node")
 class ArrayDefault:
     def run_pure(self, inputs, params):
         return {}

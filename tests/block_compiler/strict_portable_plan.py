@@ -27,7 +27,7 @@ _TerminalNode_DECLARATION = NodeDescriptor(
     'test.terminal', 'Terminal', 'Starts or ends a flow.', '1', 'terminal',
     contract=NodeContractDescriptor(params_schema={}, params_defaults={}),
     rulesets=(),
-)
+ node_type="vibeflow.node")
 
 
 class _TerminalNode:
@@ -40,7 +40,7 @@ _StepNode_DECLARATION = NodeDescriptor(
     'test.step', 'Step', 'Updates a loop value.', '1', 'process',
     contract=NodeContractDescriptor(requires=(DataRequirement('value.current', 'exactly_one', display_name='value.current'),), provides=(DataProvider('value.next', 'value.next', display_name='value.next'), DataProvider('loop.done', 'loop.done', display_name='loop.done')), params_schema={'delta': {'type': 'number'}}, params_defaults={'delta': 1}, input_semantics={'value.current': ('Conformance input value.current.',)}, output_semantics={'value.next': ('Conformance output value.next.',), 'loop.done': ('Conformance output loop.done.',)}),
     rulesets=('vibeflow.process',),
-)
+ node_type="vibeflow.node")
 
 
 class _StepNode:
@@ -53,7 +53,7 @@ _GlobalStateNode_DECLARATION = NodeDescriptor(
     'test.global_state', 'Global State', 'Changes audited ambient state.', '1', 'global_state',
     contract=NodeContractDescriptor(params_schema={}, params_defaults={}),
     rulesets=('vibeflow.global_state',),
-)
+ node_type="vibeflow.node")
 
 
 class _GlobalStateNode:
@@ -88,10 +88,10 @@ def _provider(key: str, data_type: str) -> dict[str, str]:
     return {"key": key, "type": data_type, "display_name": key}
 
 
-def _node(node_id: str, type_used: str, **fields) -> dict[str, object]:
+def _node(node_id: str, definition_id: str, **fields) -> dict[str, object]:
     return {
         "id": node_id,
-        "type_used": type_used,
+        "definition_id": definition_id,
         "display_name": node_id.replace("_", " ").title(),
         "description": f"Portable-plan fixture instance {node_id}.",
         **fields,
@@ -101,7 +101,7 @@ def _node(node_id: str, type_used: str, **fields) -> dict[str, object]:
 def _loop_graph():
     return parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 {
                     "type_key": "loop.step",
                     "display_name": "Loop Step",
@@ -178,7 +178,7 @@ def test_execution_plan_adapter_is_frozen_serializable_and_preserves_nested_loop
 
     plan = execution_plan.to_workflow_plan(
         workflow_id="portable-loop",
-        source_by_type={"test.step": SourceRef(kind="typescript", ref="nodes/step.ts", export="run")},
+        source_by_definition={"test.step": SourceRef(kind="typescript", ref="nodes/step.ts", export="run")},
         pipeline_inputs=(PipelineInputSpec("value.current", "value.current", required=True),),
         pipeline_outputs=(PipelineOutputSpec("value.final", "exactly_one", "final"),),
     )
@@ -244,7 +244,7 @@ def test_python_execution_plan_adapter_preserves_global_state_and_locks() -> Non
     root = plan.block(plan.entry_block)
     state = root.node("state")
 
-    assert plan.abi_version == "vibeflow.workflow.v9"
+    assert plan.abi_version == "vibeflow.workflow.v10"
     assert plan.contains_global_state is True
     assert "root_exclusive" not in plan.to_dict()
     assert plan.execution_lock.to_dict() == {

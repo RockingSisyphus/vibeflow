@@ -13,7 +13,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     support = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(support)
     from vibeflow.core.contracts import DataProvider, DataRequirement
-    from vibeflow.core.flow import EdgeSpec, GraphConfig, LoopSpec, NodeMetadata, NodeSpec, NodesetSpec
+    from vibeflow.core.flow import EdgeSpec, GraphConfig, LoopSpec, NodeMetadata, NodeCallSpec, NodesetTypeSpec
     from vibeflow.targets.python.project.registry import NodeRegistry
     if variant == "current":
         from vibeflow.tooling.application.python.project.declarations import default_python_registry as NodeRegistry
@@ -22,10 +22,10 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     def io(name, operation, signal):
         if variant == "baseline":
             from vibeflow.core.flow import IoSpec
-            return NodeSpec(name, "vibeflow.io", io=IoSpec(operation), metadata=NodeMetadata(name, "Historical native IO boundary."),
+            return NodeCallSpec(name, "vibeflow.io", io=IoSpec(operation), metadata=NodeMetadata(name, "Historical native IO boundary."),
                 provides=(DataProvider(signal, signal, display_name="Received value"),) if operation == "receive" else (),
                 requires=(DataRequirement(signal, "exactly_one", display_name="Sent value"),) if operation == "send" else ())
-        return NodeSpec(name, "probe.boundary."+operation+"."+signal, flow_kind="terminal", metadata=NodeMetadata(name, "Explicit terminal boundary."),
+        return NodeCallSpec(name, "probe.boundary."+operation+"."+signal, flow_kind="terminal", metadata=NodeMetadata(name, "Explicit terminal boundary."),
             provides=(DataProvider(signal, signal, display_name="Received value"),) if operation == "receive" else (),
             requires=(DataRequirement(signal, "exactly_one", display_name="Sent value"),) if operation == "send" else ())
 
@@ -44,14 +44,14 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         body = GraphConfig(body_nodes, body_edges, **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
         if variant == "current":
             body = replace(body, rulesets=() if child_empty else (selected,) if selected else body.rulesets)
-        child = NodesetSpec("variant.body", "Body", "A loaded and invoked native graph.", (), (), body)
+        child = NodesetTypeSpec("variant.body", "Body", "A loaded and invoked native graph.", (), (), body)
         count = 2 if kind == "repeat" else 1
-        calls = tuple(NodeSpec("stage" + str(index), "vibeflow.loop.while" if kind == "loop" else child.type_key,
+        calls = tuple(NodeCallSpec("stage" + str(index), "vibeflow.loop.while" if kind == "loop" else child.type_key,
             loop=LoopSpec(body=child.type_key) if kind == "loop" else LoopSpec(), metadata=NodeMetadata("Stage", "Actual native body call.")) for index in range(count))
         nodes = (io("start", "receive", "root.signal"), *calls, io("end", "send", "root.signal"))
         edges = tuple(EdgeSpec(first.id, second.id, schedule=True) for first, second in zip(nodes, nodes[1:]))
         edges += (EdgeSpec("start", "end", schedule=False, transfer=True),)
-        graph = GraphConfig(nodes, edges, nodesets={child.type_key: child}, **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
+        graph = GraphConfig(nodes, edges, nodeset_types={child.type_key: child}, **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
         if variant == "current":
             graph = replace(graph, rulesets=() if root_empty else (selected,) if selected else graph.rulesets)
         return graph
@@ -97,7 +97,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         resources = {"rule": "variant.capture", "ruleset": "variant.phases", "entrypoints": {"import": ["capture"], "static": ["capture"], "run": ["capture"]}}
         catalog_source.parent.mkdir(parents=True, exist_ok=True)
         catalog_source.write_text(json.dumps(resources), encoding="utf-8")
-        rule = RuleDescriptor("variant.capture", outputs={"snapshot": "variant.workflow_snapshot.v1"})
+        rule = RuleDescriptor("variant.capture", level="graph", outputs={"snapshot": "variant.workflow_snapshot.v1"})
         selected = RulesetDescriptor("variant.phases", (RuleCall("capture", rule_id=rule.id),), entrypoints=resources["entrypoints"])
         catalogs.rules.register(rule, source=str(catalog_source))
         catalogs.rulesets.register(selected, source=str(catalog_source))

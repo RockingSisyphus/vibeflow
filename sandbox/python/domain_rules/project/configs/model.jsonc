@@ -15,25 +15,25 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "example.boundary",
+        "definition_id": "example.boundary",
         "display_name": "Start",
         "description": "Start the native workflow."
       },
       {
         "id": "model",
-        "type_used": "example.model",
+        "definition_id": "example.model",
         "display_name": "Model",
         "description": "Execute one model block."
       },
       {
         "id": "transform",
-        "type_used": "example.transform",
+        "definition_id": "example.transform",
         "display_name": "Transform",
         "description": "Apply the data transformation."
       },
       {
         "id": "end",
-        "type_used": "example.boundary",
+        "definition_id": "example.boundary",
         "display_name": "End",
         "description": "End the native workflow."
       }
@@ -65,7 +65,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

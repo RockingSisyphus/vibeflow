@@ -5,8 +5,8 @@ from pathlib import Path
 
 
 def node_document(*, type_key="demo.node", class_name="DemoNode", contract=None, rulesets=None):
-    return {
-        "kind": "node", "type_key": type_key, "display_name": "Demo",
+    return {'node_type': 'vibeflow.node',
+        "kind": "node", 'id': type_key, "display_name": "Demo",
         "description": "A fixture Node with one declared result.", "version": "1.0", "flow_kind": "process",
         "rulesets": ["vibeflow.process"] if rulesets is None else rulesets,
         "contract": contract if contract is not None else {
@@ -14,7 +14,7 @@ def node_document(*, type_key="demo.node", class_name="DemoNode", contract=None,
             "output_semantics": {"demo.out": ["demo output"]}, "examples": [{"inputs": {}, "params": {}}],
         },
         "implementations": [{"language": "python", "targets": ["python"],
-            "source": {"kind": "file", "ref": "demo_node.py", "export": class_name}}],
+            "source": {"kind": "file", "ref": "nodes/demo_node.py", "export": class_name}}],
     }
 
 
@@ -28,7 +28,8 @@ def _valid_node_source(*, run_body='        return {"demo.out": 1}'):
 def _inspect_node_source(tmp_path, capsys, source, *, node_type="demo.node", class_name="DemoNode", extra_args=None, descriptor=None, additional_nodes=()):
     from tests.fixtures.support.strict_support import cli_main
     tmp_path.mkdir(parents=True, exist_ok=True)
-    module_path = tmp_path / "demo_node.py"
+    module_path = tmp_path / "nodes/demo_node.py"
+    module_path.parent.mkdir(exist_ok=True)
     module_path.write_text(source.strip(), encoding="utf-8")
     from tests.fixtures.support.plugins import write_plugin
     declarations = [node_document(type_key=node_type, class_name=class_name) if descriptor is None else descriptor,
@@ -36,8 +37,8 @@ def _inspect_node_source(tmp_path, capsys, source, *, node_type="demo.node", cla
     selection = write_plugin(tmp_path, declarations, target="python")
     (tmp_path / "vibeflow_project.jsonc").write_text(json.dumps({"project_target": "python"}), encoding="utf-8")
     config = tmp_path / "inspect.jsonc"
-    config.write_text(json.dumps({"rulesets": [], "plugins": [selection], "pipeline": {"nodes": [{"id":"inspect", "type_used":node_type, "display_name":"Inspect", "description":"Inspect one resource"}]}}))
-    args = ["inspect-node", "--config", str(config), "--type", node_type, "--module", str(module_path), "--class", class_name, *(extra_args or ())]
+    config.write_text(json.dumps({"rulesets": [], "plugins": [selection], "pipeline": {"nodes": [{"id":"inspect", "definition_id":node_type, "display_name":"Inspect", "description":"Inspect one resource"}]}}))
+    args = ["inspect-node", "--config", str(config), "--node-id", node_type, "--module", str(module_path), "--class", class_name, *(extra_args or ())]
     code = cli_main(args)
     return code, json.loads(capsys.readouterr().out)
 
@@ -85,7 +86,7 @@ def write_registry_project(root, registry, keys):
                                if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load))
         declaration = registry.descriptor(key).to_dict()
         declaration["implementations"] = [{"language": "python", "targets": ["python"],
-            "source": {"kind": "file", "ref": "nodes.py", "export": implementation.__name__}}]
+            "source": {"kind": "file", "ref": "nodes/fixture_implementations.py", "export": implementation.__name__}}]
         declarations.append(declaration)
     imports, implementations, seen = [], [], set()
     for statement in selected.values():
@@ -99,6 +100,15 @@ def write_registry_project(root, registry, keys):
            for statement in selected.values()) and not any(code.startswith("def V(") for code in implementations):
         implementations.insert(0, 'def V(inputs, data_type):\n    return inputs[data_type]["value"]')
         imports = [code for code in imports if not ("strict_support" in code and " V" in code)]
-    (root / "nodes.py").write_text("from __future__ import annotations\n\n" + "\n".join(imports) + "\n\n" + "\n\n".join(implementations) + "\n", encoding="utf-8")
+    (root / "nodes").mkdir(exist_ok=True)
+    (root / "nodes/fixture_implementations.py").write_text("from __future__ import annotations\n\n" + "\n".join(imports) + "\n\n" + "\n\n".join(implementations) + "\n", encoding="utf-8")
     (root / "vibeflow_project.jsonc").write_text(json.dumps({"project_target": "python"}), encoding="utf-8")
     return write_plugin(root, declarations, target="python")
+
+
+def depth_ruleset(maximum, identifier="test.depth"):
+    """Select nesting policy through the same Rule parameters as authors."""
+    from vibeflow.core.rules import RuleCall,RuleRelation,RulesetDescriptor
+    return RulesetDescriptor(identifier, calls=(RuleCall("base",ruleset_id="vibeflow.workflow"),),
+        relations=(RuleRelation("$self","base/nodeset_types","overrides",params={"nodeset_max_depth":maximum}),),
+        graph_scope="effective_subtree")

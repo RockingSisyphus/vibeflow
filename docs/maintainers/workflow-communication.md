@@ -17,7 +17,7 @@ implementation ledger, not a claim that unfinished stages have passed.
   JSON protocol. A launcher process exiting is not a workflow completion.
 - No run groups, automatic child cleanup, implicit process pools, persistent
   message broker, business retries or cross-machine deployment.
-- Native `type_used: vibeflow.io` and `io` configuration are migrated to ordinary
+- Native `definition_id: vibeflow.io` and `io` configuration are migrated to ordinary
   SDK declarations with explicit contracts, port capabilities and Rules. Add
   terminal boundaries where the removed special node supplied implicit ones.
 - Historical preview v2 remains readable; execution ABI changes require AOT

@@ -31,22 +31,22 @@ window.VFInspector=(()=>{
   }
   function raw(parent,value){const d=element("details");d.append(element("summary","全部事实（含关联定义）"),element("pre",JSON.stringify(value,null,2)));parent.append(d);}
   function nodeDetails(parent,facts,architecture){
-    const info=VFModel.nodeInfo(facts,architecture),type=info.type,definition=info.definition,t=info.typeInfo;
-    table(parent,[["类型",facts.type_used||facts.kind],["状态",info.status],
+    const info=VFModel.nodeInfo(facts,architecture),nodeDefinition=info.nodeDefinition,definition=info.definition,t=info.definitionInfo;
+    table(parent,[["业务 Node",facts.definition_id||facts.kind],["NodeType",nodeDefinition?.node_type],["类型说明",info.nodeType?.description],["状态",info.status],
       ["调用声明状态",facts.status!==info.status?facts.status:undefined],
       ["目标定义状态",definition?.status??facts.invokes?.target_status],
       ["内部结构",facts.invokes?(info.expandable?"可原地展开":"暂无内部定义"):undefined],["流程类型",facts.flow_kind||t.flow_kind],
-      ["调用职责",facts.role?.description],["类型说明",t.description||facts.info?.description||facts.description],
+      ["调用职责",facts.role?.description],["业务定义说明",t.description||facts.info?.description||facts.description],
       ["Nodeset 说明",definition?.description],["版本",t.version||facts.version],["作者",t.author||facts.author],
       ["标签",facts.tags?.length?facts.tags:t.tags?.length?t.tags:undefined],
-      ["调用来源",source(facts.source)],["实现来源",source(type?.source)],["声明来源",source(type?.declaration)],
-      ["实现入口",type?.implementations?.map(i=>[i.language,(i.targets||[]).join(" / "),source(i.source)].filter(Boolean).join(" · ")).join("\n")],
+      ["调用来源",source(facts.source)],["实现来源",source(nodeDefinition?.source)],["声明来源",source(nodeDefinition?.declaration)],
+      ["实现入口",nodeDefinition?.implementations?.map(i=>[i.language,(i.targets||[]).join(" / "),source(i.source)].filter(Boolean).join(" · ")).join("\n")],
       ["定义来源",source(definition?.source)],["资源来源",facts.sources?.length?facts.sources.map(source).join("\n"):facts.path],
-      ["目标定义",facts.invokes?.target],["汇合策略",facts.join_policy],["副作用范围",facts.effect_scope||type?.info?.effect_scope],
+      ["目标定义",facts.invokes?.target],["汇合策略",facts.join_policy],["副作用范围",facts.effect_scope||nodeDefinition?.info?.effect_scope],
       ["执行锁",facts.effective_execution_lock||facts.execution_lock],
-      ["BaseLib 依赖",type?.base_libs?.length?type.base_libs:info.resource?.base_libs?.length?info.resource.base_libs:undefined],
-      ["能力要求",type?.capabilities?.length?type.capabilities:info.resource?.capabilities?.length?info.resource.capabilities:undefined]]);
-    if(facts.type_used||facts.contract||facts.requires||facts.provides){
+      ["BaseLib 依赖",nodeDefinition?.base_libs?.length?nodeDefinition.base_libs:info.resource?.base_libs?.length?info.resource.base_libs:undefined],
+      ["能力要求",nodeDefinition?.capabilities?.length?nodeDefinition.capabilities:info.resource?.capabilities?.length?info.resource.capabilities:undefined]]);
+    if(facts.definition_id||facts.contract||facts.requires||facts.provides){
       contracts(parent,"输入契约",facts.requires??info.contract.requires??definition?.requires,semantics(info,"input_semantics"));
       contracts(parent,"输出契约",facts.provides??info.contract.provides??definition?.provides,semantics(info,"output_semantics"),"output");
     }
@@ -58,20 +58,19 @@ window.VFInspector=(()=>{
         if(nonempty(value)){part.append(element("h5",title));table(part,Object.entries(value));}
     }
     if(facts.loop){const part=section(parent,"Loop 规则");table(part,Object.entries(facts.loop));}
-    if(facts.io){const part=section(parent,"IO 声明");table(part,Object.entries(facts.io));}
     if(facts.preview_operations?.length){
       const part=section(parent,"接口操作与等待行为");
       for(const action of facts.preview_operations){const row=element("article");row.className="contract-detail";
         row.append(element("strong",VFModel.operationLabel(action)));table(row,Object.entries(action).map(([key,value])=>[({capability:"Capability",target:"目标别名",entry:"目标入口",wait:"等待执行结束",operation:"操作"})[key]||key,value]));part.append(row);}
     }
     if(nonempty(definition?.global_config?.values??definition?.global_config)){const part=section(parent,"Nodeset 全局配置声明");table(part,Object.entries(values(definition.global_config)));}
-    if(nonempty(facts.metadata)||nonempty(type?.metadata)){const part=section(parent,"补充元数据");table(part,[["调用",facts.metadata],["类型",type?.metadata]]);}
-    const rules=facts.selected_rulesets??facts.rulesets??type?.rulesets;
+    if(nonempty(facts.metadata)||nonempty(nodeDefinition?.metadata)){const part=section(parent,"补充元数据");table(part,[["调用",facts.metadata],["业务定义",nodeDefinition?.metadata]]);}
+    const rules=facts.selected_rulesets??facts.rulesets??nodeDefinition?.rulesets;
     if(rules?.length){const part=section(parent,"规则声明");notes(part,rules);}
     if(info.plannedBehavior){const part=section(parent,"计划节点行为");table(part,Object.entries(info.plannedBehavior));}
     const p=facts.presentation?.values?facts.presentation:facts.effective_presentation;
     if(p){const part=section(parent,"展示样式");table(part,[["最终样式",p.values],["样式来源",p.sources]]);}
-    raw(parent,{call:facts,...(type?{node_type:type}:{}),...(definition?{nodeset:definition}:{}),...(info.resource?{resource:info.resource}:{})});
+    raw(parent,{call:facts,...(nodeDefinition?{node_definition:nodeDefinition}:{}),...(info.nodeType?{node_type:info.nodeType}:{}),...(definition?{nodeset:definition}:{}),...(info.resource?{resource:info.resource}:{})});
   }
   function edgeDetails(parent,info){
     const facts=info.facts;

@@ -8,11 +8,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {sdkPlugin} from "./sdk_loader.mjs";
 
-const PLUGIN_ABI = "vibeflow.plugin.v3";
-const RULE_ABI = "vibeflow.rule.v2";
+const PLUGIN_ABI = "vibeflow.plugin.v4";
+const RULE_ABI = "vibeflow.rule.v3";
 // SDK files are kernel inputs, not project sources. Their ZIP extraction paths
 // are temporary, so keep them out of the project's source load-state facts.
-const sdkSourceDirectories = ["./", "../nodetypes/"].map(relative =>
+const sdkSourceDirectories = ["./"].map(relative =>
   fileURLToPath(new URL(relative, import.meta.url)));
 const instances = new Map();
 const sourceAnalyses = new Map();
@@ -167,16 +167,16 @@ function sourceService(ts, packageRoot, facts) {
       const absolute = path.resolve(packageRoot, file);
       parsed(absolute);
       const declared = (currentFacts.source_owners || []).filter(item => path.resolve(item.path) === absolute);
-      const nodeTypes = new Set();
-      for (const source of currentFacts.sources || []) if ((currentFacts.node_catalog || currentFacts.node_types)?.[source.owner] && (currentFacts.source_files || []).includes(source.path) && reachable(source.path).includes(absolute)) nodeTypes.add(source.owner);
-      for (const [key, descriptor] of Object.entries(currentFacts.node_catalog || currentFacts.node_types || {})) {
+      const nodeDefinitions = new Set();
+      for (const source of currentFacts.sources || []) if ((currentFacts.node_definitions)?.[source.owner] && (currentFacts.source_files || []).includes(source.path) && reachable(source.path).includes(absolute)) nodeDefinitions.add(source.owner);
+      for (const [key, descriptor] of Object.entries(currentFacts.node_definitions || {})) {
         if (!descriptor || typeof descriptor !== "object") continue;
         for (const implementation of descriptor.implementations || []) {
           const entry = implementation.source?.ref;
-          if (entry && provided.has(path.resolve(entry)) && reachable(entry).includes(absolute)) nodeTypes.add(key);
+          if (entry && provided.has(path.resolve(entry)) && reachable(entry).includes(absolute)) nodeDefinitions.add(key);
         }
       }
-      return deepFreeze({path: absolute, declared, node_types: [...nodeTypes]});
+      return deepFreeze({path: absolute, declared, node_definitions: [...nodeDefinitions]});
     },
     nodes(file, kind) {
       const {tree} = parsed(file); const result = [];
@@ -236,6 +236,24 @@ async function loadImplementation(request, isRule) {
 async function declarations(request) {
   const packageRoot = path.resolve(request.packageRoot);
   const tools = await localTools(packageRoot);
+  if (request.resourcesOnly) {
+    const declarationPath = path.resolve(request.module);
+    const analysis = sourceService(tools.ts, packageRoot, {sources:[{path:declarationPath,text:readFileSync(declarationPath,"utf8")}]});
+    try {
+      if (!analysis.imports(declarationPath).some(item=>item.specifier === "@vibeflow/plugin" && !item.type_only)) return {resources:[]};
+    } finally { analysis.dispose(); }
+    const entry = path.resolve(request.module);
+    const contents = `import * as values from ${JSON.stringify(entry)};\nimport {__discoverResources} from "@vibeflow/plugin";\nexport const resources=__discoverResources(values,${JSON.stringify(entry)});`;
+    const built = await tools.esbuild.build({absWorkingDir: packageRoot,
+      stdin:{contents,resolveDir:packageRoot,sourcefile:"vibeflow-resource-discovery.mjs"},
+      bundle:true,write:false,metafile:true,format:"esm",platform:"node",target:["es2022"],logLevel:"silent",
+      plugins:[sdkPlugin(tools.ts)]});
+    const loaded = await import(`data:text/javascript;base64,${Buffer.from(built.outputFiles[0].text).toString("base64")}`);
+    return ruleJsonValue({resources:loaded.resources.map(resource=>({descriptor:resource.descriptor,origin:resource.origin})),
+      included_sources:Object.keys(built.metafile.inputs).filter(file=>file!=="vibeflow-resource-discovery.mjs").map(file=>path.resolve(packageRoot,file))
+        .filter(file=>!sdkSourceDirectories.some(directory=>file.startsWith(directory))),
+      loaded_sources:[entry]});
+  }
   const result = await tools.esbuild.build({absWorkingDir: packageRoot, entryPoints: [request.module], bundle: true,
     write: false, metafile: true, format: "esm", platform: "node", target: ["es2022"], sourcemap: "inline", logLevel: "silent",
     plugins: [sdkPlugin(tools.ts)]});

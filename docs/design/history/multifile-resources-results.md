@@ -20,8 +20,8 @@
 
 ## 正式示例与浏览器证据
 
-- [JS/TS 展开 SVG](../../../sandbox/javascript/multifile_resources/ARCHITECTURE.svg) 和 [Architecture JSONC](../../../sandbox/javascript/multifile_resources/ARCHITECTURE.jsonc)：6 个资源、9 个源码文件、29 条关系，包含 Node、BaseLib、插件包、runtime Plugin 和 Host。Host 的 `types.d.ts` 导入保留第 4 行及 `type_only` 资料。
-- [Python 展开 SVG](../../../sandbox/python/multifile_resources/ARCHITECTURE.svg) 和 [Architecture JSONC](../../../sandbox/python/multifile_resources/ARCHITECTURE.jsonc)：5 个资源、6 个文件、21 条关系。
+- JS/TS 展开 SVG（历史路径：`../../../sandbox/javascript/multifile_resources/ARCHITECTURE.svg`） 和 Architecture JSONC（历史路径：`../../../sandbox/javascript/multifile_resources/ARCHITECTURE.jsonc`）：6 个资源、9 个源码文件、29 条关系，包含 Node、BaseLib、插件包、runtime Plugin 和 Host。Host 的 `types.d.ts` 导入保留第 4 行及 `type_only` 资料。
+- Python 展开 SVG（历史路径：`../../../sandbox/python/multifile_resources/ARCHITECTURE.svg`） 和 Architecture JSONC（历史路径：`../../../sandbox/python/multifile_resources/ARCHITECTURE.jsonc`）：5 个资源、6 个文件、21 条关系。
 - [JS/TS 浏览器截图](../../maintainers/evidence/index.md#artifact-5e568d4eb84698a0)、[Python 浏览器截图](../../maintainers/evidence/index.md#artifact-f8c7436e0b8321c0) 及相邻的 browser/review JSON、Mermaid 文件记录真实最终产物。目视检查了文字、云形标签、裁切和跨资源连边；模型为浅蓝色，Host 和 BaseLib 保留自身图形和展示。
 
 专项图形场景另遍历全部公开形状，并对最终 SVG 的计算颜色和实际几何做自动断言。正式图通过不替代业务运行；数值计算、原生组合、宿主行为和发行入口分别执行。

@@ -20,7 +20,7 @@ def test_native_work_ownership_uses_bindings_and_actual_join_contract(tmp_path,b
     source='import threading as th\nimport concurrent.futures as futures\nclass Work:\n    def run_pure(self,inputs,params):\n'+''.join('        '+line+'\n' for line in body.splitlines())+'        return {}\n'
     path=tmp_path/'node.py';path.write_text(source)
     registry=native_registry()
-    registry.register(NodeDescriptor('fixture.work','Work','Ownership fixture','1','process',contract=NodeContractDescriptor(),rulesets=('vibeflow.document',)),source={'path':str(path),'symbol':'Work'})
+    registry.register(NodeDescriptor('fixture.work','Work','Ownership fixture','1','process',contract=NodeContractDescriptor(),rulesets=('vibeflow.document',), node_type="vibeflow.node"),source={'path':str(path),'symbol':'Work'})
     registry.source_locations={'fixture.work':(path,'Work','fixture',tmp_path)}
     registry.source_roots=(tmp_path,);registry.source_root_ids={tmp_path:'fixture'}
     context=analyze_node_source_context(registry,('fixture.work',))

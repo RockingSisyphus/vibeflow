@@ -1,7 +1,7 @@
 {
   "nodeset_imports": [
     {
-      "path": "nodesets/loop_body.jsonc"
+      "path": "nodeset_types/loop_body.jsonc"
     }
   ],
   "pipeline": {
@@ -17,13 +17,13 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts the bounded loop workflow."
       },
       {
         "id": "loop",
-        "type_used": "vibeflow.loop.while",
+        "definition_id": "vibeflow.loop.while",
         "display_name": "Increment three times",
         "description": "Carries x through three bounded +1 iterations.",
         "requires": [
@@ -70,7 +70,7 @@
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends after the bounded loop completes."
       }
@@ -104,7 +104,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

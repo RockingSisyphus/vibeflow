@@ -104,30 +104,36 @@ def test_reindex_preserves_a_status_written_during_replay(tmp_path, monkeypatch)
     assert max(rows, key=lambda row:row["revision"])["status"] == "succeeded"
 
 
-def test_preview_command_uses_enclosing_workspace_or_standalone_project(tmp_path, monkeypatch, capsys):
+def test_preview_command_uses_registered_project_or_explicit_data_directory(tmp_path, monkeypatch, capsys):
+    from tests.fixtures.support.projects import register_root
     from vibeflow.tooling.presentation.preview.cli import main
-    root = tmp_path/"工作区";child = root/"project/configs";child.mkdir(parents=True)
-    (root/"vibeflow_config.jsonc").write_text('{}')
-    (child.parent/"vibeflow_project.jsonc").write_text('{}')
+    root = tmp_path / "工作区"
+    child = root / "project/configs"
+    child.mkdir(parents=True)
+    register_root(child.parent)
     monkeypatch.chdir(child)
     assert main([]) == 0
     assert Path(json.loads(capsys.readouterr().out)["output"]).parent == root
-    assert (root/"vibeflow-preview/index.js").read_text() == ""
-    (root/"vibeflow_config.jsonc").unlink()
-    assert main([]) == 0
-    assert Path(json.loads(capsys.readouterr().out)["output"]).parent == child.parent
-    assert (child.parent/"vibeflow-preview/index.js").read_text() == ""
+    assert (root / "vibeflow-preview/index.js").read_text() == ""
+    (root / "vibeflow_config.jsonc").unlink()
+    assert main([]) == 1
+    assert json.loads(capsys.readouterr().out)["status"] == "ERROR"
+    assert main(["--preview-root", str(root / "standalone viewer")]) == 0
+    assert Path(json.loads(capsys.readouterr().out)["output"]).parent == root / "standalone viewer"
 
 
-def test_adapter_discovers_standalone_project_root(tmp_path):
+def test_adapter_discovers_registered_project_root(tmp_path):
+    from tests.fixtures.support.projects import register_root
     from vibeflow.tooling.application.presentation_targets import preview_workspace
     from vibeflow.tooling.presentation.preview.exporter import workflow_identity
-    root=tmp_path/"独立 项目";config=root/"configs/main.jsonc";config.parent.mkdir(parents=True)
-    (root/"vibeflow_project.jsonc").write_text('{"project_target":"python"}')
+    root = tmp_path / "独立 项目"
+    config = root / "configs/main.jsonc"
+    config.parent.mkdir(parents=True)
+    register_root(root)
     config.write_text('{}')
-    workspace=preview_workspace(config)
-    assert workspace.root == root
-    assert workflow_identity(config,workspace)["path"] == "configs/main.jsonc"
+    workspace = preview_workspace(config)
+    assert workspace.root == root.parent
+    assert workflow_identity(config, workspace)["path"] == "configs/main.jsonc"
 
 
 def test_node_aliases_preserve_identity():
@@ -140,7 +146,9 @@ def test_node_aliases_preserve_identity():
 
 def test_missing_graph_and_nonzero_delegate_status_are_recorded(tmp_path):
     from vibeflow.tooling.application.python.preview_run import source_run_preview, bind_run_observer
-    config = tmp_path / "missing.jsonc"
+    from tests.fixtures.support.projects import register_root
+    register_root(tmp_path / "app")
+    config = tmp_path / "app/missing.jsonc"
     with source_run_preview(config):
         bind_run_observer(SimpleNamespace(result={"status":"failed","error":"program exited with code 4"}))
     with pytest.raises(RuntimeError):
@@ -170,7 +178,9 @@ def test_source_run_is_not_blocked_by_preview_status_write_failure(tmp_path, mon
             raise OSError("preview device unavailable")
     monkeypatch.setattr(preview_run, "python_preview", lambda **kwargs:Record())
     run_dir = tmp_path/"run";run_dir.mkdir()
-    with preview_run.source_run_preview(tmp_path/"main.jsonc"):
+    from tests.fixtures.support.projects import register_root
+    register_root(tmp_path / "app")
+    with preview_run.source_run_preview(tmp_path/"app/main.jsonc"):
         from types import SimpleNamespace
         prepared = SimpleNamespace(graph=SimpleNamespace(entries={}, default_entry=""))
         preview_run.start_run_preview(prepared, run_dir)
@@ -184,7 +194,7 @@ def test_data_snapshot_has_no_render_dependency_and_separates_installer(tmp_path
     record=publish_preview(root=tmp_path,workflow={"id":"r:main"},category="review",status="passed",
         architecture={"workflow":{"nodes":[],"edges":[]}})
     payload=json.loads((record.directory/"snapshot.js").read_text()[len("VibeFlowPreview.snapshot("):-3])
-    assert payload["version"]==2 and "bodies" not in payload
+    assert payload["version"]==3 and "bodies" not in payload
     assert payload["artifacts"]=={} and not (tmp_path/"vibeflow-preview.html").exists()
     assert not list(record.directory.glob("*.svg"))
     install_page(tmp_path)
@@ -218,40 +228,40 @@ def _presentations(root):
     from vibeflow.tooling.application.javascript.presentation.architecture import build_architecture_facts
 
     registry = NodeRegistry()
-    descriptor = NodeDescriptor("fixture.work", "Work", "Preview node", "1", "process", contract=NodeContractDescriptor(), rulesets=())
+    descriptor = NodeDescriptor("fixture.work", "Work", "Preview node", "1", "process", contract=NodeContractDescriptor(), rulesets=(), node_type="vibeflow.node")
     registry.register(descriptor, loader=lambda: pytest.fail("preview must not execute node implementations"))
     catalogs = DescriptorCatalogs.empty(); catalogs.nodes.register(descriptor)
-    external=NodeDescriptor("fixture.external","External","External dependency","1","process",contract=NodeContractDescriptor(),rulesets=(),external=True)
+    external=NodeDescriptor("fixture.external","External","External dependency","1","process",contract=NodeContractDescriptor(),rulesets=(),external=True, node_type="vibeflow.node")
     registry.register(external,loader=lambda:pytest.fail("external dependency must not execute"));catalogs.nodes.register(external)
     def call(name, kind="fixture.work", **fields):
-        return dict(id=name, type_used=kind, display_name=name, description="真实预览测试 "+name, **fields)
+        return dict(id=name, definition_id=kind, display_name=name, description="真实预览测试 "+name, **fields)
     def body(key, nodes):
         return dict(type_key=key, display_name=key, description=key, expand=False, requires=[], provides=[],
                     pipeline={"nodes":nodes,"edges":[[a["id"],b["id"]] for a,b in zip(nodes,nodes[1:])]})
     shapes = [call("shape_"+shape.replace("-","_"),style={"shape":shape,"fill":"#d6eaff","stroke":"#425a78","text":"#172b45","icon":"M"}) for shape in sorted(NODE_SHAPES)]
-    next(n for n in shapes if n["id"] == "shape_circle")["type_used"] = "fixture.external"
-    next(n for n in shapes if n["id"] == "shape_rect")["type_used"] = "deep0"
+    next(n for n in shapes if n["id"] == "shape_circle")["definition_id"] = "fixture.external"
+    next(n for n in shapes if n["id"] == "shape_rect")["definition_id"] = "deep0"
     deep = [body("deep"+str(i), [call("next", "deep"+str(i+1))]) for i in range(5)]
     deep.append(body("deep5", [call("bottom")]))
     config = root / "main.jsonc"
-    graph = parse_graph_config({"rulesets":[], "nodesets":[*deep,body("leaf", shapes),body("outer",[call("inner","leaf")])],
+    graph = parse_graph_config({"rulesets":[], "nodeset_types":[*deep,body("leaf", shapes),body("outer",[call("inner","leaf")])],
         "pipeline":{"nodes":[call("first","outer"),call("second","outer",style={"fill":"#efe0f8"}),
             call("loop","vibeflow.loop.while",requires=[],provides=[],loop={"body":"outer","max_iterations":1,"stop_after":1}),
             call("future","future.type",status="planned",flow_kind="process",requires=[],provides=[])],
             "edges":[["first","second"],["second","loop"],["loop","future"]]}},
         project_root=root,root_path=root,root_id="fixture",source_path=config)
     prepared = prepare_python_presentation(graph,registry=registry)
-    compiled_nodesets = {key:prepared.graph_for(value.graph)[1] for key,value in graph.nodesets.items()}
-    architecture = build_architecture_facts(graph,compiled=prepared.compiled,compiled_nodesets=compiled_nodesets,
-        catalogs=catalogs,used_node_types=frozenset({descriptor.id}),active_base_lib_ids=frozenset(),
-        plugin_records=(),host_records=(),root_id="fixture",source_path="main.jsonc")
+    compiled_nodeset_types = {key:prepared.graph_for(value.graph)[1] for key,value in graph.nodeset_types.items()}
+    architecture = build_architecture_facts(graph,compiled=prepared.compiled,compiled_nodeset_types=compiled_nodeset_types,
+        catalogs=catalogs,used_node_ids=frozenset({descriptor.id}),active_base_lib_ids=frozenset(),
+        plugin_records=(),root_id="fixture",source_path="main.jsonc")
     root_model=SimpleNamespace(id="fixture",path=root,project_config={"preview":{"workflow_links":[
         {"from_workflow":"main.jsonc","from_call_path":"first","to_root":"remote","to_workflow":"other.jsonc","kind":"call","label":"历史目标"},
         {"from_workflow":"main.jsonc","to_root":"missing","to_workflow":"absent.jsonc","kind":"reference","label":"缺失目标"}]}})
     remote_model=SimpleNamespace(id="remote",path=root/"remote",project_config={"preview":{"workflow_links":[
         {"from_workflow":"other.jsonc","to_root":"fixture","to_workflow":"main.jsonc","kind":"reference"}]}})
     workspace=SimpleNamespace(root=root,roots=(root_model,remote_model),root_for_path=lambda p:root_model)
-    javascript=SimpleNamespace(warnings=(),graph=graph,compiled=prepared.compiled,compiled_nodesets=compiled_nodesets,
+    javascript=SimpleNamespace(warnings=(),graph=graph,compiled=prepared.compiled,compiled_nodeset_types=compiled_nodeset_types,
         catalogs=catalogs,architecture=architecture,workspace=workspace,config_path=config)
     return prepared,javascript,workspace,config
 
@@ -270,7 +280,7 @@ def test_real_offline_shapes_nested_browser_and_history(tmp_path):
     assert second.metadata["workflow"]["target"] == "javascript"
     # Read the actual producer protocol, not a second rendering implementation.
     payload = json.loads((first.directory/"snapshot.js").read_text()[len("VibeFlowPreview.snapshot("):-3])
-    assert payload["version"] == 2 and "bodies" not in payload
+    assert payload["version"] == 3 and "bodies" not in payload
     assert payload["architecture"] == prepared.architecture()
     assert not list(first.directory.glob("*.svg"))
     from vibeflow.tooling.presentation.preview.exporter import attach_svg
@@ -282,7 +292,7 @@ def test_real_offline_shapes_nested_browser_and_history(tmp_path):
     shutil.copytree(tmp_path/"vibeflow-preview",destination/"vibeflow-preview")
     tool=tmp_path/"独立 工具"
     shutil.copytree(Path(__file__).resolve().parents[2]/"tools/workflow-viewer",tool)
-    (tool/"preview.config.js").write_text('window.VibeFlowViewerConfig={dataRoot:new URL("../搬移 空格/vibeflow-preview/",document.currentScript.src).href};')
+    (tool/"preview.config.js").write_text('window.VibeFlowViewerConfig={dataRoot:"../搬移 空格/vibeflow-preview/"};')
     browser = Path(__file__).resolve().parents[1]/"fixtures/preview/browser.cjs"
     renderer = _find_mmdc().resolve()
     result=subprocess.run(["node",str(browser),str(renderer),str(destination/"vibeflow-preview.html"),
@@ -302,7 +312,7 @@ def test_real_project_resource_views(tmp_path):
     from vibeflow.tooling.application.python.presentation.preview import python_preview
     project = tmp_path / "project"
     write_project(project)
-    workspace = load_workspace_config(project / "vibeflow_config.jsonc")
+    workspace = load_workspace_config(project.parent / "vibeflow_config.jsonc")
     config = project / "workflow.jsonc"
     loaded = load_workspace_graph_for_export(config, workspace=workspace, validate_health=True, _include_presentation=True)
     assert loaded[4] is None
@@ -322,7 +332,8 @@ def test_node_details_edge_roles_and_contracts_in_real_browser(tmp_path):
     from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
     from vibeflow.tooling.application.javascript.presentation.architecture import build_architecture_facts
     from vibeflow.tooling.presentation.preview.exporter import publish_preview
-    from vibeflow.tooling.presentation.mermaid import _find_mmdc
+    from vibeflow.tooling.presentation.mermaid import _find_mmdc, is_mermaid_svg_renderer_available
+    if not is_mermaid_svg_renderer_available(): pytest.skip("full gate supplies locked browser")
     registry=NodeRegistry();catalogs=DescriptorCatalogs.empty()
     contracts={"emit":NodeContractDescriptor(provides=(DataProvider("payload","fixture.payload","计算结果"),),
         output_semantics={"payload":("结果携带本次计算的完整数值。",)},
@@ -331,9 +342,9 @@ def test_node_details_edge_roles_and_contracts_in_real_browser(tmp_path):
             input_semantics={"fixture.payload":("消费上游结果，不重新计算。",)})}
     for key,kind in (("boundary","terminal"),("emit","process"),("take","process"),("choice","decision")):
         descriptor=NodeDescriptor("detail."+key,"详情测试 "+key,"类型定义："+key+" 的完整职责说明。","2.1",kind,
-            contract=contracts.get(key,NodeContractDescriptor()),rulesets=())
+            contract=contracts.get(key,NodeContractDescriptor()),rulesets=(), node_type="vibeflow.node")
         registry.register(descriptor,loader=lambda:pytest.fail("viewer executed business code"));catalogs.nodes.register(descriptor)
-    calls=[{"id":name,"type_used":"detail."+kind,"display_name":name,"description":"调用职责："+name,
+    calls=[{"id":name,"definition_id":"detail."+kind,"display_name":name,"description":"调用职责："+name,
             **({"join_policy":"all"} if name=="join" else {}),**({"config":{"factor":3}} if name=="emit" else {})}
            for name,kind in (("start","boundary"),("emit","emit"),("left","take"),("right","take"),("join","take"),
                              ("choice","choice"),("yes","boundary"),("no","boundary"),("end","boundary"))]
@@ -346,8 +357,8 @@ def test_node_details_edge_roles_and_contracts_in_real_browser(tmp_path):
         {"from":"choice","to":"no","when":"route == 'no'"},["yes","end"],["no","end"]]}},
         project_root=tmp_path,root_path=tmp_path,root_id="details",source_path=tmp_path/"main.jsonc")
     prepared=prepare_python_presentation(graph,registry=registry)
-    javascript=build_architecture_facts(prepared.graph,compiled=prepared.compiled,compiled_nodesets={},catalogs=catalogs,
-        used_node_types=frozenset(catalogs.nodes.to_dict()),active_base_lib_ids=frozenset(),plugin_records=(),host_records=(),
+    javascript=build_architecture_facts(prepared.graph,compiled=prepared.compiled,compiled_nodeset_types={},catalogs=catalogs,
+        used_node_ids=frozenset(catalogs.nodes.to_dict()),active_base_lib_ids=frozenset(),plugin_records=(),
         root_id="details",source_path="main.jsonc")
     records=[]
     for target,architecture in (("python",prepared.architecture()),("javascript",javascript)):
@@ -370,7 +381,7 @@ def test_default_python_commands_and_explicit_svg_failure(tmp_path, monkeypatch,
     def no_renderer(*args,**kwargs):
         raise RuntimeError("Mermaid deliberately unavailable")
     monkeypatch.setattr(mermaid,"_find_mmdc",no_renderer)
-    common=["--workspace",str(project/"vibeflow_config.jsonc"),"--config",str(project/"workflow.jsonc")]
+    common=["--workspace",str(project.parent/"vibeflow_config.jsonc"),"--config",str(project/"workflow.jsonc")]
     original_import=builtins.__import__
     def no_graphics_import(name,globals=None,locals=None,fromlist=(),level=0):
         if ".presentation.mermaid" in name or name=="vibeflow.tooling.presentation" and "mermaid" in fromlist:
@@ -378,49 +389,55 @@ def test_default_python_commands_and_explicit_svg_failure(tmp_path, monkeypatch,
         return original_import(name,globals,locals,fromlist,level)
     with monkeypatch.context() as scope:
         scope.setattr(builtins,"__import__",no_graphics_import)
-        assert main(["review",*common])==0;capsys.readouterr()
+        review_status=main(["review",*common]);review_output=capsys.readouterr().out
+        assert review_status==0,review_output
         assert main(["build",*common,"--out-dir",str(tmp_path/"bundle")])==0;capsys.readouterr()
         assert main(["run",*common,"--run-root",str(tmp_path/"runs"),"--run-id","actual"] )==0;capsys.readouterr()
-    records=[json.loads(f.read_text()) for f in (project/"vibeflow-preview/snapshots").glob("*/record.json")]
+    records=[json.loads(f.read_text()) for f in (project.parent/"vibeflow-preview/snapshots").glob("*/record.json")]
     assert {(r["category"],r["status"]) for r in records}=={("review","passed"),("build","succeeded"),("run","succeeded")}
-    assert all(r["version"]==2 for r in records)
-    assert not list((project/"vibeflow-preview/snapshots").rglob("*.svg"))
+    assert all(r["version"]==3 for r in records)
+    assert not list((project.parent/"vibeflow-preview/snapshots").rglob("*.svg"))
     assert main(["review",*common,"--with-svg"])==1;capsys.readouterr()
-    failed=[json.loads(f.read_text()) for f in (project/"vibeflow-preview/snapshots").glob("*/record.json") if json.loads(f.read_text())["status"]=="failed"]
+    failed=[json.loads(f.read_text()) for f in (project.parent/"vibeflow-preview/snapshots").glob("*/record.json") if json.loads(f.read_text())["status"]=="failed"]
     assert len(failed)==1
-    data=json.loads((project/"vibeflow-preview/snapshots"/failed[0]["id"]/"snapshot.js").read_text()[len("VibeFlowPreview.snapshot("):-3])
+    data=json.loads((project.parent/"vibeflow-preview/snapshots"/failed[0]["id"]/"snapshot.js").read_text()[len("VibeFlowPreview.snapshot("):-3])
     assert data["architecture"]["workflow"]["nodes"] and not data["artifacts"]
 
 
 def test_default_javascript_commands_and_explicit_svg_failure(tmp_path, monkeypatch, capsys):
-    from tests.fixtures.javascript.resource_sections.run_all import write_fixture
+    from tests.targets.javascript.test_code_plugins import project as javascript_project
     from vibeflow.tooling.application.cli import main
     from vibeflow.tooling.presentation import mermaid
     project=tmp_path/"javascript"
-    write_fixture(project,Path(os.environ["VIBEFLOW_TEST_TOOLCHAIN_ROOT"]),"nested","default")
+    javascript_project(project)
+    (project / "vibeflow_project.jsonc").write_text(json.dumps({"project_target":"javascript", "architecture":{"documents":[
+        {"workflow":"workflow.jsonc","document":"ARCHITECTURE.jsonc"}]}}))
     monkeypatch.setattr(mermaid,"_find_mmdc",lambda:(_ for _ in ()).throw(RuntimeError("Mermaid deliberately unavailable")))
-    common=["--workspace",str(project/"vibeflow_config.jsonc"),"--config",str(project/"workflow.jsonc")]
-    assert main(["review",*common])==0;capsys.readouterr()
+    common=["--workspace",str(project.parent/"vibeflow_config.jsonc"),"--config",str(project/"workflow.jsonc")]
+    review_status=main(["review",*common]);review_output=capsys.readouterr().out
+    assert review_status==0,review_output
     assert main(["build",*common,"--target","node","--profile","single-esm","--out-dir",str(tmp_path/"bundle")])==0;capsys.readouterr()
-    records=[json.loads(f.read_text()) for f in (project/"vibeflow-preview/snapshots").glob("*/record.json")]
+    records=[json.loads(f.read_text()) for f in (project.parent/"vibeflow-preview/snapshots").glob("*/record.json")]
     assert {(r["category"],r["status"]) for r in records}=={("review","passed"),("build","succeeded")}
     for record in records:
-        script=(project/"vibeflow-preview/snapshots"/record["id"]/"snapshot.js").read_text()
+        script=(project.parent/"vibeflow-preview/snapshots"/record["id"]/"snapshot.js").read_text()
         architecture=json.loads(script[len("VibeFlowPreview.snapshot("):-3])["architecture"]
         assert {"rule_selections","rule_checks","implementation_graph"} <= architecture.keys()
         assert architecture["implementation_graph"] and architecture["workflow"]["nodes"]
     assert main(["review",*common,"--with-svg"])==1;capsys.readouterr()
-    records=[json.loads(f.read_text()) for f in (project/"vibeflow-preview/snapshots").glob("*/record.json")]
+    records=[json.loads(f.read_text()) for f in (project.parent/"vibeflow-preview/snapshots").glob("*/record.json")]
     failed=next(r for r in records if r["status"]=="failed")
-    assert (project/"vibeflow-preview/snapshots"/failed["id"]/"snapshot.js").is_file()
+    assert (project.parent/"vibeflow-preview/snapshots"/failed["id"]/"snapshot.js").is_file()
 
 
 def test_cancelled_run_uses_observer_terminal_result(tmp_path):
     from vibeflow.targets.python.runtime.observation import RunObservation
     from vibeflow.tooling.application.python.preview_run import source_run_preview,bind_run_observer
+    from tests.fixtures.support.projects import register_root
+    register_root(tmp_path / "app")
     observer=RunObservation(tmp_path/"run")
     with pytest.raises(KeyboardInterrupt):
-        with source_run_preview(tmp_path/"absent.jsonc"):
+        with source_run_preview(tmp_path/"app/absent.jsonc"):
             with observer.scope():
                 bind_run_observer(observer)
                 with pytest.raises(TypeError):observer.result["status"]="succeeded"
@@ -428,3 +445,47 @@ def test_cancelled_run_uses_observer_terminal_result(tmp_path):
     records=[json.loads(f.read_text()) for f in (tmp_path/"vibeflow-preview/snapshots").glob("*/record.json")]
     assert records[0]["status"]==observer.result["status"]=="failed"
     assert records[0]["error"]==observer.result["error"]=="cancelled"
+
+
+def test_real_resource_cards_express_all_declared_shapes(tmp_path):
+    from vibeflow.core.style import NODE_SHAPES
+    from vibeflow.tooling.presentation.mermaid import is_mermaid_svg_renderer_available, _find_mmdc
+    from tests.fixtures.support.projects import register_root
+    from vibeflow.tooling.project.workspace_loader import load_project_workspace
+    from vibeflow.tooling.application.python.workspace_service import load_workspace_graph_for_export
+    from vibeflow.tooling.application.python.presentation.preview import python_preview
+    if not is_mermaid_svg_renderer_available():
+        pytest.skip("full gate supplies the locked browser")
+    root = tmp_path / "project"
+    register_root(root)
+    (root / "base_lib").mkdir()
+    (root / "nodes").mkdir()
+    selections, libraries = [], []
+    for index, shape in enumerate(sorted(NODE_SHAPES)):
+        style = {"shape":shape,"fill":"#c8e4ff","stroke":"#1a5276","text":"#123456","icon":"M"}
+        library = "shapes.lib" + str(index)
+        libraries.append(library)
+        (root / "base_lib" / f"lib{index}.py").write_text(
+            'from vibeflow.targets.python.sdk import base_lib\n'
+            f'@base_lib(id={library!r},rulesets=[],presentation={style!r})\n'
+            'def identity(value):\n    return value\n')
+        package = root / "plugins" / f"shape{index}"
+        package.mkdir(parents=True)
+        (package / "plugin.py").write_text('from vibeflow.targets.python.sdk import Plugin\n'
+            f'plugin=Plugin(id="shapes.plugin{index}",resources=[],presentation={style!r})\n')
+        selections.append({"source":{"kind":"file","ref":f"plugins/shape{index}/plugin.py"}})
+    (root / "nodes/main.py").write_text('from vibeflow.targets.python.sdk import node\n'
+        f'@node(id="shapes.main",node_type="vibeflow.node",flow_kind="terminal",contract={{}},rulesets=[],base_libs={libraries!r})\n'
+        'class Main:\n    def run_pure(self,inputs,params):\n        return {}\n')
+    config = root / "workflow.jsonc"
+    config.write_text(json.dumps({"plugins":selections,"base_lib":{"modules":libraries},"rulesets":[],"pipeline":{"nodes":[{
+        "id":"main","definition_id":"shapes.main","display_name":"Resource shapes","description":"One real workflow using all shape resources"}]}}))
+    workspace = load_project_workspace(config)
+    loaded = load_workspace_graph_for_export(config,workspace=workspace,validate_health=False,_include_presentation=True)
+    assert loaded[4] is None
+    record = python_preview(loaded[-1],config=config,workspace=workspace)
+    browser = Path(__file__).resolve().parents[1] / "fixtures/preview/resource-shapes.cjs"
+    result = subprocess.run(["node",str(browser),str(_find_mmdc().resolve()),str(record.root/"vibeflow-preview.html"),json.dumps(sorted(NODE_SHAPES))],
+        capture_output=True,text=True,timeout=90)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(result.stdout)["cards"] == 28

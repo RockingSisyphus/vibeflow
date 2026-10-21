@@ -36,8 +36,8 @@ def _legacy_contract(contract):
 
 
 def _declaration(spec, contract, *, type_key="parity.node", class_name="DemoNode", ref="node.py"):
-    declaration = {
-        "kind": "node", "type_key": type_key, "display_name": "Parity", "category": "parity",
+    declaration = {'node_type': 'vibeflow.node',
+        "kind": "node", 'id': type_key, "display_name": "Parity", "category": "parity",
         "description": "One rule parity observation.", "version": "1.0", "flow_kind": spec.get("flow_kind", "process"),
         "rulesets": spec.get("rulesets", ["vibeflow.process"]), "contract": contract,
         "implementations": [{"language": "python", "targets": ["python"],
@@ -60,7 +60,7 @@ def _adapt_source(source, descriptor, spec):
     class_name = descriptor["implementations"][0]["source"]["export"]
     source = re.sub(r"^(class " + re.escape(class_name) + r"(?:\([^\n]*\))?:\n)",
         lambda match: match.group(0) + metadata, source, flags=re.MULTILINE)
-    prefix = "from vibeflow.targets.python.nodetypes.protocols import NodeInfo, NodeContract\nfrom vibeflow.core import DataProvider, DataRequirement\n"
+    prefix = "from vibeflow.targets.python.sdk.protocols import NodeInfo, NodeContract\nfrom vibeflow.core import DataProvider, DataRequirement\n"
     if source.startswith("from __future__ import annotations\n"):
         return source.replace("from __future__ import annotations\n", "from __future__ import annotations\n" + prefix, 1)
     return prefix + source
@@ -105,7 +105,8 @@ def _write_project(root, variant, spec):
         policy["base_lib"]["allowed_paths"] = [str(root / value) for value in policy["base_lib"].get("allowed_paths", [])]
     if variant == "current":
         _write_current_plugin(root, spec, resources, files)
-    (root / "policy.jsonc").write_text(json.dumps({"policy": policy}), encoding="utf-8")
+    if variant == "baseline":
+        (root / "policy.jsonc").write_text(json.dumps({"policy": policy}), encoding="utf-8")
     if "general_source" in spec:
         (root / "source.py").write_text(spec["general_source"], encoding="utf-8")
 
@@ -126,8 +127,9 @@ def _write_run_project(root, variant):
             "entrypoints":{"import":["import"], "static":[], "run":[]}})
     if variant == "baseline":
         (root / "vibeflow_project.jsonc").write_text(json.dumps(project), encoding="utf-8")
-    (root / "workspace.jsonc").write_text(json.dumps({"roots": [{"id": "project", "path": "."}]}), encoding="utf-8")
-    calls = [{"id": name, "type_used": "parity." + ("node" if name == "demo" else name),
+    if variant == "baseline":
+        (root / "workspace.jsonc").write_text(json.dumps({"roots": [{"id": "project", "path": "."}]}), encoding="utf-8")
+    calls = [{"id": name, "definition_id": "parity." + ("node" if name == "demo" else name),
         "display_name": name.title(), "description": "Runtime import parity call."} for name in ("start", "demo", "end")]
     (root / "workflow.jsonc").write_text(json.dumps({"pipeline": {"nodes": calls,
         "edges": [["start", "demo"], ["demo", "end"]]}}), encoding="utf-8")
@@ -211,12 +213,29 @@ def _write_current_plugin(root, spec, resources, files):
     if spec.get("entrypoint") == "cli.run":
         for item in resources:
             if item["kind"] == "node":
-                item["rulesets"] = ["parity.import_only"] if item["type_key"] == "parity.node" else []
+                item["rulesets"] = ["parity.import_only"] if item["id"] == "parity.node" else []
+    parameters=deepcopy(spec.get('current_policy',spec.get('policy',{})))
+    numeric={k:v for k,v in parameters.items() if k in {'node_source','complexity','maintainability'}}
+    imports={"imports":parameters['imports']} if 'imports' in parameters else {}
+    for declaration in list(resources):
+        if declaration['kind'] not in {'node','base_lib'}:continue
+        selected=declaration.get('rulesets',[])
+        if not selected or not (numeric or imports):continue
+        identifier='parity.parameters.'+declaration['id']
+        calls=[{'id':'native'+str(i),'ruleset_id':key} for i,key in enumerate(selected)]
+        relations=[]
+        for call in calls:
+            for leaf,policy in [('maintainability',numeric),('effects',imports),('imports',imports)]:
+                if policy:relations.append({'source':'$self','target':call['id']+'/'+leaf,'kind':'overrides','params':{'policy':policy}})
+        resources.append({'kind':'ruleset','id':identifier,'calls':calls,'relations':relations})
+        declaration['rulesets']=[identifier]
     selection = write_plugin(root, resources, target="python", plugin_id="parity.resources")
     (root / "vibeflow_project.jsonc").write_text(json.dumps({"project_target":"python"}))
     workflow = root / "workflow.jsonc"
     data = json.loads(workflow.read_text()) if workflow.is_file() else {"rulesets":[], "pipeline":{"nodes":[{
-        "id":"demo", "type_used":"parity.node", "display_name":"Demo", "description":"Source rule observation"}]}}
+        "id":"demo", "definition_id":"parity.node", "display_name":"Demo", "description":"Source rule observation"}]}}
+    if spec.get('entrypoint')=='target.validate_graph_health':
+        data={'rulesets':[],'pipeline':{'nodes':[{'id':name,'definition_id':'parity.'+('node' if name=='demo' else name),'display_name':name,'description':'Graph source check'} for name in ('start','demo','end')],'edges':[['start','demo'],['demo','end']]}}
     data["plugins"] = [selection]
     workflow.write_text(json.dumps(data))
 
@@ -229,24 +248,35 @@ from vibeflow.tooling.project.workspace_loader import load_project_workspace
 from vibeflow.targets.python.project.resource_rules import review_python_resource
 from vibeflow.targets.python.rules.node.policy import PurityPolicy
 root=Path(sys.argv[1]); options=json.loads(sys.argv[2])
-registry=declared_python_registry(load_project_workspace(root/"workflow.jsonc"),config_path=root/"workflow.jsonc")
+from vibeflow.tooling.project.resources import ResourcePreparationError
+try:
+    registry=declared_python_registry(load_project_workspace(root/"workflow.jsonc"),config_path=root/"workflow.jsonc")
+except ResourcePreparationError as error:
+    print(json.dumps({'findings':list(error.diagnostics)}))
+    raise SystemExit(1)
 registry.configure_rule_defaults(purity_policy=PurityPolicy(**options))
-findings=[item.to_dict() for declaration in registry.loaded_plugins.catalogs.base_libs
+findings=[item.to_dict() for declaration in registry.prepared_resources.catalogs.base_libs
     for phase in ("import","static") for item in review_python_resource(declaration,base_path=root,registry=registry,phase=phase)]
-print(json.dumps({"base_lib":{"findings":findings,"modules":[item.id for item in registry.loaded_plugins.catalogs.base_libs]}}))
+print(json.dumps({"base_lib":{"findings":findings,"modules":[item.id for item in registry.prepared_resources.catalogs.base_libs]}}))
 '''
 
 
 def _command(root, variant, spec):
     entrypoint = spec.get("entrypoints", {}).get(variant, spec.get("entrypoint", "cli.inspect-node"))
     if entrypoint == "cli.quality-check":
+        if variant=="current":
+            options={}
+            args=spec.get('cli_args',[])
+            if '--max-function-params' in args:options['max_function_params']=int(args[args.index('--max-function-params')+1])
+            (root/'root_rules.jsonc').write_text(json.dumps({'rulesets':[{'rule_id':'vibeflow.root.files','params':options},{'rule_id':'vibeflow.root.duplicates'}]}))
+            return [sys.executable,'-m','vibeflow','quality-check','--path',str(root),'--json']
         return [sys.executable, "-m", "vibeflow", "quality-check", "--path", str(root / "source.py"), "--json", *spec.get("cli_args", [])]
     if entrypoint == "cli.run":
         return [sys.executable, "-m", "vibeflow", "run", "--config", str(root / "workflow.jsonc"),
-            "--workspace", str(root / "workspace.jsonc"), "--run-root", str(root / "runs"), "--run-id", "import-marker"]
+            "--workspace", str(root / "workspace.jsonc" if variant=="baseline" else root.parent/"vibeflow_config.jsonc"), "--run-root", str(root / "runs"), "--run-id", "import-marker"]
     if entrypoint == "cli.inspect-node":
-        return [sys.executable, "-m", "vibeflow", "inspect-node", "--type", "parity.node", "--module", str(root / "node.py"),
-            "--class", "DemoNode", "--policy", str(root / "policy.jsonc"), *(["--config", str(root / "workflow.jsonc")] if variant == "current" else [])]
+        return [sys.executable, "-m", "vibeflow", "inspect-node", "--node-id", "parity.node", "--module", str(root / "node.py"),
+            "--class", "DemoNode", *(["--config", str(root / "workflow.jsonc")] if variant == "current" else ["--policy",str(root/"policy.jsonc")])]
     scripts = {"target.scan_base_lib": lambda: _base_lib_script(variant), "target.analyze_python_source": lambda: _source_script(variant),
         "target.validate_node_class": _class_validation_script}
     script = scripts[entrypoint]() if entrypoint in scripts else _graph_script(variant)
@@ -310,13 +340,13 @@ report=validate_graph_health(graph,registry=registry,purity_policy=policy,source
     policy_module = "vibeflow.targets.python.quality.source_analysis" if variant == "baseline" else "vibeflow.targets.python.rules.node.policy"
     return '''import json,sys
 from pathlib import Path
-from vibeflow.core import GraphConfig,NodeSpec,EdgeSpec,DataProvider
+from vibeflow.core import GraphConfig,NodeCallSpec,EdgeSpec,DataProvider
 from vibeflow.core.flow import NodeMetadata
 from vibeflow.targets.python.project import NodeRegistry
 ''' + "from " + policy_module + " import PurityPolicy\n" + '''from vibeflow.targets.python.quality.workflow import validate_graph_health
 root=Path(sys.argv[1]); policy=PurityPolicy(**json.loads(sys.argv[2]))
 def call(name):
-    return NodeSpec(id=name,type_used='parity.'+(name if name!='demo' else 'node'),metadata=NodeMetadata(name,'Parity graph call'),provides=(DataProvider('demo.out','demo.out',display_name='Result'),) if name=='demo' else ())
+    return NodeCallSpec(id=name,definition_id='parity.'+(name if name!='demo' else 'node'),metadata=NodeMetadata(name,'Parity graph call'),provides=(DataProvider('demo.out','demo.out',display_name='Result'),) if name=='demo' else ())
 graph=GraphConfig(nodes=tuple(call(name) for name in ('start','demo','end')),edges=(EdgeSpec('start','demo'),EdgeSpec('demo','end')))
 ''' + setup + "print(json.dumps({'health':report.to_dict()}))\n"
 

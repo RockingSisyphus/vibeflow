@@ -9,16 +9,19 @@ from vibeflow.tooling.project.workspace_loader import load_project_workspace
 
 @pytest.mark.parametrize("selection", [(), ("vibeflow.plugin",)])
 def test_plugin_import_rule_is_selected_and_blocks_the_actual_write(tmp_path, selection):
+    from tests.fixtures.support.projects import register_root
+    register_root(tmp_path)
+    (tmp_path / "plugins/extension").mkdir(parents=True)
     marker = tmp_path / "loaded"
-    path = tmp_path / "extension.py"
+    path = tmp_path / "plugins/extension/extension.py"
     path.write_text(f'from pathlib import Path\nPath({str(marker)!r}).write_text("loaded")\nclass Plugin: pass\n')
     (tmp_path / "vibeflow_project.jsonc").write_text('{"project_target":"python"}')
     with path.open("a") as handle:
         handle.write("\ndef create(context): return Plugin()\n")
-    (tmp_path / "plugin.py").write_text("from vibeflow.targets.python.sdk import Plugin, SourceLocator\n" +
+    (tmp_path / "plugins/extension/plugin.py").write_text("from vibeflow.targets.python.sdk import Plugin, SourceLocator\n" +
         f"plugin=Plugin(id='extension',runtime=SourceLocator(kind='file',ref='extension.py',export='create'),rulesets={selection!r})\n")
     config = tmp_path / "main.jsonc"
-    config.write_text(json.dumps({"plugins":[{"source":{"kind":"file","ref":"plugin.py"}}],"rulesets":[],"pipeline":{"nodes":[{"id":"stub","type_used":"planned.stub","status":"planned","flow_kind":"process","requires":[],"provides":[],"display_name":"Stub","description":"Native planned call"}]}}))
+    config.write_text(json.dumps({"plugins":[{"source":{"kind":"file","ref":"plugins/extension/plugin.py"}}],"rulesets":[],"pipeline":{"nodes":[{"id":"stub","definition_id":"planned.stub","status":"planned","flow_kind":"process","requires":[],"provides":[],"display_name":"Stub","description":"Native planned call"}]}}))
     report = validate_workspace_config_path(config,workspace=load_project_workspace(config))
     assert not marker.exists()
     if not selection:
@@ -45,7 +48,8 @@ def test_declared_library_rule_checks_only_its_reached_sources_before_binding(tm
     marker = tmp_path / "library-loaded"
     (tmp_path / "library.py").write_text(f'from pathlib import Path\nPath({str(marker)!r}).write_text("loaded")\n')
     (tmp_path / "leaf.py").write_text('import library\nclass Leaf:\n    def run_pure(self,inputs,params): return {}\n')
-    (tmp_path / "rule.py").write_text('''
+    (tmp_path / "plugins/code_plugin").mkdir(parents=True)
+    (tmp_path / "plugins/code_plugin/rule.py").write_text('''
 def check(context, inputs, params):
     assert context.subject["kind"] == "base_lib" and context.subject["id"] == "library"
     assert "call" not in context.facts
@@ -53,8 +57,8 @@ def check(context, inputs, params):
     return {"findings":[{"code":"TEST.LIBRARY.REJECT","message":"Review reached library",
         "object_type":"base_lib","object_id":context.subject["id"]}]}
 ''')
-    declarations = ({"kind":"node","type_key":"leaf","display_name":"Leaf",
-        "description":"Selected implementation","version":"1","flow_kind":"process","rulesets":[],"contract":{},
+    declarations = ({'node_type': 'vibeflow.node', "kind":"node",'id':"leaf","display_name":"Leaf",
+        "description":"Selected implementation","version":"1","flow_kind":"process","rulesets":[],"base_libs":["library"],"contract":{},
         "implementations":[{"language":"python","targets":["python"],"source":{"kind":"file","ref":"leaf.py","export":"Leaf"}}]},
     {"kind":"base_lib","id":"library","rulesets":["test.library"],
         "display_name":"Library","description":"One reached library",
@@ -63,10 +67,10 @@ def check(context, inputs, params):
         "implementations":[{"language":"python","source":{"kind":"file","ref":"rule.py","export":"check"}}]},
     {"kind":"ruleset","id":"test.library",
         "calls":[{"id":"library","rule_id":"test.library"}],"entrypoints":{"import":["library"]}})
-    write("vibeflow_project.jsonc",{"project_target":"python","quality_enabled":False,
+    write("vibeflow_project.jsonc",{"project_target":"python",
 })
     plugin = write_plugin(tmp_path, declarations, target="python")
-    write("main.jsonc",{"plugins":[plugin], "rulesets":[],"pipeline":{"nodes":[{"id":"leaf","type_used":"leaf",
+    write("main.jsonc",{"plugins":[plugin], "rulesets":[],"pipeline":{"nodes":[{"id":"leaf","definition_id":"leaf",
         "display_name":"Leaf","description":"One real call"}]}})
     report = validate_workspace_config_path(tmp_path / "main.jsonc",workspace=load_project_workspace(tmp_path / "main.jsonc"))
     finding = next(item for item in report.errors if item.code == "TEST.LIBRARY.REJECT")
@@ -76,7 +80,7 @@ def check(context, inputs, params):
     preview = effective_rule_plans(tmp_path / "main.jsonc",phase="import")
     selected = next(item for item in preview["resources"] if item["id"] == "library")
     assert selected["rulesets"] == ["test.library"]
-    assert selected["selection_source"] == str(tmp_path / "code_plugin.py")
+    assert selected["selection_source"] == str(tmp_path / "base_lib/code_plugin_declarations.py")
     assert not marker.exists()
 
 

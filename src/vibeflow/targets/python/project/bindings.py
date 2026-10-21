@@ -33,7 +33,7 @@ class PythonCallBinding:
     """Live Python implementation and effective parameters for one call."""
 
     path: tuple[str, ...]
-    type_key: str
+    definition_id: str
     implementation: object = field(compare=False, repr=False)
     effective_params: Mapping[str, object] = field(compare=False, repr=False)
     source: SourceRef
@@ -41,7 +41,7 @@ class PythonCallBinding:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "path", _binding_path(self.path))
-        object.__setattr__(self, "type_key", _required_text(self.type_key, "type_key"))
+        object.__setattr__(self, "definition_id", _required_text(self.definition_id, "definition_id"))
         if self.implementation is None:
             raise PythonBindingError("implementation cannot be None")
         if not isinstance(self.source, SourceRef):
@@ -62,7 +62,7 @@ class PythonCallBinding:
 
         return {
             "path": list(self.path),
-            "type_key": self.type_key,
+            "definition_id": self.definition_id,
             "implementation": _stable_python_reference(self.implementation),
             "effective_params": _metadata_value(
                 self.effective_params,

@@ -23,8 +23,6 @@ EXAMPLE = ROOT / "sandbox/python/domain_rules"
 def domain_project(tmp_path):
     example = tmp_path / "example"
     shutil.copytree(EXAMPLE, example)
-    from tests.fixtures.support.plugins import copy_sdk_inputs
-    copy_sdk_inputs(EXAMPLE, example)
     for name in tuple(sys.modules):
         if name == "domain_nodes" or name.startswith("domain_helpers"):
             sys.modules.pop(name)
@@ -47,7 +45,7 @@ def _evidence(payload, node_type):
     for execution in payload["info"]["rule_executions"]:
         for result in execution["results"].values():
             record = result["records"].get("evidence")
-            if record and record["value"]["node_type"] == node_type:
+            if record and record["value"]["definition_id"] == node_type:
                 return record["value"]
     raise AssertionError(f"no selected domain Rule evidence for {node_type}")
 
@@ -60,18 +58,18 @@ def _register_architecture(project):
 
 
 def _illegal_helper(project):
-    helper = project / "domain_helpers/illegal_model.py"
+    helper = project / "base_lib/domain_helpers/illegal_model.py"
     helper.write_text('"""A model definition in an ordinary transform helper."""\n'
                       'def model_forward(value):\n    return value + 1\n')
-    path = project / "domain_nodes.py"
-    source = path.read_text().replace("from domain_helpers.arithmetic import scale",
-        "from domain_helpers.arithmetic import scale\nfrom domain_helpers.illegal_model import model_forward")
+    path = project / "nodes/domain_nodes.py"
+    source = path.read_text().replace("from ..base_lib.domain_helpers.arithmetic import scale",
+        "from ..base_lib.domain_helpers.arithmetic import scale\nfrom ..base_lib.domain_helpers.illegal_model import model_forward")
     source = source.replace('return {"result": value + params["offset"]}',
                             'return {"result": model_forward(value) + params["offset"]}')
     path.write_text(source)
     declaration = resource(project, "node", "example.transform")
     data = json.loads(declaration.read_text())
-    data["implementations"][0].setdefault("implementation_files", []).append({"kind":"file", "ref":"domain_helpers/illegal_model.py"})
+    data["implementations"][0].setdefault("implementation_files", []).append({"kind":"file", "ref":"base_lib/domain_helpers/illegal_model.py"})
     declaration.write_text(json.dumps(data))
     return helper
 
@@ -84,7 +82,7 @@ def test_category_rules_public_ast_helpers_and_actual_numerical_run(domain_proje
     assert "model_block" in evidence["tags"]
     assert evidence["ast_kind"] == "ClassDef"
     assert [item["symbol"] for item in evidence["definitions"]] == ["ModelBlock.model_forward"]
-    assert {"symbol": "scale", "path": str(project / "domain_helpers/arithmetic.py"),
+    assert {"symbol": "scale", "path": str(project / "base_lib/domain_helpers/arithmetic.py"),
             "owners": ["example.model"]} in evidence["helpers"]
     result = run_workspace_checked(project / "configs/model.jsonc",
         workspace=load_workspace_config(workspace), initial={"value": 3}, run_root=tmp_path / "runs", run_id="domain")
@@ -116,7 +114,7 @@ def test_category_style_and_call_override_enter_formal_review(domain_project, ca
     from vibeflow.tooling.project.config_loader import strip_jsonc_comments
     architecture = json.loads(strip_jsonc_comments((project / "ARCHITECTURE.jsonc").read_text()))
     model = next(item for item in architecture["workflow"]["nodes"] if item["id"] == "model")
-    assert "model_block" in architecture["node_types"]["example.model"]["info"]["tags"]
+    assert "model_block" in architecture["node_definitions"]["example.model"]["info"]["tags"]
     assert model["presentation"]["values"]["fill"] == "#ddeeff"
     assert model["presentation"]["sources"]["fill"] == "call"
     assert main(["export-mermaid", *_common(workspace, project), "--output", str(output)]) == 0
@@ -150,7 +148,7 @@ def test_helper_model_location_reaches_every_formal_check(domain_project, capsys
     finding = next(item for item in findings if item["code"] == "EXAMPLE.MODEL.LOCATION")
     assert finding["definition_id"] == "example.model_definition"
     assert finding["source_location"] == {"path": str(helper), "line": 2, "column": 1}
-    assert finding["details"]["ownership"] == [{"node_type": "example.transform", "relation": "helper_reference"}]
+    assert finding["details"]["ownership"] == [{"definition_id": "example.transform", "relation": "helper_reference"}]
     assert finding["details"]["calls"] == [{"owner": "pipeline", "node": "transform"}]
     if command == "review":
         assert payload["published"] is False
@@ -161,7 +159,7 @@ def test_helper_model_location_reaches_every_formal_check(domain_project, capsys
 
 def test_one_block_is_a_domain_convention_and_empty_selection_is_unconstrained(domain_project, capsys):
     workspace, project = domain_project
-    path = project / "domain_nodes.py"
+    path = project / "nodes/domain_nodes.py"
     source = path.read_text().replace("    def run_pure(self, inputs, params):\n        value = inputs[\"example.input\"]",
         "    def model_forward(self, value, gain):\n        return value * gain\n\n"
         "    def run_pure(self, inputs, params):\n        value = inputs[\"example.input\"]")
@@ -187,15 +185,15 @@ def test_unselected_declarations_and_unreachable_files_are_not_domain_scanned(do
     workspace, project = domain_project
     path = resource(project, 'node', 'example.unused')
     data = json.loads((resource(project, 'node', 'example.model')).read_text())
-    data["type_key"] = "example.unused"
-    data["implementations"][0]["source"] = {"kind": "file", "ref": "unused/model.py", "export": "UnusedModel"}
+    data["id"] = "example.unused"
+    data["implementations"][0]["source"] = {"kind": "file", "ref": "nodes/unused/model.py", "export": "UnusedModel"}
     path.write_text(json.dumps(data))
-    unused = project / "unused"
+    unused = project / "nodes/unused"
     unused.mkdir()
     (unused / "model.py").write_text("class UnusedModel:\n    def run_pure(self, inputs, params):\n        return {'feature': 1}\n")
     (unused / "unreachable.py").write_text("def model_forward(value):\n    return value\n")
     code, payload = _call(capsys, ["quality-check", "--workspace", str(workspace), "--json"])
-    assert code == 0, payload["source_quality"]["errors"]
+    assert code == 0, payload["errors"]
     definitions = [item for report in payload["reports"] for item in report["errors"] if item["definition_id"] == "example.model_definition"]
     assert definitions == []
     evidence = _evidence(payload["reports"][0], "example.model")
@@ -205,7 +203,7 @@ def test_unselected_declarations_and_unreachable_files_are_not_domain_scanned(do
 def test_rule_review_does_not_import_node_or_rule_implementations(domain_project, capsys):
     workspace, project = domain_project
     node_marker, rule_marker = project / "node-imported", project / "rule-imported"
-    for path, marker in ((project / "domain_nodes.py", node_marker), (project / "rules/model_definition.py", rule_marker)):
+    for path, marker in ((project / "nodes/domain_nodes.py", node_marker), (project / "plugins/code_plugin/rules/model_definition.py", rule_marker)):
         path.write_text(f"from pathlib import Path\nPath({str(marker)!r}).write_text('ran')\nraise RuntimeError('must not import')\n")
     code, payload = _call(capsys, ["review-rules", *_common(workspace, project), "--node", "model", "--json"])
     assert code == 0, payload
@@ -222,7 +220,7 @@ def test_rule_review_does_not_import_node_or_rule_implementations(domain_project
 @pytest.mark.parametrize("location", ["module", "ordinary_node"])
 def test_same_file_model_definitions_have_precise_domain_ownership(domain_project, capsys, location):
     workspace, project = domain_project
-    path = project / "domain_nodes.py"
+    path = project / "nodes/domain_nodes.py"
     source = path.read_text()
     if location == "module":
         source += "\n\ndef model_forward(value):\n    return value\n"
@@ -243,8 +241,8 @@ def test_same_file_model_definitions_have_precise_domain_ownership(domain_projec
     assert finding["definition_id"] == ("example.model_files" if location == "module" else "example.model_definition")
     assert finding["source_location"] == {"path": str(path), "line": line, "column": 1}
     if location == "ordinary_node":
-        assert finding["details"]["node_type"] == "example.transform"
-        assert finding["details"]["ownership"] == [{"node_type": "example.transform", "relation": "helper_reference"}]
+        assert finding["details"]["definition_id"] == "example.transform"
+        assert finding["details"]["ownership"] == [{"definition_id": "example.transform", "relation": "helper_reference"}]
         assert finding["details"]["calls"] == [{"owner": "pipeline", "node": "transform"}]
     else:
         # Sharing a module with an allowed model implementation does not grant
@@ -255,7 +253,7 @@ def test_same_file_model_definitions_have_precise_domain_ownership(domain_projec
 @pytest.mark.parametrize("selection", ["default", "terminal", "empty"])
 def test_process_print_policy_is_checked_and_executed_through_cli(domain_project, capsys, tmp_path, monkeypatch, selection):
     workspace, project = domain_project
-    source = project / "domain_nodes.py"
+    source = project / "nodes/domain_nodes.py"
     source.write_text(source.read_text().replace('return {"result": value + params["offset"]}',
         'print("domain transform result", value + params["offset"])\n'
         '        return {"result": value + params["offset"]}'))
@@ -306,12 +304,12 @@ def test_process_print_policy_is_checked_and_executed_through_cli(domain_project
 def test_selected_import_interface_rejects_missing_export_before_module_execution(domain_project, capsys, tmp_path):
     workspace, project = domain_project
     marker = project / "business-module-imported"
-    path = project / "domain_nodes.py"
+    path = project / "nodes/domain_nodes.py"
     path.write_text(f"from pathlib import Path\nPath({str(marker)!r}).write_text('imported')\n" + path.read_text())
     for manifest in resources(project, "node"):
         node = json.loads(manifest.read_text())
         node["rulesets"] = []
-        if node["type_key"] == "example.model":
+        if node["id"] == "example.model":
             node["rulesets"] = ["example.prebind_interface"]
             node["implementations"][0]["source"]["export"] = "MissingModel"
         manifest.write_text(json.dumps(node))
@@ -340,7 +338,7 @@ def test_module_rule_binding_uses_resolved_source_provenance(domain_project, cap
     workspace, project = domain_project
     manifest = resource(project, 'rule', 'example.model_definition')
     data = json.loads(manifest.read_text())
-    data["implementations"][0]["source"] = {"kind":"module","ref":"rules.model_definition","export":export}
+    data["implementations"][0]["source"] = {"kind":"module","ref":"plugins.code_plugin.rules.model_definition","export":export}
     manifest.write_text(json.dumps(data))
     code, payload = _call(capsys, ["validate", *_common(workspace, project), "--json"])
     if export == "check":
@@ -350,7 +348,7 @@ def test_module_rule_binding_uses_resolved_source_provenance(domain_project, cap
         assert code == 1, payload
         finding = next(item for item in payload["errors"] if item["code"] == "RULE.IMPLEMENTATION.LOAD")
         assert finding["definition_id"] == "example.model_definition"
-        assert finding["source_location"]["path"] == str(project / "code_plugin.py")
+        assert finding["source_location"]["path"] == str(project / "plugins/code_plugin/plugin.py")
         assert finding["source_location"]["line"] > 0
-        assert finding["details"]["implementation"] == {"kind":"module","ref":"rules.model_definition",
-            "export":export,"path":str(project / "rules/model_definition.py")}
+        assert finding["details"]["implementation"] == {"kind":"module","ref":"plugins.code_plugin.rules.model_definition",
+            "export":export,"path":str(project / "plugins/code_plugin/rules/model_definition.py")}

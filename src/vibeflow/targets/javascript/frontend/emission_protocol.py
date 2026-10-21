@@ -21,7 +21,7 @@ from vibeflow.targets.javascript.frontend.errors import AotPlanError
 
 class EmissionNode(Protocol):
     id: str
-    type_used: str
+    definition_id: str
     implementation: object | None
     requires: Sequence[object]
     provides: Sequence[object]

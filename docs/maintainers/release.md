@@ -1,6 +1,8 @@
-# 当前源码：多入口与独立 Workflow 通信（未发布）
+# 当前本地构建：VibeFlow 1.2.1
 
-命名入口、调用级 Capability 授权、本机通信协议和普通端口节点使用 Workflow ABI v9；旧 AOT 需重建，旧原生 IO 配置须迁移。保留先前 1.1.5 AOT 准备优化；本项不自动提交、推送或发布。实施与验收见[工作记录](workflow-communication.md)。以下段落记录各次历史发行，不代表当前源码协议。
+当前开发源码使用 Workflow ABI v10、AOT v4 与快照 v3；项目治理重构的实际状态见[实施记录](project-governance-refactor.md)。
+
+1.2.1 构建时，命名入口、调用级 Capability 授权、本机通信协议和普通端口节点使用 Workflow ABI v9；旧 AOT 需重建，旧原生 IO 配置须迁移。1.2.1 本地分发包包含上述功能、先前 AOT 准备优化及本轮测试提效与职责清理。构建范围见[1.2.1 构建说明](history/release-1.2.1.md)，功能实施见[工作记录](workflow-communication.md)。以下段落记录各次历史发行，不代表当前源码协议。
 
 # VibeFlow 1.1.2
 

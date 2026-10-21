@@ -50,22 +50,18 @@ function __vfObservation(options) {
     },
     kernel(event) { sink?.kernel(JSON.stringify(event)); },
     run(callback) { return sink ? sink.run(callback) : callback(); },
-    running() {
-      if (state === "running" || closed) return;
-      state = "running";
-      publish();
-    },
     stopping() {
       if (closed || state === "stopping") return;
       state = "stopping";
       publish();
     },
-    start(running = true) {
+    start() {
       if (typeof __vfCreateFileObservation === "function") {
         sink = __vfCreateFileObservation(raw, record(), interval);
       }
       publish();
-      if (running) observer.running();
+      state = "running";
+      publish();
       if (raw.onStatus) {
         timer = setInterval(() => {
           try { raw.onStatus(record()); }
@@ -114,10 +110,6 @@ function __vfObservedOptions(options, observer) {
 
 function __vfObserveSync(invoke, inputs, options) {
   if (options !== undefined && (!options || typeof options !== "object" || Array.isArray(options))) return invoke(inputs, options);
-  if (options?.__vfParentObservation) {
-    const observer = options.__vfParentObservation;
-    return observer.run(() => invoke(inputs, __vfObservedOptions(options, observer)));
-  }
   const observer = __vfObservation(options);
   try {
     observer.start();
@@ -132,10 +124,6 @@ function __vfObserveSync(invoke, inputs, options) {
 
 async function __vfObserveAsync(invoke, inputs, options) {
   if (options !== undefined && (!options || typeof options !== "object" || Array.isArray(options))) return invoke(inputs, options);
-  if (options?.__vfParentObservation) {
-    const observer = options.__vfParentObservation;
-    return observer.run(() => invoke(inputs, __vfObservedOptions(options, observer)));
-  }
   const observer = __vfObservation(options);
   try {
     observer.start();
@@ -146,36 +134,4 @@ async function __vfObserveAsync(invoke, inputs, options) {
     try { observer.finish(error); } catch { /* Preserve the execution failure. */ }
     throw error;
   }
-}
-
-function __vfObserveHost(create, options) {
-  if (options !== undefined && (!options || typeof options !== "object" || Array.isArray(options))) return create(options);
-  const observer = __vfObservation(options);
-  let host;
-  try {
-    observer.start(false);
-    host = observer.run(() => create({...options, __vfParentObservation: observer}));
-  } catch (error) {
-    try { observer.finish(error); } catch { /* Preserve the creation failure. */ }
-    throw error;
-  }
-  async function lifecycle(method) {
-    try {
-      if (method === "stop") observer.stopping();
-      await observer.run(() => host[method]());
-      if (method === "start") observer.running();
-      else observer.finish(null);
-    } catch (error) {
-      try { observer.finish(error); } catch { /* Preserve the lifecycle failure. */ }
-      throw error;
-    }
-  }
-  return Object.freeze({
-    signal: host.signal,
-    get started() { return host.started; },
-    start: () => lifecycle("start"),
-    stop: () => lifecycle("stop"),
-    ...(host.runWorkflow ? {runWorkflow: (...args) => host.runWorkflow(...args)} : {}),
-    ...(host.runWorkflowAsync ? {runWorkflowAsync: (...args) => host.runWorkflowAsync(...args)} : {}),
-  });
 }

@@ -52,8 +52,8 @@ from vibeflow.core.flow import (
     ExecutionLockSpec,
     GraphConfig,
     GraphConfigError,
-    NodeSpec,
-    NodesetSpec,
+    NodeCallSpec,
+    NodesetTypeSpec,
 )
 from vibeflow.core.findings import Finding, HealthFinding, HealthReport
 from vibeflow.core.models import (
@@ -117,8 +117,8 @@ __all__ = [
     "ImplementationFacts",
     "NodeConfigError",
     "NodeConfigSpec",
-    "NodeSpec",
-    "NodesetSpec",
+    "NodeCallSpec",
+    "NodesetTypeSpec",
     "NodesetDependency",
     "NodesetDependencyGraph",
     "NodesetDepthViolation",

@@ -16,9 +16,9 @@ from vibeflow.core.rules import RuleContext, RuleRecord, RuleResult, compile_rul
 from vibeflow.core.rules.models import plain
 from vibeflow.core.rules.selection import resolve_node_selection
 from vibeflow.core.rules.planning import graph_rule_subjects, graph_rule_tasks, scoped_graph
-from vibeflow.targets.javascript.rules.project import bound_project_quality_defaults
-from vibeflow.targets.shared.quality_support import ProjectQualityFacts, QualityPolicy
-from vibeflow.core.flow import LOOP_NODE_TYPES, STATUS_PLANNED
+from vibeflow.targets.javascript.rules.source_quality import bound_source_quality_defaults
+from vibeflow.targets.shared.quality_support import SourceQualityFacts, QualityPolicy
+from vibeflow.core.flow import LOOP_DEFINITION_IDS, STATUS_PLANNED
 from vibeflow.targets.javascript.build.plugin_session import JavascriptPluginSession
 from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
 from vibeflow.targets.javascript.frontend.plugin_descriptors import JavascriptPluginError
@@ -38,17 +38,16 @@ def _compile_rule_plan(ruleset_id: str, *, catalogs: Any, entrypoint: str, rules
                                rulesets=catalogs.rulesets, entrypoint=entrypoint)
     except RuleGraphError as error:
         subject = context.subject if context is not None else {}
-        owner = str(subject.get("type_key", subject.get("id", subject.get("workflow", ""))))
+        owner = str(subject.get("definition_id", subject.get("id", subject.get("workflow", ""))))
         finding = rule_graph_error_finding(error, rulesets=catalogs.rulesets,
-            object_type="node_type" if "type_key" in subject else str(subject.get("kind", "ruleset")), object_id=owner)
+            object_type="node" if "definition_id" in subject else str(subject.get("kind", "ruleset")), object_id=owner)
         if context is not None:
-            association = {name: plain(subject[name]) for name in ("type_key", "call_paths") if name in subject}
+            association = {name: plain(subject[name]) for name in ("definition_id", "call_paths") if name in subject}
             finding = replace(finding, details={**finding.details, **association})
-            if "type_key" in subject:
+            if "definition_id" in subject:
                 selection_source = catalogs.nodes.source_for(owner)
-            elif subject.get("kind") in {"base_lib", "plugin", "host_extension"}:
-                catalog = {"base_lib": catalogs.base_libs, "plugin": catalogs.plugins,
-                           "host_extension": catalogs.host_extensions}[subject["kind"]]
+            elif subject.get("kind") in {"base_lib", "plugin"}:
+                catalog = {"base_lib": catalogs.base_libs, "plugin": catalogs.plugins}[subject["kind"]]
                 selection_source = catalog.source_for(owner) or selection_source
             else:
                 selection_source = str(subject.get("workflow", context.scope.get("workflow", ""))) or selection_source
@@ -72,7 +71,7 @@ class JavascriptRuleReport:
         return {"subjects": {key: [item.to_dict() for item in value] for key, value in self.results.items()},
                 "findings": [item.common_dict() for item in self.findings], "selections":plain(self.selections),
                 "effect_policies": plain(self.policies),
-                "call_effect_policies": [{"node_type": path[0], "call_path": list(path[1:]), "effect_scope": self.call_effect_scopes[path], "records": plain(records)} for path, records in sorted(self.call_effect_policies.items())],
+                "call_effect_policies": [{"definition_id": path[0], "call_path": list(path[1:]), "effect_scope": self.call_effect_scopes[path], "records": plain(records)} for path, records in sorted(self.call_effect_policies.items())],
                 "unconstrained": [key for key, executions in self.results.items() if not key.startswith("workflow:") and not any(item.plan.invocations for item in executions)],
                 "unconstrained_effects": [key for key in self.results if not key.startswith("workflow:") and key not in self.policies], "facts": plain(self.facts)}
 
@@ -96,7 +95,7 @@ def _summarize_policies(records: list[Mapping[str, Any]], *, type_wide: bool = F
     return {**(values[0] if same else {}), "effect_scope": scope, "records": records}
 
 
-def node_type_calls(graph: Any) -> dict[str, list[tuple[str, ...]]]:
+def node_definition_calls(graph: Any) -> dict[str, list[tuple[str, ...]]]:
     result: dict[str, list[tuple[str, ...]]] = {}
     for subject in graph_rule_subjects(graph):
         if subject.declaration_only or subject.definition is not None and subject.definition.status == STATUS_PLANNED:
@@ -104,9 +103,9 @@ def node_type_calls(graph: Any) -> dict[str, list[tuple[str, ...]]]:
         for node in subject.graph.nodes:
             if node.status == STATUS_PLANNED:
                 continue
-            target = node.loop.body if node.type_used in LOOP_NODE_TYPES else node.type_used
-            if target not in subject.available_nodesets:
-                result.setdefault(node.type_used, []).append((*subject.call_path, node.id))
+            target = node.loop.body if node.definition_id in LOOP_DEFINITION_IDS else node.definition_id
+            if target not in subject.available_nodeset_types:
+                result.setdefault(node.definition_id, []).append((*subject.call_path, node.id))
     return result
 
 
@@ -121,10 +120,10 @@ def source_node_calls(graph: Any) -> dict[str, list[tuple[str, ...]]]:
     Empty paths mean declaration-only review, not an executable invocation.
     Import ownership must cover this same set before source closure extraction.
     """
-    result = node_type_calls(graph)
+    result = node_definition_calls(graph)
     for subject in graph_rule_subjects(graph):
         if subject.declaration_only:
-            for key in node_type_calls(subject.graph):
+            for key in node_definition_calls(subject.graph):
                 result.setdefault(key, [])
     return result
 
@@ -169,13 +168,13 @@ class _RuleSession:
         return key
 
     def project_view(self,view):
-        if "project_facts" in view.facts or not view.facts.get("evaluate_sources",True):
+        if "source_quality" in view.facts or not view.facts.get("evaluate_sources",True):
             return view
         if "analysis_cache" not in view.facts:
             return view
         if view.identity not in self.project_views:
             self.project_views[view.identity] = view.derive(
-                {"project_facts":self.analysis_cache.project_facts(view.facts)},key="project_facts")
+                {"source_quality":self.analysis_cache.project_facts(view.facts)},key="source_quality")
         return self.project_views[view.identity]
 
     def execute(self, selected: tuple[str, ...], context: RuleContext, *, before_import: bool = False, private_context=None, selection=None, public_view=None, private_view=None) -> tuple[Any, ...]:
@@ -194,11 +193,11 @@ class _RuleSession:
                 if context.subject.get("kind") == "node" and plan.graph_scope == "effective_subtree":
                     raise ProjectBuildError("RULE.GRAPH_SCOPE.NODE", "Node selections cannot use an effective_subtree Ruleset")
                 from inspect import unwrap
-                from vibeflow.targets.javascript.rules.project import project_quality_handlers
-                project_handlers = tuple(project_quality_handlers().values())
+                from vibeflow.targets.javascript.rules.source_quality import source_quality_handlers
+                project_handlers = tuple(source_quality_handlers().values())
                 bound_rules = {item.rule.id:native_binding(self.catalogs,"rule",item.rule.id) for item in plan.invocations}
                 core_handlers = tuple(binding for rule in self.catalogs.rules
-                    if getattr(self.catalogs.origins.get(("rules",rule.id)),"plugin_id","") == "vibeflow.core"
+                    if getattr(getattr(self.catalogs.origins.get(("rules",rule.id)),"owner",None),"plugin_id","") == "vibeflow.core"
                     and (binding := native_binding(self.catalogs,"rule",rule.id)) is not None)
                 prepared_public,prepared_private = public_view,private_view
                 if any(bound is None for bound in bound_rules.values()):
@@ -312,9 +311,9 @@ def run_javascript_rules(
     used = source_node_calls(graph)
     call_specs = _call_specs(graph)
     if include_registered:
-        used.update({item.type_key: used.get(item.type_key, []) for item in catalogs.nodes})
+        used.update({item.id: used.get(item.id, []) for item in catalogs.nodes})
     snapshot = {key: catalogs.nodes.require(key).to_dict() for key in sorted(used) if catalogs.nodes.get(key) is not None}
-    report_facts = {**contribution_facts(catalogs), "node_types": snapshot, "import_policy": plain(import_policy or {})}
+    report_facts = {**contribution_facts(catalogs), "node_definitions": snapshot, "import_policy": plain(import_policy or {})}
     results: dict[str, tuple[Any, ...]] = {}
     findings: list[Finding] = []
     diagnostic_indexes = {}
@@ -323,13 +322,13 @@ def run_javascript_rules(
     call_records: dict[tuple[str, ...], list[Mapping[str, Any]]] = {}
     source_scopes: dict[str, Mapping[str, Any]] = {}
     choices = []
-    rule_defaults = bound_project_quality_defaults(
+    rule_defaults = bound_source_quality_defaults(
         {item.id: native_binding(catalogs, "rule", item.id) for item in catalogs.rules},
         quality_policy or javascript_quality_policy(),
         rules={item.id:item for item in catalogs.rules}, origins=catalogs.origins)
     with ExitStack() as stack:
         session = _check_session(stack, catalogs=catalogs, project_root=project_root, package_root=package_root, node_command=node_command, target=target)
-        background = session.facts.capture({**contribution_facts(catalogs),"node_types":snapshot,
+        background = session.facts.capture({**contribution_facts(catalogs),"node_definitions":snapshot,
             "package_root":str(package_root),"project_root":str(project_root),"node_command":node_command,
             "rule_defaults":rule_defaults,"catalogs":catalogs,"evaluate_sources":evaluate_sources,
             "analysis_cache":session.analysis_cache})
@@ -337,7 +336,7 @@ def run_javascript_rules(
         selected_resources = {(owner.get("kind"), owner.get("id")) for owner in (import_policy or {}).get("owners", ())}
         subjects.extend((kind, kind + ":" + item.id, item, []) for kind,item in source_resources(catalogs)
                         if kind != "node" and (kind,item.id) in selected_resources)
-        for kind, type_key, descriptor, calls in subjects:
+        for kind, definition_id, descriptor, calls in subjects:
             if descriptor is None:
                 continue
             resource_id = descriptor.id
@@ -349,7 +348,7 @@ def run_javascript_rules(
                         file = (project_root / locator.ref).resolve()
                         if file.is_file():
                             sources.append({"path":str(file), "text":file.read_text(encoding="utf-8"),
-                                "export":(locator.export or "run") if role == "entry" else "", "role":role, "owner":type_key})
+                                "export":(locator.export or "run") if role == "entry" else "", "role":role, "owner":definition_id})
             source_files = [item["path"] for item in sources]
             selections = {call: resolve_node_selection(descriptor, call_specs.get(call)) for call in calls or [()]} if kind == "node" else {}
             selected = descriptor.rulesets if kind != "node" else tuple(ref for value in selections.values() for ref in value.references)
@@ -381,7 +380,7 @@ def run_javascript_rules(
                 "import_policy":driver_import_policy(source_policy)}
             source_view = background.derive(source_parts)
             facts = source_view.facts
-            source_scopes[type_key] = {key: plain(facts[key]) for key in ("sources", "source_files", "source_owners")}
+            source_scopes[definition_id] = {key: plain(facts[key]) for key in ("sources", "source_files", "source_owners")}
             subject_results = []
             # Call rules keep callpoint identity; source rules receive the exact target,
             # source path and export identity for the engine's optional source cache.
@@ -391,10 +390,10 @@ def run_javascript_rules(
                 local_owners = [owner for owner in facts["source_owners"] if owner["path"] in local_paths
                     and (owner["kind"] != "node" or owner["id"] == resource_id)]
                 public_facts = {"sources": local_sources, "source_files": [file for file in source_files if file in local_paths],
-                    "node_types": {resource_id: descriptor.to_dict()}, "source_owners": local_owners,
+                    "node_definitions": {resource_id: descriptor.to_dict()}, "source_owners": local_owners,
                     "evaluate_sources": evaluate_sources}
                 if local_quality is not None:
-                    public_facts["project_facts"] = ProjectQualityFacts(root=str(project_root), files=tuple(_file_fact(item) for item in local_quality["files"]), findings=tuple(_finding_fact(item) for item in local_quality["findings"]))
+                    public_facts["source_quality"] = SourceQualityFacts(root=str(project_root), files=tuple(_file_fact(item) for item in local_quality["files"]), findings=tuple(_finding_fact(item) for item in local_quality["findings"]))
             else:
                 public_facts = facts
             public_view = session.facts.capture(public_facts) if kind == "node" else source_view
@@ -403,10 +402,10 @@ def run_javascript_rules(
             for call in contexts:
                 selection = selections[call] if kind == "node" else None
                 if selection is not None:
-                    choices.append({"kind":"node", "type_key":type_key, "call_path":call, "selection":selection.to_dict()})
+                    choices.append({"kind":"node", "definition_id":definition_id, "call_path":call, "selection":selection.to_dict()})
                 if kind == "node":
-                    call_records.setdefault((type_key, *call), [])
-                context = public_view.context(phase, subject={**({"type_key":type_key} if kind == "node" else {"id":resource_id}), "kind":kind, "descriptor": descriptor.to_dict(),
+                    call_records.setdefault((definition_id, *call), [])
+                context = public_view.context(phase, subject={**({"definition_id":definition_id} if kind == "node" else {"id":resource_id}), "kind":kind, "descriptor": descriptor.to_dict(),
                     "call_path": call, "call_paths": [call] if calls else [],
                     "call_spec": plain(call_specs.get(call)), "source_identity": identity},
                     scope={"files": tuple(item["path"] for item in public_facts.get("sources", ()))})
@@ -424,7 +423,7 @@ def run_javascript_rules(
                             inputs = {name: result.results[provider].records[port]
                                 for name, (provider, port) in invocation.inputs.items()
                                 if port in result.results[provider].records}
-                            key = (type_key, invocation.rule.id, value_fingerprint(invocation.params),
+                            key = (definition_id, invocation.rule.id, value_fingerprint(invocation.params),
                                 record_inputs_fingerprint(inputs), value_fingerprint(finding.common_dict()),
                                 call if invocation.rule.scope == "call" else ())
                             paths = [list(call)] if calls else []
@@ -447,11 +446,11 @@ def run_javascript_rules(
                                 continue
                             evidence = {"definition_id": invocation.rule.id, "rule_call_id": invocation_id,
                                         "scope": invocation.rule.scope, "value": plain(record.value),
-                                        "call_path": list(call), "node_type": type_key,
+                                        "call_path": list(call), "node_definition_id": definition_id,
                                         "cached": invocation_id not in result.executed}
-                            policy_records.setdefault(type_key, []).append(evidence)
-                            call_records.setdefault((type_key, *call), []).append(evidence)
-            results[type_key] = tuple(subject_results)
+                            policy_records.setdefault(definition_id, []).append(evidence)
+                            call_records.setdefault((definition_id, *call), []).append(evidence)
+            results[definition_id] = tuple(subject_results)
     policies = {key: _summarize_policies(records, type_wide=True) for key, records in policy_records.items()}
     call_scopes = {path: str(_summarize_policies(records)["effect_scope"]) if records else "unconstrained" for path, records in call_records.items()}
     for key,policy in tuple(policies.items()):
@@ -461,7 +460,7 @@ def run_javascript_rules(
                                 {path: tuple(records) for path, records in call_records.items()}, source_scopes, tuple(choices))
 
 
-def run_javascript_workflow_rules(graph: Any, catalogs: Any, *, compiled_by_path: Mapping[tuple[str, ...], Any], node_report: JavascriptRuleReport, project_root: Path, package_root: Path, target: str = "javascript", node_command: str = "node", evaluate_sources: bool = True, rule_defaults: Mapping[str, Mapping[str, Any]] | None = None, quality_policy: QualityPolicy | None = None, phase: str = "static", compiled_nodesets: Mapping[str, Any] | None = None) -> JavascriptRuleReport:
+def run_javascript_workflow_rules(graph: Any, catalogs: Any, *, compiled_by_path: Mapping[tuple[str, ...], Any], node_report: JavascriptRuleReport, project_root: Path, package_root: Path, target: str = "javascript", node_command: str = "node", evaluate_sources: bool = True, rule_defaults: Mapping[str, Mapping[str, Any]] | None = None, quality_policy: QualityPolicy | None = None, phase: str = "static", compiled_nodeset_types: Mapping[str, Any] | None = None) -> JavascriptRuleReport:
     """Execute Core's range plan; native compilation remains independent."""
     results, findings = dict(node_report.results), list(node_report.findings)
     from vibeflow.core.rules.planning import graph_rule_selections
@@ -473,14 +472,14 @@ def run_javascript_workflow_rules(graph: Any, catalogs: Any, *, compiled_by_path
         for returned in execution.results.values() for record in returned.records.values()
         if record.type_id == "vibeflow.node_metrics.v1"}
     def compiled_for(subject):
-        return ((compiled_nodesets or {}).get(subject.owner.removeprefix("nodeset:"))
+        return ((compiled_nodeset_types or {}).get(subject.owner.removeprefix("nodeset:"))
             if subject.declaration_only else compiled_by_path.get(subject.call_path))
     def graph_facts(task, subject):
         current = scoped_graph(task, subject)
-        measured = {node.id:metrics[(node.type_used, (*subject.call_path, node.id))]
-            for node in current.nodes if (node.type_used, (*subject.call_path, node.id)) in metrics}
+        measured = {node.id:metrics[(node.definition_id, (*subject.call_path, node.id))]
+            for node in current.nodes if (node.definition_id, (*subject.call_path, node.id)) in metrics}
         return {"graph": current, "owner": subject.owner, "call_path": subject.call_path,
-            "node_types": {node.id: node.type_used for node in current.nodes},
+            "call_definitions": {node.id: node.definition_id for node in current.nodes},
             "definition": subject.definition, "declaration_graph":subject.graph,
             "node_metrics": measured,
             "fingerprints": {key: str(value["run_pure_fingerprint"]) for key, value in measured.items() if value.get("run_pure_fingerprint")},
@@ -499,11 +498,11 @@ def run_javascript_workflow_rules(graph: Any, catalogs: Any, *, compiled_by_path
             subject = task.subject
             if phase != "import" and compiled_for(subject) is None:
                 continue
-            defaults = {**bound_project_quality_defaults(
+            defaults = {**bound_source_quality_defaults(
                 {item.id: native_binding(catalogs, "rule", item.id) for item in catalogs.rules},
                 quality_policy or javascript_quality_policy(), rules={item.id: item for item in catalogs.rules},
                 origins=catalogs.origins), **(rule_defaults or {})}
-            responsible_types = {node.type_used for item in task.subjects for node in item.graph.nodes}
+            responsible_types = {node.definition_id for item in task.subjects for node in item.graph.nodes}
             local_scopes = [value for key,value in node_report.source_scopes.items() if key in responsible_types]
             local_sources = {source["path"]:source for value in local_scopes for source in value["sources"]}
             local_files = sorted({file for value in local_scopes for file in value["source_files"]})
@@ -511,7 +510,7 @@ def run_javascript_workflow_rules(graph: Any, catalogs: Any, *, compiled_by_path
                 "graphs": tuple(graph_facts(task, item) for item in task.subjects),
                 "sources": list(local_sources.values()), "source_files": local_files, "source_owners": list(owners.values()),
                 "global_sources":list(sources.values()),
-                "node_catalog": node_report.facts.get("node_types", {}),
+                "node_definitions": node_report.facts.get("node_definitions", {}),
                 "import_policy": driver_import_policy(node_report.facts.get("import_policy", {})), "catalogs": catalogs,
                 "project_root": str(project_root), "package_root": str(package_root), "node_command": node_command,
                 "evaluate_sources": evaluate_sources, "rule_defaults": defaults, "analysis_cache": session.analysis_cache}
@@ -521,7 +520,7 @@ def run_javascript_workflow_rules(graph: Any, catalogs: Any, *, compiled_by_path
                     "source_identity":(view.identity,task.graph_scope,tuple(item.call_path for item in task.subjects),task.boundaries),
                     "id": subject.owner.removeprefix("nodeset:") if subject.declaration_only else str(subject.graph.source_path or subject.owner), "owner":subject.owner, "workflow": str(subject.graph.source_path or ""),
                     **({} if subject.declaration_only else {"call_path": subject.call_path, "call_paths": [subject.call_path]})},
-                scope={"graph_scope": task.graph_scope, "graph_paths": tuple(item.call_path for item in task.subjects),
+                scope={"level": "graph", "graph_scope": task.graph_scope, "graph_paths": tuple(item.call_path for item in task.subjects),
                     "call_path": subject.call_path, "boundaries": task.boundaries,
                     "files": tuple(sources)})
             executions = session.execute((task.reference,), context, selection=task.selection,public_view=view)
@@ -540,4 +539,4 @@ def run_javascript_workflow_rules(graph: Any, catalogs: Any, *, compiled_by_path
         node_report.call_effect_scopes, node_report.call_effect_policies, node_report.source_scopes, choices)
 
 
-__all__ = ["JavascriptRuleReport", "run_javascript_rules", "run_javascript_workflow_rules", "node_type_calls", "source_node_calls"]
+__all__ = ["JavascriptRuleReport", "run_javascript_rules", "run_javascript_workflow_rules", "node_definition_calls", "source_node_calls"]

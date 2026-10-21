@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from vibeflow.tooling.project.schema_common import _validate_rule_selection, _error, _non_empty_string, _validate_node_configs, _validate_execution_lock, _validate_positive_int, _validate_provider_list, _validate_requirement_list, _warning
-from vibeflow.core.flow import JOIN_POLICIES, LOOP_NODE_TYPES, LOOP_WHILE_TYPE, SIMILAR_TO_RELATIONSHIPS
+from vibeflow.core.flow import JOIN_POLICIES, LOOP_DEFINITION_IDS, LOOP_WHILE_DEFINITION_ID, SIMILAR_TO_RELATIONSHIPS
 from vibeflow.core.findings import HealthFinding
 from vibeflow.core.constants import FLOW_KINDS
 from vibeflow.core.planned import PLANNED_BEHAVIOR_BLOCKING, PLANNED_BEHAVIOR_PYTHON_STUB, PLANNED_BEHAVIOR_TRANSPARENT, validate_stub_module_ref
@@ -15,7 +15,7 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
     if not isinstance(value, Mapping):
         findings.append(_error("CONFIG.SCHEMA.NODE_OBJECT", f"{prefix} must be an object", prefix))
         return
-    if "io" in value or value.get("type_used") == "vibeflow.io":
+    if "io" in value or value.get("definition_id") == "vibeflow.io":
         findings.append(_error("GRAPH.IO.MIGRATION", "use ordinary SDK nodes with explicit contracts and vibeflow.port Capability; add terminal boundaries", prefix))
         return
     status = str(value.get("status", "implemented")).strip()
@@ -51,7 +51,7 @@ def _validate_node_identity(value: Mapping[str, Any], prefix: str, findings: lis
         findings.append(_error("CONFIG.SCHEMA.NODE_LEGACY_NAME", f"{prefix}.name is removed; use {prefix}.id", f"{prefix}.name"))
     if "type" in value or "registry_key" in value:
         object_id = f"{prefix}.type" if "type" in value else f"{prefix}.registry_key"
-        findings.append(_error("CONFIG.SCHEMA.NODE_LEGACY_TYPE", f"{object_id} is removed; use {prefix}.type_used", object_id))
+        findings.append(_error("CONFIG.SCHEMA.NODE_LEGACY_TYPE", f"{object_id} is removed; use {prefix}.definition_id", object_id))
     if not _non_empty_string(value.get("id")):
         findings.append(_error("CONFIG.SCHEMA.NODE_MISSING_ID", f"{prefix}.id must be a non-empty string", f"{prefix}.id"))
     if status not in STATUSES:
@@ -62,15 +62,15 @@ def _validate_node_identity(value: Mapping[str, Any], prefix: str, findings: lis
         findings.append(_error("NODE.FLOW_KIND.INVALID", f"{prefix}.flow_kind must be one of {sorted(FLOW_KINDS)}", f"{prefix}.flow_kind"))
     if status == "implemented" and _non_empty_string(value.get("flow_kind")):
         findings.append(_error("GRAPH.PLANNED.IMPLEMENTED_HAS_CONFIG_FLOW_KIND", f"{prefix}.flow_kind is only allowed for planned nodes", f"{prefix}.flow_kind"))
-    type_used = str(value.get("type_used", "")).strip()
-    if type_used.startswith("nodeset."):
-        findings.append(_error("CONFIG.SCHEMA.NODE_LEGACY_NODESET_TYPE", f"{prefix}.type_used must use the nodeset type_key directly, not nodeset.<name>", f"{prefix}.type_used"))
-    if status != "planned" and not _non_empty_string(value.get("type_used")):
+    definition_id = str(value.get("definition_id", "")).strip()
+    if definition_id.startswith("nodeset."):
+        findings.append(_error("CONFIG.SCHEMA.NODE_LEGACY_NODESET_TYPE", f"{prefix}.definition_id must use the nodeset type_key directly, not nodeset.<name>", f"{prefix}.definition_id"))
+    if status != "planned" and not _non_empty_string(value.get("definition_id")):
         findings.append(
             _error(
                 "CONFIG.SCHEMA.NODE_MISSING_TYPE",
-                f"{prefix} must define non-empty string field 'type_used'",
-                f"{prefix}.type_used",
+                f"{prefix} must define non-empty string field 'definition_id'",
+                f"{prefix}.definition_id",
             )
         )
 
@@ -81,8 +81,8 @@ def _validate_node_contract_fields(
     *,
     status: str,
 ) -> None:
-    type_used = str(value.get("type_used", "")).strip()
-    explicit_contract = status == "planned" or type_used in LOOP_NODE_TYPES
+    definition_id = str(value.get("definition_id", "")).strip()
+    explicit_contract = status == "planned" or definition_id in LOOP_DEFINITION_IDS
     if explicit_contract:
         for field in ("requires", "provides"):
             if field not in value:
@@ -211,8 +211,8 @@ def _validate_node_join_policy(value: Mapping[str, Any], prefix: str, findings: 
         findings.append(_error("CONFIG.SCHEMA.NODE_JOIN_POLICY", f"{prefix}.join_policy must be one of {sorted(JOIN_POLICIES)}", f"{prefix}.join_policy"))
 
 def _validate_node_loop(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
-    node_type = str(value.get("type_used", "")).strip()
-    if node_type not in LOOP_NODE_TYPES:
+    definition_id = str(value.get("definition_id", "")).strip()
+    if definition_id not in LOOP_DEFINITION_IDS:
         if "loop" in value:
             findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.loop is only allowed on VibeFlow loop nodes", f"{prefix}.loop"))
         return
@@ -229,7 +229,7 @@ def _validate_node_loop(value: Mapping[str, Any], prefix: str, findings: list[He
         findings.append(_error("CONFIG.SCHEMA.NODE_LOOP_INVALID", f"{prefix}.loop contains unsupported loop keys: {unknown}", f"{prefix}.loop"))
     if "max_iterations" in loop and loop["max_iterations"] is not None:
         _validate_positive_int(loop["max_iterations"], f"{prefix}.loop.max_iterations", findings, "CONFIG.SCHEMA.NODE_LOOP_INVALID")
-    if node_type == LOOP_WHILE_TYPE:
+    if definition_id == LOOP_WHILE_DEFINITION_ID:
         has_stop_after = "stop_after" in loop
         has_stop_when = "stop_when" in loop
         if has_stop_after:
@@ -296,7 +296,7 @@ def _validate_planned_behavior(value: Mapping[str, Any], prefix: str, findings: 
     if "planned_behavior" not in value:
         return
     if status != "planned":
-        findings.append(_error("GRAPH.PLANNED.BEHAVIOR_IMPLEMENTED", f"{prefix}.planned_behavior is only allowed for planned nodes/nodesets", f"{prefix}.planned_behavior"))
+        findings.append(_error("GRAPH.PLANNED.BEHAVIOR_IMPLEMENTED", f"{prefix}.planned_behavior is only allowed for planned nodes/nodeset_types", f"{prefix}.planned_behavior"))
         return
     behavior = value["planned_behavior"]
     if isinstance(behavior, str):

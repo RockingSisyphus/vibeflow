@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping
 
-from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, NodeSpec
+from vibeflow.core.flow import GraphConfig, LOOP_DEFINITION_IDS, NodeCallSpec
 
 NODESET_WIDTH_WARNING = 10
 
@@ -32,7 +32,7 @@ NodesetPath = tuple[tuple[str, ...], tuple[NodesetDependency, ...]]
 @dataclass(frozen=True)
 class NodesetDependencyGraph:
     pipeline: tuple[NodesetDependency, ...]
-    nodesets: Mapping[str, tuple[NodesetDependency, ...]]
+    nodeset_types: Mapping[str, tuple[NodesetDependency, ...]]
 
 
 @dataclass(frozen=True)
@@ -63,13 +63,13 @@ def analyze_nodeset_dependencies(graph: GraphConfig) -> NodesetDependencyGraph:
             graph=graph,
             owner="pipeline",
         ),
-        nodesets={
+        nodeset_types={
             name: _dependencies_for_nodes(
                 nodeset.graph.nodes,
                 graph=graph,
                 owner=f"nodeset:{name}",
             )
-            for name, nodeset in sorted(graph.nodesets.items())
+            for name, nodeset in sorted(graph.nodeset_types.items())
         },
     )
 
@@ -109,10 +109,10 @@ def nodeset_depth_violations(
         if dependency.target not in cyclic_nodes
     ]
 
-    remaining = set(dependencies.nodesets) - reachable - cyclic_nodes
+    remaining = set(dependencies.nodeset_types) - reachable - cyclic_nodes
     incoming = {name: 0 for name in remaining}
     for source in remaining:
-        for dependency in dependencies.nodesets.get(source, ()):
+        for dependency in dependencies.nodeset_types.get(source, ()):
             if dependency.target in remaining:
                 incoming[dependency.target] += 1
     roots.extend(
@@ -143,20 +143,20 @@ def nodeset_depth_violations(
 
 
 def _dependencies_for_nodes(
-    nodes: tuple[NodeSpec, ...],
+    nodes: tuple[NodeCallSpec, ...],
     *,
     graph: GraphConfig,
     owner: str,
 ) -> tuple[NodesetDependency, ...]:
     dependencies: list[NodesetDependency] = []
     for node in nodes:
-        if node.type_used in LOOP_NODE_TYPES and node.loop.body:
+        if node.definition_id in LOOP_DEFINITION_IDS and node.loop.body:
             dependencies.append(
                 NodesetDependency(owner, node.id, node.loop.body, "loop_body")
             )
-        elif node.type_used in graph.nodesets:
+        elif node.definition_id in graph.nodeset_types:
             dependencies.append(
-                NodesetDependency(owner, node.id, node.type_used, "nodeset")
+                NodesetDependency(owner, node.id, node.definition_id, "nodeset")
             )
     return tuple(sorted(dependencies, key=_dependency_key))
 
@@ -170,11 +170,11 @@ def _adjacency(
                 {
                     dependency.target
                     for dependency in items
-                    if dependency.target in dependencies.nodesets
+                    if dependency.target in dependencies.nodeset_types
                 }
             )
         )
-        for name, items in dependencies.nodesets.items()
+        for name, items in dependencies.nodeset_types.items()
     }
 
 
@@ -275,7 +275,7 @@ def _longest_acyclic_paths(
     cyclic_nodes: set[str],
 ) -> dict[str, NodesetPath]:
     memo: dict[str, NodesetPath] = {}
-    for root in sorted(dependencies.nodesets):
+    for root in sorted(dependencies.nodeset_types):
         if root in cyclic_nodes or root in memo:
             continue
         _populate_longest_paths(
@@ -323,8 +323,8 @@ def _acyclic_children(
 ) -> tuple[NodesetDependency, ...]:
     return tuple(
         dependency
-        for dependency in dependencies.nodesets.get(name, ())
-        if dependency.target in dependencies.nodesets
+        for dependency in dependencies.nodeset_types.get(name, ())
+        if dependency.target in dependencies.nodeset_types
         and dependency.target not in cyclic_nodes
     )
 
@@ -366,12 +366,12 @@ def _reachable_from_pipeline(
     stack = [dependency.target for dependency in reversed(dependencies.pipeline)]
     while stack:
         name = stack.pop()
-        if name in reachable or name not in dependencies.nodesets:
+        if name in reachable or name not in dependencies.nodeset_types:
             continue
         reachable.add(name)
         stack.extend(
             dependency.target
-            for dependency in reversed(dependencies.nodesets.get(name, ()))
+            for dependency in reversed(dependencies.nodeset_types.get(name, ()))
         )
     return reachable
 

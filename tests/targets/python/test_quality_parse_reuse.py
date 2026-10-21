@@ -4,7 +4,7 @@ import ast
 from collections import Counter
 import json
 
-from tests.targets.python.test_code_plugins import executable_project, EXECUTABLE
+from tests.targets.python.test_code_plugins import executable_project, EXECUTABLE, PLUGIN_SOURCE
 from vibeflow.targets.python.project.check_session import current_python_check
 from vibeflow.targets.python.project.source_closure import collect_python_source_facts
 from vibeflow.targets.python.quality.source import PythonSource, analyze_python_source
@@ -12,21 +12,21 @@ from vibeflow.tooling.application.cli import main
 
 
 def test_quality_cli_reuses_syntax_across_workflows_and_project_scan(tmp_path,monkeypatch,capsys):
-    source = EXECUTABLE.replace('from vibeflow.core.rules import RuleResult',
+    plugin_source = PLUGIN_SOURCE.replace('from vibeflow.core.rules import RuleResult',
         'from vibeflow.core.rules import RuleResult\nfrom vibeflow.core.findings import HealthFinding')
-    source = source.replace('    print("rule execution")\n    assert context.subject["descriptor"].type_key == "demo"\n    assert "plugins" not in context.facts\n    return RuleResult()',
-        '    value = context.facts["plugins"]["demo"]["value"]\n'
-        '    return RuleResult(findings=(HealthFinding(rule_id="TEST.CONFIG",severity="warning",message=str(value)),))')
-    source = source.replace('plugin=Plugin(id="demo",','plugin=Plugin(declaration_rulesets=["vibeflow.plugin_declaration"],id="demo",')
-    source = source.replace('rulesets=["vibeflow.process","demo.rules"]', 'rulesets=["vibeflow.process"]')
-    source = source.replace('id="demo.rules",calls=', 'id="demo.rules",workflow_default=True,calls=')
-    workspace, original = executable_project(tmp_path,source)
+    plugin_source += """
+@rule(id="demo.config",level="graph",params_schema={"value":{"type":"integer"}},params_defaults={"value":1})
+def config_check(context,inputs,params):
+    return RuleResult(findings=(HealthFinding(rule_id="TEST.CONFIG",severity="warning",message=str(params["value"])),))
+plugin=Plugin(id="demo",resources=[shell,check,rules,config_check])
+"""
+    workspace, original = executable_project(tmp_path, plugin_source=plugin_source)
     configs = tmp_path / "configs"
     configs.mkdir()
     data = json.loads(original.read_text())
-    data["rulesets"] = ["demo.rules"]
+    data["rulesets"] = [{"rule_id":"demo.config","params":{"value":1}}]
     (configs / "first.jsonc").write_text(json.dumps(data))
-    data["plugins"][0]["config"] = {"value":9}
+    data["rulesets"][0]["params"]["value"] = 9
     (configs / "second.jsonc").write_text(json.dumps(data))
     original.unlink()
     parses = Counter()
@@ -37,25 +37,25 @@ def test_quality_cli_reuses_syntax_across_workflows_and_project_scan(tmp_path,mo
             parses[filename] += 1
         return parse(text,*args,**kwargs)
     monkeypatch.setattr(ast,"parse",counted)
-    from vibeflow.tooling.application.python import workspace_service
+    from vibeflow.tooling.application.python.project import core
     environments = []
-    loader = workspace_service._environment_or_report
+    loader = core.build_workspace_environment
     def environment(*args,**kwargs):
         result = loader(*args,**kwargs)
         environments.append(result)
         return result
-    monkeypatch.setattr(workspace_service,"_environment_or_report",environment)
+    monkeypatch.setattr(core,"build_workspace_environment",environment)
     assert main(["quality-check","--workspace",str(workspace.path),"--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert [next(item["message"] for item in report["warnings"] if item["rule_id"] == "TEST.CONFIG")
             for report in payload["reports"]] == ["1","9"]
-    assert parses == {str(tmp_path / "plugin.py"):1}
+    assert parses == {str(tmp_path / "plugins/demo/plugin.py"):1, str(tmp_path / "nodes/steps.py"):1}
     assert len(environments) == 2
     assert all(current_python_check(item.registry) is None for item in environments)
     # A later command owns a fresh syntax cache and independently checks both workflows.
     assert main(["quality-check","--workspace",str(workspace.path),"--json"]) == 0
     capsys.readouterr()
-    assert parses == {str(tmp_path / "plugin.py"):2}
+    assert parses == {str(tmp_path / "plugins/demo/plugin.py"):2, str(tmp_path / "nodes/steps.py"):2}
 
 
 def test_syntax_cache_preserves_error_locations_and_tracks_text_changes(tmp_path,monkeypatch):

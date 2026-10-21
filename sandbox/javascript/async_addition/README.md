@@ -1,6 +1,6 @@
 # javascript async_addition
 
-两个 Capability 调用使用相同 key 和不同能力实现，释放前均等待，先释放右侧得到 30，再释放左侧得到 5。持续 Host 接收两对数字、发送 5/30，第三次接收挂起，stop 后 VF_ABORTED，重复 stop 不产生额外生命周期。保留 browser ESM 构建检查。
+两个 Capability 调用使用相同 key 和不同能力实现，释放前均等待，先释放右侧得到 30，再释放左侧得到 5。持续入口通过显式 open 节点建立 API 会话，接收两对数字、发送 5/30，第三次接收挂起。作者取消后显式调用 cleanup 入口关闭会话；重复关闭由作者 API 幂等处理，框架不托管生命周期。保留 browser ESM 构建检查。
 
 ```bash
 python sandbox/javascript/async_addition/run_all.py

@@ -8,15 +8,17 @@ _APPLICATIONS = {
 }
 
 
-def load_plugin_definition(source, *, owner, workspace, node_command):
+def load_plugin_definition(source, *, owner, workspace, node_command, loading_context=None):
     application = import_module(_APPLICATIONS[owner.project_target])
-    return application.load_plugin_definition(source, owner=owner, workspace=workspace, node_command=node_command)
+    return application.load_plugin_definition(source, owner=owner, workspace=workspace, node_command=node_command, loading_context=loading_context)
 
 
 def attach_plugin_definitions(catalog, definitions):
     from vibeflow.targets.shared.bindings import attach_native_bindings
     attach_native_bindings(catalog, (value for values in definitions.values() for value in values))
     for target, values in definitions.items():
+        if target == "project":
+            continue
         application = import_module(_APPLICATIONS[target])
         attach = getattr(application, "attach_definitions", None)
         if attach is not None:
@@ -30,5 +32,13 @@ def normalize_contributions(contribution, bindings, *, owner, workspace):
 
 
 def load_builtin_definition(target):
-    application = import_module(_APPLICATIONS["python" if target == "project" else target])
-    return application.load_builtin_definition(project_only=target == "project")
+    if target == "project":
+        from vibeflow.targets.shared.rule_support.plugin import project_plugin
+        return project_plugin()
+    return import_module(_APPLICATIONS[target]).load_builtin_definition()
+
+
+def plugin_source_paths(definition, contribution, *, owner, workspace, package, node_command, syntax_cache=None):
+    application = import_module(_APPLICATIONS[owner.project_target])
+    return application.plugin_source_paths(definition, contribution, owner=owner, workspace=workspace,
+                                           package=package, node_command=node_command, syntax_cache=syntax_cache)

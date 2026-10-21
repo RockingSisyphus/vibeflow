@@ -5,34 +5,34 @@
         "display_name": "Start",
         "description": "Starts the undeclared sync fanout fixture.",
         "id": "start",
-        "type_used": "sandbox.start"
+        "definition_id": "sandbox.start"
       },
       {
         "display_name": "Fanout Source",
         "description": "Branches synchronously without being a decision node.",
         "value": 1,
         "id": "source",
-        "type_used": "sandbox.constant"
+        "definition_id": "sandbox.constant"
       },
       {
         "display_name": "Unjoined Side Branch",
         "description": "Looks like synchronous side work but never rejoins the mainline and is not async.",
         "delta": 99,
         "id": "side",
-        "type_used": "sandbox.add_out"
+        "definition_id": "sandbox.add_out"
       },
       {
         "display_name": "Finalize",
         "description": "Produces the final output on the mainline.",
         "delta": 4,
         "id": "add",
-        "type_used": "sandbox.add"
+        "definition_id": "sandbox.add"
       },
       {
         "display_name": "End",
         "description": "Ends after value.out is available.",
         "id": "end",
-        "type_used": "sandbox.out_value_end"
+        "definition_id": "sandbox.out_value_end"
       }
     ],
     "edges": [
@@ -65,7 +65,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

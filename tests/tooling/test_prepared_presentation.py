@@ -19,7 +19,7 @@ def _fixture(tmp_path):
     path = tmp_path / "implementation.py"
     path.write_text("class Demo:\n    def run_pure(self, inputs, params):\n        return {}\n")
     descriptor = NodeDescriptor("demo", "Demo", "Deferred implementation", "1", "process",
-        contract=NodeContractDescriptor(), rulesets=(), presentation={"fill":"#abcdef", "shape":"hex"})
+        contract=NodeContractDescriptor(), rulesets=(), presentation={"fill":"#abcdef", "shape":"hex"}, node_type="vibeflow.node")
     registry = NodeRegistry()
     calls = []
 
@@ -35,9 +35,9 @@ def _fixture(tmp_path):
         (PythonSourceFile.parse(str(path), "implementation", path.read_text(), root_id="app"),))
 
     def call(name, kind):
-        return {"id":name, "type_used":kind, "display_name":name, "description":name}
+        return {"id":name, "definition_id":kind, "display_name":name, "description":name}
 
-    graph = parse_graph_config({"rulesets":[], "nodesets":[{
+    graph = parse_graph_config({"rulesets":[], "nodeset_types":[{
         "type_key":"body", "display_name":"Body", "description":"Shared body", "requires":[], "provides":[],
         "pipeline":{"nodes":[call("inside", "demo")]},
     }], "pipeline":{"nodes":[call("first", "body"), call("second", "body"), call("one", "demo")]}},
@@ -73,12 +73,12 @@ def test_all_renderers_share_each_graph_compilation_and_never_bind(tmp_path, mon
     assert counts["compiles"] == 2
     assert bindings == []
     assert registry._registry == {}
-    assert document["node_types"]["demo"]["source"] == {
+    assert document["node_definitions"]["demo"]["source"] == {
         "module":"implementation", "class":"Demo", "root_id":"app", "path":"implementation.py", "line":1}
     assert document["workflow"]["nodes"][-1]["presentation"]["values"]["fill"] == "#abcdef"
     assert "shape: hex" in mermaid and "fill:#abcdef" in mermaid
-    document["node_types"]["demo"]["source"]["class"] = "Changed"
-    assert build_architecture_document(graph, prepared=prepared)["node_types"]["demo"]["source"]["class"] == "Demo"
+    document["node_definitions"]["demo"]["source"]["class"] = "Changed"
+    assert build_architecture_document(graph, prepared=prepared)["node_definitions"]["demo"]["source"]["class"] == "Demo"
 
 
 def test_standalone_registry_refreshes_stale_compiled_but_prepared_facts_stay_fixed(tmp_path):
@@ -91,7 +91,7 @@ def test_standalone_registry_refreshes_stale_compiled_but_prepared_facts_stay_fi
     registry.record_effect_policy("demo", "none")
     document = build_architecture_document(graph, prepared=prepared)
     assert document["workflow"]["nodes"][-1]["effect_scope"] == "terminal"
-    assert document["node_types"]["demo"]["info"]["effect_scope"] == "terminal"
+    assert document["node_definitions"]["demo"]["info"]["effect_scope"] == "terminal"
     assert bindings == []
 
 
@@ -106,7 +106,7 @@ def test_architecture_uses_checked_resource_selections_after_config_changes(tmp_
     config=project/"workflow.jsonc"
     raw=json.loads(config.read_text());raw["base_lib"]["modules"]=[{"id":"layout.helper","style":{"fill":"#abcdef"}}]
     config.write_text(json.dumps(raw))
-    loaded=load_workspace_graph_for_export(config,workspace=load_workspace_config(project/"vibeflow_config.jsonc"),
+    loaded=load_workspace_graph_for_export(config,workspace=load_workspace_config(project.parent/"vibeflow_config.jsonc"),
         validate_health=True,_include_presentation=True)
     assert loaded[4] is None
     prepared=loaded[-1];facts=build_architecture_facts(prepared)
@@ -139,8 +139,8 @@ def test_deferred_sdk_source_stays_unloaded_in_formal_export(tmp_path, monkeypat
                               'class Demo:\n    def run_pure(self, inputs, params): return {}\n')
     workspace, config = project(tmp_path,
         'from vibeflow.targets.python.sdk import Plugin, node, SourceLocator\n'
-        'late=node(type_key="demo",contract={},rulesets=[],source=SourceLocator("file","late.py","Demo"))\n'
-        'plugin=Plugin(id="deferred",resources=[late],declaration_rulesets=[])\n')
+        'late=node(id="demo",node_type="vibeflow.node",contract={},rulesets=[],source=SourceLocator("file","late.py","Demo"))\n'
+        , plugin_source='from vibeflow.targets.python.sdk import Plugin\nplugin=Plugin(id="deferred",resources=[],declaration_rulesets=[])\n')
     config.write_text(json.dumps({**json.loads(config.read_text()), "rulesets":[]}))
     graph, compiled, registry, resources, error, health, prepared = load_workspace_graph_for_export(
         config, workspace=workspace, validate_health=True, _include_presentation=True)
@@ -157,7 +157,7 @@ def test_deferred_sdk_source_stays_unloaded_in_formal_export(tmp_path, monkeypat
     files = document["implementation_graph"]["files"].values()
     source = next(item for item in files if item["path"] == "late.py")
     assert source["load_state"] == "not_loaded"
-    assert document["node_types"]["demo"]["source"]["line"] == 3
+    assert document["node_definitions"]["demo"]["source"]["line"] == 3
     export_ascii_flowchart(graph, prepared=prepared)
     export_mermaid(graph, prepared=prepared)
     assert registry._registry == {} and not marker.exists()
@@ -171,15 +171,15 @@ def test_plugin_preflight_and_presentation_share_one_parse(tmp_path, monkeypatch
 
     workspace, config = project(tmp_path,
         'from vibeflow.targets.python.sdk import Plugin, node\n'
-        '@node(type_key="demo",contract={},rulesets=[])\n'
+        '@node(id="demo",node_type="vibeflow.node",contract={},rulesets=[])\n'
         'class Demo:\n    def run_pure(self, inputs, params): return {}\n'
-        'plugin=Plugin(id="shared",resources=[Demo],declaration_rulesets=["vibeflow.plugin_declaration"])\n')
+        , plugin_source='from vibeflow.targets.python.sdk import Plugin\nplugin=Plugin(id="shared",resources=[],declaration_rulesets=["vibeflow.plugin_declaration"])\n')
     config.write_text(json.dumps({**json.loads(config.read_text()), "rulesets":[]}))
     parses = Counter()
     original = ast.parse
 
     def parse(source, filename="<unknown>", *args, **kwargs):
-        if Path(filename).resolve() == tmp_path / "plugin.py":
+        if Path(filename).resolve() == tmp_path / "plugins/demo/plugin.py":
             parses["plugin"] += 1
         return original(source, filename, *args, **kwargs)
 
@@ -198,7 +198,7 @@ def test_planned_run_refusal_reuses_the_checked_presentation(tmp_path, monkeypat
     from dataclasses import replace
     import pytest
     from vibeflow.core.findings import HealthReport
-    from vibeflow.tooling.application.python import runner, preflight
+    from vibeflow.tooling.application.python import execution, preflight
 
     graph, registry, bindings = _fixture(tmp_path)
     graph = replace(graph, nodes=(*graph.nodes[:-1], replace(graph.nodes[-1], status="planned")))
@@ -213,7 +213,7 @@ def test_planned_run_refusal_reuses_the_checked_presentation(tmp_path, monkeypat
 
     monkeypatch.setattr(GraphCompiler, "compile_with_findings", unexpected_compile)
     monkeypatch.setattr(preflight, "_write_preflight_artifacts", artifacts)
-    with pytest.raises(runner.CheckedRunError) as error:
+    with pytest.raises(execution.CheckedRunError) as error:
         preflight._refuse_on_planned_run(graph, HealthReport(status="PASS"), tmp_path, "planned",
             registry=registry, resources=None, runtime_options=None,
             compiled=prepared.compiled, prepared=prepared)

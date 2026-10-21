@@ -13,7 +13,7 @@ from vibeflow.targets.shared.aot_publish import (
 )
 
 
-FORMAT = "vibeflow.aot-build.v3"
+FORMAT = "vibeflow.aot-build.v4"
 
 
 def _artifact(path: Path, marker: str) -> None:
@@ -24,7 +24,7 @@ def _artifact(path: Path, marker: str) -> None:
     plan_hash = hashlib.sha256(marker.encode()).hexdigest()
     manifest = {
         "format": FORMAT,
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "project_target": "javascript",
         "workflow_id": "publish-test",
         "entry_mode": "sync",
@@ -38,12 +38,11 @@ def _artifact(path: Path, marker: str) -> None:
             "esbuild": "0.28.1",
         },
         "external_packages": [],
-        "host_extensions": [],
         "files": {"index.js": entry_hash},
     }
-    keys = ('target','profile','toolchain','external_packages','host_extensions')
+    keys = ('target','profile','toolchain','external_packages')
     manifest['target_metadata'] = {key:manifest.pop(key) for key in keys}
-    manifest['target_metadata'].update(plugin_abi_version='vibeflow.plugin.v3',
+    manifest['target_metadata'].update(plugin_abi_version='vibeflow.plugin.v4',
         plugins=dict(active=[],annotations=[],declared=[],planned=[]))
     (path / "vibeflow-build.json").write_text(
         json.dumps(manifest, sort_keys=True),

@@ -1,5 +1,5 @@
 """Copy a runnable graph with fixed SDK declarations for regression."""
-from tests.fixtures.support.plugins import resource as resource_ref, copy_sdk_inputs
+from tests.fixtures.support.plugins import resource as resource_ref
 
 from dataclasses import dataclass
 import json
@@ -58,7 +58,6 @@ def create_rule_graph_sandbox(tmp_path, target, *, toolchain_root=None):
     """
     root = tmp_path / target
     shutil.copytree(ROOT / "sandbox" / target / "rule_graph", root)
-    copy_sdk_inputs(ROOT / "sandbox" / target / "rule_graph", root)
     sandbox = RuleGraphSandbox(target, root)
     if target == "javascript":
         toolchain = Path(toolchain_root or os.environ.get("VIBEFLOW_TEST_TOOLCHAIN_ROOT", ROOT / "sandbox/javascript/minimal/project"))
@@ -73,6 +72,6 @@ def create_rule_graph_sandbox(tmp_path, target, *, toolchain_root=None):
         data = sandbox.read(path)
         data["params_defaults"]["marker"] = str(sandbox.marker)
         if name != "checker":
-            data["params_defaults"]["source"] = str(sandbox.project / "rules" / ("provider.py" if target == "python" else "provider.ts"))
+            data["params_defaults"]["source"] = str(sandbox.project / "plugins/code_plugin/rules" / ("provider.py" if target == "python" else "provider.ts"))
         sandbox.write(path, data)
     return sandbox

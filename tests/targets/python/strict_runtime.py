@@ -29,10 +29,10 @@ def test_checked_run_refuses_failed_health_before_runtime(tmp_path) -> None:
     )
     publish_native_fixture(config_path, _registry())
     with pytest.raises(CheckedRunError) as exc_info:
-        run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="bad_run")
+        run_checked(config_path, run_root=tmp_path / "runs", run_id="bad_run")
     result = exc_info.value.result
     assert result.health.status == "FAIL"
-    assert any(error.rule_id == "NODE.TYPE.UNKNOWN" for error in result.health.errors)
+    assert any(error.rule_id == "NODE.DEFINITION.UNKNOWN" for error in result.health.errors)
     assert (result.run_dir / "health_report.json").exists()
     assert (result.run_dir / "effective_policy.json").exists()
     assert not (result.run_dir / "boundary_trace.jsonl").exists()
@@ -84,7 +84,7 @@ def test_execution_plan_binds_node_instance_and_params_once() -> None:
 def test_execution_plan_prebuilds_nodeset_subplan_with_overrides() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "math.add_one",
                     requires=["value.in"],
@@ -125,7 +125,7 @@ def test_nodeset_runner_reuses_cached_subruntime() -> None:
     CountingInitNode.instances = 0
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "count.once",
                     provides=["value.out"],
@@ -166,7 +166,7 @@ def test_nodeset_runner_reuses_cached_subruntime() -> None:
 def test_nodeset_inputs_and_exports_preserve_object_reference() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "identity.object",
                     requires=["value.in"],
@@ -223,7 +223,7 @@ def test_checked_run_refuses_planned_architecture(tmp_path) -> None:
     _write_config_file(
         config_path,
         {
-            "nodesets": [
+            "nodeset_types": [
                 {
                     "type_key": "a",
                     "display_name": "A",
@@ -243,7 +243,7 @@ def test_checked_run_refuses_planned_architecture(tmp_path) -> None:
 
     publish_native_fixture(config_path, _registry())
     with pytest.raises(CheckedRunError) as exc_info:
-        run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="planned_run")
+        run_checked(config_path, run_root=tmp_path / "runs", run_id="planned_run")
 
     result = exc_info.value.result
     assert result.health.status == "FAIL"
@@ -254,7 +254,7 @@ def test_checked_run_refuses_planned_architecture(tmp_path) -> None:
 def test_nodeset_call_can_override_inner_node_config_independently() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "math.add_one",
                     requires=["value.in"],
@@ -290,7 +290,7 @@ class NoDeepcopyObject:
         raise AssertionError("should not deepcopy runtime objects")
 
 
-LoopCopyNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.loop_copy', display_name='Loop Copy', description='Copies value.out into the next value.in slot.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='value.out'),), provides=(DataProvider('value.loop', 'value.in', display_name='value.loop'),), input_semantics={'value.out': ('output value',)}, output_semantics={'value.loop': ('next loop input',)}), rulesets=("vibeflow.process",))
+LoopCopyNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.loop_copy', display_name='Loop Copy', description='Copies value.out into the next value.in slot.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='value.out'),), provides=(DataProvider('value.loop', 'value.in', display_name='value.loop'),), input_semantics={'value.out': ('output value',)}, output_semantics={'value.loop': ('next loop input',)}), rulesets=("vibeflow.process",))
 
 class LoopCopyNode:
 
@@ -298,7 +298,7 @@ class LoopCopyNode:
         return {"value.loop": inputs["value.out"]["value"]}
 
 
-BranchCopyNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.branch_copy', display_name='Branch Copy', description='Copies value.out into a distinct value.in-compatible key.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='Value Out'),), provides=(DataProvider('value.copy', 'value.in', display_name='Value Copy'),), input_semantics={'value.out': ('output value selected by the route',)}, output_semantics={'value.copy': ('copied value compatible with value.in',)}), rulesets=("vibeflow.process",))
+BranchCopyNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.branch_copy', display_name='Branch Copy', description='Copies value.out into a distinct value.in-compatible key.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='Value Out'),), provides=(DataProvider('value.copy', 'value.in', display_name='Value Copy'),), input_semantics={'value.out': ('output value selected by the route',)}, output_semantics={'value.copy': ('copied value compatible with value.in',)}), rulesets=("vibeflow.process",))
 
 class BranchCopyNode:
 
@@ -306,7 +306,7 @@ class BranchCopyNode:
         return {"value.copy": inputs["value.out"]["value"]}
 
 
-LoopAddItemNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.loop_add_item', display_name='Loop Add Item', description='Adds one loop item into a running total.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('total.current', 'exactly_one', display_name='total.current'), DataRequirement('item.value', 'exactly_one', display_name='item.value')), provides=(DataProvider('total.next', 'total.next', display_name='total.next'), DataProvider('item.metric', 'item.metric', display_name='item.metric')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('total.current', 'exactly_one', display_name='total.current'), DataRequirement('item.value', 'exactly_one', display_name='item.value'))}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('total.next', 'total.next', display_name='total.next'), DataProvider('item.metric', 'item.metric', display_name='item.metric'))}), rulesets=("vibeflow.process",))
+LoopAddItemNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.loop_add_item', display_name='Loop Add Item', description='Adds one loop item into a running total.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('total.current', 'exactly_one', display_name='total.current'), DataRequirement('item.value', 'exactly_one', display_name='item.value')), provides=(DataProvider('total.next', 'total.next', display_name='total.next'), DataProvider('item.metric', 'item.metric', display_name='item.metric')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('total.current', 'exactly_one', display_name='total.current'), DataRequirement('item.value', 'exactly_one', display_name='item.value'))}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('total.next', 'total.next', display_name='total.next'), DataProvider('item.metric', 'item.metric', display_name='item.metric'))}), rulesets=("vibeflow.process",))
 
 class LoopAddItemNode:
 
@@ -315,7 +315,7 @@ class LoopAddItemNode:
         return {"total.next": inputs["total.current"]["value"] + item, "item.metric": item}
 
 
-LoopStepUntilNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.loop_step_until', display_name='Loop Step Until', description='Increments loop.current until it reaches target.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('loop.current', 'exactly_one', display_name='loop.current'),), provides=(DataProvider('loop.next', 'loop.next', display_name='loop.next'), DataProvider('loop.done', 'loop.done', display_name='loop.done')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('loop.current', 'exactly_one', display_name='loop.current'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('loop.next', 'loop.next', display_name='loop.next'), DataProvider('loop.done', 'loop.done', display_name='loop.done'))}), rulesets=("vibeflow.process",))
+LoopStepUntilNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.loop_step_until', display_name='Loop Step Until', description='Increments loop.current until it reaches target.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('loop.current', 'exactly_one', display_name='loop.current'),), provides=(DataProvider('loop.next', 'loop.next', display_name='loop.next'), DataProvider('loop.done', 'loop.done', display_name='loop.done')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('loop.current', 'exactly_one', display_name='loop.current'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('loop.next', 'loop.next', display_name='loop.next'), DataProvider('loop.done', 'loop.done', display_name='loop.done'))}), rulesets=("vibeflow.process",))
 
 class LoopStepUntilNode:
 
@@ -324,7 +324,7 @@ class LoopStepUntilNode:
         return {"loop.next": value, "loop.done": value >= params.get("target", 3)}
 
 
-LoopNextEndNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.loop_next_end', display_name='Loop Next End', description='Ends one loop body after loop.next is ready.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('loop.next', 'exactly_one', display_name='Loop Next'),), input_semantics={'loop.next': ('next loop value',)}), rulesets=("vibeflow.process",))
+LoopNextEndNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.loop_next_end', display_name='Loop Next End', description='Ends one loop body after loop.next is ready.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('loop.next', 'exactly_one', display_name='Loop Next'),), input_semantics={'loop.next': ('next loop value',)}), rulesets=("vibeflow.process",))
 
 class LoopNextEndNode:
 
@@ -332,7 +332,7 @@ class LoopNextEndNode:
         return {}
 
 
-LoopFinalEndNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.loop_final_end', display_name='Loop Final End', description='Ends a loop workflow after loop.final is ready.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('loop.final', 'exactly_one', display_name='Loop Final'),), input_semantics={'loop.final': ('final loop value',)}), rulesets=("vibeflow.process",))
+LoopFinalEndNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.loop_final_end', display_name='Loop Final End', description='Ends a loop workflow after loop.final is ready.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('loop.final', 'exactly_one', display_name='Loop Final'),), input_semantics={'loop.final': ('final loop value',)}), rulesets=("vibeflow.process",))
 
 class LoopFinalEndNode:
 
@@ -340,7 +340,7 @@ class LoopFinalEndNode:
         return {}
 
 
-JoinPassthroughNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.join_passthrough', display_name='Join Passthrough', description='Copies value.in to value.out.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.in', 'exactly_one', display_name='value.in'),), provides=(DataProvider('value.out', 'value.out', display_name='value.out'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.in', 'exactly_one', display_name='value.in'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.out', 'value.out', display_name='value.out'),)}), rulesets=("vibeflow.process",))
+JoinPassthroughNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.join_passthrough', display_name='Join Passthrough', description='Copies value.in to value.out.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('value.in', 'exactly_one', display_name='value.in'),), provides=(DataProvider('value.out', 'value.out', display_name='value.out'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.in', 'exactly_one', display_name='value.in'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.out', 'value.out', display_name='value.out'),)}), rulesets=("vibeflow.process",))
 
 class JoinPassthroughNode:
 
@@ -348,7 +348,7 @@ class JoinPassthroughNode:
         return {"value.out": inputs["value.in"]["value"]}
 
 
-ConditionalValueNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.conditional_value', display_name='Conditional Value', description='Provides value.in and a branch flag.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('value.alt', 'value.in', display_name='value.alt'), DataProvider('flow.use_alt', 'flow.use_alt', display_name='flow.use_alt')), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.alt', 'value.in', display_name='value.alt'), DataProvider('flow.use_alt', 'flow.use_alt', display_name='flow.use_alt'))}), rulesets=("vibeflow.process",))
+ConditionalValueNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.conditional_value', display_name='Conditional Value', description='Provides value.in and a branch flag.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('value.alt', 'value.in', display_name='value.alt'), DataProvider('flow.use_alt', 'flow.use_alt', display_name='flow.use_alt')), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.alt', 'value.in', display_name='value.alt'), DataProvider('flow.use_alt', 'flow.use_alt', display_name='flow.use_alt'))}), rulesets=("vibeflow.process",))
 
 class ConditionalValueNode:
 
@@ -356,7 +356,7 @@ class ConditionalValueNode:
         return {"value.alt": 99, "flow.use_alt": True}
 
 
-LeftValueNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.left_value', display_name='Left Value', description='Produces left value.in.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('value.left', 'value.in', display_name='value.left'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.left', 'value.in', display_name='value.left'),)}), rulesets=("vibeflow.process",))
+LeftValueNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.left_value', display_name='Left Value', description='Produces left value.in.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('value.left', 'value.in', display_name='value.left'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.left', 'value.in', display_name='value.left'),)}), rulesets=("vibeflow.process",))
 
 class LeftValueNode:
 
@@ -364,7 +364,7 @@ class LeftValueNode:
         return {"value.left": 1}
 
 
-RightValueNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.right_value', display_name='Right Value', description='Produces right value.in.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('value.right', 'value.in', display_name='value.right'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.right', 'value.in', display_name='value.right'),)}), rulesets=("vibeflow.process",))
+RightValueNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.right_value', display_name='Right Value', description='Produces right value.in.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('value.right', 'value.in', display_name='value.right'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.right', 'value.in', display_name='value.right'),)}), rulesets=("vibeflow.process",))
 
 class RightValueNode:
 
@@ -372,7 +372,7 @@ class RightValueNode:
         return {"value.right": 2}
 
 
-OtherValueNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.other_value', display_name='Other Value', description='Produces other.in.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('other.in', 'other.in', display_name='other.in'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('other.in', 'other.in', display_name='other.in'),)}), rulesets=("vibeflow.process",))
+OtherValueNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.other_value', display_name='Other Value', description='Produces other.in.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('other.in', 'other.in', display_name='other.in'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('other.in', 'other.in', display_name='other.in'),)}), rulesets=("vibeflow.process",))
 
 class OtherValueNode:
 
@@ -380,7 +380,7 @@ class OtherValueNode:
         return {"other.in": 10}
 
 
-TwoInputJoinNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.two_input_join', display_name='Two Input Join', description='Adds value.in and other.in.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.in', 'exactly_one', display_name='value.in'), DataRequirement('other.in', 'exactly_one', display_name='other.in')), provides=(DataProvider('value.out', 'value.out', display_name='value.out'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.in', 'exactly_one', display_name='value.in'), DataRequirement('other.in', 'exactly_one', display_name='other.in'))}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.out', 'value.out', display_name='value.out'),)}), rulesets=("vibeflow.process",))
+TwoInputJoinNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.two_input_join', display_name='Two Input Join', description='Adds value.in and other.in.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('value.in', 'exactly_one', display_name='value.in'), DataRequirement('other.in', 'exactly_one', display_name='other.in')), provides=(DataProvider('value.out', 'value.out', display_name='value.out'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.in', 'exactly_one', display_name='value.in'), DataRequirement('other.in', 'exactly_one', display_name='other.in'))}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.out', 'value.out', display_name='value.out'),)}), rulesets=("vibeflow.process",))
 
 class TwoInputJoinNode:
 
@@ -388,7 +388,7 @@ class TwoInputJoinNode:
         return {"value.out": inputs["value.in"]["value"] + inputs["other.in"]["value"]}
 
 
-InactiveRouteNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.inactive_route', display_name='Inactive Route', description='Produces a false route flag.', version='0.1.0', flow_kind='decision', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('flow.route', 'flow.route', display_name='flow.route'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('flow.route', 'flow.route', display_name='flow.route'),)}), rulesets=("vibeflow.process",))
+InactiveRouteNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.inactive_route', display_name='Inactive Route', description='Produces a false route flag.', version='0.1.0', flow_kind='decision', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('flow.route', 'flow.route', display_name='flow.route'),), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('flow.route', 'flow.route', display_name='flow.route'),)}), rulesets=("vibeflow.process",))
 
 class InactiveRouteNode:
 
@@ -415,7 +415,7 @@ def _loop_registry() -> NodeRegistry:
 def _fixed_count_loop_graph(*, max_iterations: int = 10, stop_after: int = 3):
     return parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "loop.fixed_step",
                     requires=["loop.current"],
@@ -501,7 +501,7 @@ def _while_loop_graph(
         loop["stop_after"] = stop_after
     return parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "loop.step_until",
                     requires=["loop.current"],
@@ -607,7 +607,7 @@ def test_while_loop_outputs_match_plan_block_and_compiled_execution() -> None:
 def test_node_config_overrides_pass_through_nested_loop_body_in_all_execution_modes() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "loop.add_once",
                     requires=["value.in"],
@@ -702,7 +702,7 @@ def test_loop_stop_when_missing_or_non_bool_source_is_runtime_error() -> None:
 def test_block_execution_compiles_loop_body_with_nested_nodeset() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "loop.step_until",
                     requires=["loop.current"],
@@ -788,7 +788,7 @@ def test_block_execution_compiles_loop_body_with_nested_nodeset() -> None:
 def test_block_execution_rejects_removed_loop_concurrency_entry():
     from vibeflow.core.flow import GraphConfigError
     with pytest.raises(GraphConfigError,match='GRAPH.ASYNC.MIGRATION'):
-        parse_graph_config({'pipeline':{'nodes':[{'id':'loop','type_used':'vibeflow.loop.while','display_name':'Loop','description':'Removed task entry','requires':[],'provides':[],'async':'detached'}]}})
+        parse_graph_config({'pipeline':{'nodes':[{'id':'loop','definition_id':'vibeflow.loop.while','display_name':'Loop','description':'Removed task entry','requires':[],'provides':[],'async':'detached'}]}})
 
 
 def test_join_policy_any_active_allows_unconditional_input_when_condition_is_inactive() -> None:
@@ -945,7 +945,7 @@ def test_checked_run_writes_runtime_failure_trace(tmp_path) -> None:
     )
     publish_native_fixture(config_path, _registry())
     with pytest.raises(RuntimeError, match="boom"):
-        run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="runtime_fail")
+        run_checked(config_path, run_root=tmp_path / "runs", run_id="runtime_fail")
     trace_lines = [
         json.loads(line)
         for line in (tmp_path / "runs" / "runtime_fail" / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()
@@ -1129,7 +1129,7 @@ def test_runtime_options_compiled_executes_decision_branch(monkeypatch) -> None:
 
 
 def test_runtime_options_compiled_rejects_decision_loop() -> None:
-    DoneCheckNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.done_check', display_name='Done Check', description='Checks loop completion.', version='0.1.0', flow_kind='decision', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='value.out'),), provides=(DataProvider('loop.done', 'loop.done', display_name='loop.done'), DataProvider('value.loop', 'value.in', display_name='value.loop')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.out', 'exactly_one', display_name='value.out'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('loop.done', 'loop.done', display_name='loop.done'), DataProvider('value.loop', 'value.in', display_name='value.loop'))}), rulesets=("vibeflow.process",))
+    DoneCheckNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.done_check', display_name='Done Check', description='Checks loop completion.', version='0.1.0', flow_kind='decision', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='value.out'),), provides=(DataProvider('loop.done', 'loop.done', display_name='loop.done'), DataProvider('value.loop', 'value.in', display_name='value.loop')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.out', 'exactly_one', display_name='value.out'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('loop.done', 'loop.done', display_name='loop.done'), DataProvider('value.loop', 'value.in', display_name='value.loop'))}), rulesets=("vibeflow.process",))
 
     class DoneCheckNode:
 
@@ -1147,7 +1147,7 @@ def test_runtime_options_compiled_rejects_decision_loop() -> None:
 
 
 def test_runtime_options_block_rejects_decision_loop_before_max_steps() -> None:
-    NeverDoneNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.never_done', display_name='Never Done', description='Never exits loop.', version='0.1.0', flow_kind='decision', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='value.out'),), provides=(DataProvider('loop.done', 'loop.done', display_name='loop.done'), DataProvider('value.loop', 'value.in', display_name='value.loop')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.out', 'exactly_one', display_name='value.out'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('loop.done', 'loop.done', display_name='loop.done'), DataProvider('value.loop', 'value.in', display_name='value.loop'))}), rulesets=("vibeflow.process",))
+    NeverDoneNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.never_done', display_name='Never Done', description='Never exits loop.', version='0.1.0', flow_kind='decision', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='value.out'),), provides=(DataProvider('loop.done', 'loop.done', display_name='loop.done'), DataProvider('value.loop', 'value.in', display_name='value.loop')), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.out', 'exactly_one', display_name='value.out'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('loop.done', 'loop.done', display_name='loop.done'), DataProvider('value.loop', 'value.in', display_name='value.loop'))}), rulesets=("vibeflow.process",))
 
     class NeverDoneNode:
 
@@ -1155,7 +1155,7 @@ def test_runtime_options_block_rejects_decision_loop_before_max_steps() -> None:
             return {"loop.done": False, "value.loop": inputs["value.out"]["value"]}
 
     registry = _registry()
-    register_node(registry, replace(NeverDoneNode_DECLARATION, type_key="test.done_check"), NeverDoneNode, {"target": {"type": "number"}}, {"target": 3})
+    register_node(registry, replace(NeverDoneNode_DECLARATION, id="test.done_check"), NeverDoneNode, {"target": {"type": "number"}}, {"target": 3})
     graph = _decision_loop_graph(target=3, max_steps=1)
 
     with pytest.raises(GraphCompileError) as exc_info:
@@ -1164,14 +1164,14 @@ def test_runtime_options_block_rejects_decision_loop_before_max_steps() -> None:
 
 
 def test_runtime_options_compiled_generates_block_with_async_barrier() -> None:
-    OutToNextNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.out_to_next', display_name='Out To Next', description='Copies value.out to value.next.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='value.out'),), provides=(DataProvider('value.next', 'value.next', display_name='value.next'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.out', 'exactly_one', display_name='value.out'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.next', 'value.next', display_name='value.next'),)}), rulesets=("vibeflow.process",))
+    OutToNextNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.out_to_next', display_name='Out To Next', description='Copies value.out to value.next.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('value.out', 'exactly_one', display_name='value.out'),), provides=(DataProvider('value.next', 'value.next', display_name='value.next'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.out', 'exactly_one', display_name='value.out'),)}, output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.next', 'value.next', display_name='value.next'),)}), rulesets=("vibeflow.process",))
 
     class OutToNextNode:
 
         def run_pure(self, inputs, params):
             return {"value.next": inputs["value.out"]["value"]}
 
-    NextEndNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.next_end', display_name='Next End', description='Ends after value.next.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.next', 'exactly_one', display_name='value.next'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.next', 'exactly_one', display_name='value.next'),)}), rulesets=("vibeflow.process",))
+    NextEndNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.next_end', display_name='Next End', description='Ends after value.next.', version='0.1.0', flow_kind='terminal', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('value.next', 'exactly_one', display_name='value.next'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('value.next', 'exactly_one', display_name='value.next'),)}), rulesets=("vibeflow.process",))
 
     class NextEndNode:
 
@@ -1202,7 +1202,7 @@ def test_runtime_options_compiled_generates_block_with_async_barrier() -> None:
     original_execute_frame = PipelineRuntime._execute_frame
 
     def spy_execute_frame(self, frame, context):
-        interpreted_nodes.append(frame.name)
+        interpreted_nodes.append(frame.id)
         return original_execute_frame(self, frame, context)
 
     PipelineRuntime._execute_frame = spy_execute_frame
@@ -1275,7 +1275,7 @@ def test_runtime_options_block_executes_simple_conditional_route() -> None:
 
 
 def _runtime_nodeset_depth_config(depth: int) -> dict:
-    nodesets = [
+    nodeset_types = [
         _nodeset_config(
             "runtime.depth.0",
             requires=["value.in"],
@@ -1285,7 +1285,7 @@ def _runtime_nodeset_depth_config(depth: int) -> dict:
     ]
     for index in range(1, depth):
         child = f"runtime.depth.{index - 1}"
-        nodesets.append(
+        nodeset_types.append(
             _nodeset_config(
                 f"runtime.depth.{index}",
                 requires=["value.in"],
@@ -1303,7 +1303,7 @@ def _runtime_nodeset_depth_config(depth: int) -> dict:
             )
         )
     return {
-        "nodesets": nodesets,
+        "nodeset_types": nodeset_types,
         "pipeline": {
             "inputs": [INPUT_SPEC("value.in")],
             "nodes": [
@@ -1338,13 +1338,9 @@ def test_runtime_options_rejects_removed_concurrency_cap(value) -> None:
 
 
 @pytest.mark.parametrize("value", [0, -1, True, 1.5, "4"])
-def test_runtime_options_rejects_invalid_nodeset_max_depth(value) -> None:
-    with pytest.raises(ValueError, match="nodeset_max_depth"):
+def test_runtime_options_rejects_retired_nodeset_max_depth(value) -> None:
+    with pytest.raises(TypeError, match="nodeset_max_depth"):
         RuntimeOptions(nodeset_max_depth=value)
-
-
-def test_runtime_options_default_nodeset_max_depth_is_four() -> None:
-    assert RuntimeOptions().nodeset_max_depth == 4
 
 
 def test_pipeline_runtime_has_no_second_implicit_depth_limit() -> None:
@@ -1353,7 +1349,7 @@ def test_pipeline_runtime_has_no_second_implicit_depth_limit() -> None:
     runtime = PipelineRuntime(graph, registry=_registry())
     assert runtime._plan.frames["top"].subplan is not None
 
-    runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions(nodeset_max_depth=5))
+    runtime = PipelineRuntime(graph, registry=_registry(), runtime_options=RuntimeOptions())
     assert runtime._plan.frames["top"].subplan is not None
 
 
@@ -1366,15 +1362,18 @@ def test_checked_run_and_validate_use_effective_nodeset_max_depth(tmp_path) -> N
     publish_native_fixture(config_path, _registry())
     validation = validate_config_path(config_path)
     with pytest.raises(CheckedRunError) as refused:
-        run_checked(config_path, registry=_registry(), initial={"value.in": 2}, run_root=tmp_path / "runs", run_id="default-depth")
+        run_checked(config_path, initial={"value.in": 2}, run_root=tmp_path / "runs", run_id="default-depth")
     publish_native_fixture(config_path, _registry())
+    from tests.fixtures.support.rule_inspection import depth_ruleset
+    from tests.fixtures.support.plugins import append_resource
+    append_resource(tmp_path,depth_ruleset(5).to_dict())
+    data=json.loads(config_path.read_text());data['rulesets']=['test.depth'];config_path.write_text(json.dumps(data))
     result = run_checked(
         config_path,
-        registry=_registry(),
         initial={"value.in": 2},
         run_root=tmp_path / "runs",
         run_id="custom-depth",
-        runtime_options=RuntimeOptions(nodeset_max_depth=5),
+        runtime_options=RuntimeOptions(),
     )
 
     assert any(error.rule_id == "NODESET.NESTING.DEPTH_EXCEEDED" for error in validation.errors)
@@ -1385,7 +1384,7 @@ def test_checked_run_and_validate_use_effective_nodeset_max_depth(tmp_path) -> N
 def test_loop_iterations_do_not_increase_nodeset_nesting_depth() -> None:
     graph = _while_loop_graph(target=5, max_iterations=10)
 
-    context = PipelineRuntime(graph, registry=_loop_registry(), runtime_options=RuntimeOptions(nodeset_max_depth=1)).run({"loop.current": 0})
+    context = PipelineRuntime(graph, registry=_loop_registry(), runtime_options=RuntimeOptions()).run({"loop.current": 0})
 
     assert context.get("loop.final")["value"] == 5
 
@@ -1421,7 +1420,7 @@ def test_task_result_joins_when_required() -> None:
 
 
 def test_task_result_not_delivered_when_unconsumed() -> None:
-    SlowResultNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.slow_result', display_name='Slow Result', description='Slow result-key async task.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('value.async', 'value.async', display_name='value.async'),), examples=({'inputs': {}, 'params': {}},), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.async', 'value.async', display_name='value.async'),)}), rulesets=("vibeflow.process",))
+    SlowResultNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.slow_result', display_name='Slow Result', description='Slow result-key async task.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('value.async', 'value.async', display_name='value.async'),), examples=({'inputs': {}, 'params': {}},), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.async', 'value.async', display_name='value.async'),)}), rulesets=("vibeflow.process",))
 
     class SlowResultNode:
 
@@ -1517,7 +1516,7 @@ def test_runtime_no_longer_has_json_snapshot_output_mode() -> None:
 def test_task_nodeset_result_joins_when_required() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "math.add_one",
                     requires=["value.in"],
@@ -1547,7 +1546,7 @@ def test_task_nodeset_result_joins_when_required() -> None:
 
 
 def test_async_detached_timeout_records_warning_and_does_not_block() -> None:
-    SlowNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.slow', display_name='Slow', description='Slow detached task.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('value.out', 'value.out', display_name='value.out'),), examples=({'inputs': {}, 'params': {}},), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.out', 'value.out', display_name='value.out'),)}), rulesets=("vibeflow.process",))
+    SlowNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.slow', display_name='Slow', description='Slow detached task.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('value.out', 'value.out', display_name='value.out'),), examples=({'inputs': {}, 'params': {}},), output_semantics={item.key: ('Fixture ' + item.key,) for item in (DataProvider('value.out', 'value.out', display_name='value.out'),)}), rulesets=("vibeflow.process",))
 
     class SlowNode:
 
@@ -1614,7 +1613,7 @@ class RuntimePlugin:
     )
 
     publish_native_fixture(config_path, _registry())
-    run_checked(config_path, registry=_registry(), run_root=tmp_path / "runs", run_id="node_hooks_off", runtime_options=RuntimeOptions(node_hooks=False))
+    run_checked(config_path, run_root=tmp_path / "runs", run_id="node_hooks_off", runtime_options=RuntimeOptions(node_hooks=False))
 
     hooks = [json.loads(line)["hook"] for line in marker_path.read_text(encoding="utf-8").splitlines()]
     assert hooks == ["before_run", "after_run"]
@@ -1658,7 +1657,6 @@ class RuntimePlugin:
     publish_native_fixture(config_path, _registry())
     run_checked(
         config_path,
-        registry=_registry(),
         run_root=tmp_path / "runs",
         run_id="block_hooks",
         runtime_options=RuntimeOptions(trace="boundary", node_hooks=False, nodeset_hooks=False, block_hooks=True, execution="compiled"),
@@ -1672,7 +1670,7 @@ def test_checked_run_trace_records_nodeset_enter_exit(tmp_path) -> None:
     _write_config_file(
         config_path,
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "math.add_one",
                     requires=["value.in"],
@@ -1696,7 +1694,6 @@ def test_checked_run_trace_records_nodeset_enter_exit(tmp_path) -> None:
     publish_native_fixture(config_path, _registry())
     result = run_checked(
         config_path,
-        registry=_registry(),
         initial={"value.in": 2},
         run_root=tmp_path / "runs",
         run_id="nodeset_run",
@@ -1733,7 +1730,7 @@ def test_checked_run_output_summary_does_not_expand_large_prediction_mapping(tmp
     )
 
     publish_native_fixture(config_path, registry)
-    result = run_checked(config_path, registry=registry, run_root=tmp_path / "runs", run_id="large_prediction")
+    result = run_checked(config_path, run_root=tmp_path / "runs", run_id="large_prediction")
 
     assert result.context.get("value.out")["value"]["sample_0999"] == 999
     summary_text = (result.run_dir / "output_summary.json").read_text(encoding="utf-8")
@@ -1745,7 +1742,7 @@ def test_checked_run_output_summary_does_not_expand_large_prediction_mapping(tmp
 def test_runtime_trace_records_nested_nodeset_qualified_paths() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "inner.flow",
                     provides=["value.out"],
@@ -1792,7 +1789,7 @@ def test_runtime_trace_records_nested_nodeset_qualified_paths() -> None:
 def test_runtime_trace_counts_while_loop_nodeset_steps() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "loop.flow",
                     requires=["loop.current"],
@@ -1858,7 +1855,7 @@ def test_runtime_trace_counts_while_loop_nodeset_steps() -> None:
 def test_runtime_trace_preserves_nested_failure_path() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "fail.flow",
                     provides=["value.out"],
@@ -1952,6 +1949,8 @@ def test_checked_run_rejects_unsafe_programmatic_run_id_without_writing(tmp_path
 
 
 def test_cli_run_uses_checked_run_and_refuses_without_registered_nodes(tmp_path, capsys) -> None:
+    from tests.fixtures.support.projects import register_root
+    register_root(tmp_path)
     config_path = tmp_path / "workflow.json"
     config_path.write_text(
         json.dumps({"pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.")]}}),
@@ -1973,7 +1972,7 @@ def test_cli_run_uses_checked_run_and_refuses_without_registered_nodes(tmp_path,
     assert payload["status"] == "FAIL"
     run_dir = Path(payload["run_dir"])
     assert (run_dir / "health_report.json").exists()
-    assert payload["health"]["errors"][0]["rule_id"] == "NODE.TYPE.UNKNOWN"
+    assert payload["health"]["errors"][0]["rule_id"] == "NODE.DEFINITION.UNKNOWN"
 
 def test_cli_run_succeeds_with_declarations_and_writes_artifacts(tmp_path, capsys) -> None:
     from tests.fixtures.support.declarations import write_node_plugin

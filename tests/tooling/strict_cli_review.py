@@ -34,12 +34,13 @@ def _write_review_workspace(
     architecture_path = project / "ARCHITECTURE.jsonc"
     output_path = repo / "reports" / "graph.expanded.svg"
     workspace_path.write_text(
-        json.dumps({"policy": {}, "roots": [{"id": "project", "path": "project"}]}),
+        json.dumps({"roots": [{"id": "project", "path": "project"}]}),
         encoding="utf-8",
     )
+    (repo / "project_rules.jsonc").write_text('{"rulesets":[]}')
     project_config: dict[str, object] = {
         "project_target": "python",
-        "quality_enabled": False,
+
     }
     if registered:
         project_config["architecture"] = {

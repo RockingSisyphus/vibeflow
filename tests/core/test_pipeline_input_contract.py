@@ -33,7 +33,7 @@ def test_schema_and_parser_report_the_same_input_field(value):
     with pytest.raises(ValueError, match=r"pipeline.inputs\[0\].required must be explicitly"):
         parse_pipeline_inputs([item], field="pipeline.inputs")
     findings = collect_config_schema_findings({"pipeline": {"inputs": [item], "nodes": [
-        {"id": "start", "type_used": "test.start", "display_name": "Start", "description": "Start."},
+        {"id": "start", "definition_id": "test.start", "display_name": "Start", "description": "Start."},
     ]}})
     assert len(findings) == 1
     assert findings[0].rule_id == "CONFIG.SCHEMA.PIPELINE_INPUTS"

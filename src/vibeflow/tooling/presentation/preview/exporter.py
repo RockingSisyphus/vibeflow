@@ -9,11 +9,12 @@ class PreviewExportError(RuntimeError):
         super().__init__(str(error))
         self.record = record
 
-def workflow_identity(config, workspace=None, *, target="python", name=None):
+def workflow_identity(config, workspace, *, target="python", name=None):
     config = Path(config).resolve()
-    owner = workspace.root_for_path(config) if workspace else None
-    base = owner.path if owner else config.parent
-    root_id = owner.id if owner else "project"
+    owner = workspace.root_for_path(config)
+    if owner is None:
+        raise ValueError(f"workflow is not in a registered root: {config}")
+    base,root_id = owner.path,owner.id
     relative = config.relative_to(base).as_posix()
     return {"root_id": root_id, "path": relative, "id": root_id + ":" + relative,
             "name": name or config.stem, "target": target}
@@ -41,13 +42,12 @@ def publish_preview(*, root, workflow, category, status, architecture, links=(),
         views = [{"id":"flow", "label":"流程", "renderer":"flow"}]
         views.extend({"id":key,"label":label,"renderer":"resources","kinds":kinds}
             for key,label,kinds in (("base_lib","BaseLib",["base_lib"]),
-            ("plugin","Plugin",["plugin","plugin_declaration"]),
-            ("host_extension","Host Extension",["host_extension"])))
+            ("plugin","Plugin",["plugin_declaration"])))
         views.append({"id":"links","label":"workflow 关联","renderer":"links"})
         declared_links = list(links) + _operation_links(architecture, workflow)
         for target in (target_graphs or {}).values():
             declared_links.extend(_operation_links(target["architecture"], target["workflow"]))
-        payload = dict(version=2, id=record.metadata["id"], workflow=workflow,
+        payload = dict(version=3, id=record.metadata["id"], workflow=workflow,
                        architecture=architecture, links=declared_links, views=views, artifacts={})
         if target_graphs:
             payload["workflow_graphs"] = target_graphs

@@ -3,6 +3,7 @@ from pathlib import Path
 import json
 import os
 import subprocess
+import shutil
 import sys
 sys.dont_write_bytecode = True
 
@@ -13,14 +14,15 @@ from tests.fixtures.support.addition_sandboxes import main, workspace
 
 def run(work, *, toolchain=None):
     workspace(FIXTURE, work)
-    helper = work / "project/math_support.py"
+    helper = work / "project/plugins/addition/math_support.py"
     original = helper.read_text()
     observations = []
     for phase, code, expected in [("baseline", original, 5), ("edited", original.replace("a + b", "a + b + 1"), 6), ("restored", original, 5)]:
         helper.write_text(code)
         stage = work / phase
         stage.mkdir()
-        stage_workspace = {"roots": [{"id": "plugin-addition", "path": str(work / "project")}]}
+        stage_workspace = {"roots": [{"id": "plugin-addition", "path": "project"}]}
+        shutil.copytree(work / "project", stage / "project")
         (stage / "vibeflow_config.jsonc").write_text(json.dumps(stage_workspace))
         completed = subprocess.run([sys.executable, str(FIXTURE / "consumer.py"), str(stage)], cwd=stage,
             capture_output=True, text=True, env={**os.environ, "PYTHONPATH": str(FIXTURE.parents[2] / "src"), "PYTHONDONTWRITEBYTECODE": "1"})

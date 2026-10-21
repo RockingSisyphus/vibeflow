@@ -9,12 +9,12 @@ import pytest
 from vibeflow.tooling.application.python import PythonBuildRequest,build_python_aot,load_bundle
 
 
-TRAINING = '''from vibeflow.targets.python.sdk import Plugin,node
-@node(type_key="cpu.terminal",flow_kind="terminal",contract={},rulesets=[])
+TRAINING = '''from vibeflow.targets.python.sdk import node
+@node(node_type='vibeflow.node', id="cpu.terminal",flow_kind="terminal",contract={},rulesets=[])
 class Terminal:
     def run_pure(self,inputs,params):
         return {}
-@node(type_key="cpu.train",flow_kind="global_state",rulesets=["vibeflow.global_state"],contract={"requires":[{"type":"batch","display_name":"Batch","cardinality":"exactly_one"}],"provides":[{"key":"loss","type":"number","display_name":"Loss"},{"key":"model","type":"model","display_name":"Model"},{"key":"batch","type":"batch.seen","display_name":"Seen batch"}],"input_semantics":{"batch":["CPU training Tensor"]},"output_semantics":{"loss":["Training loss"],"model":["Same model"],"batch":["Same Tensor"]}})
+@node(node_type='vibeflow.node', id="cpu.train",flow_kind="global_state",rulesets=["vibeflow.global_state"],contract={"requires":[{"type":"batch","display_name":"Batch","cardinality":"exactly_one"}],"provides":[{"key":"loss","type":"number","display_name":"Loss"},{"key":"model","type":"model","display_name":"Model"},{"key":"batch","type":"batch.seen","display_name":"Seen batch"}],"input_semantics":{"batch":["CPU training Tensor"]},"output_semantics":{"loss":["Training loss"],"model":["Same model"],"batch":["Same Tensor"]}})
 class Train:
     def run_pure(self,inputs,params):
         model=params["_global"]["model"]
@@ -25,7 +25,6 @@ class Train:
         loss.backward()
         optimizer.step()
         return {"loss":loss.item(),"model":model,"batch":batch}
-plugin=Plugin(id="cpu",resources=[Terminal,Train])
 '''
 
 
@@ -36,18 +35,20 @@ def test_cpu_training_matches_source_after_project_removal(tmp_path):
     from vibeflow.targets.python.runtime import PipelineRuntime
     source = tmp_path/'source'
     source.mkdir()
-    (source/'vibeflow_config.jsonc').write_text('{"roots":[{"id":"cpu","path":"."}]}')
+    from tests.fixtures.support.projects import register_root
+    register_root(source)
+    (source/"nodes").mkdir()
     (source/'vibeflow_project.jsonc').write_text('{"project_target":"python"}')
-    (source/'plugin.py').write_text(TRAINING)
+    (source/'nodes/training.py').write_text(TRAINING)
     config = source/'workflow.jsonc'
-    config.write_text(json.dumps({'plugins':[{'source':{'kind':'file','ref':'plugin.py'}}],'rulesets':[],
+    config.write_text(json.dumps({'rulesets':[],
         'pipeline':{'inputs':[{'key':'input','type':'batch','display_name':'Batch','required':True}],
-            'nodes':[{'id':name,'type_used':kind,'display_name':name,'description':name}
+            'nodes':[{'id':name,'definition_id':kind,'display_name':name,'description':name}
                 for name,kind in [('start','cpu.terminal'),('train','cpu.train'),('end','cpu.terminal')]],
             'edges':[['start','train'],['train','end']],
             'outputs':[{'type':kind,'as':name,'display_name':name,'cardinality':'exactly_one'}
                 for kind,name in [('number','loss'),('model','model'),('batch.seen','batch')]]}}))
-    workspace = load_workspace_config(source/'vibeflow_config.jsonc')
+    workspace = load_workspace_config(source.parent/'vibeflow_config.jsonc')
     torch.manual_seed(41)
     initial = torch.nn.Linear(2,1)
     models = [copy.deepcopy(initial),copy.deepcopy(initial)]

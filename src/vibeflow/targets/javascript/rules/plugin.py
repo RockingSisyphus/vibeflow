@@ -5,7 +5,7 @@ from vibeflow.targets.javascript.rules.node.handlers import javascript_source_bi
 
 def javascript_rule_bindings():
     from vibeflow.targets.javascript.rules.graph import workflow_topic_handlers, workflow_plan_handlers
-    from vibeflow.targets.javascript.rules.project import javascript_project_bindings
+    from vibeflow.targets.javascript.rules.source_quality import javascript_project_bindings
     return {**capability_handlers(), **javascript_source_bindings(), **workflow_topic_handlers(), **workflow_plan_handlers(),
         **javascript_project_bindings()}
 

@@ -1,0 +1,42 @@
+{
+  "type_key": "selection.inherited",
+  "display_name": "inherited",
+  "description": "inherited",
+  "requires": [],
+  "provides": [],
+  "pipeline": {
+    "nodes": [
+      {
+        "id": "start",
+        "definition_id": "selection.node",
+        "display_name": "start",
+        "description": "start"
+      },
+      {
+        "id": "local",
+        "definition_id": "selection.node",
+        "display_name": "local",
+        "description": "local",
+        "rulesets": [
+          "selection.local"
+        ]
+      },
+      {
+        "id": "end",
+        "definition_id": "selection.node",
+        "display_name": "end",
+        "description": "end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "local"
+      },
+      {
+        "from": "local",
+        "to": "end"
+      }
+    ]
+  }
+}

@@ -18,7 +18,7 @@ _RECORD_FIELDS = {
 }
 
 
-def project_quality_report(facts, policy, executions, checked_rulesets):
+def source_quality_report(facts, policy, executions, checked_rulesets):
     from vibeflow.targets.shared.quality_support.evaluator import _dedupe_findings
     findings = list(facts.findings)
     records = {name: [] for name in _RECORD_FIELDS.values()}
@@ -117,4 +117,4 @@ def _summaries(values):
     return {**common, "rule_summaries": [{"origin": origin, "value": value} for origin, value in snapshots]}
 
 
-__all__ = ["project_quality_report"]
+__all__ = ["source_quality_report"]

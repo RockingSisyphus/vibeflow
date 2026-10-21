@@ -38,7 +38,7 @@ class EmittedWorkflow:
     plan_sha256: str
     implementation_modules: tuple[str, ...]
     implementation_bindings: tuple[tuple[str, str], ...]
-    host_extensions: tuple[str, ...] = ()
+
     runtime_plugins: tuple[str, ...] = ()
 
 
@@ -49,9 +49,7 @@ def emit_workflow_module(
 ) -> EmittedWorkflow:
     """Emit a side-effect-free ESM module from a canonical plan and bindings."""
     workflow = bound_workflow_view(plan, javascript_bindings)
-    host_extensions = tuple(
-        item.to_value() for item in javascript_bindings.host_extensions
-    )
+
     runtime_plugins = tuple(
         _plugin_binding_value(item) for item in javascript_bindings.runtime_plugins
     )
@@ -75,10 +73,7 @@ def emit_workflow_module(
         bindings,
         modules,
     )
-    host_imports, host_factories = _host_extension_imports(
-        host_extensions,
-    )
-    import_lines.extend(host_imports)
+
     plugin_imports, plugin_factories = _runtime_plugin_imports(
         runtime_plugins,
     )
@@ -137,31 +132,20 @@ def emit_workflow_module(
         plugin_source,
         static_source,
         public_entry,
-        (
-            _host_extension_source(
-                workflow,
-                host_extensions,
-                host_factories,
-            )
-            if host_extensions
-            else ""
-        ),
         "",
     ]
     return EmittedWorkflow(
         source="\n\n".join(part for part in source_parts if part != ""),
         declarations=declarations(
             workflow,
-            has_host_extensions=bool(host_extensions),
+
         ),
         plan_sha256=hashlib.sha256(
             canonical_plan.encode("utf-8")
         ).hexdigest(),
         implementation_modules=tuple(modules),
         implementation_bindings=tuple(bindings),
-        host_extensions=tuple(
-            str(item.get("id", "")) for item in host_extensions
-        ),
+
         runtime_plugins=tuple(
             str(item.get("id", "")) for item in runtime_plugins
         ),
@@ -253,26 +237,7 @@ def _implementation_imports(
     return import_lines, expressions
 
 
-def _host_extension_imports(
-    host_extensions: tuple[Mapping[str, Any], ...],
-) -> tuple[list[str], list[str]]:
-    lines: list[str] = []
-    factories: list[str] = []
-    for index, extension in enumerate(host_extensions):
-        module = module_specifier(str(extension.get("module", "")))
-        exported = str(
-            extension.get("export", "createHostExtension")
-            or "createHostExtension"
-        )
-        namespace = f"__vf_host_module_{index}"
-        lines.append(
-            f"import * as {namespace} from "
-            f"{json.dumps(module, ensure_ascii=False)};"
-        )
-        factories.append(
-            namespace + "".join(f"[{json.dumps(part, ensure_ascii=False)}]" for part in exported.split("."))
-        )
-    return lines, factories
+
 
 
 def _plugin_binding_value(value: object) -> Mapping[str, Any]:
@@ -321,265 +286,7 @@ def _runtime_plugin_imports(
     return lines, factories
 
 
-def _host_extension_source(
-    workflow: EmissionWorkflow,
-    host_extensions: tuple[Mapping[str, Any], ...],
-    factories: list[str],
-) -> str:
-    descriptors = [
-        {
-            "id": str(extension.get("id", "")),
-            "provides": [
-                str(item)
-                for item in extension.get("provides", ())
-            ],
-            "config": dict(extension.get("config", {})),
-            "factory_index": index,
-        }
-        for index, extension in enumerate(host_extensions)
-    ]
-    entry_name = (
-        "runWorkflow"
-        if workflow.entry_mode == "sync"
-        else "runWorkflowAsync"
-    )
-    invoke_async = "" if workflow.entry_mode == "sync" else "async "
-    invocation = (
-        """
-    try {
-      return runWorkflow(inputs, { ...rawOptions, capabilities, signal: linked.signal, __vfParentObservation: options.__vfParentObservation });
-    } finally {
-      linked.cleanup();
-    }"""
-        if workflow.entry_mode == "sync"
-        else """
-    const invocation = Promise.resolve().then(() =>
-      runWorkflowAsync(inputs, { ...rawOptions, capabilities, signal: linked.signal, __vfParentObservation: options.__vfParentObservation })
-    );
-    active.add(invocation);
-    try {
-      return await invocation;
-    } finally {
-      active.delete(invocation);
-      linked.cleanup();
-    }"""
-    )
-    return f"""
-const __vfHostDescriptors = {json.dumps(descriptors, ensure_ascii=False, sort_keys=True)};
-const __vfHostFactories = [{", ".join(factories)}];
 
-function __vfHostFailure(code, message, cause) {{
-  return new VibeFlowWorkflowError(code, message, {{
-    workflowId: {json.dumps(workflow.workflow_id, ensure_ascii=False)},
-    cause,
-  }});
-}}
-
-function __vfLinkedSignal(signals) {{
-  const controller = new AbortController();
-  const listeners = [];
-  for (const signal of signals.filter(Boolean)) {{
-    if (signal.aborted) {{
-      controller.abort(signal.reason);
-      break;
-    }}
-    const listener = () => controller.abort(signal.reason);
-    signal.addEventListener("abort", listener, {{ once: true }});
-    listeners.push([signal, listener]);
-  }}
-  return {{
-    signal: controller.signal,
-    cleanup() {{
-      for (const [signal, listener] of listeners) {{
-        signal.removeEventListener("abort", listener);
-      }}
-    }},
-  }};
-}}
-
-function __vfFrozenHostConfig(value) {{
-  if (Array.isArray(value)) {{
-    return Object.freeze(value.map((item) => __vfFrozenHostConfig(item)));
-  }}
-  if (value && typeof value === "object") {{
-    const copy = {{}};
-    for (const [key, item] of Object.entries(value)) {{
-      copy[key] = __vfFrozenHostConfig(item);
-    }}
-    return Object.freeze(copy);
-  }}
-  return value;
-}}
-
-export function createWorkflowHost(options = {{}}) {{
-  return __vfObserveHost(__vfCreateWorkflowHost, options);
-}}
-
-function __vfCreateWorkflowHost(options = {{}}) {{
-  if (!options || typeof options !== "object" || Array.isArray(options)) {{
-    throw __vfHostFailure(
-      "VF_HOST_OPTIONS",
-      "workflow host options must be an object",
-    );
-  }}
-  const controller = new AbortController();
-  const active = new Set();
-  const externalCapabilities = options.capabilities || {{}};
-  const providedCapabilities = Object.create(null);
-  let started = false;
-  let startedCount = 0;
-  let startPromise = null;
-  let stopPromise = null;
-
-  function mergedCapabilities(extra = {{}}) {{
-    const merged = Object.create(null);
-    for (const source of [externalCapabilities, providedCapabilities, extra]) {{
-      for (const [id, capability] of Object.entries(source || {{}})) {{
-        if (Object.prototype.hasOwnProperty.call(merged, id)) {{
-          throw __vfHostFailure(
-            "VF_HOST_CAPABILITY_CONFLICT",
-            `capability '${{id}}' is supplied by more than one host source`,
-          );
-        }}
-        merged[id] = capability;
-      }}
-    }}
-    return merged;
-  }}
-
-  {invoke_async}function invoke(inputs, rawOptions = {{}}) {{
-    if (!started || stopPromise) {{
-      throw __vfHostFailure(
-        "VF_HOST_NOT_STARTED",
-        "workflow host must be started before invoking its workflow",
-      );
-    }}
-    const capabilities = mergedCapabilities(rawOptions.capabilities);
-    const linked = __vfLinkedSignal([controller.signal, rawOptions.signal]);
-    {invocation.strip()}
-  }}
-
-  const instances = __vfHostDescriptors.map((descriptor) => {{
-    const factory = __vfHostFactories[descriptor.factory_index];
-    if (typeof factory !== "function") {{
-      throw __vfHostFailure(
-        "VF_HOST_EXTENSION_FACTORY",
-        `host_extension '${{descriptor.id}}' does not export a factory function`,
-      );
-    }}
-    let instance;
-    try {{
-      instance = factory(Object.freeze({{
-        extensionId: descriptor.id,
-        config: __vfFrozenHostConfig(descriptor.config),
-        signal: controller.signal,
-        {entry_name}: invoke,
-      }}));
-    }} catch (cause) {{
-      throw __vfHostFailure(
-        "VF_HOST_EXTENSION_CREATE",
-        `host_extension '${{descriptor.id}}' factory failed`,
-        cause,
-      );
-    }}
-    if (!instance || typeof instance !== "object"
-        || typeof instance.start !== "function"
-        || typeof instance.stop !== "function") {{
-      throw __vfHostFailure(
-        "VF_HOST_EXTENSION_SHAPE",
-        `host_extension '${{descriptor.id}}' must return start() and stop()`,
-      );
-    }}
-    const capabilities = instance.capabilities || {{}};
-    for (const capabilityId of descriptor.provides) {{
-      if (!Object.prototype.hasOwnProperty.call(capabilities, capabilityId)) {{
-        throw __vfHostFailure(
-          "VF_HOST_EXTENSION_CAPABILITY",
-          `host_extension '${{descriptor.id}}' did not provide '${{capabilityId}}'`,
-        );
-      }}
-      if (Object.prototype.hasOwnProperty.call(providedCapabilities, capabilityId)) {{
-        throw __vfHostFailure(
-          "VF_HOST_CAPABILITY_CONFLICT",
-          `multiple host_extensions provide capability '${{capabilityId}}'`,
-        );
-      }}
-      providedCapabilities[capabilityId] = capabilities[capabilityId];
-    }}
-    return {{ descriptor, instance }};
-  }});
-
-  async function start() {{
-    if (stopPromise) {{
-      throw __vfHostFailure(
-        "VF_HOST_STOPPED",
-        "a stopped workflow host cannot be restarted",
-      );
-    }}
-    if (started) return;
-    if (startPromise) return startPromise;
-    startPromise = (async () => {{
-      try {{
-        for (const item of instances) {{
-          await item.instance.start();
-          startedCount += 1;
-        }}
-        started = true;
-      }} catch (cause) {{
-        controller.abort(cause);
-        for (let index = startedCount - 1; index >= 0; index -= 1) {{
-          try {{
-            await instances[index].instance.stop();
-          }} catch {{
-            // Preserve the primary start failure.
-          }}
-        }}
-        startedCount = 0;
-        throw __vfHostFailure(
-          "VF_HOST_EXTENSION_START",
-          "workflow host failed while starting an extension",
-          cause,
-        );
-      }}
-    }})();
-    return startPromise;
-  }}
-
-  async function stop() {{
-    if (stopPromise) return stopPromise;
-    stopPromise = (async () => {{
-      controller.abort("workflow host stopped");
-      let firstFailure = null;
-      for (let index = startedCount - 1; index >= 0; index -= 1) {{
-        try {{
-          await instances[index].instance.stop();
-        }} catch (cause) {{
-          firstFailure ||= cause;
-        }}
-      }}
-      startedCount = 0;
-      started = false;
-      await Promise.allSettled([...active]);
-      if (firstFailure) {{
-        throw __vfHostFailure(
-          "VF_HOST_EXTENSION_STOP",
-          "workflow host failed while stopping an extension",
-          firstFailure,
-        );
-      }}
-    }})();
-    return stopPromise;
-  }}
-
-  return Object.freeze({{
-    signal: controller.signal,
-    get started() {{ return started; }},
-    start,
-    stop,
-    {entry_name}: invoke,
-  }});
-}}
-""".strip()
 
 
 __all__ = [

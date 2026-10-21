@@ -24,7 +24,7 @@ from vibeflow.targets.javascript.build.graph_wire import graph_wire
 
 
 _GRAPH_MUTATION_KEYS = frozenset(
-    {"graph", "workflow", "nodes", "nodesets", "routes", "edges", "replace"}
+    {"graph", "workflow", "nodes", "nodeset_types", "routes", "edges", "replace"}
 )
 
 

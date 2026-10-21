@@ -6,8 +6,7 @@ from vibeflow.core.rules import RuleCall, RuleRelation, RuleDescriptor, RulesetD
 from vibeflow.targets.python.project.policy import EffectivePolicy, default_effective_policy
 from vibeflow.targets.python.quality.policy_parameters import complete_source_policy_plan, source_rule_defaults
 from vibeflow.targets.shared.bindings import native_binding
-from vibeflow.tooling.application.python.project.effective_policy import resolve_effective_policy
-from vibeflow.tooling.project.descriptor_loader import load_builtin_plugins
+from vibeflow.tooling.project.resources import load_builtin_plugins
 from tests.targets.python.test_source_effect_parameters import _resource_context
 
 
@@ -98,16 +97,6 @@ def test_numeric_handler_does_not_accept_import_parameters():
         _plan("vibeflow.maintainability", policy={"imports":{"banned_roots":[]}})
 
 
-@pytest.mark.parametrize("section,value", [("banned_roots",[]), ("allowed_modules",[])])
-def test_explicit_project_configuration_keeps_empty_fields_and_only_consumer_sections(tmp_path, section, value):
-    configured = resolve_effective_policy({"policy":{"imports":{section:value},"node_source":{"max_lines":3}}},
-        config_path=tmp_path / "workflow.jsonc").effective_policy.to_purity_policy()
-    assert configured.configured_import_fields == frozenset({section})
-    for rule_id in ("vibeflow.no_side_effects", "vibeflow.import_side_effects"):
-        result, params = _execute(rule_id, configured=configured)
-        assert result.findings == ()
-        assert set(params["policy"]) == {"imports"}
-        assert params["policy"]["imports"][section] == []
 
 
 def test_whole_object_override_does_not_revive_discarded_rule_policy():
@@ -126,3 +115,12 @@ def test_whole_object_override_does_not_revive_discarded_rule_policy():
 def test_unsupported_scope_is_a_real_rule_failure(rule_id, scope):
     result, _ = _execute(rule_id, effect_scope=scope)
     assert any(item.code == "RULE.EXECUTION" and scope in item.message for item in result.findings)
+
+
+@pytest.mark.parametrize("text, rejected", [
+    ('from vibeflow.targets.python.sdk import node_type as shell\nkind = shell(id="example.shell")\n', False),
+    ('from vibeflow.targets.python.sdk import node_type as shell\nshell = external_factory\nkind = shell(id="example.shell")\n', True),
+])
+def test_node_type_construction_uses_sdk_identity(text, rejected):
+    result, _ = _execute("vibeflow.import_side_effects", text)
+    assert bool(result.findings) is rejected

@@ -15,7 +15,7 @@ def _rule_project(root, *, handler_source=None, outputs=None):
         ("test.in_end", "InEndNode", {}, {}),
     ])
     if handler_source is not None:
-        (root / "review_rule.py").write_text(handler_source)
+        (root / "plugins/code_plugin/review_rule.py").write_text(handler_source)
         append_resource(root, {
             "kind": "rule", "id": "project.review", "outputs": outputs or {},
             "params_schema": {"severity": {"type": "string", "enum": ["error", "warning"]}},
@@ -108,15 +108,18 @@ def test_local_rule_override_changes_severity_without_a_second_policy_switch(tmp
 def test_rule_bundle_contributes_node_and_workflow_findings_to_normal_run(tmp_path):
     config = _rule_project(tmp_path, handler_source=_DIAGNOSTIC_RULE)
     _select_node_rules(tmp_path, extra_calls=[{"id": "domain", "rule_id": "project.review"}])
+    append_resource(tmp_path, {"kind":"rule", "id":"project.graph_review", "level":"graph",
+        "params_schema":{"severity":{"type":"string"}}, "params_defaults":{"severity":"warning"},
+        "implementations":[{"language":"python","source":{"kind":"file","ref":"review_rule.py","export":"check"}}]})
     resource(tmp_path, "ruleset", "project.workflow_review").write_text(json.dumps({
         "kind": "ruleset", "id": "project.workflow_review", "graph_scope":"effective_subtree", "calls": [
-            {"id": "base", "ruleset_id": "vibeflow.workflow"}, {"id": "domain", "rule_id": "project.review"}],
+            {"id": "base", "ruleset_id": "vibeflow.workflow"}, {"id": "domain", "rule_id": "project.graph_review"}],
         "entrypoints": {"static": ["base", "domain"], "run": ["base", "domain"]}}))
     data = json.loads(config.read_text())
     data["rulesets"] = ["project.workflow_review"]
     config.write_text(json.dumps(data))
     result = run_workspace_checked(config, workspace=load_project_workspace(config), run_root=tmp_path / "runs", run_id="findings")
-    findings = {item.code: item for item in result.health.warnings if item.definition_id == "project.review"}
+    findings = {item.code: item for item in result.health.warnings if item.definition_id in {"project.review", "project.graph_review"}}
     assert set(findings) == {"DOMAIN.NODE", "DOMAIN.WORKFLOW"}
     assert all(item.source_location["path"] == "review_rule.py" for item in findings.values())
     assert result.context.get("value.in")["value"] == 1
@@ -125,7 +128,7 @@ def test_rule_bundle_contributes_node_and_workflow_findings_to_normal_run(tmp_pa
 def test_missing_lifecycle_plugin_refuses_formal_validation(tmp_path, capsys):
     config = _rule_project(tmp_path)
     data = json.loads(config.read_text())
-    data["plugins"].append({"source":{"kind":"file","ref":"missing.py"}})
+    data["plugins"].append({"source":{"kind":"file","ref":"plugins/missing/plugin.py"}})
     config.write_text(json.dumps(data))
     assert cli_main(["validate", "--config", str(config), "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)

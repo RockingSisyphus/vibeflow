@@ -8,6 +8,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "src"))
 from tests.fixtures.adaptation_regressions.common import run_cli, run_command, row, write_json
 from tests.fixtures.python.review_layout.fixtures import write_project
 from tests.fixtures.python.review_layout.run_all import user_resource_failures
@@ -48,7 +49,7 @@ def fixture(path, variant):
         next(node for node in workflow["pipeline"]["nodes"] if node["id"] == "loop")["loop"]["body"] = "layout.loop_body"
         write_json(path / "workflow.jsonc", workflow)
     # The custom check is real and selected, including in folded detail nodes.
-    (path / "plugins/check.py").write_text('''from vibeflow.targets.python.sdk import rule, ruleset
+    (path / "plugins/layout/check.py").write_text('''from vibeflow.targets.python.sdk import rule, ruleset
 @rule(id="layout.health", params_schema={"reject":{"type":"boolean"}}, params_defaults={"reject":False})
 def health(context, inputs, params):
     return {"findings": [{"code":"CASE.HIDDEN.SOURCE", "severity":"error",
@@ -57,10 +58,10 @@ def health(context, inputs, params):
 health_set = ruleset(id="layout.health_set", calls=[{"id":"health", "rule_id":"layout.health",
     "params":{"reject":''' + str(variant == "rejected") + '''}}], entrypoints={"static":["health"]})
 ''')
-    plugin = path / "code_plugin.py"
+    plugin = path / "plugins/layout/plugin.py"
     plugin.write_text(plugin.read_text().replace("from vibeflow.targets.python.sdk import Plugin",
-        "from vibeflow.targets.python.sdk import Plugin\nfrom plugins.check import health, health_set")
-        .replace("resources=[calculate, Start, End, Step, Right]", "resources=[calculate, Start, End, Step, Right, health, health_set]"))
+        "from vibeflow.targets.python.sdk import Plugin\nfrom .check import health, health_set")
+        .replace("resources=[]", "resources=[health, health_set]"))
     nodes = path / "nodes/steps.py"
     nodes.write_text(nodes.read_text().replace('rulesets=["vibeflow.process"]', 'rulesets=["vibeflow.process","layout.health_set"]'))
 
@@ -69,7 +70,7 @@ def observe(args, identifier, command, variant):
     path = args.work / identifier
     fixture(path, variant)
     output = path / ("graph.svg" if command in {"review", "export-svg"} else "graph.mmd" if command == "export-mermaid" else "graph.txt")
-    cli = [command, "--workspace", path / "vibeflow_config.jsonc"]
+    cli = [command, "--workspace", path.parent / "vibeflow_config.jsonc"]
     if command != "quality-check":
         cli.extend(("--config", path / "workflow.jsonc"))
     else:
@@ -88,7 +89,7 @@ def observe(args, identifier, command, variant):
         cli.extend(("--run-root", path / "runs", "--run-id", "folded"))
     preparation = None
     if command in {"validate", "quality-check", "run"} and variant != "rejected":
-        preparation = run_cli(path, ["export-architecture", "--workspace", path / "vibeflow_config.jsonc",
+        preparation = run_cli(path, ["export-architecture", "--workspace", path.parent / "vibeflow_config.jsonc",
             "--config", path / "workflow.jsonc", "--output", path / "ARCHITECTURE.jsonc"],
             args.kernel, name="prepare-architecture", timeout=120)
     report = path / "observation.json"
@@ -123,7 +124,7 @@ def observe(args, identifier, command, variant):
     if variant == "rejected" and actual["exit_code"] == 1:
         findings = json.loads(actual["stdout"]).get("errors", [])
         if not findings or any(item.get("code") != "CASE.HIDDEN.SOURCE" or item.get("severity") != "error"
-                               or not item.get("source_location", {}).get("path", "").endswith("plugins/check.py")
+                               or not item.get("source_location", {}).get("path", "").endswith("plugins/layout/check.py")
                                or item.get("source_location", {}).get("line") != 4 for item in findings):
             failures.append("hidden health rejection must retain only the target error, exact file and line")
     if command in {"review", "export-svg"} and output.is_file():
@@ -172,11 +173,11 @@ def observe(args, identifier, command, variant):
             failures.append("ASCII must retain only the folded outer call boxes")
     if command == "review" and (path / "ARCHITECTURE.jsonc").is_file():
         document = json.loads("\n".join(line for line in (path / "ARCHITECTURE.jsonc").read_text().splitlines() if not line.strip().startswith("//")))
-        actual["architecture_expand"] = {key: value.get("expand") for key, value in document["nodesets"].items()}
+        actual["architecture_expand"] = {key: value.get("expand") for key, value in document["nodeset_types"].items()}
         expected = {"layout.outer": variant != "outer-false", "layout.leaf_a": variant != "inner-false", "layout.leaf_b": True}
         if actual["architecture_expand"] != expected:
             failures.append("Architecture must record explicit and default expand values")
-        if not document["nodesets"]["layout.leaf_a"].get("body"):
+        if not document["nodeset_types"]["layout.leaf_a"].get("body"):
             failures.append("Architecture must preserve the complete hidden implementation")
     if command == "run" and actual["exit_code"] == 0:
         execution = json.loads((path / "runs/folded/output_summary.json").read_text())

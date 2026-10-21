@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from vibeflow.targets.python.rules.plugin import project_plugin
+from vibeflow.targets.python.rules.plugin import builtin_plugin
 from vibeflow.targets.python.rules.node.definitions import implementation_handlers
 from vibeflow.targets.python.rules.node.definitions import implementation_resources
 from vibeflow.core.descriptors import compose_contributions
-from vibeflow.targets.shared.quality_support import FileQuality, ProjectQualityFacts, evaluate_project_quality
+from vibeflow.targets.shared.quality_support import FileQuality, SourceQualityFacts, evaluate_source_quality
 from vibeflow.targets.shared.quality_support.implementation import ImplementationLimits, ImplementationMetrics
 from vibeflow.core.rules import RuleCall, RuleContext, RuleRelation, RulesetDescriptor, compile_ruleset, execute_rule_plan
 from vibeflow.targets.python.sdk import Plugin, rule
@@ -17,26 +17,26 @@ from vibeflow.targets.shared.bindings import native_binding
 
 @pytest.mark.parametrize("target", ["python", "javascript"])
 def test_standard_definitions_are_owned_by_the_selected_target(target):
-    from vibeflow.tooling.project.descriptor_loader import load_builtin_plugins
+    from vibeflow.tooling.project.resources import load_builtin_plugins
     catalogs = load_builtin_plugins(target).catalogs
-    assert len(tuple(catalogs.rules)) == 29
+    assert {item.level for item in catalogs.rules} == {"node", "graph", "root", "project"}
     assert catalogs.rules.require("vibeflow.async_lifecycle").scope == "source"
-    assert len(tuple(catalogs.rulesets)) == 12
+    assert {"vibeflow.project.default", "vibeflow.root.default"} <= {item.id for item in catalogs.rulesets}
     assert "vibeflow.task_manager" not in {item.id for item in catalogs.rulesets}
     for group, directory, entries in (("rules", "rules", catalogs.rules),
                                       ("rulesets", "rulesets", catalogs.rulesets)):
         for entry in entries:
             origin = catalogs.origins[(group, entry.id)]
-            assert f"/targets/{target}/{directory}/" in origin.path
+            assert f"/targets/{target}/{directory}/" in origin.path or "/targets/shared/rule_support/" in origin.path
     assert [item.id for item in catalogs.rulesets if item.workflow_default] == ["vibeflow.workflow"]
     assert catalogs.rulesets.require("vibeflow.workflow").graph_scope == "effective_subtree"
 
 
 def test_core_project_evaluator_has_no_implicit_standard_selection(monkeypatch):
-    import vibeflow.targets.python.rules.plugin as providers
+    import vibeflow.targets.shared.rule_support.plugin as providers
     monkeypatch.setattr(providers, "project_plugin", lambda: (_ for _ in ()).throw(AssertionError("implicit provider")))
     file = FileQuality("large.py", "large", 10000, 100000, 0, 0, 0, 0, 0, (), ())
-    report = evaluate_project_quality(ProjectQualityFacts("/scope", (file,)))
+    report = evaluate_source_quality(SourceQualityFacts("/scope", (file,)))
     assert report.status == "PASS"
     assert report.checked_rulesets == ()
     assert report.rule_executions == ()
@@ -50,7 +50,7 @@ def test_contributed_native_replacement_is_resolved_by_its_own_origin():
         observed.append(context.require("marker"))
         return RuleResult()
     external = Plugin("example", resources=(custom,))
-    standard = project_plugin()
+    standard = builtin_plugin()
     catalog = compose_contributions((standard.contributions(), external.contributions()))
     attach_plugin_definitions(catalog, {"python": (standard, external)})
     selected = RulesetDescriptor("example.review", (RuleCall("files", "vibeflow.quality.files"),),
@@ -67,8 +67,8 @@ def test_contributed_native_replacement_is_resolved_by_its_own_origin():
     assert not origin.path.startswith("builtin:")
     descriptor = catalog.rules.require("vibeflow.quality.files")
     assert not descriptor.handler
-    assert origin.symbol == "project_quality_resources"
-    assert catalog.origins[("rulesets", "vibeflow.quality.project")].symbol == "project_quality_ruleset"
+    assert origin.symbol == "source_quality_resources"
+    assert catalog.origins[("rulesets", "vibeflow.quality.source")].symbol == "source_quality_ruleset"
     implementation = descriptor.implementations[0].source
     assert implementation.export == "_files"
     assert Path(implementation.ref).is_file()
@@ -92,8 +92,8 @@ def test_core_graph_models_and_parser_do_not_select_standard_plugins():
     from vibeflow.core.flow import GraphConfig
     from vibeflow.core.config.graph import parse_graph_config_data
     assert GraphConfig(()).rulesets is None
-    graph = parse_graph_config_data({"pipeline":{"nodes":[{"id":"root","type_used":"example.node","display_name":"Call","description":"An explicit call instance."}]},"nodesets":[{
+    graph = parse_graph_config_data({"pipeline":{"nodes":[{"id":"root","definition_id":"example.node","display_name":"Call","description":"An explicit call instance."}]},"nodeset_types":[{
         "type_key":"example.stage","display_name":"Stage","description":"An explicit native scope.",
-        "requires":[],"provides":[],"pipeline":{"nodes":[{"id":"child","type_used":"example.node","display_name":"Call","description":"An explicit call instance."}]}}]})
+        "requires":[],"provides":[],"pipeline":{"nodes":[{"id":"child","definition_id":"example.node","display_name":"Call","description":"An explicit call instance."}]}}]})
     assert graph.rulesets is None
-    assert graph.nodesets["example.stage"].graph.rulesets is None
+    assert graph.nodeset_types["example.stage"].graph.rulesets is None

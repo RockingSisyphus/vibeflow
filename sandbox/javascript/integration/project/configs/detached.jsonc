@@ -12,13 +12,13 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts a main calculation and detached audit task."
       },
       {
         "id": "audit",
-        "type_used": "sandbox.detached_audit",
+        "definition_id": "sandbox.detached_audit",
         "display_name": "audit",
         "description": "Executes the declared ordinary workflow node.",
         "config": {
@@ -27,7 +27,7 @@
       },
       {
         "id": "calculate",
-        "type_used": "sandbox.math",
+        "definition_id": "sandbox.math",
         "display_name": "Preserve input",
         "description": "Keeps a synchronous business result on the main path.",
         "config": {
@@ -37,7 +37,7 @@
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends after the main calculation is available."
       }
@@ -73,7 +73,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

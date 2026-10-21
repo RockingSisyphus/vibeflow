@@ -137,9 +137,9 @@ def test_explicit_import_and_run_entrypoints_use_the_same_graph_and_records(rule
         # Target run entrance still executes this same typed Rule graph.
         from vibeflow.targets.javascript.quality.rules import run_javascript_rules
         from vibeflow.tooling.project.graph_config import parse_graph_config
-        from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
+        from vibeflow.tooling.project.resources import prepare_workflow_catalogs
         rule_project.marker.unlink()
-        catalogs = load_workflow_catalogs(rule_project.project, workflow_config=rule_project.config)
+        catalogs = prepare_workflow_catalogs(rule_project.config)
         graph = parse_graph_config(rule_project.read(rule_project.config), project_root=rule_project.project)
         report = run_javascript_rules(graph, catalogs, project_root=rule_project.project, package_root=rule_project.project, phase="run", target="node")
         result = report.results["example.calculate"][-1].results["checker"]
@@ -230,5 +230,5 @@ def test_invalid_rule_graphs_fail_formal_cli_before_external_handlers(rule_proje
     assert code == 1, payload
     finding = next(item for item in findings(payload) if item["code"] == expected)
     assert not rule_project.events()
-    assert finding.get("source_location", {}).get("path") == str(rule_project.project / ("code_plugin.py" if rule_project.target == "python" else "code_plugin.ts")), finding
+    assert finding.get("source_location", {}).get("path") == str(rule_project.project / ("plugins/code_plugin/plugin.py" if rule_project.target == "python" else "plugins/code_plugin/plugin.ts")), finding
     assert finding["source_location"]["line"] > 0

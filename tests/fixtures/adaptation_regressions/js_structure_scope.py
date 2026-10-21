@@ -7,8 +7,9 @@ from .js_structure import minimal,_CONTRACT
 
 def fixture(root,variant,registered):
     minimal(root,'declaration')
-    plugin=root/'src/plugin.ts';plugin.write_text(plugin.read_text().replace('declaration_rulesets:["vibeflow.plugin_declaration"]','declaration_rulesets:[]').replace('runtime(){return {beforeNode(){},afterNode(){},dispose(){}};},','').replace('rulesets:["vibeflow.plugin"]','rulesets:[]'))
-    helper=root/'src/helper.ts';helper.write_text('export const value=1;\nexport type Input=Record<string,unknown>;\n')
+    (root/'root_rules.jsonc').write_text('{"rulesets":["vibeflow.root.default"],"rule_params":{"vibeflow.root.structure":{"enabled":true}}}')
+    plugin=root/'plugins/demo/plugin.ts';plugin.write_text(plugin.read_text().replace('declaration_rulesets:["vibeflow.plugin_declaration"]','declaration_rulesets:[]').replace('runtime(){return {beforeNode(){},afterNode(){},dispose(){}};},','').replace('rulesets:["vibeflow.plugin"]','rulesets:[]'))
+    helper=root/'nodes/helper.ts';helper.write_text('export const value=1;\nexport type Input=Record<string,unknown>;\n')
     imported='import {value} from "./helper.ts";\n'
     prefix=''
     method='run(){return {result:6};}'
@@ -27,16 +28,16 @@ def fixture(root,variant,registered):
         prefix='class Holder{constructor(){void value;}}\n'+('new Holder();\n' if variant=='constructor_called' else '')
     elif variant=='symbol_isolation':
         helper.write_text('export function value(){return 6;}\n')
-        (root/'src/right.ts').write_text('export function right(){return 7;}\n')
+        (root/'nodes/right.ts').write_text('export function right(){return 7;}\n')
         imported='import {value} from "./helper.ts";\nimport {right} from "./right.ts";\n'
         method='run(){return {result:value()};}'
     else:raise ValueError(variant)
     support='implementation_files:["helper.ts"],' if registered else ''
-    text='import {defineNode} from "@vibeflow/plugin";\n'+imported+prefix+'export const model=defineNode({type_key:"demo.model",'+support+'rulesets:[],contract:'+_CONTRACT+','+method+'});\n'
+    text='import {defineNode} from "@vibeflow/plugin";\n'+imported+prefix+'export const model=defineNode({node_type:"vibeflow.node",id:"demo.model",'+support+'rulesets:[],contract:'+_CONTRACT+','+method+'});\n'
     if variant=='symbol_isolation':
-        text+='export const rightModel=defineNode({type_key:"audit.right",implementation_files:["right.ts"],rulesets:[],contract:'+_CONTRACT+',run(){return {result:right()};}});\n'
+        text+='export const rightModel=defineNode({node_type:"vibeflow.node",id:"audit.right",implementation_files:["right.ts"],rulesets:[],contract:'+_CONTRACT+',run(){return {result:right()};}});\n'
         plugin.write_text(plugin.read_text().replace('import {model}', 'import {model,rightModel}').replace('resources:[start,model,number]', 'resources:[start,model,rightModel,number]'))
-    (root/'src/node.ts').write_text(text)
+    (root/'nodes/node.ts').write_text(text)
 
 
 def observe(work:Path,kernel:Path,toolchain:Path|None,renderer:Path|None)->list[dict]:
@@ -45,7 +46,7 @@ def observe(work:Path,kernel:Path,toolchain:Path|None,renderer:Path|None)->list[
         for registered in (True,False):
             identifier=f'js.A05.scope.{variant}.{"registered" if registered else "unregistered"}'
             root=project(work/identifier,toolchain);fixture(root,variant,registered)
-            actual=cli_summary(run_cli(root,cli_args(root,'quality-check','--config',root/'workflow.jsonc'),kernel,name='quality',toolchain=toolchain))
+            actual=cli_summary(run_cli(root,cli_args(root,'quality-check'),kernel,name='quality',toolchain=toolchain))
             target='QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT'
             findings=[item for item in actual['diagnostics'] if item.get('code',item.get('rule_id'))==target]
             actual['target_findings']=findings

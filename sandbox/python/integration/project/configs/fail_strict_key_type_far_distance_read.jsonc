@@ -17,33 +17,33 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.start",
+        "definition_id": "sandbox.start",
         "display_name": "Start",
         "description": "Runs start."
       },
       {
         "id": "add_pair",
-        "type_used": "semantic.add_pair",
+        "definition_id": "semantic.add_pair",
         "display_name": "Add Pair",
         "description": "Runs add_pair."
       },
       {
         "factor": 3,
         "id": "scale",
-        "type_used": "semantic.scale",
+        "definition_id": "semantic.scale",
         "display_name": "Scale",
         "description": "Runs scale."
       },
       {
         "offset": 1,
         "id": "finalize",
-        "type_used": "semantic.finalize",
+        "definition_id": "semantic.finalize",
         "display_name": "Finalize",
         "description": "Runs finalize."
       },
       {
         "id": "end",
-        "type_used": "semantic.final_end",
+        "definition_id": "semantic.final_end",
         "display_name": "End",
         "description": "Runs end."
       }
@@ -78,7 +78,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

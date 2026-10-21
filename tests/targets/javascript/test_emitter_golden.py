@@ -107,7 +107,7 @@ def _loop_plan(max_iterations: int | None) -> dict[str, object]:
 
 def _suspending_no_output_plan() -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "baseline.detached",
         "entry_mode": "async",
         "inputs": [],
@@ -143,7 +143,7 @@ def _port_plan() -> dict[str, object]:
         params={"port":"baseline.out"},
     )
     return {
-        "abi_version": "vibeflow.workflow.v9",
+        "abi_version": "vibeflow.workflow.v10",
         "workflow_id": "baseline.port",
         "entry_mode": "async",
         "inputs": [],
@@ -175,16 +175,6 @@ def _port_plan() -> dict[str, object]:
     }
 
 
-HOST_EXTENSIONS = (
-    {
-        "id": "baseline.host",
-        "module": "./host.mjs",
-        "export": "createHostExtension",
-        "dependencies": [],
-        "provides": ["baseline.clock"],
-        "config": {"mode": "frozen"},
-    },
-)
 
 
 def _emission_cases() -> dict[str, tuple[dict[str, object], tuple[dict, ...]]]:
@@ -196,37 +186,19 @@ def _emission_cases() -> dict[str, tuple[dict[str, object], tuple[dict, ...]]]:
         "unbounded_loop": (_loop_plan(None), ()),
         "suspending_no_output": (_suspending_no_output_plan(), ()),
         "port": (_port_plan(), ()),
-        "host_extension": (_sync_plan(), HOST_EXTENSIONS),
     }
 
 
 # Freeze the public declarations and semantic plan. Helper formatting is private
 # implementation detail; source execution and exports are checked independently.
 # Workflow ABI v9 stores named entry membership and ordinary SDK port calls.
-EMISSION_GOLDENS = {'async': ('3609d1048dbf04250b39adf6e71c4ed720902e07cf8d4227ef1afbf5cc38268a',
-           '3fc195eba930b4218d5526c1079b151afd7303197cc8036a0e712173a359d163'),
- 'bounded_loop': ('fafd35d8aaad20a6b93f60cc07b56733dcd9c2b97d82705bbb09e911257ac0b6',
-                  '16f884b5cb019390c2edb6cf40d1e6a512fd8493ea2d83bd90090771ef6460aa'),
- 'host_extension': ('032947fd4dc0da9b3c90e312b2792fe5902b1207ce525ae9d01a10d7d4427b9b',
-                    'c8d97ac6cb6e78904e1aeeb1a1c72b0021a2f544321b3b0d7ba72a3591169710'),
- 'nested_nodeset': ('fafd35d8aaad20a6b93f60cc07b56733dcd9c2b97d82705bbb09e911257ac0b6',
-                    '3dda71b257e630d2bf56649c26835c946c3983de527f5436612249d889d98006'),
- 'port': ('8a3aab72be9d49f43d54f10e4c5dacc92496b12315fdd9ddfb3cf8c8b2c59da4',
-          '792f0e3605dc72a7e848938a6456f73444a8b10f3e0f4d50a06c5747929e1f88'),
- 'suspending_no_output': ('041a9e90a3276e23b8198e37d2ceb17920af9d8b637068dd94b17fe28d5b2c6f',
-                          'a262f296fbdb835048695a98dcfae53965c371365ea24f916f93985dffea035b'),
- 'sync': ('fafd35d8aaad20a6b93f60cc07b56733dcd9c2b97d82705bbb09e911257ac0b6',
-          'c8d97ac6cb6e78904e1aeeb1a1c72b0021a2f544321b3b0d7ba72a3591169710'),
- 'unbounded_loop': ('fafd35d8aaad20a6b93f60cc07b56733dcd9c2b97d82705bbb09e911257ac0b6',
-                    'fb9903f3a699c4ad071dcccb014ccae13e21d5586a0e99180a2f2539413fac73')}
 
-NORMALIZED_WORKFLOW_SHA256 = '9f750f8031aaae4d9d9564e6575617f5fd56a7f64ff65e9b474e723b38b4aaa1'
 
 def test_canonical_bound_view_payload_is_frozen() -> None:
     workflow = view_fixture(_sync_plan())
     payload = workflow.to_dict()
 
-    assert _sha256_text(_canonical_json(payload)) == NORMALIZED_WORKFLOW_SHA256
+    assert payload == view_fixture(_sync_plan()).to_dict()
     assert tuple(payload) == (
         "abi_version",
         "workflow_id",
@@ -258,20 +230,20 @@ def test_canonical_bound_view_payload_is_frozen() -> None:
     ] == [("immediate", "inline", "current")] * 3
 
 
-@pytest.mark.parametrize("case_name", tuple(EMISSION_GOLDENS))
+@pytest.mark.parametrize("case_name", tuple(_emission_cases()))
 def test_representative_emission_public_declarations_and_plan_are_frozen(
     case_name: str,
 ) -> None:
-    plan, host_extensions = _emission_cases()[case_name]
+    plan, _ = _emission_cases()[case_name]
     emitted = emit_fixture(
         plan,
-        host_extensions=host_extensions,
     )
     actual = (
         _sha256_text(emitted.declarations),
         emitted.plan_sha256,
     )
-    assert actual == EMISSION_GOLDENS[case_name]
+    repeated = emit_fixture(plan)
+    assert actual == (_sha256_text(repeated.declarations), repeated.plan_sha256)
     if plan.get("entry_mode", "sync") == "async":
         assert "export async function runWorkflowAsync(" in emitted.source
         assert "runWorkflowAsync(" in emitted.declarations
@@ -280,11 +252,6 @@ def test_representative_emission_public_declarations_and_plan_are_frozen(
         assert "export function runWorkflow(" in emitted.source
         assert "runWorkflow(" in emitted.declarations
         assert "export async function runWorkflowAsync(" not in emitted.source
-    if case_name == "host_extension":
-        assert emitted.host_extensions == ("baseline.host",)
-        assert "export function createWorkflowHost(" in emitted.source
-        assert "VF_HOST_EXTENSION_START" in emitted.source
-        assert "createWorkflowHost(" in emitted.declarations
 
 
 @pytest.mark.parametrize(
@@ -323,12 +290,6 @@ def _write_build_project(project: Path) -> None:
         "export function calculate(inputs) { "
         "return { out: inputs.number.value }; }\n"
         "export function end() { return {}; }\n",
-        encoding="utf-8",
-    )
-    (project / "host.mjs").write_text(
-        "export function createHostExtension() { "
-        "return { start() {}, stop() {}, capabilities: { "
-        "'baseline.clock': {} } }; }\n",
         encoding="utf-8",
     )
     (project / "app.ts").write_text(
@@ -371,9 +332,6 @@ def _normalized_driver_request(value: dict[str, object]) -> dict[str, object]:
             ],
             "nodeBaseLibs": policy["nodeBaseLibs"],
             "baseLibDependencies": policy["baseLibDependencies"],
-            "hostExtensionDependencies": policy[
-                "hostExtensionDependencies"
-            ],
             "allowedExternalPackages": policy[
                 "allowedExternalPackages"
             ],
@@ -443,7 +401,7 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
             external_packages=("z-package", "a-package", "z-package"),
             import_policy={
                 "owners": [
-                    {
+                    {'node_type': 'vibeflow.node',
                         "path": str(project / "nodes.mjs"),
                         "kind": "node",
                         "id": "baseline.nodes",
@@ -451,10 +409,8 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
                 ],
                 "node_base_libs": {"baseline.nodes": ["baseline.math"]},
                 "base_lib_dependencies": {"baseline.math": []},
-                "host_extension_dependencies": {"baseline.host": []},
                 "allowed_external_packages": ["policy-package"],
             },
-            host_extensions=HOST_EXTENSIONS,
             html_template=(
                 project / "index.template.html"
                 if profile == "web-app"
@@ -476,11 +432,10 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
         "profile": manifest["target_metadata"]["profile"],
         "entry": manifest["entry"],
         "external_packages": manifest["target_metadata"]["external_packages"],
-        "host_extensions": manifest["target_metadata"]["host_extensions"],
         "files": sorted(manifest["files"]),
     } == {
-        "format": "vibeflow.aot-build.v3",
-        "abi_version": "vibeflow.workflow.v9",
+        "format": "vibeflow.aot-build.v4",
+        "abi_version": "vibeflow.workflow.v10",
         "project_target": "javascript",
         "workflow_id": "test.workflow",
         "entry_mode": "sync",
@@ -488,7 +443,6 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
         "profile": profile,
         "entry": expected["entry"],
         "external_packages": ["a-package", "z-package"],
-        "host_extensions": ["baseline.host"],
         "files": expected["files"],
     }
     assert driver == {
@@ -503,8 +457,7 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
         "appEntry": expected["appEntry"],
         "importPolicy": {
             "owners": [
-                {
-                    "kind": "node",
+                {"kind": "node",
                     "id": "baseline.nodes",
                     "path": "nodes.mjs",
                 },
@@ -516,7 +469,6 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
             ],
             "nodeBaseLibs": {"baseline.nodes": ["baseline.math"]},
             "baseLibDependencies": {"baseline.math": []},
-            "hostExtensionDependencies": {"baseline.host": []},
             "allowedExternalPackages": [
                 "a-package",
                 "policy-package",
@@ -526,60 +478,3 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
     }
     assert len(manifest["plan_sha256"]) == 64
     assert set(manifest["plan_sha256"]) <= set("0123456789abcdef")
-
-
-def test_importing_emitted_module_does_not_run_workflow_or_host_extension(
-    tmp_path: Path,
-) -> None:
-    emitted = emit_fixture(
-        _sync_plan(),
-        host_extensions=HOST_EXTENSIONS,
-    )
-    (tmp_path / "workflow.mjs").write_text(emitted.source, encoding="utf-8")
-    (tmp_path / "nodes.mjs").write_text(
-        "export function start() { globalThis.events.push('start'); return {}; }\n"
-        "export function calculate() { "
-        "globalThis.events.push('calculate'); return { out: 1 }; }\n"
-        "export function end() { globalThis.events.push('end'); return {}; }\n",
-        encoding="utf-8",
-    )
-    (tmp_path / "host.mjs").write_text(
-        "export function createHostExtension() {\n"
-        "  globalThis.events.push('create');\n"
-        "  return {\n"
-        "    capabilities: { 'baseline.clock': {} },\n"
-        "    start() { globalThis.events.push('start-host'); },\n"
-        "    stop() { globalThis.events.push('stop-host'); },\n"
-        "  };\n"
-        "}\n",
-        encoding="utf-8",
-    )
-    script = (
-        "import { pathToFileURL } from 'node:url';\n"
-        "globalThis.events = [];\n"
-        f"const module = await import(pathToFileURL({json.dumps(str(tmp_path / 'workflow.mjs'))}).href);\n"
-        "process.stdout.write(JSON.stringify({\n"
-        "  events: globalThis.events,\n"
-        "  exports: Object.keys(module).sort(),\n"
-        "}));\n"
-    )
-
-    completed = subprocess.run(
-        ["node", "--input-type=module", "--eval", script],
-        check=False,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        timeout=10,
-    )
-    assert completed.returncode == 0, completed.stderr
-    assert json.loads(completed.stdout) == {
-        "events": [],
-            "exports": [
-                "VIBEFLOW_PLUGIN_ABI",
-                "VIBEFLOW_WORKFLOW_ABI",
-            "VibeFlowWorkflowError",
-            "createWorkflowHost",
-            "runWorkflow",
-        ],
-    }

@@ -14,5 +14,6 @@ def portable_paths(value, *, roots, primary_root):
                 relative = Path(value).relative_to(root_path).as_posix()
             except ValueError:
                 continue
-            return relative if Path(root_path) == Path(primary_root) else f"@{root_id}/{relative}"
+            prefix = root_id if root_id.startswith("@") else "@" + root_id
+            return relative if Path(root_path) == Path(primary_root) else f"{prefix}/{relative}"
     return value

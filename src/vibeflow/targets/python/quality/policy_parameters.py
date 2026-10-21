@@ -146,8 +146,3 @@ def native_rule_origins(registry):
         declared = getattr(catalog, "origins", {})
         origins.update({("rules", rule.id):declared.get(("rules", rule.id)) for rule in catalog.rules})
     return origins
-
-
-def bound_python_workflow_defaults(handlers, depth, *, rules, origins):
-    from vibeflow.targets.python.rules.graph import bound_workflow_depth_defaults
-    return bound_workflow_depth_defaults(handlers, depth, rules=rules, origins=origins)

@@ -30,7 +30,7 @@ class ProviderPlanningBoundary(DemoBoundary):
         return {}
 
 
-TwoRouteNode_DECLARATION = node_declaration(NodeDescriptor('test.two_route', 'Two Route', 'Routes flow.', '0.1.0', 'decision', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.in', 'exactly_one', display_name='value.in'),), provides=(DataProvider('flow.route', 'flow.route', display_name='flow.route'),), input_semantics={'value.in': ('input',)}, output_semantics={'flow.route': ('route',)}, examples=({'inputs': {'value.in': 1}, 'params': {}},)), rulesets=("vibeflow.process",))
+TwoRouteNode_DECLARATION = node_declaration(NodeDescriptor('test.two_route', 'Two Route', 'Routes flow.', '0.1.0', 'decision', rulesets=(), contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('value.in', 'exactly_one', display_name='value.in'),), provides=(DataProvider('flow.route', 'flow.route', display_name='flow.route'),), input_semantics={'value.in': ('input',)}, output_semantics={'flow.route': ('route',)}, examples=({'inputs': {'value.in': 1}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 class TwoRouteNode:
 
@@ -38,7 +38,7 @@ class TwoRouteNode:
         return {"flow.route": "done"}
 
 
-BodyRouteNode_DECLARATION = node_declaration(NodeDescriptor('test.body_route', 'Body Route', 'Routes inside a loop body.', '0.1.0', 'decision', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('flow.route', 'exactly_one', display_name='flow.route'),), provides=(DataProvider('flow.inner', 'flow.inner', display_name='flow.inner'),), input_semantics={'flow.route': ('outer loop route',)}, output_semantics={'flow.inner': ('body branch route',)}, examples=({'inputs': {'flow.route': 'again'}, 'params': {}},)), rulesets=("vibeflow.process",))
+BodyRouteNode_DECLARATION = node_declaration(NodeDescriptor('test.body_route', 'Body Route', 'Routes inside a loop body.', '0.1.0', 'decision', rulesets=(), contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('flow.route', 'exactly_one', display_name='flow.route'),), provides=(DataProvider('flow.inner', 'flow.inner', display_name='flow.inner'),), input_semantics={'flow.route': ('outer loop route',)}, output_semantics={'flow.inner': ('body branch route',)}, examples=({'inputs': {'flow.route': 'again'}, 'params': {}},)), rulesets=("vibeflow.process",))
 
 class BodyRouteNode:
 
@@ -46,7 +46,7 @@ class BodyRouteNode:
         return {"flow.inner": "left"}
 
 
-EmptyProcessNode_DECLARATION = node_declaration(NodeDescriptor('test.empty_process', 'Empty Process', 'Keeps a structural branch in progress.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(), rulesets=("vibeflow.process",))
+EmptyProcessNode_DECLARATION = node_declaration(NodeDescriptor('test.empty_process', 'Empty Process', 'Keeps a structural branch in progress.', '0.1.0', 'process', rulesets=(), contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(), rulesets=("vibeflow.process",))
 
 class EmptyProcessNode:
 
@@ -54,7 +54,7 @@ class EmptyProcessNode:
         return {}
 
 
-BypassSourceNode_DECLARATION = node_declaration(NodeDescriptor('test.bypass_source', 'Bypass Source', 'Produces a disconnected bypass value.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('source.value', 'value.in', display_name='Source Value'),), output_semantics={'source.value': ('source bypass value',)}), rulesets=("vibeflow.process",))
+BypassSourceNode_DECLARATION = node_declaration(NodeDescriptor('test.bypass_source', 'Bypass Source', 'Produces a disconnected bypass value.', '0.1.0', 'process', rulesets=(), contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('source.value', 'value.in', display_name='Source Value'),), output_semantics={'source.value': ('source bypass value',)}), rulesets=("vibeflow.process",))
 
 class BypassSourceNode:
 
@@ -62,7 +62,7 @@ class BypassSourceNode:
         return {"source.value": 1}
 
 
-BypassMiddleNode_DECLARATION = node_declaration(NodeDescriptor('test.bypass_middle', 'Bypass Middle', 'Forwards a disconnected bypass value.', '0.1.0', 'process', contract=NodeContractDescriptor()), NodeContractDescriptor(requires=(DataRequirement('value.in', 'exactly_one', display_name='Value In'),), provides=(DataProvider('middle.value', 'value.in', display_name='Middle Value'),), input_semantics={'value.in': ('source bypass value',)}, output_semantics={'middle.value': ('forwarded bypass value',)}), rulesets=("vibeflow.process",))
+BypassMiddleNode_DECLARATION = node_declaration(NodeDescriptor('test.bypass_middle', 'Bypass Middle', 'Forwards a disconnected bypass value.', '0.1.0', 'process', rulesets=(), contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(requires=(DataRequirement('value.in', 'exactly_one', display_name='Value In'),), provides=(DataProvider('middle.value', 'value.in', display_name='Middle Value'),), input_semantics={'value.in': ('source bypass value',)}, output_semantics={'middle.value': ('forwarded bypass value',)}), rulesets=("vibeflow.process",))
 
 class BypassMiddleNode:
 
@@ -90,7 +90,7 @@ def test_declaration_rejects_missing_and_invalid_flow_kind() -> None:
 
 def test_external_flag_does_not_override_explicit_rule_selection() -> None:
     declaration = node_declaration(
-        NodeDescriptor('test.external', 'External', 'Calls external package.', '0.1.0', 'process', external=True, contract=NodeContractDescriptor()),
+        NodeDescriptor('test.external', 'External', 'Calls external package.', '0.1.0', 'process', rulesets=(), external=True, contract=NodeContractDescriptor(), node_type="vibeflow.node"),
         NodeContractDescriptor(provides=(DataProvider('external.out', 'external.out', display_name='external.out'),), output_semantics={'external.out': ('external output',)}),
         rulesets=(),
     )
@@ -111,7 +111,7 @@ def test_external_flag_does_not_override_explicit_rule_selection() -> None:
 
 def test_external_process_contract_does_not_require_route_output() -> None:
     declaration = node_declaration(
-        NodeDescriptor('test.external_ok', 'External', 'Calls external package.', '0.1.0', 'process', external=True, contract=NodeContractDescriptor()),
+        NodeDescriptor('test.external_ok', 'External', 'Calls external package.', '0.1.0', 'process', rulesets=(), external=True, contract=NodeContractDescriptor(), node_type="vibeflow.node"),
         NodeContractDescriptor(provides=(DataProvider('external.out', 'external.out', display_name='external.out'),), output_semantics={'external.out': ('external output',)}),
         rulesets=("vibeflow.process",),
     )
@@ -243,13 +243,13 @@ def test_planned_node_is_concern_not_unknown_type() -> None:
 
     assert report.status == "CONCERNS"
     assert any(warning.rule_id == "GRAPH.PLANNED.NODE" for warning in report.warnings)
-    assert not any(error.rule_id == "NODE.TYPE.UNKNOWN" for error in report.errors)
+    assert not any(error.rule_id == "NODE.DEFINITION.UNKNOWN" for error in report.errors)
 
 
 def test_implemented_nodeset_cannot_contain_planned_child() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "a",
                     requires=[],
@@ -509,8 +509,8 @@ def test_removed_loop_registration_and_edge_limits_are_rejected() -> None:
         )
 
 def test_compiler_can_check_registry_node_types() -> None:
-    graph = parse_graph_config({"pipeline": {"nodes": [{"id": "missing", "type_used": "test.missing", "display_name": "Missing", "description": "Missing fixture."}]}})
-    with pytest.raises(GraphCompileError, match="unknown type"):
+    graph = parse_graph_config({"pipeline": {"nodes": [{"id": "missing", "definition_id": "test.missing", "display_name": "Missing", "description": "Missing fixture."}]}})
+    with pytest.raises(GraphCompileError, match="unknown definition_id"):
         GraphCompiler().compile(graph, registry=_registry())
 
 def test_boundary_config_is_removed() -> None:
@@ -532,19 +532,23 @@ def test_boundary_schema_and_node_registry_isolation() -> None:
                 "provides": ["bad.result"],
                 "allowed_paths": "runs",
             },
-            "pipeline": {"nodes": [{"id": "seed", "type_used": "test.seed", "display_name": "Seed", "description": "Seed fixture."}]},
+            "pipeline": {"nodes": [{"id": "seed", "definition_id": "test.seed", "display_name": "Seed", "description": "Seed fixture."}]},
         }
     )
     rule_ids = {finding.rule_id for finding in findings}
     assert "CONFIG.BOUNDARY.REMOVED" in rule_ids
     declaration = node_declaration(
-        NodeDescriptor('test.boundary', 'Boundary', 'A host boundary cannot implement the Node ABI.', '0.1.0', 'process', contract=NodeContractDescriptor()),
+        NodeDescriptor('test.boundary', 'Boundary', 'A host boundary cannot implement the Node ABI.', '0.1.0', 'process', rulesets=(), contract=NodeContractDescriptor(), node_type="vibeflow.node"),
         NodeContractDescriptor(), rulesets=("vibeflow.process",),
     )
     report = _review_node(declaration, DemoBoundary, policy=PurityPolicy(max_source_lines=1000))
     assert any(item.rule_id == "NODE.CONTRACT.MISSING_RUN_PURE" for item in report.findings)
 
 def test_checked_run_writes_reproducible_artifacts_without_raw_inputs(tmp_path) -> None:
+    from tests.fixtures.support.projects import project_root
+    from tests.fixtures.support.rule_inspection import write_registry_project
+    tmp_path = project_root(tmp_path)
+    selection = write_registry_project(tmp_path, _registry(), ("test.start", "test.seed", "test.add", "test.out_end"))
     config_path = tmp_path / "workflow.json"
     config_path.write_text(
         json.dumps(
@@ -568,9 +572,11 @@ def test_checked_run_writes_reproducible_artifacts_without_raw_inputs(tmp_path) 
         ),
         encoding="utf-8",
     )
+    data = json.loads(config_path.read_text())
+    data["plugins"] = [selection]
+    config_path.write_text(json.dumps(data))
     result = run_checked(
         config_path,
-        registry=_registry(),
         initial={"secret": "top-secret-value"},
         run_root=tmp_path / "runs",
         run_id="run_001",

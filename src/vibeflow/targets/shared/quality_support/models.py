@@ -288,7 +288,7 @@ class PrefixClusterQuality:
 
 
 @dataclass(frozen=True)
-class ProjectQualityFacts:
+class SourceQualityFacts:
     """Target-extracted facts consumed by the pure Core quality evaluator."""
 
     root: str
@@ -466,7 +466,7 @@ __all__ = [
     "FunctionQuality",
     "ImportSite",
     "PrefixClusterQuality",
-    "ProjectQualityFacts",
+    "SourceQualityFacts",
     "QualityFinding",
     "QualityPolicy",
     "QualityReport",

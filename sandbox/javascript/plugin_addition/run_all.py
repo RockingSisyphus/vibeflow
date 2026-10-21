@@ -16,7 +16,7 @@ from vibeflow.tooling.application.javascript.build import ProjectBuildRequest, b
 @check_scope
 def run(work, *, toolchain=None):
     workspace_path = workspace(FIXTURE, work, toolchain)
-    helper = work / "project/math_support.ts"
+    helper = work / "project/plugins/addition/math_support.ts"
     original = helper.read_text()
     observations = []
     for phase, code, expected in [("baseline", original, 5), ("edited", original.replace("a + b", "a + b + 1"), 6), ("restored", original, 5)]:
@@ -26,7 +26,7 @@ def run(work, *, toolchain=None):
             built = build_project_aot(ProjectBuildRequest(workspace=workspace_path, config=work / "project/configs" / (name + ".jsonc"), out_dir=work / (phase + "-" + name), target="node", profile="single-esm"))
             manifest = json.loads(built.manifest.read_text())
             plugins = manifest["target_metadata"]["plugins"]
-            assert manifest["target_metadata"]["plugin_abi_version"] == "vibeflow.plugin.v3"
+            assert manifest["target_metadata"]["plugin_abi_version"] == "vibeflow.plugin.v4"
             assert [item["id"] for item in plugins["active"]] == ["addition.compiler", "addition.runtime"]
             assert len(plugins["declared"]) == 3 and plugins["planned"] == ["addition.future"]
             for item in plugins["active"]:

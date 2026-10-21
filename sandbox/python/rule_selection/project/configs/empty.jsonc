@@ -3,33 +3,33 @@
     {
       "source": {
         "kind": "file",
-        "ref": "plugin.py",
+        "ref": "plugins/selection/plugin.py",
         "export": "plugin"
       }
     }
   ],
   "nodeset_imports": [
     {
-      "path": "nodesets/inherited.jsonc"
+      "path": "nodeset_types/inherited.jsonc"
     },
     {
-      "path": "nodesets/takeover.jsonc"
+      "path": "nodeset_types/takeover.jsonc"
     },
     {
-      "path": "nodesets/muted.jsonc"
+      "path": "nodeset_types/muted.jsonc"
     }
   ],
   "pipeline": {
     "nodes": [
       {
         "id": "start",
-        "type_used": "selection.node",
+        "definition_id": "selection.node",
         "display_name": "start",
         "description": "start"
       },
       {
         "id": "direct",
-        "type_used": "selection.node",
+        "definition_id": "selection.node",
         "display_name": "direct",
         "description": "direct",
         "rulesets": [
@@ -40,38 +40,38 @@
       },
       {
         "id": "disabled",
-        "type_used": "selection.node",
+        "definition_id": "selection.node",
         "display_name": "disabled",
         "description": "disabled",
         "rulesets": []
       },
       {
         "id": "left",
-        "type_used": "selection.inherited",
+        "definition_id": "selection.inherited",
         "display_name": "left",
         "description": "left"
       },
       {
         "id": "right",
-        "type_used": "selection.inherited",
+        "definition_id": "selection.inherited",
         "display_name": "right",
         "description": "right"
       },
       {
         "id": "takeover",
-        "type_used": "selection.takeover",
+        "definition_id": "selection.takeover",
         "display_name": "takeover",
         "description": "takeover"
       },
       {
         "id": "muted",
-        "type_used": "selection.muted",
+        "definition_id": "selection.muted",
         "display_name": "muted",
         "description": "muted"
       },
       {
         "id": "end",
-        "type_used": "selection.node",
+        "definition_id": "selection.node",
         "display_name": "end",
         "description": "end"
       }

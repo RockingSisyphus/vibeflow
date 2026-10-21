@@ -14,7 +14,7 @@ def observe():
     from vibeflow.core.rules import RuleContext
     from vibeflow.core.rules import models
     facts = {"analysis": [{"values": list(range(8))} for _ in range(1000)]}
-    base = RuleContext(facts=facts, subject={"type_key": "probe.first"}, scope={"files": ["nodes.py"]})
+    base = RuleContext(facts=facts, subject={"definition_id": "probe.first"}, scope={"files": ["nodes.py"]})
     results = []
     for name, change in (
         ("subject", {"subject": {"type_key": "probe.second"}}),

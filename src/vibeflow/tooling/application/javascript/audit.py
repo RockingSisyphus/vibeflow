@@ -19,13 +19,12 @@ from vibeflow.core import (
 from vibeflow.core.contracts import providers_to_dicts, requirements_to_dicts
 from vibeflow.core.descriptors import DescriptorCatalogs, PluginSelectionError
 from vibeflow.core.flow import (
-    LOOP_NODE_TYPES,
+    LOOP_DEFINITION_IDS,
     STATUS_PLANNED,
     GraphConfig,
 )
 from vibeflow.targets.shared.quality_support import QualityPolicy
 from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy
-from vibeflow.tooling.application.javascript.rule_defaults import workflow_rule_defaults
 from vibeflow.targets.javascript.build.project_paths import (
     javascript_options,
     safe_project_path,
@@ -53,8 +52,8 @@ from vibeflow.tooling.project.config_loader import (
     ConfigDocument,
     load_workspace_config_document,
 )
-from vibeflow.tooling.project.descriptor_loader import (
-    load_workflow_catalogs,
+from vibeflow.tooling.project.resources import (
+    prepare_workflow_catalogs,
 )
 from vibeflow.tooling.project.graph_config import parse_graph_config
 from vibeflow.tooling.project.plugin_review import load_plugin_review_resources
@@ -69,10 +68,10 @@ class JavascriptAuditRequest:
     config: str | Path
     node_command: str = "node"
     audit_sources: bool = True
-    audit_registered_resources: bool = False
-    quality_facts_by_root: Mapping[str, DriverQualityResult] | None = None
     quality_policy: QualityPolicy | None = None
     catalogs: DescriptorCatalogs | None = None
+    preparation: object | None = None
+    governance: object | None = None
 
 
 @dataclass(frozen=True)
@@ -83,7 +82,7 @@ class JavascriptAuditResult:
     graph: GraphConfig
     compiled: CompiledGraph
     compiled_by_path: Mapping[tuple[str, ...], CompiledGraph]
-    compiled_nodesets: Mapping[str, CompiledGraph]
+    compiled_nodeset_types: Mapping[str, CompiledGraph]
     catalogs: DescriptorCatalogs
     implementation_facts: ImplementationFacts
     plan: WorkflowPlan
@@ -92,7 +91,7 @@ class JavascriptAuditResult:
     source_files: tuple[str, ...]
     warnings: tuple[Mapping[str, object], ...] = ()
     plugin_records: tuple[Mapping[str, object], ...] = ()
-    host_records: tuple[Mapping[str, object], ...] = ()
+
     toolchain: AuditToolchainInfo | None = None
     rule_report: JavascriptRuleReport | None = None
     rule_facts: Mapping[str, Any] | None = None
@@ -136,10 +135,16 @@ def audit_javascript_project(
             f"workflow config does not exist: {config_path}",
         )
 
-    catalogs = request.catalogs or load_workflow_catalogs(
-        root.path,
-        project_config=root.config_path, workflow_config=config_path, workspace=workspace, node_command=request.node_command,
-    )
+    from vibeflow.tooling.project.preparation import ProjectPreparation
+    preparation = request.preparation or ProjectPreparation(workspace, root=root, workflow=config_path, node_command=request.node_command)
+    prepared_resources = preparation.workflow_resources(config_path)
+    catalogs = request.catalogs or prepared_resources.catalogs
+    governance = request.governance or preparation.review()
+    governance_errors = tuple(item for item in governance.findings if item.severity == "error")
+    if governance_errors:
+        raise ProjectBuildError(governance_errors[0].rule_id, governance_errors[0].message,
+                                diagnostics=tuple(item.to_dict() for item in governance.findings))
+
     try:
         validate_javascript_descriptor_catalogs(catalogs)
         facts = target_neutral_implementation_facts_from_catalog(
@@ -147,38 +152,26 @@ def audit_javascript_project(
         )
     except JavascriptImplementationFactsError as exc:
         raise ProjectBuildError(exc.code, exc.message) from exc
-    document = load_workspace_config_document(config_path, workspace=workspace)
-    graph = parse_graph_config(
-        document.data,
-        project_root=root.path,
-        root_id=root.id,
-        root_path=root.path,
-        source_path=config_path,
-    )
+    document = prepared_resources.document
+    graph = prepared_resources.graph
     javascript = javascript_options(root)
     package_root = safe_project_path(root.path, javascript["package_root"], subject="javascript.package_root", require_directory=True)
     rule_plugin_records, rule_plugin_ids = _plugin_records(document.data, catalogs=catalogs)
-    host_records, host_extension_ids = _host_extension_records(document.data, root=root, catalogs=catalogs)
-    rule_host_records, rule_host_ids = host_records, host_extension_ids
-    if request.audit_registered_resources:
-        planned_plugins = {item["id"] for item in rule_plugin_records if item.get("status") == "planned"}
-        planned_hosts = {item["id"] for item in rule_host_records if item.get("status") == "planned"}
-        rule_plugin_ids = tuple(item.id for item in catalogs.plugins if item.id not in planned_plugins)
-        rule_host_ids = tuple(item.id for item in catalogs.host_extensions if item.id not in planned_hosts)
+
+
     rule_import_policy, _ = target_neutral_import_policy(
-        catalogs=catalogs, project_root=root.path, allowed_external=set(javascript["external_packages"]),
-        node_ids=None if request.audit_registered_resources else frozenset(source_node_calls(graph)), host_extension_ids=frozenset(rule_host_ids), plugin_ids=frozenset(rule_plugin_ids),
+        resource_inventory=prepared_resources.resource_inventory, catalogs=catalogs, project_root=root.path, allowed_external=set(javascript["external_packages"]),
+        node_ids=frozenset(source_node_calls(graph)),  plugin_ids=frozenset(rule_plugin_ids),
     )
     rule_report = run_javascript_rules(graph, catalogs, project_root=root.path, package_root=package_root,
-                                     phase="static", import_policy=rule_import_policy, node_command=request.node_command, evaluate_sources=request.audit_sources, include_registered=request.audit_registered_resources, prefetched_quality=(request.quality_facts_by_root or {}).get(str(root.path)),
-                                     quality_policy=request.quality_policy or javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
+                                     phase="static", import_policy=rule_import_policy, node_command=request.node_command, evaluate_sources=request.audit_sources,
+                                     quality_policy=request.quality_policy or javascript_quality_policy())
     rule_errors = tuple(item for item in rule_report.findings if item.severity == "error")
     if rule_errors:
         first = rule_errors[0]
         raise ProjectBuildError(first.rule_id, first.message, diagnostics=tuple(item.to_dict() for item in rule_report.findings))
     rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={}, node_report=rule_report, project_root=root.path, package_root=package_root, phase="import", node_command=request.node_command, evaluate_sources=request.audit_sources,
-        rule_defaults=workflow_rule_defaults(catalogs, javascript["nodeset_max_depth"]),
-        quality_policy=request.quality_policy or javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
+        quality_policy=request.quality_policy or javascript_quality_policy())
     rule_errors = tuple(item for item in rule_report.findings if item.severity == "error")
     if rule_errors:
         first = rule_errors[0]
@@ -187,7 +180,7 @@ def audit_javascript_project(
     width_warnings = ()
     javascript = javascript_options(root)
     compiled_by_path: dict[tuple[str, ...], CompiledGraph] = {}
-    used_node_types: set[str] = set()
+    used_node_ids: set[str] = set()
     compilation = _validate_graph_tree(
         graph,
         catalogs=catalogs,
@@ -195,22 +188,22 @@ def audit_javascript_project(
         path=(),
         active_nodesets=(),
         compiled_by_path=compiled_by_path,
-        used_node_types=used_node_types,
+        used_node_ids=used_node_ids,
         call_effect_scopes=rule_report.call_effect_scopes,
     )
     graph = compilation.workflow.graph
     compiled = compilation.compiled_graph
-    compiled_nodesets = {
+    compiled_nodeset_types = {
         type_key: compile_core(
             CoreCompileRequest(
                 graph=nodeset.graph,
                 implementation_facts=facts,
                 target_features=TargetFeatureSet(target="javascript"),
-                known_nodesets=frozenset(nodeset.graph.nodesets),
+                known_nodeset_types=frozenset(nodeset.graph.nodeset_types),
                 owner=f"nodeset:{type_key}",
             )
         ).compiled_graph
-        for type_key, nodeset in sorted(graph.nodesets.items())
+        for type_key, nodeset in sorted(graph.nodeset_types.items())
     }
     plan = compile_graph_plan(
         graph,
@@ -231,40 +224,12 @@ def audit_javascript_project(
         require_directory=True,
     )
     external = set(javascript["external_packages"])
-    planned_plugin_ids = frozenset(
-        str(item.get("id", ""))
-        for item in plugin_records
-        if item.get("status") == "planned"
-    )
-    planned_host_extension_ids = frozenset(
-        str(item.get("id", ""))
-        for item in host_records
-        if item.get("status") == "planned"
-    )
-    if request.audit_registered_resources:
-        # Project quality owns the whole registered implementation catalog,
-        # not only the workflow's active runtime closure.  Planned selections
-        # remain declarations and therefore never cause their source to load.
-        plugin_ids = tuple(
-            descriptor.id
-            for descriptor in catalogs.plugins
-            if descriptor.id not in planned_plugin_ids
-        )
-        host_extension_ids = tuple(
-            descriptor.id
-            for descriptor in catalogs.host_extensions
-            if descriptor.id not in planned_host_extension_ids
-        )
     import_policy, source_files = target_neutral_import_policy(
-        catalogs=catalogs,
+        resource_inventory=prepared_resources.resource_inventory, catalogs=catalogs,
         project_root=root.path,
         allowed_external=external,
-        node_ids=(
-            None
-            if request.audit_registered_resources
-            else frozenset(used_node_types)
-        ),
-        host_extension_ids=frozenset(host_extension_ids),
+        node_ids=frozenset(used_node_ids),
+
         plugin_ids=frozenset(plugin_ids),
     )
     toolchain: AuditToolchainInfo | None = None
@@ -286,8 +251,8 @@ def audit_javascript_project(
                 str(exc),
                 diagnostics=(*exc.diagnostics, *width_warnings),
             ) from exc
-    rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={(): compiled, **compiled_by_path}, compiled_nodesets=compiled_nodesets, node_report=rule_report, project_root=root.path, package_root=package_root, rule_defaults=workflow_rule_defaults(catalogs, javascript["nodeset_max_depth"]), node_command=request.node_command, evaluate_sources=request.audit_sources,
-                                                 quality_policy=request.quality_policy or javascript_quality_policy(structure_limits=getattr(root, "quality_structure", None)))
+    rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={(): compiled, **compiled_by_path}, compiled_nodeset_types=compiled_nodeset_types, node_report=rule_report, project_root=root.path, package_root=package_root, node_command=request.node_command, evaluate_sources=request.audit_sources,
+                                                 quality_policy=request.quality_policy or javascript_quality_policy())
     workflow_errors = tuple(item for item in rule_report.findings if item.severity == "error")
     if workflow_errors:
         first = workflow_errors[0]
@@ -295,16 +260,16 @@ def audit_javascript_project(
     architecture = build_architecture_facts(
         graph,
         compiled=compiled,
-        compiled_nodesets=compiled_nodesets,
+        compiled_nodeset_types=compiled_nodeset_types,
         catalogs=catalogs,
-        used_node_types=frozenset(used_node_types),
+        used_node_ids=frozenset(used_node_ids),
         active_base_lib_ids=frozenset(
             str(owner.get("id", ""))
             for owner in import_policy.get("owners", ())
             if owner.get("kind") == "base_lib"
         ),
         plugin_records=plugin_records,
-        host_records=host_records,
+
         root_id=root.id,
         source_path=config_path.relative_to(root.path).as_posix(),
         project_root=root.path, selections=document.data, roots={item.id:item.path for item in workspace.roots},
@@ -317,7 +282,7 @@ def audit_javascript_project(
         graph=graph,
         compiled=compiled,
         compiled_by_path=dict(compiled_by_path),
-        compiled_nodesets=compiled_nodesets,
+        compiled_nodeset_types=compiled_nodeset_types,
         catalogs=catalogs,
         implementation_facts=facts,
         plan=plan,
@@ -326,7 +291,7 @@ def audit_javascript_project(
         source_files=source_files,
         warnings=(*width_warnings, *implementation_warnings, *(item.to_dict() for item in rule_report.findings if item.severity == "warning")),
         plugin_records=plugin_records,
-        host_records=host_records,
+
         toolchain=toolchain,
         rule_report=rule_report, rule_facts=rule_report.facts,
     )
@@ -346,7 +311,7 @@ def inspect_payload(result: JavascriptAuditResult) -> dict[str, object]:
             "nodes": [
                 {
                     "id": node.id,
-                    "type_used": node.type_used,
+                    "definition_id": node.definition_id,
                     "status": node.status,
                     "flow_kind": compiled.flow_kinds.get(
                         node.id,
@@ -386,10 +351,10 @@ def inspect_payload(result: JavascriptAuditResult) -> dict[str, object]:
 def _effective_lock_text(graph: GraphConfig, node: object) -> str:
     node_lock = getattr(node, "execution_lock", None)
     if node_lock is not None:
-        node_type = str(getattr(node, "type_used", ""))
+        definition_id = str(getattr(node, "definition_id", ""))
         scope = (
             "block"
-            if node_type in LOOP_NODE_TYPES or node_type in graph.nodesets
+            if definition_id in LOOP_DEFINITION_IDS or definition_id in graph.nodeset_types
             else "node"
         )
         return f"{node_lock.key} ({scope})"
@@ -406,7 +371,7 @@ def _validate_graph_tree(
     path: tuple[str, ...],
     active_nodesets: tuple[str, ...],
     compiled_by_path: dict[tuple[str, ...], CompiledGraph],
-    used_node_types: set[str],
+    used_node_ids: set[str],
     call_effect_scopes: Mapping,
 ):
     compilation = compile_core(
@@ -414,7 +379,7 @@ def _validate_graph_tree(
             graph=graph,
             implementation_facts=facts,
             target_features=TargetFeatureSet(target="javascript"),
-            known_nodesets=frozenset(graph.nodesets),
+            known_nodeset_types=frozenset(graph.nodeset_types),
             owner="pipeline" if not path else "nodeset:" + ".".join(path),
         )
     )
@@ -426,11 +391,11 @@ def _validate_graph_tree(
         call_path = (*path, node.id)
         if node.status == STATUS_PLANNED:
             continue
-        is_loop = node.type_used in LOOP_NODE_TYPES
-        is_nodeset = node.type_used in graph.nodesets and not is_loop
+        is_loop = node.definition_id in LOOP_DEFINITION_IDS
+        is_nodeset = node.definition_id in graph.nodeset_types and not is_loop
         if is_loop or is_nodeset:
-            nodeset_key = node.loop.body if is_loop else node.type_used
-            nodeset = graph.nodesets.get(nodeset_key)
+            nodeset_key = node.loop.body if is_loop else node.definition_id
+            nodeset = graph.nodeset_types.get(nodeset_key)
             if nodeset is None:
                 raise ProjectBuildError(
                     "VF_AOT_NODESET",
@@ -451,26 +416,26 @@ def _validate_graph_tree(
                 path=call_path,
                 active_nodesets=(*active_nodesets, nodeset_key),
                 compiled_by_path=compiled_by_path,
-                used_node_types=used_node_types,
+                used_node_ids=used_node_ids,
                 call_effect_scopes=call_effect_scopes,
             )
             compiled_by_path[call_path] = child.compiled_graph
             continue
-        descriptor = catalogs.nodes.get(node.type_used)
+        descriptor = catalogs.nodes.get(node.definition_id)
         if descriptor is None:
             raise ProjectBuildError(
                 "VF_AOT_NODE_UNKNOWN",
-                f"node type '{node.type_used}' has no descriptor",
+                f"node type '{node.definition_id}' has no descriptor",
                 call_path,
             )
-        used_node_types.add(descriptor.type_key)
+        used_node_ids.add(descriptor.id)
         if not any(
             implementation.language in {"javascript", "typescript"}
             for implementation in descriptor.implementations
         ):
             raise ProjectBuildError(
                 "VF_AOT_CONTRACT_INVALID",
-                f"node '{node.type_used}' has no JavaScript/TypeScript implementation",
+                f"node '{node.definition_id}' has no JavaScript/TypeScript implementation",
                 call_path,
             )
         for base_lib_id in descriptor.base_libs:
@@ -485,7 +450,7 @@ def _validate_graph_tree(
             if capability is None:
                 raise ProjectBuildError(
                     "VF_AOT_CAPABILITY_UNKNOWN",
-                    f"node '{node.type_used}' requires unknown capability '{requirement.id}'",
+                    f"node '{node.definition_id}' requires unknown capability '{requirement.id}'",
                     call_path,
                 )
             unknown = sorted(
@@ -495,7 +460,7 @@ def _validate_graph_tree(
                 raise ProjectBuildError(
                     "VF_AOT_CAPABILITY_OPERATION",
                     (
-                        f"node '{node.type_used}' requires unknown operations "
+                        f"node '{node.definition_id}' requires unknown operations "
                         f"on capability '{requirement.id}': {unknown}"
                     ),
                     call_path,
@@ -584,23 +549,7 @@ def _plugin_records(
     )
 
 
-def _host_extension_records(config, *, root, catalogs):
-    from vibeflow.tooling.application.javascript.host_selection import declared_hosts
-    from vibeflow.targets.javascript.build.host_selection import active_host_ids
-    resources = declared_hosts(config, catalog=catalogs.host_extensions)
-    active = active_host_ids(tuple(item.id for item in resources if item.status == "implemented"),
-        catalog=catalogs.host_extensions, planned=frozenset(item.id for item in resources if item.status == "planned"))
-    for identifier in active:
-        descriptor = catalogs.host_extensions.require(identifier)
-        implementations = tuple(item for item in descriptor.implementations
-                                if item.language in {"javascript", "typescript"})
-        if not implementations:
-            raise ProjectBuildError("VF_AOT_CONTRACT_INVALID",
-                f"host_extension '{identifier}' has no JavaScript/TypeScript implementation")
-        if any(item.completion != "immediate" for item in implementations):
-            raise ProjectBuildError("VF_AOT_CONTRACT_INVALID",
-                f"host_extension '{identifier}' factory must be immediate")
-    return tuple(item.to_dict() for item in resources), active
+
 
 
 __all__ = [

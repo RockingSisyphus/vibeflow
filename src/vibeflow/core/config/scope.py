@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
-from vibeflow.core.flow import NodeSpec
+from vibeflow.core.flow import NodeCallSpec
 
 
 ALLOW_CONFIG_OVERRIDE_FIELD = "allow_config_override"
@@ -37,7 +37,7 @@ class ConfigBindingError(ValueError):
 
 
 def effective_node_params(
-    spec: NodeSpec,
+    spec: NodeCallSpec,
     overrides: Mapping[str, Mapping[str, object]],
 ) -> dict[str, object]:
     return {**dict(spec.params), **dict(overrides.get(spec.id, {}))}
@@ -116,7 +116,7 @@ def config_override_conflicts(
 
 
 def nested_node_config_overrides(
-    spec: NodeSpec,
+    spec: NodeCallSpec,
     parent_overrides: Mapping[str, Mapping[str, object]],
 ) -> dict[str, dict[str, object]]:
     nested = _copy_overrides(spec.node_config_overrides)

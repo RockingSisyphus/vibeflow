@@ -16,7 +16,7 @@ from vibeflow.tooling.project.graph_config import parse_graph_config
 def _terminal_node() -> dict[str, object]:
     return {
         "id": "end",
-        "type_used": "example.end",
+        "definition_id": "example.end",
         "display_name": "End",
         "description": "Ends the workflow.",
     }
@@ -97,18 +97,18 @@ def test_pipeline_output_aliases_are_unique() -> None:
         )
 
 
-def test_graph_compiler_accepts_language_neutral_node_catalog() -> None:
+def test_graph_compiler_accepts_language_neutral_node_definitions() -> None:
     catalog = NodeCatalog(
         (
             NodeDescriptor(
-                type_key="example.end",
+                rulesets=(), id="example.end",
                 display_name="End",
 
                 description="Ends the workflow.",
                 version="1.0.0",
                 flow_kind="terminal",
                 contract=NodeContractDescriptor(),
-            ),
+             node_type="vibeflow.node"),
         )
     )
     graph = parse_graph_config({"pipeline": {"nodes": [_terminal_node()]}})

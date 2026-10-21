@@ -29,14 +29,14 @@ class RuntimeOutputMixin:
             provider = providers_by_key.get(str(key))
             if provider is None:
                 continue
-            envelope = DataEnvelope(key=provider.key, type=provider.type, value=value, source_node=source.name)
+            envelope = DataEnvelope(key=provider.key, type=provider.type, value=value, source_node=source.id)
             if provider.type in required_types:
-                state.inboxes[target.name] = [
+                state.inboxes[target.id] = [
                     item
-                    for item in state.inboxes[target.name]
+                    for item in state.inboxes[target.id]
                     if (item.key, item.type, item.source_node) != (envelope.key, envelope.type, envelope.source_node)
                 ]
-                state.inboxes[target.name].append(envelope)
+                state.inboxes[target.id].append(envelope)
 
     def _record_node_output_candidates(
         self,
@@ -55,7 +55,7 @@ class RuntimeOutputMixin:
                     key=provider.key,
                     type=provider.type,
                     value=value,
-                    source_node=frame.name,
+                    source_node=frame.id,
                 ),
                 state,
             )

@@ -13,7 +13,7 @@ def workflow_plan_from_execution_plan(
     execution_plan: Any,
     *,
     workflow_id: str | None = None,
-    source_by_type: Mapping[str, SourceRef] | None = None,
+    source_by_definition: Mapping[str, SourceRef] | None = None,
     pipeline_inputs: Sequence[PipelineInputSpec] | None = None,
     pipeline_outputs: Sequence[PipelineOutputSpec] | None = None,
 ) -> WorkflowPlan:
@@ -23,7 +23,7 @@ def workflow_plan_from_execution_plan(
     if original is None:
         raise PortablePlanError("execution plan has no prepared workflow")
     original = workflow_subplan(original, execution_plan.python_bindings.block_id)
-    sources = _normalize_source_map(source_by_type)
+    sources = _normalize_source_map(source_by_definition)
     frames_by_path = {}
     def collect(native, block_id):
         block = original.block(block_id)
@@ -38,7 +38,7 @@ def workflow_plan_from_execution_plan(
         calls = []
         for call in block.nodes:
             frame = frames_by_path[(*block.path,call.id)]
-            calls.append(replace(call, implementation=sources.get(call.type_used,call.implementation),
+            calls.append(replace(call, implementation=sources.get(call.definition_id,call.implementation),
                 params=freeze_json_object(frame.params,path=f"node[{call.id}].params")))
         blocks.append(replace(block,nodes=tuple(calls)))
     graph = execution_plan.graph

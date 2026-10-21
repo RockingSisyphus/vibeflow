@@ -1,6 +1,6 @@
 # Python 最小示例
 
-`code_plugin.py` 通过 Python SDK 声明 Node、契约与规则，`nodes.py` 保存实现；workflow 显式选择固定插件对象。`base_lib/` 提供纯算术辅助函数，`nodesets.jsonc` 与 `config_with_imports.jsonc` 演示组合和导入。
+`code_plugin.py` 通过 Python SDK 声明 Node、契约与规则，`nodes.py` 保存实现；workflow 显式选择固定插件对象。`base_lib/` 提供纯算术辅助函数，`nodeset_types.jsonc` 与 `config_with_imports.jsonc` 演示组合和导入。
 
 ```bash
 python -m vibeflow build --workspace sandbox/python/minimal/vibeflow_config.jsonc --config sandbox/python/minimal/config.jsonc --out-dir /path/to/candidate-bundle

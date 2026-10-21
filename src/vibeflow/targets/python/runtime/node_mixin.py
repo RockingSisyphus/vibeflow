@@ -18,12 +18,12 @@ class RuntimeNodeMixin:
             if frame.is_planned_stub:
                 outputs = self._run_planned_stub_node(frame, inputs)
             elif frame.is_loop:
-                if loop_block(self._plan, frame.name) is not None:
+                if loop_block(self._plan, frame.id) is not None:
                     outputs = self._run_loop_block_node(frame, inputs)
                 else:
                     outputs = self._run_loop_node(frame, inputs)
             elif frame.is_nodeset:
-                if nodeset_block(self._plan, frame.name) is not None:
+                if nodeset_block(self._plan, frame.id) is not None:
                     outputs = self._run_nodeset_block_node(frame, inputs)
                 else:
                     outputs = self._run_nodeset_node(frame, inputs)
@@ -35,13 +35,13 @@ class RuntimeNodeMixin:
     def _run_planned_stub_node(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
         started = time.perf_counter()
         try:
-            self._call_runtime_plugins("before_node", frame.name, frame.node_type, summarize_mapping(inputs))
+            self._call_runtime_plugins("before_node", frame.id, frame.definition_id, summarize_mapping(inputs))
             outputs = self._execute_planned_stub_outputs(frame, inputs)
-            self._mark_node_run(frame.name)
+            self._mark_node_run(frame.id)
             self._record_runtime_event(
                 "planned_stub",
-                frame.name,
-                frame.node_type,
+                frame.id,
+                frame.definition_id,
                 input_summary=summarize_mapping(inputs),
                 output_summary=summarize_mapping(outputs),
                 elapsed_ms=elapsed_ms(started),
@@ -53,13 +53,13 @@ class RuntimeNodeMixin:
                     "output_keys": list(outputs),
                 },
             )
-            self._call_runtime_plugins("after_node", frame.name, frame.node_type, summarize_mapping(outputs))
+            self._call_runtime_plugins("after_node", frame.id, frame.definition_id, summarize_mapping(outputs))
             return outputs
         except SystemExit as exc:
             if self.delegate_cli:
                 try:
                     exit_signal = normalize_delegate_cli_system_exit(
-                        exc, source=frame.name, effect_scope=frame.effect_scope
+                        exc, source=frame.id, effect_scope=frame.effect_scope
                     )
                 except PipelineRuntimeError as denied:
                     failure = denied
@@ -67,21 +67,21 @@ class RuntimeNodeMixin:
                     raise exit_signal from exc
             else:
                 failure = PipelineRuntimeError(
-                    f"planned python_stub node '{frame.name}' attempted SystemExit outside delegate CLI mode"
+                    f"planned python_stub node '{frame.id}' attempted SystemExit outside delegate CLI mode"
                 )
             self._record_runtime_event(
                 "node_failed",
-                frame.name,
-                frame.node_type,
+                frame.id,
+                frame.definition_id,
                 input_summary=summarize_mapping(inputs),
                 failure=str(failure),
                 elapsed_ms=elapsed_ms(started),
             )
-            self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(failure))
+            self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(failure))
             raise failure from exc
         except Exception as exc:
-            self._record_runtime_event("node_failed", frame.name, frame.node_type, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started))
-            self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(exc))
+            self._record_runtime_event("node_failed", frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started))
+            self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(exc))
             raise
 
     def _run_pure_node(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
@@ -89,59 +89,59 @@ class RuntimeNodeMixin:
         try:
             node = frame.node
             if node is None:
-                raise PipelineRuntimeError(f"node '{frame.name}' has no bound callable")
-            self._call_runtime_plugins("before_node", frame.name, frame.node_type, summarize_mapping(inputs))
+                raise PipelineRuntimeError(f"node '{frame.id}' has no bound callable")
+            self._call_runtime_plugins("before_node", frame.id, frame.definition_id, summarize_mapping(inputs))
             outputs = self._execute_pure_outputs(frame, inputs)
-            self._mark_node_run(frame.name)
-            self._record_runtime_event("node", frame.name, frame.node_type, input_summary=summarize_mapping(inputs), output_summary=summarize_mapping(outputs), elapsed_ms=elapsed_ms(started))
-            self._call_runtime_plugins("after_node", frame.name, frame.node_type, summarize_mapping(outputs))
+            self._mark_node_run(frame.id)
+            self._record_runtime_event("node", frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), output_summary=summarize_mapping(outputs), elapsed_ms=elapsed_ms(started))
+            self._call_runtime_plugins("after_node", frame.id, frame.definition_id, summarize_mapping(outputs))
             return outputs
         except SystemExit as exc:
             if not self.delegate_cli:
                 failure = PipelineRuntimeError(
-                    f"node '{frame.name}' attempted SystemExit outside delegate CLI mode"
+                    f"node '{frame.id}' attempted SystemExit outside delegate CLI mode"
                 )
                 self._record_runtime_event(
                     "node_failed",
-                    frame.name,
-                    frame.node_type,
+                    frame.id,
+                    frame.definition_id,
                     input_summary=summarize_mapping(inputs),
                     failure=str(failure),
                     elapsed_ms=elapsed_ms(started),
                 )
-                self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(failure))
+                self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(failure))
                 raise failure from exc
             try:
                 exit_signal = normalize_delegate_cli_system_exit(
-                    exc, source=frame.name, effect_scope=frame.effect_scope
+                    exc, source=frame.id, effect_scope=frame.effect_scope
                 )
             except PipelineRuntimeError as failure:
                 self._record_runtime_event(
                     "node_failed",
-                    frame.name,
-                    frame.node_type,
+                    frame.id,
+                    frame.definition_id,
                     input_summary=summarize_mapping(inputs),
                     failure=str(failure),
                     elapsed_ms=elapsed_ms(started),
                 )
-                self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(failure))
+                self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(failure))
                 raise failure from exc
             raise exit_signal from exc
         except NodeRegistryError as exc:
             failure = PipelineRuntimeError(str(exc))
-            self._record_runtime_event("node_failed", frame.name, frame.node_type, failure=str(failure), elapsed_ms=elapsed_ms(started))
-            self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(failure))
+            self._record_runtime_event("node_failed", frame.id, frame.definition_id, failure=str(failure), elapsed_ms=elapsed_ms(started))
+            self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(failure))
             raise failure from exc
         except Exception as exc:
-            self._record_runtime_event("node_failed", frame.name, frame.node_type, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started))
-            self._call_runtime_plugins("node_failed", frame.name, frame.node_type, str(exc))
+            self._record_runtime_event("node_failed", frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started))
+            self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(exc))
             raise
 
     def _execute_pure_outputs(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
         node = frame.node
         if node is None:
-            raise PipelineRuntimeError(f"node '{frame.name}' has no bound callable")
-        params = self.registry.merge_config(frame.type_used, {
+            raise PipelineRuntimeError(f"node '{frame.id}' has no bound callable")
+        params = self.registry.merge_config(frame.definition_id, {
             key: value for key, value in frame.params.items() if key != "_global"
         })
         # Runtime globals retain their reference semantics; Node config is JSON.
@@ -169,32 +169,32 @@ class RuntimeNodeMixin:
 
     def _execute_planned_stub_outputs(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
         if not self.runtime_options.allow_planned_stub:
-            raise PipelineRuntimeError(f"planned python_stub node '{frame.name}' requires allow_planned_stub")
+            raise PipelineRuntimeError(f"planned python_stub node '{frame.id}' requires allow_planned_stub")
         if frame.is_nodeset:
             self._assert_planned_stub_nodeset_contract(frame)
         try:
             path = Path(frame.planned_stub_path) if frame.planned_stub_path else resolve_stub_module_path(frame.planned_stub_module, self.graph.project_root)
             run_stub = load_stub_callable(path)
         except Exception as exc:
-            raise PipelineRuntimeError(f"planned python_stub '{frame.name}' failed to load stub: {exc}") from exc
+            raise PipelineRuntimeError(f"planned python_stub '{frame.id}' failed to load stub: {exc}") from exc
         if not signature_is_run_stub(run_stub):
-            raise PipelineRuntimeError(f"planned python_stub '{frame.name}' must expose run_stub(inputs, params)")
+            raise PipelineRuntimeError(f"planned python_stub '{frame.id}' must expose run_stub(inputs, params)")
         outputs = run_stub(dict(inputs), dict(frame.params))
         return self._validate_outputs(frame, outputs, subject="planned python_stub")
 
     def _validate_outputs(self, frame: NodeFrame, outputs: object, *, subject: str = "node") -> Mapping[str, object]:
         if not isinstance(outputs, Mapping):
-            raise PipelineRuntimeError(f"{subject} '{frame.name}' must return a mapping")
+            raise PipelineRuntimeError(f"{subject} '{frame.id}' must return a mapping")
         actual = {str(key) for key in outputs}
         expected = set(frame.provide_keys)
         if actual != expected:
-            raise PipelineRuntimeError(f"{subject} '{frame.name}' output keys must exactly match provides: expected {sorted(expected)}, got {sorted(actual)}")
+            raise PipelineRuntimeError(f"{subject} '{frame.id}' output keys must exactly match provides: expected {sorted(expected)}, got {sorted(actual)}")
         return {str(key): value for key, value in outputs.items()}
 
     def _assert_planned_stub_nodeset_contract(self, frame: NodeFrame) -> None:
-        nodeset = self.graph.nodesets.get(frame.nodeset_type_key)
+        nodeset = self.graph.nodeset_types.get(frame.nodeset_type_id)
         if nodeset is None:
-            raise PipelineRuntimeError(f"unknown planned python_stub nodeset: {frame.nodeset_type_key}")
+            raise PipelineRuntimeError(f"unknown planned python_stub nodeset: {frame.nodeset_type_id}")
         if set(frame.requires) != set(nodeset.requires):
             raise PipelineRuntimeError(f"planned python_stub nodeset instance '{frame.id}' requires must match nodeset '{nodeset.type_key}' requires")
         if set(frame.provides) != set(nodeset.provides):

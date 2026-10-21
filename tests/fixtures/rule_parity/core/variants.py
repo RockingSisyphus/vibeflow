@@ -19,23 +19,23 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             kw.update(classification="approved_change",notes="Retired concurrency declarations require explicit task targets, including planned and nested calls.")
         support.append(rows,name,title,family,operation,expected,**kw)
     codes = support.expectation
-    from vibeflow.targets.shared.quality_support import FileQuality, FunctionQuality, ImportSite, ProjectQualityFacts, QualityPolicy, QualityStructureLimits, QualityStructureRoles, QualityThresholds
+    from vibeflow.targets.shared.quality_support import FileQuality, FunctionQuality, ImportSite, SourceQualityFacts, QualityPolicy, QualityStructureLimits, QualityStructureRoles, QualityThresholds
     from vibeflow.targets.shared.quality_support.models import QualityStructureConventions
     from vibeflow.targets.shared.quality_support.implementation import CallChain, ImplementationLimits, ImplementationMetrics, analyze_call_graph
 
     if variant == "baseline":
-        from vibeflow.targets.shared.quality_support import evaluate_project_quality
+        from vibeflow.targets.shared.quality_support import evaluate_source_quality
         from vibeflow.targets.shared.quality_support.implementation import (evaluate_node_implementation,
             evaluate_base_lib_implementation, evaluate_base_lib_dependency_chain)
     else:
-        from tests.fixtures.rule_parity.core.support import evaluate_standard_project_quality as evaluate_project_quality
+        from tests.fixtures.rule_parity.core.support import evaluate_standard_project_quality as evaluate_source_quality
         from vibeflow.targets.shared.rule_support.implementation import (check_node_implementation as evaluate_node_implementation,
             check_base_lib_implementation as evaluate_base_lib_implementation, check_base_lib_dependency_chain as evaluate_base_lib_dependency_chain)
 
     def file(path="sample.py", **changes):
         return replace(FileQuality(path, path[:-3].replace("/", "."), 1, 1, 0, 0, 0, 0, 0, (), ()), **changes)
     def project(files, policy=None):
-        return evaluate_project_quality(ProjectQualityFacts(str(work_root), tuple(files)), policy)
+        return evaluate_source_quality(SourceQualityFacts(str(work_root), tuple(files)), policy)
     limits = QualityStructureLimits()
     quiet = replace(limits, **{name: 10000 for name in limits.__dataclass_fields__ if name.startswith(("warn_", "max_"))}, enforce_role_imports=False)
     root_subjects = (
@@ -105,7 +105,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         source_module = source_path[:-3].replace("/", ".")
         files = [file(source_path, imports=(target_module,),
             import_sites=(ImportSite(source_module,target_module,"import "+target_module,source_path,1,1),)), file(target_path)]
-        owners = [{"path":source_path,"id":"node","kind":"node","role":"entry","base_libs":["library"]},
+        owners = [{'node_type': 'vibeflow.node', "path":source_path,"id":"node","kind":"node","role":"entry","base_libs":["library"]},
                   {"path":target_path,"id":"library","kind":"base_lib","role":"entry","base_libs":[]}]
         if variant == "baseline":
             historical_options={"inference_off":{"infer_roles_from_path":False},
@@ -181,7 +181,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
 def _graph_variants(emit, codes, support, variant):
     from vibeflow.core.compiler import compile_core
     from vibeflow.core.contracts import DataProvider, DataRequirement
-    from vibeflow.core.flow import EdgeSpec, ExecutionLockSpec, GraphConfig, LoopSpec, NodeMetadata, NodeSpec, NodesetSpec
+    from vibeflow.core.flow import EdgeSpec, ExecutionLockSpec, GraphConfig, LoopSpec, NodeMetadata, NodeCallSpec, NodesetTypeSpec
     from vibeflow.core.models import CoreCompileRequest, ImplementationFact, ImplementationFacts, TargetFeatureSet
     from vibeflow.targets.shared.quality_support.workflow_rules.joins import append_join_policy_health
     from vibeflow.targets.shared.quality_support.workflow_rules.flow_data import append_data_contract_warnings
@@ -190,27 +190,27 @@ def _graph_variants(emit, codes, support, variant):
 
     def retired(mode, *, nested=False, planned=False):
         from vibeflow.core.config.graph import parse_graph_config_data
-        call = {'id':'work','type_used':'variant.work','async':mode,
+        call = {'id':'work','definition_id':'variant.work','async':mode,
             **({'result_key':'worker.out'} if mode == 'result_key' else {}),
             **({'status':'planned','flow_kind':'process','requires':[],'provides':[]} if planned else {})}
         data = {'pipeline':{'nodes':[call]}}
         if nested:
-            data = {'pipeline':{'nodes':[]},'nodesets':[{'type_key':'variant.child','display_name':'Child',
+            data = {'pipeline':{'nodes':[]},'nodeset_types':[{'type_key':'variant.child','display_name':'Child',
                 'description':'Nested migration','requires':[],'provides':[],'pipeline':{'nodes':[call]}}]}
         return parse_graph_config_data(data)
     def node(name, kind="process", **fields):
-        return NodeSpec(name, "variant." + name, flow_kind=kind, metadata=NodeMetadata(name, "Portable branch probe."), **fields)
+        return NodeCallSpec(name, "variant." + name, flow_kind=kind, metadata=NodeMetadata(name, "Portable branch probe."), **fields)
     def compile(graph):
         collected, visited = {}, set()
         def walk(current, known):
             if id(current) in visited:
                 return
             visited.add(id(current))
-            known = {**known, **current.nodesets}
+            known = {**known, **current.nodeset_types}
             for spec in current.nodes:
-                if spec.type_used not in known and spec.type_used != "vibeflow.io" and not spec.type_used.startswith("vibeflow.loop."):
-                    collected[spec.type_used] = ImplementationFact(spec.type_used, flow_kind=spec.flow_kind, requires=spec.requires, provides=spec.provides)
-            for definition in current.nodesets.values():
+                if spec.definition_id not in known and spec.definition_id != "vibeflow.io" and not spec.definition_id.startswith("vibeflow.loop."):
+                    collected[spec.definition_id] = ImplementationFact(spec.definition_id, flow_kind=spec.flow_kind, requires=spec.requires, provides=spec.provides)
+            for definition in current.nodeset_types.values():
                 walk(definition.graph, known)
         walk(graph, {})
         return compile_core(CoreCompileRequest(graph, ImplementationFacts(tuple(collected.values())),
@@ -232,9 +232,9 @@ def _graph_variants(emit, codes, support, variant):
             worker = node("work", **({"async_mode":"detached" if "detached" in scenario else ""} if variant == "baseline" else {}),
                 status="planned" if scenario == "planned_detached" else "implemented",
                 execution_lock=ExecutionLockSpec("other" if scenario == "different_key" else "shared") if "key" in scenario else None)
-            child = NodesetSpec("variant.child", "Child", "Nested execution-lock branch.", (), (), GraphConfig((worker,)))
-            call = NodeSpec("stage", child.type_key) if invocation == "nodeset" else NodeSpec("stage", "vibeflow.loop.while", loop=LoopSpec(body=child.type_key))
-            graph = GraphConfig((call,), nodesets={child.type_key: child}, execution_lock=ExecutionLockSpec("shared"))
+            child = NodesetTypeSpec("variant.child", "Child", "Nested execution-lock branch.", (), (), GraphConfig((worker,)))
+            call = NodeCallSpec("stage", child.type_key) if invocation == "nodeset" else NodeCallSpec("stage", "vibeflow.loop.while", loop=LoopSpec(body=child.type_key))
+            graph = GraphConfig((call,), nodeset_types={child.type_key: child}, execution_lock=ExecutionLockSpec("shared"))
             diagnostic = "GRAPH.EXECUTION_LOCK.NESTED_KEY_CONFLICT" if scenario == "different_key" else "GRAPH.EXECUTION_LOCK.DETACHED_FORBIDDEN" if scenario == "detached" else ""
             emit(f"native.nested_lock.{invocation}.{scenario}", "Nodeset/Loop实际嵌套锁 " + scenario, "native.execution_lock.variants",
                 lambda graph=graph,scenario=scenario: retired("detached",nested=True,planned=scenario=="planned_detached") if variant == "current" and "detached" in scenario else compile(graph), codes(*((diagnostic, "error"),) if diagnostic else (),
@@ -314,21 +314,21 @@ def _graph_variants(emit, codes, support, variant):
             notes="Actual compilation succeeds: the union has consumer↔b while schedule and transfer separately remain acyclic. The one-source requirement warns; all is a normal control.",
             evidence="core/compiler.py schedule/transfer cycle checks; core/quality/workflow_rules/flow_data.py:263-264,361-370")
 
-    from vibeflow.targets.shared.quality_support.nodesets import nodeset_quality_findings
+    from vibeflow.targets.shared.quality_support.nodeset_types import nodeset_quality_findings
     for invocation in ("nodeset", "loop"):
         def nested_call(name, target):
-            return NodeSpec(name, target) if invocation == "nodeset" else NodeSpec(name, "vibeflow.loop.while", loop=LoopSpec(body=target))
-        first = NodesetSpec("variant.first", "First", "Mutual reference declaration.", (), (), GraphConfig((nested_call("second", "variant.second"),)))
-        second = NodesetSpec("variant.second", "Second", "Mutual reference declaration.", (), (), GraphConfig((nested_call("first", "variant.first"),)))
-        graph = GraphConfig((), nodesets={first.type_key: first, second.type_key: second})
-        emit("planned.unused_mutual_recursion." + invocation, "未调用互递归定义仍须产生结构事实 " + invocation, "workflow.nodesets.variants",
+            return NodeCallSpec(name, target) if invocation == "nodeset" else NodeCallSpec(name, "vibeflow.loop.while", loop=LoopSpec(body=target))
+        first = NodesetTypeSpec("variant.first", "First", "Mutual reference declaration.", (), (), GraphConfig((nested_call("second", "variant.second"),)))
+        second = NodesetTypeSpec("variant.second", "Second", "Mutual reference declaration.", (), (), GraphConfig((nested_call("first", "variant.first"),)))
+        graph = GraphConfig((), nodeset_types={first.type_key: first, second.type_key: second})
+        emit("planned.unused_mutual_recursion." + invocation, "未调用互递归定义仍须产生结构事实 " + invocation, "workflow.nodeset_types.variants",
             lambda graph=graph: nodeset_quality_findings(graph), codes(("NODESET.RECURSION", "error")),
-            notes="This tests the public declaration algorithm; formal unused-declaration dispatch is independently tested and currently regresses.", evidence="core/nodeset_dependencies.py; core/quality/nodesets.py:34-48")
+            notes="This tests the public declaration algorithm; formal unused-declaration dispatch is independently tested and currently regresses.", evidence="core/nodeset_dependencies.py; core/quality/nodeset_types.py:34-48")
 
     for behavior in ("blocking", "transparent", "python_stub"):
         planned = node("future", status="planned", planned_behavior=PlannedBehavior(behavior, "stubs/future.py" if behavior == "python_stub" else ""))
-        child = NodesetSpec("variant.parent", "Parent", "Implemented parent containing a planned child.", (), (), GraphConfig((planned,)))
-        graph = GraphConfig((), nodesets={child.type_key: child})
+        child = NodesetTypeSpec("variant.parent", "Parent", "Implemented parent containing a planned child.", (), (), GraphConfig((planned,)))
+        graph = GraphConfig((), nodeset_types={child.type_key: child})
         def planned_events(graph=graph):
             events = planned_health_events(graph)
             actual = support.observe(lambda: events)
@@ -340,9 +340,9 @@ def _graph_variants(emit, codes, support, variant):
             evidence="core/quality/workflow_rules/planned.py:54-63,140-164")
     for behavior in ("blocking", "transparent", "python_stub"):
         for used in (False, True):
-            child = NodesetSpec("variant.planned", "Planned", "Unused/referenced planned definition.", (), (), GraphConfig(()), status="planned",
+            child = NodesetTypeSpec("variant.planned", "Planned", "Unused/referenced planned definition.", (), (), GraphConfig(()), status="planned",
                 planned_behavior=PlannedBehavior(behavior, "stubs/child.py" if behavior == "python_stub" else ""))
-            graph = GraphConfig((NodeSpec("stage", child.type_key),) if used else (), nodesets={child.type_key: child})
+            graph = GraphConfig((NodeCallSpec("stage", child.type_key),) if used else (), nodeset_types={child.type_key: child})
             def planned_flags(graph=graph):
                 actual = support.observe(lambda: planned_health_events(graph))
                 actual["metrics"].update(has_planned=graph_has_planned(graph), has_blocking_planned=graph_has_blocking_planned(graph))

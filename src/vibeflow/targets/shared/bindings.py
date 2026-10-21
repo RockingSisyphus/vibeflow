@@ -28,7 +28,7 @@ def native_binding(catalog, kind, resource_id):
         seen.add(resource_id)
         origin = catalog.origins.get((group, resource_id))
         if origin is not None:
-            binding = _BINDINGS.get(id(catalog), {}).get((origin.plugin_id, kind, resource_id))
+            binding = _BINDINGS.get(id(catalog), {}).get((origin.owner.plugin_id, kind, resource_id))
             if binding is not None:
                 return binding
         descriptor = getattr(catalog, group).get(resource_id)

@@ -12,10 +12,11 @@ def ownership_findings(context):
         return ()
     sources = context.require("source_context")
     kind = context.subject.get("kind", "node")
-    resource_id = context.subject.get("type_key", context.subject.get("id", ""))
+    resource_id = context.subject.get("definition_id", context.subject.get("id", ""))
     paths = {file.path for file in subject_files(context)}
     contributed = {(item["kind"],item["id"]) for item in context.facts.get("declarations", ())
-                   if item.get("origin", {}).get("plugin_id") == resource_id}
+                   if item.get("origin", {}).get("owner", {}).get("kind") == "plugin"
+                   and item["origin"]["owner"].get("id") == resource_id}
     own_sources = [item for item in owners if item["kind"] == kind and item["id"] == resource_id and item["path"] in paths]
     fallback = {"kind":kind,"id":resource_id,"base_libs":[],"dependencies":[]}
     pending = deque((item,item["path"]) for item in own_sources)
@@ -39,6 +40,10 @@ def ownership_findings(context):
             if imported.path != path or not imported.resolved_path or imported.resolved_path not in paths:
                 continue
             destinations = _destination_owners(owners, imported, own)
+            if not destinations and own.get("package_path"):
+                from pathlib import Path
+                if Path(imported.resolved_path).is_relative_to(own["package_path"]):
+                    destinations = [{**own, "path":imported.resolved_path, "role":"support", "symbol":""}]
             if referenced is not None and (imported.alias or imported.symbol or imported.module.split(".")[0]) not in referenced and (destinations or own["kind"] == "plugin"):
                 continue
             allowed = bool(destinations) and all(_allowed(own,item,contributed) for item in destinations)
@@ -66,6 +71,7 @@ def _destination_owners(owners, imported, own):
 
 
 def _allowed(own, destination, contributed):
-    return (destination["kind"] == own["kind"] and destination["id"] == own["id"]
+    return (own.get("plugin_id") and own["plugin_id"] == destination.get("plugin_id")
+        or destination["kind"] == own["kind"] and destination["id"] == own["id"]
         or destination["kind"] == "base_lib" and destination["id"] in (*own["base_libs"],*own["dependencies"])
         or own["kind"] == "plugin_declaration" and (destination["kind"],destination["id"]) in contributed)

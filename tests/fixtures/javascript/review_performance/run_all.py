@@ -11,6 +11,7 @@ import sys
 from time import perf_counter
 
 ROOT = Path(__file__).resolve().parents[4]
+sys.path[:0] = [str(ROOT), str(ROOT / "src")]
 
 
 def write_project(root,toolchain,*,nodes,libraries,repeats):
@@ -31,19 +32,20 @@ def write_project(root,toolchain,*,nodes,libraries,repeats):
         text+=''.join(f'value=add{j}(value);' for j in range(libraries))
         text+=f'if(value!=={i+sum(range(1,libraries+1))}) throw new Error("arithmetic");return {{}};}}\n'
         (root/'nodes'/f'step{i}.ts').write_text(text)
-        resources.append({'kind':'node','type_key':f'perf.step.{i}','contract':{},'base_libs':[f'perf.lib.{j}' for j in range(libraries)],
+        resources.append({'node_type': 'vibeflow.node', 'kind':'node','id':f'perf.step.{i}','contract':{},'base_libs':[f'perf.lib.{j}' for j in range(libraries)],
             'rulesets':['vibeflow.process','perf.proof'],'implementations':[{'language':'typescript','targets':['node'],
                 'source':{'kind':'file','ref':f'nodes/step{i}.ts','export':'run'}}]})
     (root/'nodes/boundary.ts').write_text('export function run(){return {};}\n')
-    resources.append({'kind':'node','type_key':'perf.boundary','flow_kind':'terminal','contract':{},'rulesets':['vibeflow.io'],
+    resources.append({'node_type': 'vibeflow.node', 'kind':'node','id':'perf.boundary','flow_kind':'terminal','contract':{},'rulesets':['vibeflow.io'],
         'implementations':[{'language':'typescript','targets':['node'],'source':{'kind':'file','ref':'nodes/boundary.ts','export':'run'}}]})
-    (root/'proof.ts').write_text('export function check(context){if(!context.facts.source_files.length)throw new Error("missing source facts");return {records:{proof:{type_id:"perf.proof.v1",value:{files:context.facts.source_files.length}}}};}\n')
+    (root/'plugins/code_plugin').mkdir(parents=True,exist_ok=True)
+    (root/'plugins/code_plugin/proof.ts').write_text('export function check(context){if(!context.facts.source_files.length)throw new Error("missing source facts");return {records:{proof:{type_id:"perf.proof.v1",value:{files:context.facts.source_files.length}}}};}\n')
     resources.extend([{'kind':'rule','id':'perf.proof','scope':'source','outputs':{'proof':'perf.proof.v1'},
         'implementations':[{'language':'typescript','source':{'kind':'file','ref':'proof.ts','export':'check'}}]},
         {'kind':'ruleset','id':'perf.proof','calls':[{'id':'check','rule_id':'perf.proof'}],
             'entrypoints':{'import':[],'static':['check'],'run':[]}}])
     write_plugin(root,resources,target='javascript',plugin_id='perf.resources')
-    def call(name,kind):return {'id':name,'type_used':kind,'display_name':name,'description':'Fixed performance fixture.'}
+    def call(name,kind):return {'id':name,'definition_id':kind,'display_name':name,'description':'Fixed performance fixture.'}
     body=[call('start','perf.boundary'),*[call(f'step{i}',f'perf.step.{i}') for i in range(nodes)],call('end','perf.boundary')]
     body[-1]['similar_to']={'node':'start','relationship':'copy','reason':'Empty boundaries.'}
     def pipeline(calls):return {'nodes':calls,'edges':[[a['id'],b['id']] for a,b in zip(calls,calls[1:])]}
@@ -52,9 +54,8 @@ def write_project(root,toolchain,*,nodes,libraries,repeats):
     calls=[call('start','perf.boundary'),*[call(f'body{i}','perf.body') for i in range(repeats)],call('end','perf.boundary')]
     calls[-1]['similar_to']={'node':'start','relationship':'copy','reason':'Empty boundaries.'}
     (root/'workflow.jsonc').write_text(json.dumps({'nodeset_imports':[{'path':'body.jsonc'}],
-        'plugins':[{'source':{'kind':'file','ref':'code_plugin.ts','export':'plugin'}}],
+        'plugins':[{'source':{'kind':'file','ref':'plugins/code_plugin/plugin.ts','export':'plugin'}}],
         'rulesets':['vibeflow.workflow'],'pipeline':pipeline(calls)}))
-    (root/'vibeflow_config.jsonc').write_text('{"roots":[{"id":"perf","path":"."}]}')
     (root/'vibeflow_project.jsonc').write_text('{"project_target":"javascript","javascript":{"package_root":".","external_packages":[]}}')
 
 
@@ -94,7 +95,7 @@ def observe(args):
     os.environ["NODE_OPTIONS"] = "--import=" + str(Path(__file__).with_name("program_probe.mjs"))
     start=perf_counter()
     with args.report.with_suffix('.stdout').open('w') as out,args.report.with_suffix('.stderr').open('w') as err,redirect_stdout(out),redirect_stderr(err):
-        code=main(['validate','--workspace',str(args.project/'vibeflow_config.jsonc'),'--config',str(args.project/'workflow.jsonc')])
+        code=main(['validate','--workspace',str(args.project.parent/'vibeflow_config.jsonc'),'--config',str(args.project/'workflow.jsonc')])
     args.report.write_text(json.dumps({'exit_code':code,'seconds':perf_counter()-start,'counts':dict(counts),'program_builds':len(program_log.read_text().splitlines()) if program_log.exists() else 0},indent=2)+'\n')
     return code
 

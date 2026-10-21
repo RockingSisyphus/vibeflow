@@ -5,7 +5,6 @@ from base_lib.sandbox_arithmetic import add as resource_add
 from base_lib.sandbox_arithmetic import divide as resource_divide
 from base_lib.sandbox_arithmetic import multiply as resource_multiply
 from base_lib.sandbox_arithmetic import subtract as resource_subtract
-from plugins.value_state import plugin_shift
 
 def VALUE(inputs, data_type: str):
     return inputs[data_type]['value']
@@ -90,14 +89,6 @@ class AddFinalToDeadNode:
     def run_pure(self, inputs, params):
         return {'value.dead': add(VALUE(inputs, 'value.final'), params.get('delta', 1))}
 
-class ResourceArithmeticNode:
-
-    def run_pure(self, inputs, params):
-        value = resource_add(VALUE(inputs, 'calc.sum'), params.get('addend', 0))
-        value = resource_multiply(value, params.get('multiplier', 1))
-        value = resource_subtract(value, params.get('subtrahend', 0))
-        value = resource_divide(value, params.get('divisor', 1))
-        return {'calc.resource': plugin_shift(value)}
 
 class ResourceScaleNode:
 

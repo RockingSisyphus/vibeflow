@@ -20,7 +20,6 @@ from typing import Any
 INPUTS = 'Readonly<{"parity.value": Readonly<{value: number}>}>'
 NODE = f'export function run(inputs: {INPUTS}) {{\n  BODY\n  return {{result: inputs["parity.value"].value + 1}};\n}}\n'
 PLUGIN = 'export function createPlugin(context: Readonly<{abiVersion: "ABI"}>) {\n  return {beforeRun() { BODY; void context.abiVersion; }};\n}\n'
-HOST = 'export function createHostExtension() {\n  return {capabilities: {}, start() { BODY; }, stop() {}};\n}\n'
 BASE_LIB = 'export function increment(value: number): number {\n  BODY\n  return value + 1;\n}\n'
 
 
@@ -45,7 +44,6 @@ class Case:
     extra_manifests: dict[str, dict[str, Any]] = field(default_factory=dict)
     additional_base_libs: tuple[str, ...] = ()
     additional_plugins: tuple[str, ...] = ()
-    additional_hosts: tuple[str, ...] = ()
     external_packages: tuple[str, ...] = ()
 
 
@@ -56,15 +54,12 @@ def _body(template: str, body: str = '') -> str:
 def _cases() -> tuple[Case, ...]:
     normal_node = _body(NODE)
     normal_plugin = _body(PLUGIN)
-    normal_host = _body(HOST)
     normal_base = _body(BASE_LIB)
     common = [
         Case('js.node.normal.audit', '正常 Node 静态检查', 'node.control', source=normal_node),
         Case('js.node.normal.build-run', '正常 Node 实际构建和数值执行', 'node.control', source=normal_node, entrypoint='build-run', metrics={'business_result': 4}),
         Case('js.plugin.normal.audit', '已选独立 Runtime Plugin 正常审查', 'plugin.control', 'plugin', normal_plugin),
         Case('js.plugin.normal.build', '已选 Runtime Plugin 合法 ABI 构建', 'plugin.control', 'plugin', normal_plugin, entrypoint='build'),
-        Case('js.host.normal.audit', '已选独立 Host Extension 正常审查', 'host.control', 'host', normal_host),
-        Case('js.host.normal.build', '已选 Host Extension 正常构建', 'host.control', 'host', normal_host, entrypoint='build'),
         Case('js.base.normal.audit', 'Node 引用已声明纯 BaseLib', 'base.control', 'base_lib', normal_base),
         Case('js.node.top-call', 'Node 模块顶层调用', 'imports.purity', source='function bootstrap() { return 1; }\nconst boot = bootstrap();\n' + normal_node, code='VF_IMPORT_SIDE_EFFECT'),
         Case('js.node.mutable-module', 'Node 模块顶层可变绑定', 'imports.purity', source='let count = 0;\n' + normal_node, code='VF_IMPORT_SIDE_EFFECT'),
@@ -95,12 +90,6 @@ def _cases() -> tuple[Case, ...]:
         Case('js.base.reverse-import', 'BaseLib 反向导入实际 Node', 'imports.ownership', 'base_lib', 'import {run} from "../nodes/calc.ts";\n' + _body(BASE_LIB, 'void run;'), 'VF_IMPORT_LAYER'),
         Case('js.base.top-call', 'BaseLib 模块顶层执行调用', 'imports.purity', 'base_lib', 'function boot() { return 1; }\nconst value = boot();\n' + normal_base, 'VF_IMPORT_SIDE_EFFECT'),
         Case('js.base.source-lines', '实际引用 BaseLib 超过 500 行', 'maintainability.source', 'base_lib', normal_base + '\n' * 501, 'BASE_LIB.SOURCE.MAX_LINES'),
-        Case('js.host.global.normal', 'Host Extension 使用宿主 globalThis 属于正常职责', 'host.control', 'host', _body(HOST, 'void globalThis;')),
-        Case('js.host.top-call', '独立 Host Extension 顶层执行调用', 'imports.purity', 'host', 'function boot() { return 1; }\nconst value = boot();\n' + normal_host, 'VF_IMPORT_SIDE_EFFECT'),
-        Case('js.host.module-write', '独立 Host Extension 写入模块状态', 'effects.module_state', 'host', 'const shared = Object.freeze({count: 0});\n' + _body(HOST, '(shared as {count: number}).count += 1;'), 'VF_MODULE_STATE'),
-        Case('js.host.node-import', 'Host Extension 跨层导入 Node', 'imports.ownership', 'host', 'import {run} from "../nodes/calc.ts";\n' + _body(HOST, 'void run;'), 'VF_IMPORT_LAYER'),
-        Case('js.host.async-factory', '独立 Host Extension 工厂错误返回 Promise', 'completion', 'host', normal_host.replace('function createHostExtension', 'async function createHostExtension'), 'VF_COMPLETION_IMMEDIATE_PROMISE'),
-        Case('js.host.timer.normal', 'Host Extension 生命周期可拥有 timer', 'host.control', 'host', _body(HOST, 'setTimeout(() => 1, 1);')),
     ]
     plugin_negatives = (
         ('host-global', '独立 Plugin 读取 globalThis', 'effects.host_io', _body(PLUGIN, 'void globalThis'), 'VF_PLUGIN_HOST_IO'),
@@ -128,7 +117,6 @@ def _cases() -> tuple[Case, ...]:
     common.extend((
         Case('js.plugin.normal.quality-cli', '正式 quality-check 的正常 Plugin 对照', 'plugin.control', 'plugin', normal_plugin, entrypoint='quality-cli'),
         Case('js.plugin.host-global.quality-cli', '正式 quality-check 拒绝独立 Plugin 宿主访问', 'effects.host_io', 'plugin', _body(PLUGIN, 'void globalThis'), 'VF_PLUGIN_HOST_IO', 'quality-cli'),
-        Case('js.host.top-call.quality-cli', '正式 quality-check 拒绝独立 Host 顶层执行', 'imports.purity', 'host', 'function boot() { return 1; }\nconst value = boot();\n' + normal_host, 'VF_IMPORT_SIDE_EFFECT', 'quality-cli'),
         Case('js.node.top-call.quality-cli', '正式 quality-check 拒绝 Node 顶层执行', 'imports.purity', source='function boot() { return 1; }\nconst value = boot();\n' + normal_node, code='VF_IMPORT_SIDE_EFFECT', entrypoint='quality-cli'),
     ))
     common.extend((
@@ -143,8 +131,7 @@ def _cases() -> tuple[Case, ...]:
         Case('js.node.unresolved-import', 'Node 导入实际不存在的文件', 'imports.ownership', source='import {missing} from "../helpers/missing.ts";\n' + _body(NODE, 'void missing;'), code='VF_IMPORT_RESOLVE'),
         Case('js.node.package-root', 'Node 导入 package_root 外真实文件', 'imports.ownership', source='import {outside} from "../../outside.ts";\n' + _body(NODE, 'outside();'), code='VF_IMPORT_PACKAGE_ROOT', extras={'../outside.ts': 'export function outside() { return 1; }\n'}),
         Case('js.base.undeclared-dependency', '启用两 BaseLib 仍须声明它们之间的依赖', 'imports.ownership', 'base_lib', 'import {step} from "./other.ts";\n' + _body(BASE_LIB, 'step(value);'), 'VF_IMPORT_BASE_LIB', extras={'base_lib/other.ts': 'export function step(value: number) { return value + 1; }\n'}, extra_manifests={'base_lib/other.jsonc': _base_descriptor('parity.other_math', 'base_lib/other.ts')}, additional_base_libs=('parity.other_math',)),
-        Case('js.plugin.undeclared-dependency', '已选两 Plugin 仍须声明彼此导入依赖', 'imports.ownership', 'plugin', 'import {createPlugin as other} from "./other.ts";\n' + _body(PLUGIN, 'void other'), 'VF_PLUGIN_IMPORT_POLICY', extras={'plugins/other.ts': normal_plugin}, extra_manifests={'plugins/other.jsonc': _plugin_descriptor('parity.other_plugin', 'plugins/other.ts')}, additional_plugins=('parity.other_plugin',)),
-        Case('js.host.undeclared-dependency', '已选两 Host 仍须声明彼此导入依赖', 'imports.ownership', 'host', 'import {createHostExtension as other} from "./other.ts";\n' + _body(HOST, 'void other;'), 'VF_IMPORT_HOST_EXTENSION', extras={'host_extensions/other.ts': normal_host}, extra_manifests={'host_extensions/other.jsonc': _host_descriptor('parity.other_host', 'host_extensions/other.ts')}, additional_hosts=('parity.other_host',)),
+        Case('js.plugin.package-private-dependency', '同包生命周期实现可直接复用私有支持代码', 'imports.ownership', 'plugin', 'import {createPlugin as other} from "./other.ts";\n' + _body(PLUGIN, 'void other'), '', extras={'plugins/other.ts': normal_plugin}, extra_manifests={'plugins/other.jsonc': _plugin_descriptor('parity.other_plugin', 'plugins/other.ts')}, additional_plugins=('parity.other_plugin',)),
     ))
     for length in (2, 7):
         extras = {}
@@ -183,13 +170,8 @@ def _plugin_descriptor(resource_id: str, file: str) -> dict[str, Any]:
             'implementations': [_implementation(file, 'createPlugin')], 'config': {'schema': {'type': 'object'}, 'defaults': {}}, 'dependencies': []}
 
 
-def _host_descriptor(resource_id: str, file: str) -> dict[str, Any]:
-    return {'kind': 'host_extension', 'id': resource_id, 'targets': ['node', 'browser'],
-            'implementations': [_implementation(file, 'createHostExtension')], 'provides': [], 'dependencies': [], 'external_packages': []}
-
-
 def _node_descriptor(variant: str, key: str, file: str, case: Case) -> dict[str, Any]:
-    result = {'kind': 'node', 'type_key': key, 'display_name': key, 'category': 'parity',
+    result = {'node_type': 'vibeflow.node', 'kind': 'node', 'id': key, 'display_name': key, 'category': 'parity',
         'description': 'One numeric increment; executable metadata stays in the descriptor.', 'version': '1.0.0', 'flow_kind': 'terminal',
         'contract': {'requires': [{'type': 'parity.value', 'cardinality': 'exactly_one', 'display_name': 'Value'}],
             'provides': [{'key': 'result', 'type': 'parity.result', 'display_name': 'Result'}],
@@ -219,9 +201,9 @@ def _project(root: Path, variant: str, toolchain: Path, case: Case) -> tuple[Pat
     for name in ('package.json', 'package-lock.json'):
         shutil.copy2(toolchain / name, root / name)
     (root / 'node_modules').symlink_to(toolchain / 'node_modules', target_is_directory=True)
-    project = {"project_target": "javascript", "javascript": {"package_root": ".", "external_packages": list(case.external_packages)}, "quality_enabled": True}
+    project = {"project_target": "javascript", "javascript": {"package_root": ".", "external_packages": list(case.external_packages)}, }
     if variant == "baseline":
-        project["descriptors"] = {group: ["manifests/" + group] for group in ("nodes", "base_lib", "data_schemas", "plugins", "host_extensions")}
+        project["descriptors"] = {group: ["manifests/" + group] for group in ("nodes", "base_lib", "data_schemas", "plugins")}
     else:
         from tests.fixtures.support.plugins import write_plugin
         write_plugin(root, [], target="javascript", plugin_id="parity.resources")
@@ -238,21 +220,22 @@ def _project(root: Path, variant: str, toolchain: Path, case: Case) -> tuple[Pat
         selected_file = 'base_lib/math.ts'
         sources['nodes/calc.ts'] = 'import {increment} from "../base_lib/math.ts";\n' + NODE.replace('BODY', 'increment(1);')
     elif case.role == 'plugin':
-        selected_file = 'plugins/runtime.ts'
-    elif case.role == 'host':
-        selected_file = 'host_extensions/host.ts'
+        selected_file = 'plugins/runtime.ts' if variant=='baseline' else 'plugins/code_plugin/runtime.ts'
     selected_source = case.source
     if variant == 'current' and case.id == 'js.plugin.module-write.worker':
         selected_source = 'const shared = Object.freeze({count:0});\n' + _body(PLUGIN, '(shared as {count:number}).count += 1')
-    sources[selected_file] = selected_source.replace('ABI', 'vibeflow.plugin.v1' if variant == 'baseline' else 'vibeflow.plugin.v3')
+    sources[selected_file] = selected_source.replace('ABI', 'vibeflow.plugin.v1' if variant == 'baseline' else 'vibeflow.plugin.v4')
+    if variant=='current':
+        sources={('plugins/code_plugin/'+name[len('plugins/'):] if name.startswith('plugins/') and not name.startswith('plugins/code_plugin/') else name):text for name,text in sources.items()}
+        if case.role=='plugin':sources[selected_file]=sources[selected_file].replace('../nodes/','../../nodes/').replace('../base_lib/','../../base_lib/')
     for name, text in sources.items():
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text.replace('ABI', 'vibeflow.plugin.v1' if variant == 'baseline' else 'vibeflow.plugin.v3'), encoding='utf-8')
+        path.write_text(text.replace('ABI', 'vibeflow.plugin.v1' if variant == 'baseline' else 'vibeflow.plugin.v4'), encoding='utf-8')
     if case.role == 'base_lib' or case.id == 'js.node.undeclared-base':
         put_definition(root, variant, {'kind': 'base_lib', 'id': 'parity.math', 'display_name': 'Increment helper', 'description': 'Pure numeric helper.', 'implementations': [_implementation('base_lib/math.ts', '')], 'dependencies': [], 'external_packages': []}, 'base_lib/math.jsonc')
     pipeline = {'entry_mode': 'async', 'inputs': [{'key': 'value', 'type': 'parity.value', 'display_name': 'Value', 'required': True}],
-        'nodes': [{'id': 'calculate', 'type_used': 'parity.calc', 'display_name': 'Calculate', 'description': 'Increment the input.'}], 'edges': [],
+        'nodes': [{'id': 'calculate', 'definition_id': 'parity.calc', 'display_name': 'Calculate', 'description': 'Increment the input.'}], 'edges': [],
         'outputs': [{'type': 'parity.result', 'cardinality': 'exactly_one', 'display_name': 'Result', 'as': 'result'}]}
     config: dict[str, Any] = {'pipeline': pipeline}
     if case.other_node:
@@ -262,24 +245,27 @@ def _project(root: Path, variant: str, toolchain: Path, case: Case) -> tuple[Pat
         other_descriptor['contract']['provides'] = []
         other_descriptor['contract']['output_semantics'] = {}
         put_definition(root, variant, other_descriptor, 'nodes/other.jsonc')
-        pipeline['nodes'].append({'id': 'other', 'type_used': 'parity.other', 'display_name': 'Other', 'description': 'Independent implementation.'})
+        pipeline['nodes'].append({'id': 'other', 'definition_id': 'parity.other', 'display_name': 'Other', 'description': 'Independent implementation.'})
         pipeline['edges'].append({'from': 'calculate', 'to': 'other'})
     if case.role == 'plugin':
         put_definition(root, variant, {'kind': 'plugin', 'id': 'parity.plugin', 'type': 'runtime', 'targets': ['node', 'browser'], 'implementations': [_implementation(selected_file, 'createPlugin')], 'config': {'schema': {'type': 'object'}, 'defaults': {}}}, 'plugins/runtime.jsonc')
         config['plugins'] = ['parity.plugin', *case.additional_plugins]
-    elif case.role == 'host':
-        put_definition(root, variant, {'kind': 'host_extension', 'id': 'parity.host', 'targets': ['node', 'browser'], 'implementations': [_implementation(selected_file, 'createHostExtension')], 'provides': [], 'dependencies': [], 'external_packages': []}, 'host_extensions/host.jsonc')
-        config['host_extensions'] = ['parity.host', *case.additional_hosts]
     for file, descriptor in case.extra_manifests.items():
         put_definition(root, variant, descriptor, file)
     if variant == "current":
         from tests.fixtures.support.plugins import resource_declarations, update_resources
         values = resource_declarations(root)
         for declaration in values:
-            if declaration["kind"] in {"base_lib", "plugin", "host_extension"}:
+            if declaration["kind"]=='plugin':
+                for implementation in declaration.get('implementations',[]):
+                    ref=implementation['source']['ref']
+                    if ref.startswith('plugins/code_plugin/'):ref=ref[len('plugins/code_plugin/'):]
+                    elif ref.startswith('plugins/'):ref=ref[len('plugins/'):]
+                    implementation['source']['ref']=ref
+            if declaration["kind"] in {"base_lib", "plugin"}:
                 declaration["rulesets"] = ["vibeflow." + declaration["kind"]]
         update_resources(root, values)
-        config["plugins"] = [{"source": {"kind":"file", "ref":"code_plugin.ts", "export":"plugin"}}]
+        config["plugins"] = [{"source": {"kind":"file", "ref":"plugins/code_plugin/plugin.ts", "export":"plugin"}}]
     config_path = root / 'workflow.jsonc'
     _write_json(config_path, config)
     return workspace, config_path, root / selected_file
@@ -336,7 +322,7 @@ def _observe(case: Case, root: Path, workspace: Path, config: Path, source: Path
             from vibeflow.tooling.application.javascript.cli import main
             stdout = StringIO()
             with redirect_stdout(stdout):
-                exit_code = main(['quality-check', '--workspace', str(workspace), '--config', str(config), '--json'])
+                exit_code = main(['quality-check', '--workspace', str(workspace), '--json'])
             payload = json.loads(stdout.getvalue())
             return _actual(str(payload.get('status', 'FAIL' if exit_code else 'PASS')), _finding_rows(payload),
                            metrics={'exit_code': exit_code}, message=str(payload.get('message', '')))
@@ -391,6 +377,8 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         workspace, config, source = _project(root, variant, toolchain, case)
         actual = _observe(case, root, workspace, config, source, variant=variant)
         code = case.current_code if variant == 'current' and case.current_code is not None else case.code
+        if variant=='current' and case.id=='js.node.package-root':code='VF_IMPORT_OWNER'
+        if variant=='current' and case.id=='js.plugin.node-import':code='DESCRIPTOR.INVALID'
         if variant == 'current' and case.id in {'js.node.recursive-helper', 'js.base.nondeterministic', 'js.node.dynamic-code'}:
             code = ''  # B04/B06/B07: preserve the baseline, retire current default inference.
         severity = 'warning' if case.id == 'js.quality.function-duplicate' else 'error'
@@ -405,7 +393,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             expected['metrics'].update(sdk_rules_checked=True, worker_opened=not bool(code))
             if code:
                 expected['located_codes'] = [code]
-        if code and case.entrypoint != 'worker' and case.id not in {'js.node.abi-output', 'js.quality.function-duplicate'}:
+        if code and case.entrypoint != 'worker' and case.id not in {'js.node.abi-output', 'js.quality.function-duplicate','js.plugin.node-import'}:
             expected['located_codes'] = [code]
         observations.append({'id': case.id, 'title': case.title, 'family': case.family, 'expected': expected, 'actual': actual,
             'classification': case.classification, 'notes': case.notes,

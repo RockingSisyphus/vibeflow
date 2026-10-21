@@ -11,12 +11,7 @@ from xml.etree import ElementTree
 
 from vibeflow.tooling.application.result_scope import add_result_scope, format_result_scope
 from vibeflow.targets.javascript.build.driver_session import check_scope
-from vibeflow.tooling.application.quality_options import (
-    add_quality_limit_arguments,
-    _quality_structure_enabled,
-    _quality_structure_overrides,
-    _quality_thresholds,
-)
+
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -33,6 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(list(sys.argv[1:] if argv is None else argv))
+    from vibeflow.tooling.application.project_quality import handle_quality_check
     handlers = {
         "build": handle_build,
         "validate": handle_validate,
@@ -78,7 +74,7 @@ def add_audit_parsers(subparsers: argparse._SubParsersAction) -> None:
             command.add_argument("--check", action="store_true")
         if name in {"export-mermaid", "export-ascii", "export-svg"}:
             command.add_argument("--expand-nodesets", dest="expand_nodesets", action="store_true")
-            command.add_argument("--collapse-nodesets", dest="expand_nodesets", action="store_false")
+            command.add_argument("--collapse-nodeset_types", dest="expand_nodesets", action="store_false")
             command.add_argument("--hide-contract", action="store_true")
             command.add_argument("--hide-semantics", action="store_true")
             command.set_defaults(expand_nodesets=False)
@@ -104,21 +100,8 @@ def add_audit_parsers(subparsers: argparse._SubParsersAction) -> None:
     review.add_argument("--with-svg", action="store_true")
     review.add_argument("--preview-root", help="override offline preview directory")
 
-    quality = subparsers.add_parser(
-        "quality-check",
-        help="check JavaScript architecture and ownership boundaries",
-    )
-    quality.add_argument("--workspace")
-    quality.add_argument("--config")
-    quality.add_argument("--path")
-    quality.add_argument(
-        "--project-target",
-        choices=("javascript",),
-        help=argparse.SUPPRESS,
-    )
-    quality.add_argument("--json", action="store_true")
-    quality.add_argument("--node-command", default="node", help=argparse.SUPPRESS)
-    add_quality_limit_arguments(quality)
+    from vibeflow.tooling.application.project_quality import add_quality_parser
+    add_quality_parser(subparsers)
 
 
 def _add_audit_input(parser: argparse.ArgumentParser) -> None:
@@ -386,6 +369,10 @@ def handle_review(args: argparse.Namespace) -> int:
         from vibeflow.tooling.project.workspace_loader import load_workspace_config
 
         workspace = load_workspace_config(Path(args.workspace).resolve())
+        from vibeflow.tooling.project.preparation import ProjectPreparation
+        args.preparation = ProjectPreparation(workspace, node_command=args.node_command)
+        args.governance = args.preparation.review(write_architecture=True)
+        payload["project_architecture"] = str(args.governance.architecture_path)
         root = workspace.root_for_path(config_path)
         if root is None:
             return _finish_review_failure(
@@ -503,309 +490,22 @@ def _publish_review_preview(result, args, payload):
     return 0
 
 
-def handle_quality_check(args: argparse.Namespace) -> int:
-    from vibeflow.tooling.project.workspace_loader import (
-        find_project_config,
-        load_project_workspace,
-        load_workspace_config,
-    )
-
-    try:
-        workspace = None
-        if args.workspace:
-            workspace_path = Path(args.workspace).resolve()
-        else:
-            try:
-                workspace_path = _find_workspace(
-                    Path(args.path or args.config or ".")
-                )
-            except ValueError:
-                project_config = find_project_config(
-                    Path(args.path or args.config or ".")
-                )
-                if project_config is not None:
-                    workspace = load_project_workspace(project_config)
-                    workspace_path = workspace.path
-                elif (
-                    args.path
-                    and not args.config
-                    and args.project_target == "javascript"
-                ):
-                    return _handle_standalone_quality(
-                        Path(args.path),
-                        args=args,
-                    )
-                else:
-                    raise
-        if workspace is None:
-            workspace = load_workspace_config(workspace_path)
-        configs = _quality_configs(
-            workspace,
-            explicit_config=args.config,
-            explicit_path=args.path,
-        )
-    except Exception as exc:
-        _print_error(exc, as_json=True, validation_scope="vibeflow_quality")
-        return 1
-    facts_cache: dict[str, object] = {}
-    catalog_cache: dict[Path, object] = {}
-    source_reports = _project_source_quality(workspace, args, configs, facts_cache=facts_cache, catalog_cache=catalog_cache)
-    reports: list[dict[str, object]] = []
-    for config in configs:
-        from vibeflow.targets.shared.quality_support import QualityThresholds
-        from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy
-        from dataclasses import replace
-        configured_root = workspace.root_for_path(config)
-        limits = configured_root.quality_structure
-        overrides = _quality_structure_overrides(args)
-        enabled = _quality_structure_enabled(args, bool(overrides))
-        if enabled is False:
-            limits = None
-        elif overrides:
-            limits = replace(limits, **overrides)
-        namespace = argparse.Namespace(
-            workspace=str(workspace_path),
-            config=str(config),
-            node_command=args.node_command,
-            audit_registered_resources=True,
-            workspace_config=workspace,
-            quality_facts_by_root=facts_cache,
-            catalogs=catalog_cache.get(config),
-            quality_policy=javascript_quality_policy(thresholds=_quality_thresholds(args, QualityThresholds), structure_limits=limits),
-        )
-        result, error = _audit(namespace)
-        if error is not None:
-            reports.append(_error_payload(error, config=config))
-        else:
-            assert result is not None
-            reports.append(_audit_success_payload(result))
-    source_quality = (
-        source_reports[0] if len(source_reports) == 1 else {
-            "status": _quality_status(source_reports),
-            "roots": source_reports,
-        }
-    )
-    status = _quality_status([source_quality, *reports])
-    payload = {
-        "status": status,
-        "project_target": "javascript",
-        "source_quality": source_quality,
-        "reports": reports,
-        **({"skipped": "quality_enabled=false"} if not source_reports and not configs else {}),
-    }
-    payload = add_result_scope(
-        payload,
-        "vibeflow_quality",
-        checked_ids=None if configs else (),
-    )
-    _print_quality_payload(payload, as_json=args.json)
-    return 1 if status in {"FAIL", "ERROR"} else 0
 
 
-def _handle_standalone_quality(
-    source_path: Path,
-    *,
-    args: argparse.Namespace,
-) -> int:
-    from vibeflow.targets.shared.quality_support import QualityStructureLimits, QualityThresholds
-    from vibeflow.tooling.application.javascript.quality_scan import DEFAULT_EXCLUDED_DIRS, scan_javascript_quality
-
-    selected = source_path.expanduser().resolve()
-    try:
-        package_root = _standalone_package_root(selected)
-        structure_overrides = _quality_structure_overrides(args)
-        enabled = _quality_structure_enabled(args, bool(structure_overrides))
-        report = scan_javascript_quality(
-            selected,
-            package_root=package_root,
-            thresholds=_quality_thresholds(args, QualityThresholds),
-            structure_limits=_javascript_structure_limits(
-                QualityStructureLimits(**structure_overrides) if enabled else None
-            ),
-            excluded_dirs=_javascript_exclusions(args, DEFAULT_EXCLUDED_DIRS),
-            node_command=args.node_command,
-        )
-    except Exception as exc:
-        payload = {
-            "status": "FAIL",
-            "project_target": "javascript",
-            "path": str(selected),
-            "source_quality": _error_payload(exc),
-            "reports": [_error_payload(exc)],
-        }
-        _print_quality_payload(add_result_scope(payload, "vibeflow_quality", checked_ids=()), as_json=args.json)
-        return 1
-    payload = {
-        "status": report.status,
-        "project_target": "javascript",
-        "path": str(selected),
-        "source_quality": report.to_dict(),
-        "source_files": [str(Path(report.root) / item.path) for item in report.files],
-        "reports": [],
-    }
-    payload = add_result_scope(payload, "vibeflow_quality")
-    _print_quality_payload(payload, as_json=args.json)
-    return 1 if report.status == "FAIL" else 0
 
 
-def _project_source_quality(workspace, args: argparse.Namespace, configs: Sequence[Path], *, facts_cache: dict[str, object] | None = None, catalog_cache=None) -> list[dict[str, object]]:
-    from dataclasses import replace
-
-    from vibeflow.targets.shared.quality_support import QualityStructureLimits, QualityThresholds
-    from vibeflow.tooling.application.javascript.quality_scan import DEFAULT_EXCLUDED_DIRS, scan_javascript_quality
-    from vibeflow.targets.javascript.frontend.errors import ProjectBuildError
-    from vibeflow.tooling.project.descriptor_loader import load_workflow_catalogs
-
-    selected = Path(args.path).resolve() if args.path else None
-    configured = Path(args.config).resolve() if args.config else None
-    overrides = _quality_structure_overrides(args)
-    enabled = _quality_structure_enabled(args, bool(overrides))
-    reports: list[dict[str, object]] = []
-    for root in workspace.roots:
-        if root.project_target != "javascript" or not root.quality_enabled:
-            continue
-        if selected is not None and not (
-            selected == root.path or root.path in selected.parents or selected in root.path.parents
-        ):
-            continue
-        if configured is not None and configured != root.path and root.path not in configured.parents:
-            continue
-        javascript = root.project_config.get("javascript", {})
-        package_value = javascript.get("package_root", ".") if isinstance(javascript, Mapping) else "."
-        package_root = (root.path / str(package_value)).resolve()
-        scan_path = (
-            selected
-            if selected is not None
-            and selected != root.path
-            and selected != configured
-            and (selected.is_dir() or selected.suffix.lower() in {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".mts", ".cts"})
-            else root.path
-        )
-        limits = root.quality_structure
-        if enabled is False:
-            limits = None
-        elif overrides:
-            limits = replace(limits if limits is not None else QualityStructureLimits(), **overrides)
-        try:
-            from vibeflow.tooling.project.descriptor_loader import load_builtin_plugins
-            scoped_catalogs = []
-            for config in configs:
-                if root.path not in config.parents:
-                    continue
-                catalog = load_workflow_catalogs(root.path, project_config=root.config_path, workflow_config=config, workspace=workspace, node_command=args.node_command)
-                scoped_catalogs.append(catalog)
-                if catalog_cache is not None:
-                    catalog_cache[config] = catalog
-            catalogs = scoped_catalogs[0] if scoped_catalogs else load_builtin_plugins("javascript").catalogs
-            roles = _javascript_structure_roles(root, catalogs)
-            for catalog in scoped_catalogs[1:]:
-                extra = _javascript_structure_roles(root, catalog)
-                roles = replace(roles, _resource_scopes=(*roles._resource_scopes, *extra._resource_scopes))
-            report = scan_javascript_quality(
-                scan_path,
-                catalog=catalogs,
-                package_root=package_root,
-                thresholds=_quality_thresholds(args, QualityThresholds),
-                structure_limits=_javascript_structure_limits(limits),
-                structure_roles=roles,
-                registered_catalogs=tuple(scoped_catalogs) if scan_path == root.path else None,
-                excluded_dirs=_javascript_exclusions(args, DEFAULT_EXCLUDED_DIRS),
-                node_command=args.node_command,
-                facts_cache=facts_cache if scan_path == root.path else None,
-            )
-            if scan_path == root.path and not any(root.path in config.parents for config in configs):
-                from vibeflow.targets.javascript.build.quality_source import javascript_quality_policy
-                report = _audit_registered_without_workflow(
-                    report, catalogs, root, package_root,
-                    node_command=args.node_command,
-                    quality_policy=javascript_quality_policy(thresholds=_quality_thresholds(args, QualityThresholds),
-                        structure_limits=_javascript_structure_limits(limits), structure_roles=_javascript_structure_roles(root, catalogs)),
-                )
-            reports.append(report.to_dict())
-        except Exception as exc:
-            reports.append({"root": str(root.path), **_error_payload(exc)})
-    return reports
 
 
-def _audit_registered_without_workflow(report, catalogs, root, package_root: Path, *, node_command: str, quality_policy=None):
-    from dataclasses import replace
-    from vibeflow.core.flow import GraphConfig
-    from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
-    from vibeflow.targets.javascript.quality.rules import run_javascript_rules
-    javascript = root.project_config.get("javascript", {})
-    external = set(javascript.get("external_packages", ())) if isinstance(javascript, Mapping) else set()
-    import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=root.path, allowed_external=external, node_ids=None, host_extension_ids=frozenset(item.id for item in catalogs.host_extensions), plugin_ids=frozenset(item.id for item in catalogs.plugins))
-    selected = run_javascript_rules(GraphConfig(nodes=(), project_root=str(root.path), rulesets=()), catalogs, project_root=root.path, package_root=package_root, import_policy=import_policy, node_command=node_command, include_registered=True, quality_policy=quality_policy)
-    findings = (*report.findings, *selected.findings)
-    status = "FAIL" if any(item.severity == "error" for item in findings) else "CONCERNS" if findings else "PASS"
-    return replace(report, findings=findings, status=status)
 
 
-def _javascript_structure_roles(root, catalogs):
-    from vibeflow.targets.shared.quality_support import QualityStructureRoles
-    from vibeflow.tooling.project.source_roles import resource_structure_scopes
-    return QualityStructureRoles(
-        _resource_scopes=resource_structure_scopes((catalogs,), root.path, language="javascript"),
-    )
 
 
-def _javascript_structure_limits(limits):
-    if limits is None:
-        return None
-    from dataclasses import replace
-
-    from vibeflow.targets.shared.quality_support import QualityStructureLimits
-
-    default = QualityStructureLimits().allowed_root_code_files
-    allowed = (
-        ("index.ts", "index.js", "index.tsx", "index.jsx", "index.mts", "index.mjs")
-        if limits.allowed_root_code_files == default
-        else limits.allowed_root_code_files
-    )
-    return replace(limits, allowed_root_code_files=allowed)
 
 
-def _javascript_exclusions(args: argparse.Namespace, defaults) -> set[str]:
-    excluded = set(defaults)
-    if args.include_references:
-        excluded.discard("references")
-    excluded.update(f"./{name}" for name in args.exclude_dir)
-    excluded.update(f"./{path}" for path in args.exclude_path)
-    return excluded
 
 
-def _quality_status(reports: Sequence[Mapping[str, object]]) -> str:
-    rank = {"PASS": 0, "CONCERNS": 1, "FAIL": 2, "ERROR": 2}
-    if not reports:
-        return "PASS"
-    status = max((str(report.get("status", "ERROR")) for report in reports), key=lambda value: rank.get(value, 2))
-    return "FAIL" if status == "ERROR" else status
 
 
-def _print_quality_payload(payload: Mapping[str, object], *, as_json: bool) -> None:
-    if as_json:
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
-        return
-    lines = [f"JavaScript quality: {payload.get('status', 'ERROR')}"]
-    source = payload.get("source_quality", {})
-    if isinstance(source, Mapping):
-        summary = source.get("summary", {})
-        if isinstance(summary, Mapping):
-            lines.append(
-                f"Source: {source.get('status')} ({summary.get('files', 0)} files, "
-                f"{summary.get('errors', 0)} errors, {summary.get('warnings', 0)} warnings)"
-            )
-            for item in (*source.get("errors", ()), *source.get("warnings", ()))[:20]:
-                if isinstance(item, Mapping):
-                    lines.append(_diagnostic_text(item))
-        elif source.get("error"):
-            lines.append(str(source["error"]))
-        lines.extend(_diagnostic_text(item) for item in source.get("diagnostics", ()) if isinstance(item, Mapping))
-    for report in payload.get("reports", ()):
-        if isinstance(report, Mapping):
-            lines.append(f"Workflow: {report.get('status', 'ERROR')} {report.get('config', '')}")
-            lines.extend(_diagnostic_text(item) for item in report.get("diagnostics", ()) if isinstance(item, Mapping))
-    print("\n".join(lines))
 
 
 def _diagnostic_text(finding: Mapping[str, object]) -> str:
@@ -820,21 +520,13 @@ def _diagnostic_text(finding: Mapping[str, object]) -> str:
             if location.get(field) is not None:
                 position += f":{location[field]}"
     details = finding.get("details", {})
-    owner = str(details.get("node_type", "")) if isinstance(details, Mapping) else ""
+    owner = str(details.get("definition_id", "")) if isinstance(details, Mapping) else ""
     if not owner:
         owner = str(finding.get("object_id", ""))
     owner_text = f" (owner: {owner})" if owner else ""
     return f"  {identity}: {position}{owner_text} {finding.get('message', '')}"
 
 
-def _standalone_package_root(source_path: Path) -> Path:
-    start = source_path if source_path.is_dir() else source_path.parent
-    for candidate in (start, *start.parents):
-        if (candidate / "package.json").is_file():
-            return candidate
-    raise ValueError(
-        "standalone JavaScript quality requires an ancestor package.json"
-    )
 
 
 def _audit(args: argparse.Namespace):
@@ -854,12 +546,9 @@ def _audit(args: argparse.Namespace):
                     ),
                     config=Path(args.config),
                     node_command=str(args.node_command),
-                    audit_registered_resources=bool(
-                        getattr(args, "audit_registered_resources", False)
-                    ),
-                    quality_facts_by_root=getattr(args, "quality_facts_by_root", None),
                     quality_policy=getattr(args, "quality_policy", None),
                     catalogs=getattr(args, "catalogs", None),
+                    preparation=getattr(args, "preparation", None), governance=getattr(args, "governance", None),
                 )
             ),
             None,
@@ -1047,81 +736,8 @@ def _finish_review_failure(
     return 1
 
 
-def _quality_configs(
-    workspace,
-    *,
-    explicit_config: str | None,
-    explicit_path: str | None,
-) -> tuple[Path, ...]:
-    from vibeflow.tooling.project.workflow_discovery import is_workflow_config, workflow_configs_for_root
-
-    if explicit_config:
-        candidate = Path(explicit_config).resolve()
-        root = workspace.root_for_path(candidate)
-        if (
-            root is not None
-            and root.project_target == "javascript"
-            and not getattr(root, "quality_enabled", True)
-        ):
-            return ()
-        return (candidate,)
-    if explicit_path:
-        candidate = Path(explicit_path).resolve()
-        if candidate.is_file() and is_workflow_config(candidate):
-            root = workspace.root_for_path(candidate)
-            if (
-                root is not None
-                and root.project_target == "javascript"
-                and not getattr(root, "quality_enabled", True)
-            ):
-                return ()
-            return (candidate,)
-        if candidate.is_file() and candidate.suffix.lower() in {
-            ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".mts", ".cts",
-        }:
-            return ()
-        if candidate.is_dir() and candidate.name not in {"."} and all(candidate != root.path for root in workspace.roots):
-            return ()
-        roots = [
-            root
-            for root in workspace.roots
-            if root.project_target == "javascript"
-            and (
-                candidate == root.path
-                or root.path in candidate.parents
-                or candidate in root.path.parents
-            )
-        ]
-    else:
-        roots = [
-            root
-            for root in workspace.roots
-            if root.project_target == "javascript"
-        ]
-    matched_roots = tuple(roots)
-    roots = [
-        root
-        for root in matched_roots
-        if getattr(root, "quality_enabled", True)
-    ]
-    if matched_roots and not roots:
-        return ()
-    configs: set[Path] = set()
-    for root in roots:
-        configs.update(workflow_configs_for_root(root))
-    return tuple(sorted(configs))
 
 
-def _find_workspace(value: Path) -> Path:
-    candidate = value.expanduser().resolve()
-    start = candidate if candidate.is_dir() else candidate.parent
-    for directory in (start, *start.parents):
-        workspace = directory / "vibeflow_config.jsonc"
-        if workspace.is_file():
-            return workspace
-    raise ValueError(
-        f"cannot find vibeflow_config.jsonc above {candidate}; pass --workspace"
-    )
 
 
 def _error_payload(error: Exception, *, config: Path | None = None,

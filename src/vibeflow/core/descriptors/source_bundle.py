@@ -61,7 +61,7 @@ def declaration_descriptor(value):
 def source_resources(catalogs):
     """Fixed declarations in the selected workflow, including plugin packages."""
     for kind, name in (("node", "nodes"), ("base_lib", "base_libs"),
-                       ("plugin", "plugins"), ("host_extension", "host_extensions")):
+                       ("plugin", "plugins")):
         for descriptor in getattr(catalogs, name):
             yield kind, descriptor
     for record in catalogs.plugin_records:

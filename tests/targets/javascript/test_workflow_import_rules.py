@@ -28,8 +28,6 @@ def import_project(tmp_path):
     shutil.copytree(ROOT / "sandbox/javascript/integration", sandbox,
                     ignore=shutil.ignore_patterns("node_modules", "__pycache__", "*.pyc", ".artifacts"))
     project = sandbox / "project"
-    from tests.fixtures.support.plugins import copy_sdk_inputs
-    copy_sdk_inputs(ROOT / "sandbox/javascript/integration", sandbox)
     (project / "node_modules").symlink_to(toolchain / "node_modules", target_is_directory=True)
     # Workflow Rules receive actual source scopes even when Node Rules are unselected.
     definitions = resource_declarations(project)
@@ -42,18 +40,18 @@ def import_project(tmp_path):
 
 def _select_import_rule(project, scope, outcome):
     config = project / "configs" / ({"root": "linear", "nodeset": "nodeset", "loop": "loop"}[scope] + ".jsonc")
-    owner = config if scope == "root" else project / "configs/nodesets" / ("arithmetic.jsonc" if scope == "nodeset" else "loop_body.jsonc")
+    owner = config if scope == "root" else project / "configs/nodeset_types" / ("arithmetic.jsonc" if scope == "nodeset" else "loop_body.jsonc")
     declaration = json.loads(owner.read_text())
     declaration["rulesets"] = ["test.workflow_import"]
     owner.write_text(json.dumps(declaration))
     # A loaded unused declaration can opt out of review without adding source reads.
     unused = {"type_key": "unused.block", "display_name": "Unused block", "description": "Outside the actual workflow closure.",
               "requires": [], "provides": [], "rulesets": [], "pipeline": declaration["pipeline"]}
-    (project / "configs/nodesets/unused.jsonc").write_text(json.dumps(unused))
+    (project / "configs/nodeset_types/unused.jsonc").write_text(json.dumps(unused))
     document = json.loads(config.read_text())
-    document.setdefault("nodeset_imports", []).append({"path": "nodesets/unused.jsonc"})
+    document.setdefault("nodeset_imports", []).append({"path": "nodeset_types/unused.jsonc"})
     config.write_text(json.dumps(document))
-    rule = project / "rules/workflow_import.ts"
+    rule = project / "plugins/code_plugin/rules/workflow_import.ts"
     returned = '{findings:[{code:"TEST.IMPORT.WARNING",severity:"warning",message:"Import evidence"},{code:"TEST.IMPORT.REJECT",severity:"error",message:"Reject actual workflow",source_location:{path:file,line:1,column:1}}]}'
     if outcome == "unavailable":
         returned = '{state:"unavailable",findings:[]}'
@@ -63,13 +61,13 @@ def _select_import_rule(project, scope, outcome):
         returned = '{records:{evidence:{type_id:"test.workflow_import.v1",value:{phase:context.phase,has_compiled:"compiled" in context.facts,order:context.facts.compiled?.order??[],paths:context.subject.call_paths,sources:context.facts.sources.map(source=>source.path)}}}}'
     rule.write_text('export function check(context) {\n'
         ' if((context.phase==="import" && "compiled" in context.facts) || (context.phase==="static" && !("compiled" in context.facts))) throw new Error("Phase needs real compilation facts");\n'
-        ' for(const block of Object.values(context.facts.graph.nodesets)) if(!block.graph.nodeset_refs.every(id=>id in context.facts.graph.nodesets)) throw new Error("Invalid Nodeset declaration reference");\n'
+        ' for(const block of Object.values(context.facts.graph.nodeset_types)) if(!block.graph.nodeset_refs.every(id=>id in context.facts.graph.nodeset_types)) throw new Error("Invalid Nodeset declaration reference");\n'
         ' if(context.facts.sources.some(source=>source.path.includes("/negative/"))) throw new Error("Unrelated source scan");\n'
         ' const file=context.facts.source_files[0]; if(!file || !context.sources.symbols(file).length) throw new Error("Missing actual source ABI");\n'
-        ' if(context.facts.graph.nodes.some(node=>node.type_used==="sandbox.add") && !context.facts.sources.some(source=>source.path.endsWith("/base_lib/math.ts"))) throw new Error("Missing reached helper snapshot");\n'
+        ' if(context.facts.graph.nodes.some(node=>node.definition_id==="sandbox.add") && !context.facts.sources.some(source=>source.path.endsWith("/base_lib/math.ts"))) throw new Error("Missing reached helper snapshot");\n'
         ' return ' + returned + ';\n}\n')
     manifest = sdk_resource(project, "rule", "test.workflow_import")
-    sdk_resource(project, "rule", "test.workflow_import").write_text(json.dumps({"kind": "rule", "id": "test.workflow_import", "outputs": {"evidence": "test.workflow_import.v1"} if outcome == "completed" else {},
+    sdk_resource(project, "rule", "test.workflow_import").write_text(json.dumps({"kind": "rule", "id": "test.workflow_import", "level":"graph", "outputs": {"evidence": "test.workflow_import.v1"} if outcome == "completed" else {},
         "implementations": [{"language": "typescript",  "source": {"kind": "file", "ref": "rules/workflow_import.ts", "export": "check"}}]}))
     (sdk_resource(project, "ruleset", "test.workflow_import")).write_text(json.dumps({"kind": "ruleset", "id": "test.workflow_import",
         "calls": [{"id": "check", "rule_id": "test.workflow_import"}], "entrypoints": {"import": ["check"], "static": ["check"] if outcome == "completed" else [], "run": []}}))
@@ -142,7 +140,7 @@ def test_declaration_only_preview_keeps_import_unavailable_without_executing_rul
 def test_loaded_unused_nodeset_keeps_its_rule_selection_without_fake_calls(import_project):
     workspace, project = import_project
     config, _ = _select_import_rule(project, "root", "completed")
-    unused = project / "configs/nodesets/unused.jsonc"
+    unused = project / "configs/nodeset_types/unused.jsonc"
     declaration = json.loads(unused.read_text())
     declaration["rulesets"] = ["test.unregistered"]
     unused.write_text(json.dumps(declaration))
@@ -158,7 +156,9 @@ def test_workflow_import_builtin_reads_actual_scoped_source_ownership(import_pro
     config, _ = _select_import_rule(project, "root", "completed")
     manifest = sdk_resource(project, "ruleset", "test.workflow_import")
     selection = json.loads(manifest.read_text())
-    selection["calls"] = [{"id": "guard", "rule_id": "vibeflow.import_side_effects"}]
+    sdk_resource(project, "rule", "test.workflow_guard").write_text(json.dumps({
+        "kind":"rule", "id":"test.workflow_guard", "level":"graph", "handler":"vibeflow.import_side_effects"}))
+    selection["calls"] = [{"id": "guard", "rule_id": "test.workflow_guard"}]
     selection["entrypoints"] = {"import": ["guard"], "static": [], "run": []}
     manifest.write_text(json.dumps(selection))
     source = project / "nodes/add.ts"
@@ -166,7 +166,7 @@ def test_workflow_import_builtin_reads_actual_scoped_source_ownership(import_pro
     with pytest.raises(ProjectBuildError) as error:
         audit_javascript_project(JavascriptAuditRequest(workspace, config))
     finding = next(item for item in error.value.diagnostics if item["code"] == "VF_IMPORT_SIDE_EFFECT")
-    assert finding["definition_id"] == "vibeflow.import_side_effects"
+    assert finding["definition_id"] == "test.workflow_guard"
     assert finding["source_location"] == {"path": str(source), "line": 1, "column": 1}
     assert finding["details"]["source_owner"]["id"] == "sandbox.add"
     assert finding["details"]["call_paths"] == [[]]

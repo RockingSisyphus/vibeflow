@@ -138,9 +138,7 @@ def build_aot(request: BuildRequest) -> BuildResult:
                 "sourcemap": sourcemap,
                 "external": sorted(set(request.external_packages)),
                 "runtimeBindings": [{"module": module, "export": exported} for module, exported in emitted.implementation_bindings]
-                    + ([{"module": item.to_value()["module"], "export": item.to_value()["export"]} for item in request.javascript_bindings.host_extensions]
-                       + [{"module": item.implementation.ref, "export": item.implementation.export} for item in request.javascript_bindings.runtime_plugins]
-                       ),
+                    + [{"module": item.implementation.ref, "export": item.implementation.export} for item in request.javascript_bindings.runtime_plugins],
                 "typecheckFiles": [
                     str(contract_check),
                     *(

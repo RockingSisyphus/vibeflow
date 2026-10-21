@@ -18,7 +18,7 @@ from vibeflow.targets.javascript.frontend.emission_view import bound_workflow_vi
 from vibeflow.targets.javascript.frontend.emitter import emit_workflow_module
 
 
-def plan_fixture(description, *, project_root=None, import_policy=None, host_extensions=()):
+def plan_fixture(description, *, project_root=None, import_policy=None):
     """Construct native plan dataclasses and a JS sidecar from authored cases."""
     blocks = []
     metadata, required_capabilities = {}, {}
@@ -73,12 +73,12 @@ def plan_fixture(description, *, project_root=None, import_policy=None, host_ext
             completion = raw.get("completion", (implementation or {}).get("completion", "immediate"))
             schedule = raw.get("schedule", "inline")
             executor = raw.get("executor", "event_loop" if completion == "suspend" or schedule != "inline" else "current")
-            metadata[raw["type_used"]] = {"completion": completion,
+            metadata[raw["definition_id"]] = {"completion": completion,
                 "language": (implementation or {}).get("language", "javascript"),
                 "params_schema": raw.get("params_schema", {})}
-            required_capabilities[raw["type_used"]] = raw.get("capabilities", ())
+            required_capabilities[raw["definition_id"]] = raw.get("capabilities", ())
             nodes.append(NodeCallPlan(
-                id=raw["id"], type_used=raw["type_used"], implementation=source(implementation, fallback=raw["type_used"]),
+                id=raw["id"], definition_id=raw["definition_id"], implementation=source(implementation, fallback=raw["definition_id"]),
                 requires=tuple(DataRequirementPlan(value["type"], value.get("cardinality", "exactly_one")) for value in raw.get("requires", ())),
                 provides=tuple(DataProviderPlan(value["key"], value["type"]) for value in raw.get("provides", ())),
                 params=freeze_json_object(raw.get("params", {})), config_overrides=freeze_json_object({}),
@@ -86,7 +86,7 @@ def plan_fixture(description, *, project_root=None, import_policy=None, host_ext
                 max_concurrency=raw.get("max_concurrency", 8),
                 status=raw.get("status", "implemented"), planned_behavior=raw.get("planned_behavior", ""),
                 is_terminal=raw.get("is_terminal", False), is_nodeset=raw.get("is_nodeset", False),
-                is_loop=raw.get("is_loop", False), nodeset_type_key="", child_block=child_id, exports=(),
+                is_loop=raw.get("is_loop", False), nodeset_type_id="", child_block=child_id, exports=(),
                 completion=completion, schedule=schedule, executor=executor,
                 effect_scope=raw.get("effect_scope", "none"),
             ))
@@ -118,14 +118,13 @@ def plan_fixture(description, *, project_root=None, import_policy=None, host_ext
     )
     capability_values = description.get("capabilities", ())
     capabilities = capability_values if isinstance(capability_values, dict) else {value["id"]: {"operations": value["operations"]} for value in capability_values}
-    hosts = tuple(dict(item, module=str((Path(project_root) / item["module"]).resolve())) if project_root else item for item in host_extensions)
-    bindings = build_javascript_binding_plan(plan, implementations=metadata, capabilities_by_type=required_capabilities,
-        schemas=schemas, capabilities=capabilities, import_policy=import_policy or {}, host_extensions=hosts)
+    bindings = build_javascript_binding_plan(plan, implementations=metadata, capabilities_by_definition=required_capabilities,
+        schemas=schemas, capabilities=capabilities, import_policy=import_policy or {})
     return plan, bindings
 
 
-def emit_fixture(description, *, host_extensions=()):
-    plan, bindings = plan_fixture(description, host_extensions=host_extensions)
+def emit_fixture(description):
+    plan, bindings = plan_fixture(description)
     return emit_workflow_module(plan, javascript_bindings=bindings)
 
 
@@ -134,7 +133,7 @@ def view_fixture(description):
     return bound_workflow_view(plan, bindings)
 
 
-def fixture_build_request(*, plan, import_policy=None, host_extensions=(), **kwargs):
+def fixture_build_request(*, plan, import_policy=None, **kwargs):
     canonical, bindings = plan_fixture(plan, project_root=kwargs["project_root"],
-        import_policy=import_policy, host_extensions=host_extensions)
+        import_policy=import_policy)
     return BuildRequest(plan=canonical, javascript_bindings=bindings, **kwargs)

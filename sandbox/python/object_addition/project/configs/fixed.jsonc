@@ -1,16 +1,7 @@
 {
-  "plugins": [
-    {
-      "source": {
-        "kind": "file",
-        "ref": "plugin.py",
-        "export": "plugin"
-      }
-    }
-  ],
   "nodeset_imports": [
     {
-      "path": "nodesets/step.jsonc"
+      "path": "nodeset_types/step.jsonc"
     }
   ],
   "pipeline": {
@@ -31,13 +22,13 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "addition.boundary",
+        "definition_id": "addition.boundary",
         "display_name": "start",
         "description": "start"
       },
       {
         "id": "loop",
-        "type_used": "vibeflow.loop.while",
+        "definition_id": "vibeflow.loop.while",
         "display_name": "loop",
         "description": "loop",
         "loop": {
@@ -167,7 +158,7 @@
       },
       {
         "id": "end",
-        "type_used": "addition.boundary",
+        "definition_id": "addition.boundary",
         "display_name": "end",
         "description": "end"
       }

@@ -3,7 +3,7 @@
     "nodes": [
       {
         "id": "missing",
-        "type_used": "sandbox.missing",
+        "definition_id": "sandbox.missing",
         "display_name": "Missing",
         "description": "Runs missing."
       }
@@ -13,7 +13,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

@@ -15,7 +15,7 @@ from typing import Mapping
 
 from vibeflow.core.rules import RuleGraphError, compile_ruleset
 from vibeflow.tooling.project.config_loader import load_config_document, load_workspace_config_document
-from vibeflow.tooling.project.descriptor_loader import load_workflow_plugins
+from vibeflow.tooling.project.resources import prepare_workflow_resources
 from vibeflow.tooling.project.workspace_loader import find_project_config, load_project_workspace, load_workspace_config
 
 
@@ -25,10 +25,12 @@ def effective_rule_plans(config: Path, *, workspace=None, node_path: str = "", p
     project_config = owner.config_path if owner else find_project_config(config)
     if project_config is None:
         raise ValueError(f"workflow has no owning project: {config}")
-    if owner is None:
-        owner = load_project_workspace(project_config).roots[0]
     active_workspace = workspace or load_project_workspace(project_config)
-    loaded = load_workflow_plugins(active_workspace, config)
+    if owner is None:
+        owner = active_workspace.root_for_path(config)
+    if owner is None:
+        raise ValueError(f"workflow does not belong to a registered root: {config}")
+    loaded = prepare_workflow_resources(active_workspace, config)
     catalogs = loaded.catalogs
     from vibeflow.targets.shared.bindings import native_binding
     handlers = {item.id:native_binding(catalogs, "rule", item.id) for item in catalogs.rules}
@@ -36,7 +38,7 @@ def effective_rule_plans(config: Path, *, workspace=None, node_path: str = "", p
     rulesets = {item.id: item for item in catalogs.rulesets}
     if owner.project_target == "python":
         from vibeflow.tooling.application.python.rule_defaults import declared_rule_resources
-        registry, rules, rulesets = declared_rule_resources(active_workspace, config, loaded_plugins=loaded)
+        registry, rules, rulesets = declared_rule_resources(active_workspace, config, prepared_resources=loaded)
     defaults = _project_rule_defaults(owner, document=document, workspace=workspace, handlers=handlers,
         rules=rules, origins=catalogs.origins)
     for rule_id, params in defaults.items():
@@ -45,8 +47,8 @@ def effective_rule_plans(config: Path, *, workspace=None, node_path: str = "", p
     purity_policy = None
     project_target = owner.project_target
     if owner.project_target == "python":
-        from vibeflow.tooling.application.python.rule_defaults import source_policy_for_document
-        purity_policy = source_policy_for_document(document, workspace=workspace)
+        from vibeflow.tooling.application.python.rule_defaults import default_source_policy
+        purity_policy = default_source_policy()
     def compiled_plan(selected):
         plan = compile_ruleset(selected, rules=rules, rulesets=rulesets, entrypoint=phase)
         if project_target == "python":
@@ -65,8 +67,8 @@ def effective_rule_plans(config: Path, *, workspace=None, node_path: str = "", p
             raise ValueError(f"unknown Node call path: {node_path}")
     output = []
     for path, call in calls:
-        type_key = str(call.get("type_used", ""))
-        descriptor = catalogs.nodes.get(type_key)
+        definition_id = str(call.get("definition_id", ""))
+        descriptor = catalogs.nodes.get(definition_id)
         if descriptor is None:
             continue
         choice = resolve_node_selection(descriptor, specs[path])
@@ -74,14 +76,14 @@ def effective_rule_plans(config: Path, *, workspace=None, node_path: str = "", p
         plans = [compiled_plan(selected) for selected in selection]
         if any(plan["graph_scope"] == "effective_subtree" for plan in plans):
             raise RuleGraphError("RULE.GRAPH_SCOPE.NODE", "Node selections cannot use an effective_subtree Ruleset")
-        output.append({"call": path, "type_key": type_key, "selection": choice.to_dict(),
+        output.append({"call": path, "definition_id": definition_id, "selection": choice.to_dict(),
                        "selection_source": choice.source,
-                       "origin": catalogs.origins[("nodes", type_key)].to_dict(),
+                       "origin": catalogs.origins[("nodes", definition_id)].to_dict(),
                        "rulesets": selection_data(selection), "constraint_state": "selected" if selection else "unconstrained", "plans": plans})
     reached_libraries = set()
     if owner.project_target == "python":
         from vibeflow.tooling.application.python.rule_defaults import reached_library_ids
-        reached_libraries = reached_library_ids(registry, {call.get("type_used") for _, call in calls if call.get("status") != "planned"})
+        reached_libraries = reached_library_ids(registry, {call.get("definition_id") for _, call in calls if call.get("status") != "planned"})
     resources = _resource_plans(catalogs, calls=calls, data=document.data, project=owner.project_config,
         compiled_plan=compiled_plan, reached_libraries=reached_libraries)
     workflow = [compiled_plan(task.reference) for task in tasks if task.subject.owner == "pipeline"]
@@ -115,13 +117,12 @@ def _resource_plans(catalogs, *, calls, data, project, compiled_plan, reached_li
     def ids(values):
         return {value if isinstance(value,str) else value.get("id") for value in values
                 if isinstance(value,str) or isinstance(value,Mapping) and value.get("enabled",True) is not False}
-    selected = {"base_lib":set(reached_libraries), "plugin":ids(catalogs.lifecycle_selections),
-                "host_extension":ids(data.get("host_extensions",()))}
+    selected = {"base_lib":set(reached_libraries), "plugin":ids(catalogs.lifecycle_selections)}
     for _, call in calls:
-        descriptor = catalogs.nodes.get(call.get("type_used", ""))
+        descriptor = catalogs.nodes.get(call.get("definition_id", ""))
         if descriptor is not None and call.get("status") != "planned":
             selected["base_lib"].update(descriptor.base_libs)
-    for kind,catalog in (("plugin",catalogs.plugins),("host_extension",catalogs.host_extensions)):
+    for kind,catalog in ([("plugin",catalogs.plugins)]):
         pending, visited = list(selected[kind]), set()
         while pending:
             key = pending.pop()
@@ -139,7 +140,7 @@ def _resource_plans(catalogs, *, calls, data, project, compiled_plan, reached_li
         "rulesets":selection_data(item.rulesets),"constraint_state":"selected" if item.rulesets else "unconstrained",
         "plans":[compiled_plan(selection) for selection in item.rulesets]}
         for item in declarations]
-    for kind, catalog in (("base_lib",catalogs.base_libs),("plugin",catalogs.plugins),("host_extension",catalogs.host_extensions)):
+    for kind, catalog in (("base_lib",catalogs.base_libs),("plugin",catalogs.plugins)):
         pending, visited = list(selected[kind]), set()
         while pending:
             key = pending.pop()
@@ -159,19 +160,9 @@ def _resource_plans(catalogs, *, calls, data, project, compiled_plan, reached_li
 def _project_rule_defaults(root, *, document, workspace, handlers, rules, origins):
     if root.project_target == "python":
         from vibeflow.tooling.application.python.rule_defaults import source_rule_defaults
-        depth = root.runtime_options.get("nodeset_max_depth", 4)
-    else:
-        from vibeflow.tooling.application.javascript.rule_defaults import source_rule_defaults
-        javascript = root.project_config.get("javascript", {})
-        if not isinstance(javascript, Mapping):
-            raise ValueError("project javascript config must be an object")
-        depth = javascript.get("nodeset_max_depth", 4)
-    if not isinstance(depth, int) or isinstance(depth, bool) or depth <= 0:
-        raise ValueError("project nodeset_max_depth must be a positive integer")
-    return (source_rule_defaults(document, workspace=workspace, handlers=handlers, rules=rules, origins=origins, depth=depth)
-            if root.project_target == "python" else source_rule_defaults(handlers, rules=rules, origins=origins, depth=depth))
-
-
+        return source_rule_defaults(handlers, rules=rules, origins=origins)
+    from vibeflow.tooling.application.javascript.rule_defaults import source_rule_defaults
+    return source_rule_defaults(handlers, rules=rules, origins=origins)
 
 
 def rule_plans_mermaid(payload: Mapping[str, object]) -> str:

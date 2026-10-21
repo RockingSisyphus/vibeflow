@@ -145,20 +145,17 @@ def _validate_target_metadata(value, *, language):
         _safe_relative_name(value['bindings'])
         _validate_toolchain(value['toolchain'],python=True)
         return
-    if set(value) != {'target','profile','toolchain','external_packages','host_extensions','plugin_abi_version','plugins'}:
+    if set(value) != {'target','profile','toolchain','external_packages','plugin_abi_version','plugins'}:
         _invalid_manifest('invalid JavaScript metadata fields')
     if value['target'] not in {'browser','node'} or value['profile'] not in {'esm-module','single-esm','web-app'}:
         _invalid_manifest('invalid JavaScript target or profile')
-    if value['plugin_abi_version'] != 'vibeflow.plugin.v3':
+    if value['plugin_abi_version'] != 'vibeflow.plugin.v4':
         _invalid_manifest('plugin_abi_version is invalid')
     _validate_toolchain(value['toolchain'])
     _validate_plugins(value['plugins'])
     external = value['external_packages']
     if not isinstance(external,list) or any(not isinstance(item,str) or not item for item in external) or external != sorted(set(external)):
         _invalid_manifest('external_packages must be sorted unique strings')
-    hosts = value['host_extensions']
-    if not isinstance(hosts,list) or any(not isinstance(item,str) or not item for item in hosts) or len(hosts) != len(set(hosts)):
-        _invalid_manifest('host_extensions must be unique non-empty strings')
 
 
 def _validate_plugins(value: Any) -> None:

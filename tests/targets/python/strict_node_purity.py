@@ -18,7 +18,7 @@ def validate_graph_health(graph, *, registry=None, **kwargs):
 
 
 
-DuplicateThreeNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.duplicate_three', display_name='Duplicate Three', description='Duplicates output for an unclaimed comparison.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider('dup.three', 'dup.three', display_name='Duplicate Three'),), output_semantics={'dup.three': ('third duplicate fixture value',)}), rulesets=("vibeflow.process",))
+DuplicateThreeNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.duplicate_three', display_name='Duplicate Three', description='Duplicates output for an unclaimed comparison.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider('dup.three', 'dup.three', display_name='Duplicate Three'),), output_semantics={'dup.three': ('third duplicate fixture value',)}), rulesets=("vibeflow.process",))
 
 
 def test_architecture_smells_warn_for_mismatched_metadata_and_unstable_keys(tmp_path, capsys) -> None:
@@ -55,7 +55,7 @@ def test_graph_health_reports_node_metrics_duplicate_logic_and_confusing_node_na
     assert "GRAPH.SMELL.DUPLICATE_LOGIC" in rule_ids
     duplicate = next(warning for warning in payload["warnings"] if warning["rule_id"] == "GRAPH.SMELL.DUPLICATE_LOGIC")
     assert duplicate["details"]["nodes"] == ["DuplicateOne", "duplicate_two"]
-    assert duplicate["details"]["node_types"] == {"DuplicateOne": "test.duplicate_one", "duplicate_two": "test.duplicate_two"}
+    assert duplicate["details"]["call_definitions"] == {"DuplicateOne": "test.duplicate_one", "duplicate_two": "test.duplicate_two"}
     assert duplicate["details"]["fingerprint"]
     assert duplicate["details"]["duplicate_group"] == ["DuplicateOne", "duplicate_two"]
     assert "similar_to" in duplicate["details"]["suppression_hint"]
@@ -95,7 +95,7 @@ def test_graph_health_suppresses_declared_similar_duplicate_logic_pairs() -> Non
 def test_graph_health_flow_and_data_findings_include_owner_and_provider_context() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "inner.flow",
                     requires=["value.in"],
@@ -148,12 +148,17 @@ def test_graph_health_flow_and_data_findings_include_owner_and_provider_context(
 
 def test_graph_health_checks_each_nested_nodeset_definition_once() -> None:
     graph = _nested_bad_leaf_graph(depth=6)
+    from tests.fixtures.support.rule_inspection import depth_ruleset
+    from dataclasses import replace
+    graph=replace(graph,rulesets=("test.depth",))
+    checked_registry=_registry()
+    from types import SimpleNamespace
+    checked_registry.rule_catalogs=(*checked_registry.rule_catalogs,SimpleNamespace(rules=(),rulesets=(depth_ruleset(8),)))
 
     report = validate_graph_health(
         graph,
-        registry=_registry(),
+        registry=checked_registry,
         purity_policy=PurityPolicy(max_source_lines=1000),
-        nodeset_max_depth=8,
     )
     findings = [*report.errors, *report.warnings]
 
@@ -169,7 +174,7 @@ def test_graph_health_checks_each_nested_nodeset_definition_once() -> None:
 def test_graph_health_keeps_same_node_problem_separate_by_owner() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 {**_bad_leaf_nodeset("left.leaf"), "provides":[]},
                 {**_bad_leaf_nodeset("right.leaf"), "provides":[]},
             ],
@@ -195,15 +200,15 @@ def test_graph_health_keeps_same_node_problem_separate_by_owner() -> None:
 
 
 def test_nodeset_override_path_errors_are_not_repeated_by_nested_definition_expansion() -> None:
-    nodesets = [_bad_leaf_nodeset("ns0")]
+    nodeset_types = [_bad_leaf_nodeset("ns0")]
     first_wrapper = _wrapper_nodeset("ns1", "ns0")
     first_wrapper["pipeline"]["nodes"][1]["node_configs"] = {"missing.path": {"delta": 1}}
-    nodesets.append(first_wrapper)
+    nodeset_types.append(first_wrapper)
     for index in range(2, 6):
-        nodesets.append(_wrapper_nodeset(f"ns{index}", f"ns{index - 1}"))
+        nodeset_types.append(_wrapper_nodeset(f"ns{index}", f"ns{index - 1}"))
     graph = parse_graph_config(
         {
-            "nodesets": nodesets,
+            "nodeset_types": nodeset_types,
             "pipeline": {
                 "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
@@ -220,7 +225,6 @@ def test_nodeset_override_path_errors_are_not_repeated_by_nested_definition_expa
         graph,
         registry=_registry(),
         purity_policy=PurityPolicy(max_source_lines=1000),
-        nodeset_max_depth=8,
     )
     errors = [error for error in report.errors if error.rule_id == "NODESET.CONFIG.UNKNOWN_NODE"]
 
@@ -233,7 +237,7 @@ def test_nodeset_override_path_errors_are_not_repeated_by_nested_definition_expa
 def test_node_config_override_path_can_pass_through_loop_body() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "loop.add_body",
                     requires=["value.in"],
@@ -280,7 +284,7 @@ def test_node_config_override_path_can_pass_through_loop_body() -> None:
 def test_node_config_override_path_still_rejects_traversing_plain_node() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "plain.body",
                     requires=["value.in"],
@@ -314,7 +318,7 @@ def test_node_config_override_path_still_rejects_traversing_plain_node() -> None
     assert invalid.object_id == "composite"
     assert invalid.details["path"] == "add.inner"
     assert invalid.details["node"] == "add"
-    assert invalid.details["type_used"] == "test.add"
+    assert invalid.details["definition_id"] == "test.add"
     assert invalid.details["composite_kind"] == "none"
 
 
@@ -359,7 +363,7 @@ def test_health_report_aggregates_duplicate_findings_but_not_different_direct_so
         ))
 
     registry = _registry()
-    rule = RuleDescriptor("test.duplicates")
+    rule = RuleDescriptor("test.duplicates", level="graph")
     ruleset = RulesetDescriptor("test.duplicates",calls=(RuleCall("check",rule_id=rule.id),))
     registry.rule_catalogs = (*registry.rule_catalogs, SimpleNamespace(rules=(rule,),rulesets=(ruleset,)),)
     defaults = registry.rule_handler_loader
@@ -383,12 +387,12 @@ def test_health_report_aggregates_duplicate_findings_but_not_different_direct_so
 
 
 def _nested_bad_leaf_graph(*, depth: int):
-    nodesets = [_bad_leaf_nodeset("ns0")]
+    nodeset_types = [_bad_leaf_nodeset("ns0")]
     for index in range(1, depth):
-        nodesets.append(_wrapper_nodeset(f"ns{index}", f"ns{index - 1}"))
+        nodeset_types.append(_wrapper_nodeset(f"ns{index}", f"ns{index - 1}"))
     return parse_graph_config(
         {
-            "nodesets": nodesets,
+            "nodeset_types": nodeset_types,
             "pipeline": {
                 "inputs": [INPUT_SPEC("value.in")],
                 "nodes": [
@@ -416,7 +420,7 @@ def _nodeset_depth_graph(
     pipeline_uses_chain: bool = True,
     planned: bool = False,
 ):
-    nodesets = [
+    nodeset_types = [
         _nodeset_config(
             "depth.0",
             provides=["value.out"],
@@ -447,7 +451,7 @@ def _nodeset_depth_graph(
         calls = [call]
         if branch and index == depth - 1:
             calls.append(_node_call("branch", "depth.0", "Calls a shallow branch."))
-        nodesets.append(
+        nodeset_types.append(
             _nodeset_config(
                 f"depth.{index}",
                 provides=["value.out"],
@@ -455,14 +459,14 @@ def _nodeset_depth_graph(
             )
         )
     if planned:
-        for nodeset in nodesets:
+        for nodeset in nodeset_types:
             nodeset["status"] = "planned"
     pipeline_node = (
         _node_call("top", f"depth.{depth - 1}", "Calls the depth fixture.")
         if pipeline_uses_chain
         else _node_call("seed", "test.seed", "Leaves the depth fixture unused.")
     )
-    return parse_graph_config({"nodesets": nodesets, "pipeline": {"nodes": [pipeline_node]}})
+    return parse_graph_config({"nodeset_types": nodeset_types, "pipeline": {"nodes": [pipeline_node]}})
 
 
 def _bad_leaf_nodeset(name: str) -> dict:
@@ -474,7 +478,7 @@ def _bad_leaf_nodeset(name: str) -> dict:
         pipeline={
             "nodes": [
                 _node_call("start", "test.start", "Starts the bad leaf."),
-                {'id': 'bad', 'type_used': 'test.add', 'display_name': 'Bad', 'description': 'Exercises bad in the graph-health fixture.'},
+                {'id': 'bad', 'definition_id': 'test.add', 'display_name': 'Bad', 'description': 'Exercises bad in the graph-health fixture.'},
                 _node_call("end", "test.out_end", "Ends after value.out."),
             ],
             "edges": [{"from": "start", "to": "end"}],
@@ -622,7 +626,7 @@ def test_graph_health_warns_for_duplicate_explicit_edges() -> None:
 def test_graph_health_warns_for_overwide_nodeset() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "wide.flow",
                     provides=["wide.out"],
@@ -647,7 +651,7 @@ def test_nodeset_schema_requires_metadata_contract_and_purity() -> None:
         {
             "type_key": "bad.flow",
             "purity": "impure",
-            "pipeline": {"nodes": [{"id": "seed", "type_used": "test.seed"}]},
+            "pipeline": {"nodes": [{"id": "seed", "definition_id": "test.seed"}]},
         }
     )
     rule_ids = {finding.rule_id for finding in findings}
@@ -658,7 +662,7 @@ def test_nodeset_schema_requires_metadata_contract_and_purity() -> None:
 def test_nodeset_health_accepts_valid_contract_and_groups_no_findings() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "math.add_one",
                     requires=["value.in"],
@@ -685,7 +689,7 @@ def test_nodeset_health_accepts_valid_contract_and_groups_no_findings() -> None:
 def test_nodeset_health_rejects_direct_and_indirect_recursion() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "loop.self",
                     provides=["loop.out"],
@@ -721,7 +725,7 @@ def test_nodeset_health_rejects_direct_and_indirect_recursion() -> None:
 def test_nodeset_health_treats_loop_body_as_recursion_reference() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "loop.body",
                     provides=["loop.out"],
@@ -829,14 +833,20 @@ def test_nodeset_depth_limit_checks_unused_planned_definitions() -> None:
 def test_graph_health_rejects_invalid_nodeset_max_depth(value) -> None:
     graph = parse_graph_config({"pipeline": _seed_only_pipeline()})
 
-    report = validate_graph_health(graph, registry=_registry(), nodeset_max_depth=value)
+    from dataclasses import replace
+    from tests.fixtures.support.rule_inspection import depth_ruleset
+    graph=replace(graph,rulesets=("test.depth",))
+    checked_registry=_registry()
+    from types import SimpleNamespace
+    checked_registry.rule_catalogs=(*checked_registry.rule_catalogs,SimpleNamespace(rules=(),rulesets=(depth_ruleset(value),)))
+    report = validate_graph_health(graph, registry=checked_registry)
     assert any(item.failure_layer == "rule" for item in report.errors)
 
 
 def test_nodeset_health_rejects_export_and_internal_key_leak() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                     _nodeset_config(
                         "bad.scope",
                         provides=["public.out", "missing.out"],
@@ -861,7 +871,7 @@ def test_nodeset_health_rejects_export_and_internal_key_leak() -> None:
 
 def test_nodeset_call_rejects_duplicate_external_contract() -> None:
     config = {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "math.add_one",
                     requires=["value.in"],
@@ -876,7 +886,7 @@ def test_nodeset_call_rejects_duplicate_external_contract() -> None:
                     _node_call("start", "test.start", "Starts the mismatch fixture."),
                     {
                         "id": "bad_composite",
-                        "type_used": "math.add_one",
+                        "definition_id": "math.add_one",
                         "display_name": "Bad Composite",
                         "description": "Attempts to redefine a nodeset contract at its call site.",
                         "requires": [REQ_SPEC("value.in")],
@@ -887,13 +897,13 @@ def test_nodeset_call_rejects_duplicate_external_contract() -> None:
                 "edges": _edge_chain("start", "bad_composite", "end"),
             },
         }
-    with pytest.raises(GraphConfigError, match="derived from type_used"):
+    with pytest.raises(GraphConfigError, match="derived from definition_id"):
         parse_graph_config(config)
 
 def test_nodeset_health_rejects_nested_nodeset_unknown_exports() -> None:
     graph = parse_graph_config(
         {
-            "nodesets": [
+            "nodeset_types": [
                 _nodeset_config(
                     "inner.flow",
                     provides=["inner.out"],

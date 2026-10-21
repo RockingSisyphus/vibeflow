@@ -22,7 +22,7 @@ EXECUTORS = frozenset({"current", "event_loop", "thread"})
 class ImplementationFact:
     """Static, target-supplied facts about one node implementation."""
 
-    type_key: str
+    definition_id: str
     flow_kind: str = ""
     effect_scope: str = ""
     requires: tuple[DataRequirement, ...] = ()
@@ -36,7 +36,7 @@ class ImplementationFact:
 
     def __post_init__(self) -> None:
         text_fields = (
-            self.type_key,
+            self.definition_id,
             self.flow_kind,
             self.effect_scope,
             self.completion,
@@ -60,8 +60,8 @@ class ImplementationFact:
             )
         object.__setattr__(self, "requires", requires)
         object.__setattr__(self, "provides", provides)
-        if not self.type_key.strip():
-            raise ValueError("implementation type_key must be non-empty")
+        if not self.definition_id.strip():
+            raise ValueError("implementation definition_id must be non-empty")
         if self.completion not in COMPLETIONS:
             raise ValueError(
                 f"implementation completion must be one of {sorted(COMPLETIONS)}"
@@ -77,7 +77,7 @@ class ImplementationFact:
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "type_key": self.type_key,
+            "definition_id": self.definition_id,
             "flow_kind": self.flow_kind,
             "effect_scope": self.effect_scope,
 
@@ -106,15 +106,15 @@ class ImplementationFacts:
             raise ValueError(
                 "implementation facts nodes must contain ImplementationFact values"
             )
-        ordered = tuple(sorted(self.nodes, key=lambda item: item.type_key))
-        keys = tuple(item.type_key for item in ordered)
+        ordered = tuple(sorted(self.nodes, key=lambda item: item.definition_id))
+        keys = tuple(item.definition_id for item in ordered)
         if len(keys) != len(set(keys)):
-            raise ValueError("implementation facts contain duplicate type_key")
+            raise ValueError("implementation facts contain duplicate definition_id")
         object.__setattr__(self, "nodes", ordered)
 
-    def get(self, type_key: str) -> ImplementationFact | None:
+    def get(self, definition_id: str) -> ImplementationFact | None:
         return next(
-            (item for item in self.nodes if item.type_key == type_key),
+            (item for item in self.nodes if item.definition_id == definition_id),
             None,
         )
 
@@ -175,7 +175,7 @@ class CoreCompileRequest:
         default_factory=ImplementationFacts
     )
     target_features: TargetFeatureSet = field(default_factory=TargetFeatureSet)
-    known_nodesets: frozenset[str] = field(default_factory=frozenset)
+    known_nodeset_types: frozenset[str] = field(default_factory=frozenset)
     owner: str = "pipeline"
 
     def __post_init__(self) -> None:
@@ -191,7 +191,7 @@ class CoreCompileRequest:
             )
         if not isinstance(self.owner, str) or not self.owner.strip():
             raise ValueError("core compile owner must be non-empty")
-        object.__setattr__(self, "known_nodesets", frozenset(self.known_nodesets))
+        object.__setattr__(self, "known_nodeset_types", frozenset(self.known_nodeset_types))
 
 
 @dataclass(frozen=True)

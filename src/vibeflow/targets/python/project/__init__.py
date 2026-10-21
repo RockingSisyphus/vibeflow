@@ -30,7 +30,7 @@ _export(
     "explicit_flow_cycles",
 )
 _export(
-    "vibeflow.targets.python.nodetypes.protocols",
+    "vibeflow.targets.python.sdk.protocols",
     "EFFECT_SCOPE_GLOBAL_STATE",
     "EFFECT_SCOPE_NONE",
     "EFFECT_SCOPE_PYTHON_IO",
@@ -60,9 +60,7 @@ _export(
     "vibeflow.targets.python.project.policy",
     "DEFAULT_POLICY_DATA",
     "EffectivePolicy",
-    "PolicyResolveResult",
     "default_effective_policy",
-    "merge_policy",
 )
 _export(
     "vibeflow.targets.python.project.registry",

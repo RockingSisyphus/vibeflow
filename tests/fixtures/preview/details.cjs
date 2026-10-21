@@ -12,7 +12,7 @@ for(const id of ids){
  await locate('emit');assert.match(await page.$eval('[data-call-path="emit"] .node-card',e=>e.textContent),/调用职责：emit/);
  const detail=await page.$eval('#details',e=>e.innerText);
  for(const expected of ['类型定义：emit 的完整职责说明。','结果携带本次计算的完整数值。','默认参数','参数约束','调用参数','factor'])assert(detail.includes(expected),target+' missing '+expected);
- const raw=await page.$eval('#details details pre',e=>JSON.parse(e.textContent));assert(raw.call&&raw.node_type);
+ const raw=await page.$eval('#details details pre',e=>JSON.parse(e.textContent));assert(raw.call&&raw.node_definition);
  const edge=async(from,to)=>page.$eval(`.edge-line[data-from="${from}"][data-to="${to}"]`,e=>({kind:e.dataset.edgeKind,color:getComputedStyle(e).stroke,dash:getComputedStyle(e).strokeDasharray,marker:e.getAttribute('marker-end'),id:e.dataset.edgeId}));
  const normal=await edge('start','emit'),parallel=await edge('emit','left'),data=await edge('emit','join'),joinEdge=await edge('left','join'),conditional=await edge('choice','yes');
  assert.equal(normal.kind,'flow');assert.equal(parallel.kind,'parallel');assert.equal(joinEdge.kind,'parallel');assert.equal(data.kind,'data');assert.notEqual(data.dash,'none');assert.equal(normal.dash,'none');assert.notEqual(parallel.color,normal.color);assert.notEqual(data.marker,normal.marker);assert.equal(conditional.kind,'flow');

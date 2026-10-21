@@ -12,7 +12,7 @@ from vibeflow.core.descriptors.values import (
 
 
 def parse_rule(data: Mapping[str, Any]) -> RuleDescriptor:
-    check_fields(data, allowed={"kind", "id", "display_name", "description", "implementations", "inputs", "outputs", "params_schema", "params_defaults", "handler", "scope"}, field="rule")
+    check_fields(data, allowed={"kind", "id", "display_name", "description", "implementations", "inputs", "outputs", "params_schema", "params_defaults", "handler", "scope", "level"}, field="rule")
     return _construct(RuleDescriptor,
         id=required_string(data.get("id"), field="rule.id"),
         display_name=optional_string(data.get("display_name")),
@@ -24,6 +24,7 @@ def parse_rule(data: Mapping[str, Any]) -> RuleDescriptor:
         params_defaults=mapping_or_empty(data.get("params_defaults"), field="rule.params_defaults"),
         handler=optional_string(data.get("handler")),
         scope=optional_string(data.get("scope")) or "call",
+        level=optional_string(data.get("level")) or "node",
     )
 
 

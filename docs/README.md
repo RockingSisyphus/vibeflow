@@ -14,7 +14,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 
 - [系统架构](design/system-architecture.md)：当前内核分层、插件装配与共享架构资料。
 - [执行模型](design/execution-model.md)：普通图调度、显式汇合、规则入口与宿主生命周期。
-- [普通图并发设计](design/graph-concurrency.md)：ABI v9 编译链路、分发局部额度、两侧执行器、取消收尾与维护验证。
+- [普通图并发设计](design/graph-concurrency.md)：当前 ABI 编译链路、分发局部额度、两侧执行器、取消收尾与维护验证。
 - [Rule 机制设计](design/rule-system.md)：统一选择、资料与负责范围、协作、复用及维护边界。
 
 ## 设计演进与验收记录
@@ -37,7 +37,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - [完整修复计划](design/history/rule-system-repair-plan.md)
 - [完整修复验收与问题矩阵](design/history/rule-system-repair-results.md)
 - [业务分类与领域规则旧方案](design/history/domain-node-extensions-plan.md)：业务含义现由完整 Node 与领域 Rule 表达。
-- [0.16 统一资源接入与旧接口迁移](../distribution/docs/user/rule-system-migration.md)
+- [当前配置与接口迁移](../distribution/docs/user/rule-system-migration.md)
 - [基线规则总表](design/history/baseline-rule-inventory.md)
 - [Core 规则盘点](design/history/baseline-rule-inventory-core.md)
 - [Python 规则盘点](design/history/baseline-rule-inventory-python.md)
@@ -48,6 +48,9 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - [产品检查边界与 0.17 格式迁移](../distribution/docs/user/product-check-boundaries.md)
 
 ## 当前维护说明
+
+- [项目治理与资源分层实施状态](maintainers/project-governance-refactor.md)：方案 B 的边界、历史失败与最终完整验收。
+- [用户项目治理与目录规范](../distribution/docs/user/project-governance.md)：独立 root、资源所有权与四级规则。
 
 - [测试提效与技术债迭代](maintainers/test-and-debt-iterations.md)：逐轮诊断、覆盖删增、实际耗时及自主修复记录。
 - [综合数学沙箱说明](maintainers/comprehensive-math-sandbox.md)
@@ -68,11 +71,14 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - [发行与文档装配](maintainers/release.md)
 - [目录职责整改计划](maintainers/directory-remediation-plan-20261009.md)
 - [历史证据索引](maintainers/evidence/index.md)
+- [项目治理重构验证索引](maintainers/evidence/project-governance-20261021.md)：原始批次位置、历史失败与最终复验。
 - [目录职责与产物约定](maintainers/directory-layout.md)
 - [目录整改结果](maintainers/directory-remediation-results-20261009.md)
 - [目录清理与删除原则](maintainers/directory-cleanup-20261010.md)
 
 ## 历史审核与实施记录
+
+- [1.2.1 本地构建说明](maintainers/history/release-1.2.1.md)：命名入口、跨 workflow 通信、普通端口迁移与完整回归后的分发构建。
 
 - [展示子系统清理（2026-10-19）](maintainers/history/presentation-cleanup-20261019.md)：删除旧转接与死代码、收拢展示目录、统一协议和样式事实，记录回归及保留边界。
 - [双语言 AOT 与维护整理实施记录](maintainers/history/aot-unification-implementation.md)
@@ -151,3 +157,5 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
 
 完整归位规则见[仓库目录职责](maintainers/directory-layout.md)。
+
+- [路线与目标决定](goal-decisions.md)：开发过程中需要保留的用户取舍。

@@ -8,8 +8,8 @@ def write_json(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n")
 
 
-def call(identifier, type_used, **extra):
-    return {"id": identifier, "type_used": type_used,
+def call(identifier, definition_id, **extra):
+    return {"id": identifier, "definition_id": definition_id,
             "display_name": identifier, "description": "Layout fixture " + identifier, **extra}
 
 
@@ -29,23 +29,23 @@ def calculate(value):
     return value + 1
 ''')
     (root / "nodes/steps.py").write_text('''from vibeflow.targets.python.sdk import node
-from base_lib.helper import calculate
-@node(type_key="layout.start", flow_kind="terminal", contract={}, rulesets=["vibeflow.process"])
+from ..base_lib.helper import calculate
+@node(node_type='vibeflow.node', id="layout.start", flow_kind="terminal", contract={}, rulesets=["vibeflow.process"])
 class Start:
     def run_pure(self, inputs, params):
         return {}
-@node(type_key="layout.end", flow_kind="terminal", contract={}, rulesets=["vibeflow.process"])
+@node(node_type='vibeflow.node', id="layout.end", flow_kind="terminal", contract={}, rulesets=["vibeflow.process"])
 class End:
     def run_pure(self, inputs, params):
         return {}
-@node(type_key="layout.step", rulesets=["vibeflow.process"], base_libs=["layout.helper"],
+@node(node_type='vibeflow.node', id="layout.step", rulesets=["vibeflow.process"], base_libs=["layout.helper"],
       contract={"provides":[{"key":"result", "type":"number", "display_name":"Result"}],
                 "output_semantics":{"result":["The calculated fixture value."]}},
       presentation={"fill":"#d6eaff", "stroke":"#425a78", "text":"#172b45", "shape":"rounded"})
 class Step:
     def run_pure(self, inputs, params):
         return {"result": calculate(1)}
-@node(type_key="layout.step_right", rulesets=["vibeflow.process"], base_libs=["layout.helper"],
+@node(node_type='vibeflow.node', id="layout.step_right", rulesets=["vibeflow.process"], base_libs=["layout.helper"],
       contract={"provides":[{"key":"right_result", "type":"number", "display_name":"Right result"}],
                 "output_semantics":{"right_result":["A separately named calculated fixture value."]}},
       presentation={"fill":"#d6eaff", "stroke":"#425a78", "text":"#172b45", "shape":"rounded"})
@@ -53,7 +53,8 @@ class Right:
     def run_pure(self, inputs, params):
         return {"right_result": calculate(2)}
 ''')
-    (root / "plugins/lifecycle.py").write_text('''class Compiler:
+    (root / "plugins/layout").mkdir()
+    (root / "plugins/layout/lifecycle.py").write_text('''class Compiler:
     def after_compile(self, graph, compiled):
         return None
 class Runtime:
@@ -64,11 +65,9 @@ def create_compiler(context):
 def create_runtime(context):
     return Runtime()
 ''')
-    (root / "code_plugin.py").write_text('''from vibeflow.targets.python.sdk import Plugin
-from base_lib.helper import calculate
-from nodes.steps import Start, End, Step, Right
-from plugins.lifecycle import create_compiler, create_runtime
-plugin = Plugin(id="layout.resources", resources=[calculate, Start, End, Step, Right],
+    (root / "plugins/layout/plugin.py").write_text('''from vibeflow.targets.python.sdk import Plugin
+from .lifecycle import create_compiler, create_runtime
+plugin = Plugin(id="layout.resources", resources=[],
     compiler=create_compiler, runtime=create_runtime, rulesets=["vibeflow.plugin"],
     declaration_rulesets=["vibeflow.plugin_declaration"],
     display_name="Layout lifecycle", description="Real compiler and runtime declarations.",
@@ -97,10 +96,11 @@ plugin = Plugin(id="layout.resources", resources=[calculate, Start, End, Step, R
     nodes[-1]["similar_to"] = {"node":"start", "relationship":"copy",
                                "reason":"Empty start and end boundary outputs."}
     write_json(root / "workflow.jsonc", {"plugins":[{"id":"layout.resources",
-        "source":{"kind":"file", "ref":"code_plugin.py"}}],
+        "source":{"kind":"file", "ref":"plugins/layout/plugin.py"}}],
         "base_lib":{"modules":["layout.helper"]}, "rulesets":["vibeflow.workflow"],
         "nodeset_imports":[{"path":name} for name in ("leaf_a.jsonc", "leaf_b.jsonc", "outer.jsonc")],
         "pipeline":pipeline(nodes)})
-    write_json(root / "vibeflow_config.jsonc", {"roots":[{"id":"layout", "path":"."}]})
+    from tests.fixtures.support.projects import register_root
+    register_root(root)
     write_json(root / "vibeflow_project.jsonc", {"project_target":"python", "architecture":{
         "documents":[{"workflow":"workflow.jsonc", "document":"ARCHITECTURE.jsonc"}]}})

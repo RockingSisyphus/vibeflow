@@ -47,7 +47,7 @@ def source_query():
     from vibeflow.targets.python.project.compiler import GraphCompiler
     from vibeflow.tooling.project.graph_config import parse_graph_config
     root = Path.cwd()
-    workspace = load_workspace_config(root / "vibeflow_config.jsonc")
+    workspace = load_workspace_config(root.parent / "vibeflow_config.jsonc")
     registry = declared_python_registry(workspace, root / "workflow.jsonc")
     data = load_config_document(root / "workflow.jsonc").data
     graph = parse_graph_config(data, project_root=root, source_path=root / "workflow.jsonc")
@@ -59,7 +59,7 @@ def source_query():
         after_query = {"snapshot_unchanged":registry.source_context_snapshot is original,
             "session_unchanged":current_python_check(registry).sources is original,
             "states_unchanged":dict(registry.source_load_states) == states,
-            "query_types":[item.type_key for item in queried.nodes]}
+            "query_types":[item.definition_id for item in queried.nodes]}
         # Start the compile check from a freshly published actual workflow scope;
         # a failed query check must not conceal an independent compile failure.
         original = collect_workflow_source_context(registry, graph)
@@ -74,7 +74,7 @@ def source_query():
         except Exception as exc:
             error = {"message":str(exc), "findings":[item.to_dict() for item in getattr(exc,"findings",())]}
         return {"query":after_query, "compile":after_compile, "binding_error":error,
-            "actual_calls":[[item.owner,item.node_id,item.type_key] for item in original.calls],
+            "actual_calls":[[item.owner,item.node_id,item.definition_id] for item in original.calls],
             "a_imported":(root / "a.imported").exists(), "b_imported":(root / "b.imported").exists(),
             "business_ran":(root / "a.ran").exists(),
             "a_state_after_binding":registry.source_load_states.get(str(root / "a.py"))}

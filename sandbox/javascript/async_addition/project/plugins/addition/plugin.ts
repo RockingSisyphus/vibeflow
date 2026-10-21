@@ -1,0 +1,13 @@
+import {definePlugin,defineCapability,defineDataSchema} from "@vibeflow/plugin";
+import {library} from "./math.ts";
+import {portCapability,portSchema0,portSchema1,portSchema2,portSchema3} from "./ports.ts";
+export const storage=defineCapability({id:"addition.storage",targets:["node","browser"],operations:{read:{input_type:"addition.request",output_type:"addition.response",completion:"suspend"}}});
+export const a=defineDataSchema({type_key:"addition.a",schema:{type:"number"}});
+export const b=defineDataSchema({type_key:"addition.b",schema:{type:"number"}});
+export const result=defineDataSchema({type_key:"addition.result",schema:{type:"number"}});
+export const key=defineDataSchema({type_key:"addition.key",schema:{type:"string"}});
+export const pair=defineDataSchema({type_key:"addition.pair",schema:{type:"object",properties:{a:{type:"number"},b:{type:"number"}},required:["a","b"],additionalProperties:false}});
+export const request=defineDataSchema({type_key:"addition.request",schema:{type:"object",properties:{key:{type:"string"}},required:["key"],additionalProperties:false}});
+export const response=defineDataSchema({type_key:"addition.response",schema:{type:"object",properties:{value:{type:"number"}},required:["value"],additionalProperties:false}});
+export const session=defineCapability({id:"addition.session",targets:["node","browser"],operations:{open:{input_type:"vibeflow.port.send.result",output_type:"vibeflow.port.send.result"},close:{input_type:"vibeflow.port.send.result",output_type:"vibeflow.port.send.result"}}});
+export const plugin=definePlugin({id:"addition.async",resources:[portCapability,portSchema0,portSchema1,portSchema2,portSchema3,storage,session,library,a,b,result,key,pair,request,response]});

@@ -12,7 +12,7 @@ _BUILTIN_PLUGIN_ID = "vibeflow.core"
 
 def configured_rule_defaults(rule, configured, origin, *, factory):
     """Fill a native declaration's schema without replacing external defaults."""
-    automatic = (origin is not None and origin.plugin_id == _BUILTIN_PLUGIN_ID
+    automatic = (origin is not None and origin.owner.plugin_id == _BUILTIN_PLUGIN_ID
         and origin.path == str(inspect.getsourcefile(factory))
         and origin.symbol == factory.__qualname__
         and origin.line == inspect.getsourcelines(factory)[1])
@@ -41,8 +41,21 @@ class BuiltinPlugin:
 
 def make_builtin_plugin(rules, rulesets, handlers, *, declaration_origins):
     """Pair fixed portable declarations with Target-owned native bindings."""
+    from vibeflow.core.descriptors.contributions import ResourceOrigin, ResourceOwner
+    from vibeflow.targets.shared.rule_support.governance import governance_resources, governance_handlers
+    governance_rules, governance_sets = governance_resources(rules)
+    rules, rulesets = (*rules, *governance_rules), (*rulesets, *governance_sets)
+    handlers = {**handlers, **governance_handlers()}
+    declaration_origins = dict(declaration_origins)
+    origin = ResourceOrigin(ResourceOwner("plugin", _BUILTIN_PLUGIN_ID),
+        str(inspect.getsourcefile(governance_resources)), inspect.getsourcelines(governance_resources)[1],
+        symbol=governance_resources.__qualname__)
+    for kind, group in (("rule", governance_rules), ("ruleset", governance_sets)):
+        declaration_origins.update({(kind, item.id): origin for item in group})
     source = str(inspect.getsourcefile(make_builtin_plugin))
     builder = ContributionBuilder(_BUILTIN_PLUGIN_ID, source=source)
+    from vibeflow.core.descriptors.node_types import NodeTypeDescriptor
+    builder.add(NodeTypeDescriptor("vibeflow.node", display_name="Node"))
     bindings = {}
     for descriptor in rules:
         check = handlers[descriptor.id]
@@ -55,3 +68,8 @@ def make_builtin_plugin(rules, rulesets, handlers, *, declaration_origins):
     for descriptor in rulesets:
         builder.add(descriptor, origin=declaration_origins[("ruleset", descriptor.id)])
     return BuiltinPlugin(builder.id, builder.finish(), MappingProxyType(bindings), source)
+
+
+def project_plugin():
+    """Project inventory governance has no dependency on either source Target."""
+    return make_builtin_plugin((), (), {}, declaration_origins={})

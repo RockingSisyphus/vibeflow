@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Mapping
 
-from vibeflow.targets.shared.quality_support import QualityStructureLimits
 from vibeflow.tooling.project.architecture_types import (
     ArchitectureDocumentSpec,
     WorkspaceConfigError,
@@ -28,10 +27,7 @@ class WorkspaceRoot:
     config_path: Path
     project_config: Mapping[str, Any]
     project_target: ProjectTarget
-    quality_enabled: bool = True
-    quality_structure: QualityStructureLimits = field(
-        default_factory=QualityStructureLimits
-    )
+    purpose: str = ""
     runtime_options: Mapping[str, object] = field(default_factory=dict)
     architecture_documents: tuple[ArchitectureDocumentSpec, ...] = ()
 
@@ -40,8 +36,8 @@ class WorkspaceRoot:
 class WorkspaceConfig:
     path: Path
     root: Path
-    policy: object
     roots: tuple[WorkspaceRoot, ...]
+    purpose: str = ""
 
     def root_by_id(self, root_id: str) -> WorkspaceRoot:
         for root in self.roots:

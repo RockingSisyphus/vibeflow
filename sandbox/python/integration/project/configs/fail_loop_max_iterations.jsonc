@@ -14,7 +14,7 @@
         "display_name": "Start",
         "description": "Starts a loop that should fail on max_iterations.",
         "id": "start",
-        "type_used": "sandbox.start"
+        "definition_id": "sandbox.start"
       },
       {
         "display_name": "Bounded Retry Loop",
@@ -73,13 +73,13 @@
           }
         },
         "id": "retry_loop",
-        "type_used": "vibeflow.loop.while"
+        "definition_id": "vibeflow.loop.while"
       },
       {
         "display_name": "End",
         "description": "Would end if the loop converged.",
         "id": "end",
-        "type_used": "semantic.loop_end"
+        "definition_id": "semantic.loop_end"
       }
     ],
     "edges": [
@@ -107,14 +107,14 @@
   },
   "nodeset_imports": [
     {
-      "path": "nodesets/fail_loop_max_iterations/loop_never_done_step.jsonc"
+      "path": "nodeset_types/fail_loop_max_iterations/loop_never_done_step.jsonc"
     }
   ],
   "plugins": [
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

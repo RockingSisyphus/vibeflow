@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from vibeflow.core.flow import GraphConfig, NodeSpec, NodesetSpec
+from vibeflow.core.flow import GraphConfig, NodeCallSpec, NodesetTypeSpec
 from vibeflow.core.planned import PlannedBehavior
 
 
@@ -54,7 +54,7 @@ import vibeflow.targets.python.runtime.compiled
 forbidden = (
     "vibeflow.targets.python.project.compiler",
     "vibeflow.graph_config",
-    "vibeflow.targets.python.nodetypes.protocols",
+    "vibeflow.targets.python.sdk.protocols",
     "vibeflow.targets.python.project.plugins",
     "vibeflow.runtime",
     "vibeflow.tooling",
@@ -84,7 +84,7 @@ def test_python_block_compiler_source_is_deterministic_golden() -> None:
         order=("start", "finish"),
         frames={"start": frame(), "finish": frame()},
         graph=SimpleNamespace(
-            nodes=(SimpleNamespace(name="start"), SimpleNamespace(name="finish"))
+            nodes=(SimpleNamespace(id="start"), SimpleNamespace(id="finish"))
         ),
         compiled=SimpleNamespace(resolved_schedule_edges=()),
     )
@@ -129,9 +129,9 @@ def test_planned_helpers_traverse_nested_nodesets_once() -> None:
         referenced_nodeset_names,
     )
 
-    planned_leaf = NodeSpec(
+    planned_leaf = NodeCallSpec(
         id="leaf",
-        type_used="example.leaf",
+        definition_id="example.leaf",
         status="planned",
         planned_behavior=PlannedBehavior(
             kind="python_stub",
@@ -139,7 +139,7 @@ def test_planned_helpers_traverse_nested_nodesets_once() -> None:
         ),
     )
     nested_graph = GraphConfig(nodes=(planned_leaf,))
-    nested = NodesetSpec(
+    nested = NodesetTypeSpec(
         type_key="example.group",
         display_name="Group",
         description="Nested planned traversal fixture.",
@@ -148,8 +148,8 @@ def test_planned_helpers_traverse_nested_nodesets_once() -> None:
         graph=nested_graph,
     )
     root = GraphConfig(
-        nodes=(NodeSpec(id="group", type_used="example.group"),),
-        nodesets={"example.group": nested},
+        nodes=(NodeCallSpec(id="group", definition_id="example.group"),),
+        nodeset_types={"example.group": nested},
     )
 
     assert has_planned(root)

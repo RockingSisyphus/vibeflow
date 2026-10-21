@@ -6,16 +6,20 @@ from tests.fixtures.adaptation_regressions.common import write_json
 
 
 def call(identifier, type_key):
-    return {"id": identifier, "type_used": type_key, "display_name": identifier,
+    return {"id": identifier, "definition_id": type_key, "display_name": identifier,
             "description": "Exercise one explicitly selected SDK implementation."}
 
 
-def project(root, source, *, rulesets=(), nodes=None, extra=None):
+def project(root, source, *, node_source, rulesets=(), nodes=None, extra=None):
     root.mkdir(parents=True, exist_ok=True)
-    (root / "plugin.py").write_text(source, encoding="utf-8")
-    write_json(root / "vibeflow_config.jsonc", {"roots": [{"id": "case", "path": "."}]})
+    from tests.fixtures.support.projects import register_root
+    register_root(root)
+    (root / "nodes").mkdir(exist_ok=True)
+    (root / "nodes/declarations.py").write_text(node_source)
+    (root / "plugins/audit").mkdir(parents=True,exist_ok=True)
+    (root / "plugins/audit/plugin.py").write_text(source, encoding="utf-8")
     write_json(root / "vibeflow_project.jsonc", {"project_target": "python"})
-    data = {"plugins": [{"source": {"kind": "file", "ref": "plugin.py"}}],
+    data = {"plugins": [{"source": {"kind": "file", "ref": "plugins/audit/plugin.py"}}],
             "rulesets": list(rulesets),
             "pipeline": {"nodes": nodes or [call("leaf", "audit.leaf")], "edges": []},
             **(extra or {})}
@@ -38,7 +42,7 @@ def static(context, inputs, params):
     record("node-static")
     return RuleResult()
 
-@rule(id="audit.artifact", scope="call")
+@rule(id="audit.artifact", level="graph", scope="call")
 def artifact(context, inputs, params):
     kept = context.require("compiled").providers.get("audit.compiler") == "kept"
     record("workflow:" + str(kept))
@@ -53,7 +57,7 @@ node_checks = ruleset(id="audit.node_checks", calls=[{"id":"static","rule_id":"a
 workflow_checks = ruleset(id="audit.workflow_checks", calls=[{"id":"artifact","rule_id":"audit.artifact"}],
     entrypoints={"static":["artifact"],"run":["artifact"]})
 
-@node(type_key="audit.leaf", flow_kind="terminal", contract={}, rulesets=["audit.node_checks"])
+@node(node_type="vibeflow.node", id="audit.leaf", flow_kind="terminal", contract={}, rulesets=["audit.node_checks"])
 class Leaf:
     def run_pure(self, inputs, params):
         raise RuntimeError("Business entry must not run during inspection.")
@@ -93,16 +97,30 @@ def compiler_project(root, mode="success", *, runnable=False):
         source = source.replace('flow_kind="terminal", contract={}', f'flow_kind="process", contract={contract!r}')
         source = source.replace('raise RuntimeError("Business entry must not run during inspection.")',
                                 'record("business:7")\n        return {"value":7}')
-        boundaries = ('@node(type_key="audit.start",flow_kind="terminal",contract={},rulesets=[])\n'
+        boundaries = ('@node(node_type="vibeflow.node", id="audit.start",flow_kind="terminal",contract={},rulesets=[])\n'
             'class Start:\n    def run_pure(self,inputs,params):\n        return {}\n'
-            '@node(type_key="audit.end",flow_kind="terminal",contract={},rulesets=[])\n'
+            '@node(node_type="vibeflow.node", id="audit.end",flow_kind="terminal",contract={},rulesets=[])\n'
             'class End:\n    def run_pure(self,inputs,params):\n        return {}\n')
         source = source.replace('plugin = Plugin(',boundaries + '\nplugin = Plugin(')
         source = source.replace('resources=[Leaf,','resources=[Start,End,Leaf,')
         extra = {"pipeline":{"nodes":[call("start","audit.start"),call("leaf","audit.leaf"),call("end","audit.end")],
             "edges":[["start","leaf"],["leaf","end"]],
             "outputs":[{"type":"number","as":"result","cardinality":"exactly_one","display_name":"Result"}]}}
-    return project(root, source, rulesets=["audit.workflow_checks"], extra=extra)
+    node_start=source.index('@node(')
+    node_end=source.index('class Compiler:')
+    node_source='from pathlib import Path\nfrom vibeflow.targets.python.sdk import node\n'
+    node_source+='def record(value):\n    with Path('+repr(str(root/'hooks.jsonl'))+').open("a") as stream:\n        stream.write(value+"\\n")\n'
+    node_source+=source[node_start:node_end]
+    source=source[:node_start]+source[node_end:]
+    if runnable:
+        boundary_start=source.index('@node(')
+        boundary_end=source.index('plugin = Plugin(',boundary_start)
+        node_source+=source[boundary_start:boundary_end]
+        source=source[:boundary_start]+source[boundary_end:]
+    source=source.replace('resources=[Start,End,Leaf,','resources=[').replace('resources=[Leaf,','resources=[')
+    source=source.replace('Path(__file__).with_name("hooks.jsonl")','Path('+repr(str(root/'hooks.jsonl'))+')')
+    return project(root,source,node_source=node_source,rulesets=["audit.workflow_checks"],extra=extra)
+
 
 
 SCOPE = '''from pathlib import Path
@@ -113,7 +131,7 @@ from vibeflow.core.findings import HealthFinding
 @rule(id="audit.load_state", scope="source")
 def load_state(context, inputs, params):
     source = context.require("source_context")
-    node = next(item for item in source.nodes if item.type_key == context.subject["type_key"])
+    node = next(item for item in source.nodes if item.definition_id == context.subject["definition_id"])
     present = source.file(node.path) is not None
     assert "source_load_states" not in context.facts
     with Path(__file__).with_name("rule.jsonl").open("a") as stream:
@@ -121,21 +139,26 @@ def load_state(context, inputs, params):
     if REFUSE or not present:
         return RuleResult(findings=(HealthFinding(rule_id="AUDIT.IMPORT.REFUSED" if REFUSE else "AUDIT.LOAD_STATE.MISSING",
             severity="error", message="Import rejected." if REFUSE else "Actual source absent from current load states.",
-            source_location={"path":node.path,"line":1}, object_type="node", object_id=node.type_key),))
+            source_location={"path":node.path,"line":1}, object_type="node", object_id=node.definition_id),))
     return RuleResult()
 
 checks = ruleset(id="audit.import", calls=[{"id":"check","rule_id":"audit.load_state"}],
     entrypoints={"import":["check"]})
-a = node(type_key="audit.a", flow_kind="terminal", contract={}, rulesets=["audit.import"],
+a = node(node_type="vibeflow.node", id="audit.a", flow_kind="terminal", contract={}, rulesets=["audit.import"],
     source=SourceLocator("file","a.py","A"))
-b = node(type_key="audit.b", flow_kind="terminal", contract={}, rulesets=[],
+b = node(node_type="vibeflow.node", id="audit.b", flow_kind="terminal", contract={}, rulesets=[],
     source=SourceLocator("file","b.py","B"))
 plugin = Plugin(id="audit", resources=[a,b,load_state,checks], declaration_rulesets=[])
 '''
 
 
 def scope_project(root, *, unused=True, refuse=False):
-    project(root, f"REFUSE = {refuse!r}\n" + SCOPE, nodes=[call("a", "audit.a")])
+    start=SCOPE.index('a = node(')
+    end=SCOPE.index('plugin = Plugin(')
+    node_source='from vibeflow.targets.python.sdk import node,SourceLocator\n'+SCOPE[start:end]
+    source=f"REFUSE = {refuse!r}\n"+SCOPE[:start]+SCOPE[end:]
+    source=source.replace('resources=[a,b,load_state,checks]','resources=[load_state,checks]')
+    project(root,source,node_source=node_source,nodes=[call("a","audit.a")])
     (root / "a.py").write_text('from pathlib import Path\n'
         'Path(__file__).with_name("a.imported").write_text("loaded")\n'
         'class A:\n    def run_pure(self, inputs, params):\n'
@@ -152,41 +175,3 @@ def scope_project(root, *, unused=True, refuse=False):
         data["nodeset_imports"] = [{"path":"unused.jsonc"}]
         write_json(root / "workflow.jsonc", data)
     return root
-
-
-def policy_project(root, *, inline=None, discovered=None, explicit=None, nested=False,
-                   override=False, unrelated=False):
-    contract = {"provides":[{"key":"result","type":"number","display_name":"Result"}],
-                "output_semantics":{"result":["The sandbox number."]}}
-    code = 'from vibeflow.targets.python.sdk import Plugin,node,SourceLocator,ruleset\n'
-    selection = "['audit.size']" if override else "['vibeflow.process']"
-    code += (f'leaf=node(type_key="audit.leaf",contract={contract!r},rulesets={selection},'
-             'source=SourceLocator("file","leaf.py","Leaf"))\n')
-    resources = ["leaf"]
-    if override:
-        code += ('size=ruleset(id="audit.size",calls=[{"id":"size","rule_id":"vibeflow.maintainability",'
-                 '"params":{"policy":{"node_source":{"max_lines":40}}}}],entrypoints={"static":["size"]})\n')
-        resources.append("size")
-    if unrelated:
-        code += (f'bad=node(type_key="audit.bad",contract={contract!r},rulesets=["vibeflow.process"],'
-                 'source=SourceLocator("file","bad.py","Bad"))\n')
-        resources.append("bad")
-    code += f'plugin=Plugin(id="audit",resources=[{",".join(resources)}],declaration_rulesets=[])\n'
-    project(root, code)
-    leaf = 'class Leaf:\n    def run_pure(self, inputs, params):\n        return {"result":7}\n'
-    leaf = leaf.replace('        return {"result":7}', '\n'.join('        # Local implementation line' for _ in range(25)) + '\n        return {"result":7}')
-    (root / "leaf.py").write_text(leaf)
-    (root / "bad.py").write_text('class Bad:\n    def run_pure(self, inputs, params):\n'
-        '        print("unrelated forbidden output")\n        return {"result":7}\n')
-    import json
-    data = json.loads((root / "workflow.jsonc").read_text())
-    if inline is not None:
-        data["policy"] = {"node_source":{"max_lines":inline}}
-    config = root / ("configs/workflow.jsonc" if nested else "workflow.jsonc")
-    config.parent.mkdir(exist_ok=True)
-    write_json(config, data)
-    if discovered is not None:
-        write_json(config.parent / "kernel_policy.jsonc", {"node_source":{"max_lines":discovered}})
-    if explicit is not None:
-        write_json(root / "explicit.jsonc", {"node_source":{"max_lines":explicit}})
-    return root, config

@@ -41,7 +41,7 @@ def write_cases(work):
             graph["nodes"] = [node for node in graph["nodes"] if node["id"] in keep]
             for node in graph["nodes"]:
                 if node["id"] not in {"start", "end"}:
-                    node["type_used"] = "native.noop"
+                    node["definition_id"] = "native.noop"
             graph["outputs"] = []
             next(node for node in graph["nodes"] if node["id"] == "w0")["join_policy"] = "all"
             graph["edges"] = [["start", "w1"], ["start", "w2"], ["w1", "w0"], ["w2", "w0"],

@@ -34,12 +34,12 @@ def _registry_flow_kinds(graph, registry) -> dict[str, str]:
         if node.status == STATUS_PLANNED:
             continue
         try:
-            descriptor = registry.descriptor(node.type_used)
+            descriptor = registry.descriptor(node.definition_id)
         except Exception:
             continue
         flow_kind = descriptor.flow_kind
         if flow_kind:
-            kinds[node.name] = flow_kind
+            kinds[node.id] = flow_kind
     return kinds
 
 
@@ -55,7 +55,7 @@ def _append_nodeset_flow_health(
         append_join_policy_health,
     )
 
-    for nodeset in graph.nodesets.values():
+    for nodeset in graph.nodeset_types.values():
         if nodeset.status == STATUS_PLANNED:
             continue
         if nodeset.type_key in visited_nodesets:

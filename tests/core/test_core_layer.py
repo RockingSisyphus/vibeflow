@@ -25,8 +25,8 @@ from vibeflow.core.flow import (
     ExecutionLockSpec,
     GraphConfig,
     GraphConfigError,
-    NodeSpec,
-    NodesetSpec,
+    NodeCallSpec,
+    NodesetTypeSpec,
 )
 from vibeflow.core.inspection import build_architecture_report
 from vibeflow.core.models import (
@@ -40,8 +40,8 @@ from vibeflow.core.models import (
 def _graph() -> GraphConfig:
     return GraphConfig(
         nodes=(
-            NodeSpec(id="first", type_used="fixture.first"),
-            NodeSpec(id="second", type_used="fixture.second"),
+            NodeCallSpec(id="first", definition_id="fixture.first"),
+            NodeCallSpec(id="second", definition_id="fixture.second"),
         ),
         edges=(EdgeSpec("first", "second"),),
     )
@@ -60,7 +60,7 @@ def _facts() -> ImplementationFacts:
 def _nested_global_state_graph() -> GraphConfig:
     return parse_graph_config_data(
         {
-            "nodesets": [
+            "nodeset_types": [
                 {
                     "type_key": "fixture.inner",
                     "display_name": "Inner",
@@ -69,7 +69,7 @@ def _nested_global_state_graph() -> GraphConfig:
                     "provides": [],
                     "pipeline": {
                         "nodes": [
-                            {"id": "state", "type_used": "fixture.state", "display_name": "State", "description": "Owns the nested global state."},
+                            {"id": "state", "definition_id": "fixture.state", "display_name": "State", "description": "Owns the nested global state."},
                         ]
                     },
                 },
@@ -81,14 +81,14 @@ def _nested_global_state_graph() -> GraphConfig:
                     "provides": [],
                     "pipeline": {
                         "nodes": [
-                            {"id": "inner", "type_used": "fixture.inner", "display_name": "Inner", "description": "Calls the inner nodeset."},
+                            {"id": "inner", "definition_id": "fixture.inner", "display_name": "Inner", "description": "Calls the inner nodeset."},
                         ]
                     },
                 },
             ],
             "pipeline": {
                 "nodes": [
-                    {"id": "outer", "type_used": "fixture.outer", "display_name": "Outer", "description": "Calls the outer nodeset."},
+                    {"id": "outer", "definition_id": "fixture.outer", "display_name": "Outer", "description": "Calls the outer nodeset."},
                 ]
             },
         }
@@ -123,7 +123,7 @@ def test_compile_core_accepts_only_static_facts_and_is_deterministic() -> None:
 
 
 def test_pure_graph_compiler_rejects_missing_strict_implementation_fact() -> None:
-    with pytest.raises(GraphCompileError, match="unknown type_used 'fixture.second'"):
+    with pytest.raises(GraphCompileError, match="unknown definition_id 'fixture.second'"):
         GraphCompiler().compile(
             _graph(),
             implementation_facts=ImplementationFacts(
@@ -171,7 +171,7 @@ print(json.dumps(sorted(name for name in sys.modules if name.startswith(forbidde
 
 
 def test_global_state_requires_target_feature_without_implicit_effect_permission() -> None:
-    graph = GraphConfig(nodes=(NodeSpec("state", "fixture.state"),))
+    graph = GraphConfig(nodes=(NodeCallSpec("state", "fixture.state"),))
     facts = ImplementationFacts(
         (ImplementationFact("fixture.state", flow_kind=FLOW_KIND_GLOBAL_STATE),),
         strict=True,
@@ -280,19 +280,19 @@ def test_effective_execution_lock_suppresses_uncoordinated_global_warning() -> N
             {TARGET_FEATURE_GLOBAL_STATE, TARGET_FEATURE_EXECUTION_LOCKS}
         ),
     )
-    child_unlocked = GraphConfig(nodes=(NodeSpec("state", "fixture.state"),))
+    child_unlocked = GraphConfig(nodes=(NodeCallSpec("state", "fixture.state"),))
     child_locked = GraphConfig(
-        nodes=(NodeSpec("state", "fixture.state"),),
+        nodes=(NodeCallSpec("state", "fixture.state"),),
         execution_lock=ExecutionLockSpec("project.block"),
     )
     graphs = (
         GraphConfig(
-            nodes=(NodeSpec("state", "fixture.state"),),
+            nodes=(NodeCallSpec("state", "fixture.state"),),
             execution_lock=ExecutionLockSpec("project.root"),
         ),
         GraphConfig(
             nodes=(
-                NodeSpec(
+                NodeCallSpec(
                     "state",
                     "fixture.state",
                     execution_lock=ExecutionLockSpec("project.node"),
@@ -300,9 +300,9 @@ def test_effective_execution_lock_suppresses_uncoordinated_global_warning() -> N
             ),
         ),
         GraphConfig(
-            nodes=(NodeSpec("group", "fixture.group"),),
-            nodesets={
-                "fixture.group": NodesetSpec(
+            nodes=(NodeCallSpec("group", "fixture.group"),),
+            nodeset_types={
+                "fixture.group": NodesetTypeSpec(
                     "fixture.group",
                     "Group",
                     "The child block owns the lock.",
@@ -314,14 +314,14 @@ def test_effective_execution_lock_suppresses_uncoordinated_global_warning() -> N
         ),
         GraphConfig(
             nodes=(
-                NodeSpec(
+                NodeCallSpec(
                     "group",
                     "fixture.group",
                     execution_lock=ExecutionLockSpec("project.ancestor"),
                 ),
             ),
-            nodesets={
-                "fixture.group": NodesetSpec(
+            nodeset_types={
+                "fixture.group": NodesetTypeSpec(
                     "fixture.group",
                     "Group",
                     "The invocation owns the lock.",
@@ -339,7 +339,7 @@ def test_effective_execution_lock_suppresses_uncoordinated_global_warning() -> N
                 graph=graph,
                 implementation_facts=facts,
                 target_features=features,
-                known_nodesets=frozenset(graph.nodesets),
+                known_nodeset_types=frozenset(graph.nodeset_types),
             )
         )
         assert not any(
@@ -352,7 +352,7 @@ def test_effective_execution_lock_suppresses_uncoordinated_global_warning() -> N
 def test_planned_nodeset_trees_do_not_create_execution_or_lock_facts() -> None:
     graph = parse_graph_config_data(
         {
-            "nodesets": [
+            "nodeset_types": [
                 {
                     "type_key": "fixture.planned_definition",
                     "display_name": "Planned Definition",
@@ -364,7 +364,7 @@ def test_planned_nodeset_trees_do_not_create_execution_or_lock_facts() -> None:
                         "nodes": [
                             {
                                 "id": "state",
-                                "type_used": "fixture.state",
+                                "definition_id": "fixture.state",
                                 "display_name": "State",
                                 "description": "Would own state in the planned definition.",
                                 "execution_lock": {"key": "ignored-child-lock"},
@@ -380,7 +380,7 @@ def test_planned_nodeset_trees_do_not_create_execution_or_lock_facts() -> None:
                     "provides": [],
                     "pipeline": {
                         "nodes": [
-                            {"id": "state", "type_used": "fixture.state", "display_name": "State", "description": "Owns state in the implemented definition."},
+                            {"id": "state", "definition_id": "fixture.state", "display_name": "State", "description": "Owns state in the implemented definition."},
                         ]
                     },
                 },
@@ -394,7 +394,7 @@ def test_planned_nodeset_trees_do_not_create_execution_or_lock_facts() -> None:
                         "nodes": [
                             {
                                 "id": "future_state",
-                                "type_used": "planned.state",
+                                "definition_id": "planned.state",
                                 "status": "planned",
                                 "flow_kind": FLOW_KIND_GLOBAL_STATE,
                                 "display_name": "Future State",
@@ -410,14 +410,14 @@ def test_planned_nodeset_trees_do_not_create_execution_or_lock_facts() -> None:
                 "nodes": [
                     {
                         "id": "planned_definition_call",
-                        "type_used": "fixture.planned_definition",
+                        "definition_id": "fixture.planned_definition",
                         "display_name": "Planned Definition",
                         "description": "Calls the planned nodeset definition.",
                         "execution_lock": {"key": "ignored-planned-lock"},
                     },
                     {
                         "id": "planned_call",
-                        "type_used": "fixture.implemented_definition",
+                        "definition_id": "fixture.implemented_definition",
                         "status": "planned",
                         "flow_kind": "predefined",
                         "display_name": "Planned Call",
@@ -428,7 +428,7 @@ def test_planned_nodeset_trees_do_not_create_execution_or_lock_facts() -> None:
                     },
                     {
                         "id": "planned_child_call",
-                        "type_used": "fixture.planned_child",
+                        "definition_id": "fixture.planned_child",
                         "display_name": "Planned Child Call",
                         "description": "Calls the nodeset containing a planned child.",
                     },
@@ -457,7 +457,7 @@ def test_planned_nodeset_trees_do_not_create_execution_or_lock_facts() -> None:
 def test_recursive_nodeset_cycle_is_guarded_while_finding_global_state() -> None:
     graph = parse_graph_config_data(
         {
-            "nodesets": [
+            "nodeset_types": [
                 {
                     "type_key": "fixture.cycle_a",
                     "display_name": "Cycle A",
@@ -466,7 +466,7 @@ def test_recursive_nodeset_cycle_is_guarded_while_finding_global_state() -> None
                     "provides": [],
                     "pipeline": {
                         "nodes": [
-                            {"id": "to_b", "type_used": "fixture.cycle_b", "display_name": "To B", "description": "Calls cycle B."},
+                            {"id": "to_b", "definition_id": "fixture.cycle_b", "display_name": "To B", "description": "Calls cycle B."},
                         ]
                     },
                 },
@@ -478,15 +478,15 @@ def test_recursive_nodeset_cycle_is_guarded_while_finding_global_state() -> None
                     "provides": [],
                     "pipeline": {
                         "nodes": [
-                            {"id": "back", "type_used": "fixture.cycle_a", "display_name": "Back", "description": "Calls cycle A."},
-                            {"id": "state", "type_used": "fixture.state", "display_name": "State", "description": "Owns nested global state."},
+                            {"id": "back", "definition_id": "fixture.cycle_a", "display_name": "Back", "description": "Calls cycle A."},
+                            {"id": "state", "definition_id": "fixture.state", "display_name": "State", "description": "Owns nested global state."},
                         ]
                     },
                 },
             ],
             "pipeline": {
                 "nodes": [
-                    {"id": "cycle", "type_used": "fixture.cycle_a", "display_name": "Cycle", "description": "Calls the recursive nodeset fixture."},
+                    {"id": "cycle", "definition_id": "fixture.cycle_a", "display_name": "Cycle", "description": "Calls the recursive nodeset fixture."},
                 ]
             },
         }
@@ -512,7 +512,7 @@ def test_recursive_nodeset_cycle_is_guarded_while_finding_global_state() -> None
 def test_nested_execution_lock_requires_target_feature() -> None:
     graph = parse_graph_config_data(
         {
-            "nodesets": [
+            "nodeset_types": [
                 {
                     "type_key": "fixture.locked",
                     "display_name": "Locked",
@@ -523,7 +523,7 @@ def test_nested_execution_lock_requires_target_feature() -> None:
                         "nodes": [
                             {
                                 "id": "locked",
-                                "type_used": "fixture.work",
+                                "definition_id": "fixture.work",
                                 "display_name": "Locked Work",
                                 "description": "Runs work under the child lock.",
                                 "execution_lock": {"key": "child-lock"},
@@ -534,7 +534,7 @@ def test_nested_execution_lock_requires_target_feature() -> None:
             ],
             "pipeline": {
                 "nodes": [
-                    {"id": "outer", "type_used": "fixture.locked", "display_name": "Outer", "description": "Calls the locked nodeset."},
+                    {"id": "outer", "definition_id": "fixture.locked", "display_name": "Outer", "description": "Calls the locked nodeset."},
                 ]
             },
         }
@@ -565,7 +565,7 @@ def test_nested_execution_locks_must_reuse_the_active_core_key() -> None:
     def locked_graph(child_key: str) -> GraphConfig:
         return parse_graph_config_data(
             {
-                "nodesets": [
+                "nodeset_types": [
                     {
                         "type_key": "fixture.locked",
                         "display_name": "Locked",
@@ -576,7 +576,7 @@ def test_nested_execution_locks_must_reuse_the_active_core_key() -> None:
                             "nodes": [
                                 {
                                     "id": "locked",
-                                    "type_used": "fixture.work",
+                                    "definition_id": "fixture.work",
                                     "display_name": "Locked Work",
                                     "description": "Runs work under the nested lock.",
                                     "execution_lock": {"key": child_key},
@@ -588,7 +588,7 @@ def test_nested_execution_locks_must_reuse_the_active_core_key() -> None:
                 "pipeline": {
                     "execution_lock": {"key": "root-lock"},
                     "nodes": [
-                        {"id": "outer", "type_used": "fixture.locked", "display_name": "Outer", "description": "Calls the locked nodeset."},
+                        {"id": "outer", "definition_id": "fixture.locked", "display_name": "Outer", "description": "Calls the locked nodeset."},
                     ],
                 },
             }
@@ -631,11 +631,11 @@ def test_nested_execution_locks_must_reuse_the_active_core_key() -> None:
 
 
 def test_explicit_nodeset_child_lock_reuses_its_parent_scope():
-    from vibeflow.core.flow import NodesetSpec
-    child = GraphConfig((NodeSpec("work","fixture.work",execution_lock=ExecutionLockSpec("other")),))
-    group = NodesetSpec("fixture.group","Group","Ordinary nested scope",(),(),child)
-    graph = GraphConfig((NodeSpec("group","fixture.group",execution_lock=ExecutionLockSpec("scope")),),
-                        nodesets={group.type_key:group})
+    from vibeflow.core.flow import NodesetTypeSpec
+    child = GraphConfig((NodeCallSpec("work","fixture.work",execution_lock=ExecutionLockSpec("other")),))
+    group = NodesetTypeSpec("fixture.group","Group","Ordinary nested scope",(),(),child)
+    graph = GraphConfig((NodeCallSpec("group","fixture.group",execution_lock=ExecutionLockSpec("scope")),),
+                        nodeset_types={group.type_key:group})
     facts = ImplementationFacts((ImplementationFact("fixture.work",flow_kind="process"),),strict=True)
     with pytest.raises(GraphCompileError) as error:
         compile_core(CoreCompileRequest(graph=graph,implementation_facts=facts,
@@ -647,7 +647,7 @@ def test_explicit_nodeset_child_lock_reuses_its_parent_scope():
 def test_planned_global_state_is_visible_but_does_not_require_feature_or_lock() -> None:
     graph = GraphConfig(
         nodes=(
-            NodeSpec(
+            NodeCallSpec(
                 "future",
                 "planned.future",
                 status="planned",
@@ -670,7 +670,7 @@ def test_planned_global_state_is_visible_but_does_not_require_feature_or_lock() 
 def test_uncompiled_architecture_marks_declared_implemented_global_state() -> None:
     graph = GraphConfig(
         nodes=(
-            NodeSpec(
+            NodeCallSpec(
                 "state",
                 "fixture.state",
                 flow_kind=FLOW_KIND_GLOBAL_STATE,
@@ -687,14 +687,14 @@ def test_uncompiled_architecture_marks_declared_implemented_global_state() -> No
 def test_uncompiled_architecture_recurses_into_implemented_nodesets() -> None:
     child_graph = GraphConfig(
         nodes=(
-            NodeSpec(
+            NodeCallSpec(
                 "state",
                 "fixture.state",
                 flow_kind=FLOW_KIND_GLOBAL_STATE,
             ),
         )
     )
-    nodeset = NodesetSpec(
+    nodeset = NodesetTypeSpec(
         type_key="fixture.inner",
         display_name="Inner",
         description="Contains declared global state.",
@@ -703,8 +703,8 @@ def test_uncompiled_architecture_recurses_into_implemented_nodesets() -> None:
         graph=child_graph,
     )
     graph = GraphConfig(
-        nodes=(NodeSpec("outer", "fixture.inner"),),
-        nodesets={"fixture.inner": nodeset},
+        nodes=(NodeCallSpec("outer", "fixture.inner"),),
+        nodeset_types={"fixture.inner": nodeset},
     )
 
     architecture = build_architecture_report(graph)
@@ -722,7 +722,7 @@ def test_execution_lock_config_is_normalized_reserved_and_feature_gated() -> Non
                 "nodes": [
                     {
                         "id": "step",
-                        "type_used": "fixture.first",
+                        "definition_id": "fixture.first",
                         "display_name": "Step",
                         "description": "Runs under the normalized execution lock.",
                         "execution_lock": {"key": " trainer "},
@@ -764,7 +764,7 @@ def test_execution_lock_config_is_normalized_reserved_and_feature_gated() -> Non
             {
                 "pipeline": {
                     "execution_lock": {"key": "vibeflow.internal"},
-                    "nodes": [{"id": "step", "type_used": "fixture.first", "display_name": "Step", "description": "Exercises a reserved execution lock."}],
+                    "nodes": [{"id": "step", "definition_id": "fixture.first", "display_name": "Step", "description": "Exercises a reserved execution lock."}],
                 }
             }
         )
@@ -774,8 +774,8 @@ def test_execution_lock_config_is_normalized_reserved_and_feature_gated() -> Non
 def test_hidden_task_declarations_are_rejected_at_every_graph_depth(nested):
     from vibeflow.core.config import parse_graph_config_data
     from vibeflow.core.flow import GraphConfigError
-    body = {"nodes":[{"id":"dispatch","type_used":"fixture.work","task_targets":{}}]}
-    document = {"pipeline":body} if not nested else {"pipeline":{"nodes":[]},"nodesets":[{
+    body = {"nodes":[{"id":"dispatch","definition_id":"fixture.work","task_targets":{}}]}
+    document = {"pipeline":body} if not nested else {"pipeline":{"nodes":[]},"nodeset_types":[{
         "type_key":"fixture.body","display_name":"Body","description":"Nested scope",
         "requires":[],"provides":[],"pipeline":body}]}
     with pytest.raises(GraphConfigError,match="GRAPH.TASK.MIGRATION"):

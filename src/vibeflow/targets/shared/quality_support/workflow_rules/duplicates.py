@@ -9,11 +9,11 @@ def _duplicate_logic_facts(
     fingerprints: dict[str, str],
     node_metrics: dict[str, dict[str, object]],
     *,
-    node_types: Mapping[str, str] | None = None,
+    call_definitions: Mapping[str, str] | None = None,
     node_similarities: Mapping[str, Mapping[str, str]] | None = None,
 ) -> tuple[HealthFinding, ...]:
     findings: list[HealthFinding] = []
-    types = dict(node_types or {})
+    types = dict(call_definitions or {})
     similarities = {name: dict(value) for name, value in (node_similarities or {}).items()}
     for fingerprint, group in _fingerprint_groups(fingerprints).items():
         if len(group) < 2:
@@ -41,7 +41,7 @@ def _duplicate_logic_facts(
                         suggested_fix_type="split_node",
                         details={
                             "nodes": [first, second],
-                            "node_types": {name: types.get(name, "") for name in (first, second)},
+                            "call_definitions": {name: types.get(name, "") for name in (first, second)},
                             "run_pure_shapes": {first: first_shape, second: second_shape},
                             "fingerprint": fingerprint,
                             "duplicate_group": group,
@@ -52,8 +52,8 @@ def _duplicate_logic_facts(
     return tuple(findings)
 
 
-def duplicate_logic_findings(fingerprints, node_metrics, *, node_types=None, node_similarities=None):
-    return _duplicate_logic_facts(fingerprints, node_metrics, node_types=node_types, node_similarities=node_similarities)
+def duplicate_logic_findings(fingerprints, node_metrics, *, call_definitions=None, node_similarities=None):
+    return _duplicate_logic_facts(fingerprints, node_metrics, call_definitions=call_definitions, node_similarities=node_similarities)
 
 
 def _fingerprint_groups(fingerprints: Mapping[str, str]) -> dict[str, list[str]]:

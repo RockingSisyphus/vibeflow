@@ -1,5 +1,6 @@
 from tests.fixtures.support.preview import preview_directory, preview_architecture, preview_snapshot
 from tests.fixtures.support.strict_support import *
+from tests.fixtures.support.projects import project_root
 from tests.fixtures.support.rule_inspection import _valid_node_source, _inspect_node_source, write_registry_project, node_document
 
 
@@ -15,6 +16,7 @@ def _chain_declarations(modules):
     return node, library
 
 def test_node_base_lib_dependency_chain_warning_and_error(tmp_path, capsys, monkeypatch) -> None:
+    tmp_path = project_root(tmp_path)
     _clear_base_lib_modules()
     monkeypatch.syspath_prepend(str(tmp_path))
     _write_base_lib_chain(tmp_path, ["a", "b", "c", "d"])
@@ -33,8 +35,7 @@ def test_node_base_lib_dependency_chain_warning_and_error(tmp_path, capsys, monk
     assert warning["details"]["longest_chain"] == ["node", "base_lib.a", "base_lib.b", "base_lib.c", "base_lib.d"]
     assert payload["base_lib_dependency_chain"]["longest_chain_length"] == 5
 
-    deeper = tmp_path / "deep"
-    deeper.mkdir()
+    deeper = project_root(tmp_path.parent / "deep")
     _clear_base_lib_modules()
     monkeypatch.syspath_prepend(str(deeper))
     _write_base_lib_chain(deeper, ["a", "b", "c", "d", "e", "f"])
@@ -58,7 +59,7 @@ def test_jsonc_loader_strips_comments_without_changing_runtime_data(tmp_path) ->
   */
     "pipeline": {
     "nodes": [
-      {"id": "seed", "type_used": "test.seed", "display_name": "Seed", "description": "Produces value.in.", "provides": [{"key": "value.in", "type": "value.in"}]}
+      {"id": "seed", "definition_id": "test.seed", "display_name": "Seed", "description": "Produces value.in.", "provides": [{"key": "value.in", "type": "value.in"}]}
     ]
   }
 }
@@ -95,53 +96,22 @@ def test_jsonc_loader_keeps_parse_error_location_after_comments(tmp_path) -> Non
     assert exc.source_location["line"] == 4
     assert exc.source_location["column"] > 1
 
-def test_policy_default_discovery_explicit_and_inline_merge_order(tmp_path) -> None:
-    config_path = tmp_path / "workflow.jsonc"
-    discovered_path = tmp_path / "kernel_policy.jsonc"
-    explicit_path = tmp_path / "explicit_policy.jsonc"
-    config_path.write_text(json.dumps({"policy": {"node_source": {"max_bytes": 3000}, "imports": {"allowed_roots": ["inline_allowed"]}},
-        "pipeline": {"nodes": [_node_call("seed", "test.seed", "Produces value.in.")]}}), encoding="utf-8")
-    discovered_path.write_text('{"node_source": {"max_lines": 400}, "imports": {"allowed_roots": ["discovered"]}}', encoding="utf-8")
-    explicit_path.write_text('{"policy": {"node_source": {"max_lines": 250}, "imports": {"allowed_roots": ["explicit"]}}}', encoding="utf-8")
-    result = resolve_effective_policy(load_config_document(config_path).data, config_path=config_path, explicit_policy_path=explicit_path)
-    policy = result.effective_policy.to_dict()
-    assert result.findings == ()
-    assert policy["node_source"]["max_lines"] == 250
-    assert policy["node_source"]["max_bytes"] == 3000
-    assert policy["imports"]["allowed_roots"] == ["inline_allowed"]
-    assert policy["sources"][0] == "kernel.default_policy"
-    assert f"project.policy:{discovered_path}" in policy["sources"]
-    assert f"project.policy:{explicit_path}" in policy["sources"]
-    assert policy["sources"][-1] == "config.inline_policy"
 
 
-def test_policy_diagnostic_filters_are_replaced_by_rule_graph_configuration(tmp_path) -> None:
-    document = {"policy": {"rules": {"downgrades": [{"rule_id": "NODE.IMPORT.BANNED", "to": "warning"}]}}}
-    result = resolve_effective_policy(document, config_path=tmp_path / "workflow.jsonc")
-    assert any(item.code == "CONFIG.POLICY.RULES.REMOVED" for item in result.findings)
 
-def test_policy_discovery_prefers_kernel_policy_over_governance(tmp_path) -> None:
-    config_path = tmp_path / "workflow.json"
-    config_path.write_text('{"pipeline": {"nodes": [{"id": "seed", "type_used": "test.seed", "display_name": "Seed", "description": "Seed fixture."}]}}', encoding="utf-8")
-    (tmp_path / "kernel_policy.jsonc").write_text('{"node_source": {"max_lines": 321}}', encoding="utf-8")
-    (tmp_path / "governance.jsonc").write_text('{"node_source": {"max_lines": 123}}', encoding="utf-8")
-    result = resolve_effective_policy(load_config_document(config_path).data, config_path=config_path)
-    policy = result.effective_policy.to_dict()
-    assert policy["node_source"]["max_lines"] == 321
-    assert f"project.policy:{tmp_path / 'governance.jsonc'}" not in policy["sources"]
 
 def test_schema_validation_rejects_invalid_pipeline_shapes() -> None:
     findings = collect_config_schema_findings(
         {
             "pipeline": {
                 "nodes": [
-                    {"type_used": "test.seed"},
-                    {"id": "bad_requires", "type_used": "test.seed", "requires": "x"},
+                    {"definition_id": "test.seed"},
+                    {"id": "bad_requires", "definition_id": "test.seed", "requires": "x"},
                 ],
                 "edges": [{"from": "a", "to": "b", "max_executions": 0}],
                 "loops": [{"id": "loop", "edges": [["a", "b"]]}],
             },
-            "nodesets": [{"id": "bad"}],
+            "nodeset_types": [{"id": "bad"}],
             "boundary": {"config": []},
         }
     )
@@ -155,17 +125,9 @@ def test_schema_validation_rejects_invalid_pipeline_shapes() -> None:
     assert "CONFIG.BOUNDARY.REMOVED" in rule_ids
     assert "pipeline.nodes[0].id" in object_ids
 
-def test_schema_validation_rejects_policy_bool_as_int() -> None:
-    findings = collect_config_schema_findings(
-        {
-            "policy": {"node_source": {"max_lines": True}},
-        "pipeline": {"nodes": [{"id": "seed", "type_used": "test.seed", "display_name": "Seed", "description": "Seed fixture."}]},
-        }
-    )
-    assert any(finding.object_id == "policy.node_source.max_lines" for finding in findings)
-    assert any(finding.rule_id == "CONFIG.SCHEMA.POLICY_POSITIVE_INT" for finding in findings)
 
 def test_cli_validate_jsonc_outputs_effective_policy(tmp_path, capsys) -> None:
+    tmp_path = project_root(tmp_path)
     selection = write_registry_project(tmp_path, _registry(), ("test.start", "test.seed", "test.add", "test.out_end"))
     config_path = tmp_path / "workflow.jsonc"
     config_path.write_text(
@@ -177,10 +139,10 @@ def test_cli_validate_jsonc_outputs_effective_policy(tmp_path, capsys) -> None:
   "pipeline": {
     // explicit edges define the graph
     "nodes": [
-      {"id": "start", "type_used": "test.start", "display_name": "Start", "description": "Starts the flow."},
-      {"id": "seed", "type_used": "test.seed", "display_name": "Seed", "description": "Produces value.in."},
-      {"id": "add", "type_used": "test.add", "display_name": "Add", "description": "Adds value.in."},
-      {"id": "end", "type_used": "test.out_end", "display_name": "End", "description": "Ends the flow."}
+      {"id": "start", "definition_id": "test.start", "display_name": "Start", "description": "Starts the flow."},
+      {"id": "seed", "definition_id": "test.seed", "display_name": "Seed", "description": "Produces value.in."},
+      {"id": "add", "definition_id": "test.add", "display_name": "Add", "description": "Adds value.in."},
+      {"id": "end", "definition_id": "test.out_end", "display_name": "End", "description": "Ends the flow."}
     ],
     "edges": [["start", "seed"], ["seed", "add"], ["add", "end"]],
     "outputs": [{"type": "value.out", "cardinality": "exactly_one", "display_name": "Value Out"}]
@@ -190,20 +152,20 @@ def test_cli_validate_jsonc_outputs_effective_policy(tmp_path, capsys) -> None:
         encoding="utf-8",
     )
     document = json.loads(config_path.read_text().replace("// explicit edges define the graph", ""))
-    policy = document.pop("policy")
+    document.pop("policy")
     document["plugins"] = [selection]
     config_path.write_text(json.dumps(document), encoding="utf-8")
-    workspace_path = tmp_path / "vibeflow_config.jsonc"
-    workspace_path.write_text(json.dumps({"policy": policy, "roots": [{"id": "project", "path": "."}]}), encoding="utf-8")
+    workspace_path = tmp_path.parent / "vibeflow_config.jsonc"
     code = cli_main(["validate", "--config", str(config_path), "--workspace", str(workspace_path), "--json"])
     payload = json.loads(capsys.readouterr().out)
     assert code == 0
     assert payload["status"] == "CONCERNS"
     assert {item["code"] for item in payload["warnings"]} == {"GRAPH.SMELL.DUPLICATE_LOGIC"}
-    assert payload["effective_policy"]["node_source"]["max_lines"] == 222
-    assert payload["effective_policy"]["sources"][-1] == f"workspace.policy:{workspace_path}"
+    assert payload["effective_policy"]["node_source"]["max_lines"] > 0
+    assert payload["effective_policy"]["sources"] == ["kernel.default_policy"]
 
 def test_cli_validate_bad_jsonc_reports_syntax_layer(tmp_path, capsys) -> None:
+    tmp_path = project_root(tmp_path)
     config_path = tmp_path / "bad.jsonc"
     config_path.write_text('{\n  "pipeline": {"nodes": []},\n  "bad": [1,]\n}', encoding="utf-8")
     code = cli_main(["validate", "--config", str(config_path), "--json"])
@@ -215,8 +177,9 @@ def test_cli_validate_bad_jsonc_reports_syntax_layer(tmp_path, capsys) -> None:
     assert payload["errors"][0]["source_location"]["line"] == 3
 
 def test_cli_validate_schema_error_reports_schema_layer(tmp_path, capsys) -> None:
+    tmp_path = project_root(tmp_path)
     config_path = tmp_path / "bad_schema.json"
-    config_path.write_text('{"pipeline": {"nodes": [{"type_used": "test.seed"}]}}', encoding="utf-8")
+    config_path.write_text('{"pipeline": {"nodes": [{"definition_id": "test.seed"}]}}', encoding="utf-8")
     code = cli_main(["validate", "--config", str(config_path), "--json"])
     payload = json.loads(capsys.readouterr().out)
     assert code == 1
@@ -225,12 +188,13 @@ def test_cli_validate_schema_error_reports_schema_layer(tmp_path, capsys) -> Non
     assert payload["errors"][0]["failure_layer"] == "schema"
 
 def test_cli_validate_topology_error_reports_topology_layer(tmp_path, capsys) -> None:
+    tmp_path = project_root(tmp_path)
     config_path = tmp_path / "bad_topology.json"
     config_path.write_text(
         json.dumps(
             {
                 "pipeline": {
-                    "nodes": [{"id": "seed", "type_used": "test.seed", "display_name": "Seed", "description": "Seed fixture."}],
+                    "nodes": [{"id": "seed", "definition_id": "test.seed", "display_name": "Seed", "description": "Seed fixture."}],
                     "edges": [["seed", "missing"]],
                 }
             }
@@ -243,38 +207,17 @@ def test_cli_validate_topology_error_reports_topology_layer(tmp_path, capsys) ->
     assert payload["status"] == "FAIL"
     assert payload["errors"][0]["failure_layer"] == "topology"
 
-def test_cli_validate_explicit_policy_path_and_inspect_config(tmp_path, capsys) -> None:
-    selection = write_registry_project(tmp_path, _registry(), ("test.start", "test.seed", "test.add", "test.out_end"))
-    config_path = tmp_path / "workflow.json"
-    policy_path = tmp_path / "policy.jsonc"
-    config_path.write_text(
-        json.dumps(
-            {"plugins": [selection], "pipeline": _seed_add_pipeline()}
-        ),
-        encoding="utf-8",
-    )
-    policy_path.write_text('{"node_source": {"max_lines": 111}}', encoding="utf-8")
-    code = cli_main(["inspect-config", "--config", str(config_path), "--policy", str(policy_path)])
-    payload = json.loads(capsys.readouterr().out)
-    assert code == 0
-    assert payload["health"]["effective_policy"]["node_source"]["max_lines"] == 111
-    assert payload["config"]["effective_edges"] == [
-        {"from": "start", "to": "seed", "when": ""},
-        {"from": "seed", "to": "add", "when": ""},
-        {"from": "add", "to": "end", "when": ""},
-    ]
 
 def test_minimal_example_project_runs_only_through_declared_extension_points(tmp_path, monkeypatch) -> None:
-    project = _repo_root() / "sandbox" / "python" / "minimal"
+    project = _repo_root() / "sandbox" / "python" / "minimal" / "project"
     _clear_base_lib_modules()
     monkeypatch.syspath_prepend(str(project))
     from vibeflow.tooling.project.workspace_loader import load_project_workspace
     from vibeflow.tooling.application.python.project.declarations import declared_python_registry
-    registry = declared_python_registry(load_project_workspace(project), project / "config.jsonc")
+    registry = declared_python_registry(load_project_workspace(project), project / "configs/config.jsonc")
 
     result = run_checked(
-        project / "config.jsonc",
-        registry=registry,
+        project / "configs/config.jsonc",
         run_root=tmp_path / "runs",
         run_id="minimal_example",
         preview_root=tmp_path / "preview",
@@ -285,11 +228,10 @@ def test_minimal_example_project_runs_only_through_declared_extension_points(tmp
     assert result.health.info["rule_executions"]
     assert result.health.info["effective_resources"]["base_lib"]["modules"][0]["id"] == "base_lib.math_tools"
     assert (result.run_dir / "compiled_graph.json").exists()
-    assert "example.add_one" in preview_architecture(result.run_dir)["nodesets"]
+    assert "example.add_one" in preview_architecture(result.run_dir)["nodeset_types"]
 
     imported_result = run_checked(
-        project / "config_with_imports.jsonc",
-        registry=registry,
+        project / "configs/config_with_imports.jsonc",
         run_root=tmp_path / "runs",
         run_id="minimal_example_imports",
         preview_root=tmp_path / "preview",

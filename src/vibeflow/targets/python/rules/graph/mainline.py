@@ -23,7 +23,7 @@ def append_mainline_health(graph, compiled, state, *, registry, owner: str = "pi
                 details=dict(finding.details),
             )
         )
-    for nodeset in graph.nodesets.values() if include_nested else ():
+    for nodeset in graph.nodeset_types.values() if include_nested else ():
         if nodeset.status == "planned" or nodeset.type_key in visited_nodesets:
             continue
         visited_nodesets.add(nodeset.type_key)

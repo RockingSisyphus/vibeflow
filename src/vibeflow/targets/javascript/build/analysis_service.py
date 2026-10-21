@@ -6,7 +6,7 @@ from typing import Any, Mapping
 from vibeflow.core.findings import Finding
 from vibeflow.core.rules import RuleContext, RuleResult
 from vibeflow.core.rules.models import plain
-from vibeflow.targets.shared.quality_support import ProjectQualityFacts
+from vibeflow.targets.shared.quality_support import SourceQualityFacts
 from vibeflow.targets.javascript.build.toolchain import run_rule_check_driver, run_quality_facts_driver
 from vibeflow.targets.javascript.build.quality_source import _file_fact, _finding_fact
 from vibeflow.targets.javascript.quality.diagnostics import rule_finding
@@ -34,14 +34,14 @@ class JavascriptAnalysis:
             self.metrics[key] = run_quality_facts_driver(request, package_root=package_root, node_command=node_command)
         return self.metrics[key]
 
-    def project_facts(self, facts: Mapping[str, Any]) -> ProjectQualityFacts:
+    def project_facts(self, facts: Mapping[str, Any]) -> SourceQualityFacts:
         roots = list(facts.get("source_files", ()))
         if not roots:
-            return ProjectQualityFacts(root=str(facts["project_root"]))
+            return SourceQualityFacts(root=str(facts["project_root"]))
         sources = plain(facts.get("sources", ()))
         parsed = self.quality_facts({"qualityRoot": facts["project_root"], "qualityFiles": sorted(item["path"] for item in sources), "sourceSnapshots": sources},
                                     package_root=facts["package_root"], node_command=str(facts.get("node_command", "node")))
-        return ProjectQualityFacts(root=str(facts["project_root"]), files=tuple(_file_fact(item) for item in parsed.files),
+        return SourceQualityFacts(root=str(facts["project_root"]), files=tuple(_file_fact(item) for item in parsed.files),
                                    findings=tuple(_finding_fact(item) for item in parsed.findings))
 
 
@@ -53,7 +53,7 @@ def source_check(context: RuleContext, topics: tuple[str, ...], rule_id: str, *,
         {"typecheckFiles": list(facts.get("source_files", ())), "ruleTopics": list(topics),
          "ruleParams": plain(params or {}),
          "importPolicy": plain(facts.get("import_policy", {})), "sourceSnapshots": plain(facts.get("sources", ())),
-         "ruleSubjectKind": context.subject.get("kind", "node"), "ruleSubjectId": context.subject.get("type_key", context.subject.get("id", ""))},
+         "ruleSubjectKind": context.subject.get("kind", "node"), "ruleSubjectId": context.subject.get("definition_id", context.subject.get("id", ""))},
         package_root=facts["package_root"], node_command=str(facts.get("node_command", "node")),
     )
     return tuple(rule_finding(item, rule_id, context) for item in result.findings)
@@ -68,7 +68,7 @@ def measure_builtin_resource(context: RuleContext, params: Mapping[str, Any], *,
     if not facts.get("evaluate_sources", True):
         return RuleResult(state="unavailable")
     kind = context.subject.get("kind", "node")
-    resource_id = context.subject.get("type_key", context.subject.get("id", ""))
+    resource_id = context.subject.get("definition_id", context.subject.get("id", ""))
     descriptor = next(item for owner,item in source_resources(facts["catalogs"]) if owner == kind and item.id == resource_id)
     base_ids: set[str] = set()
     def visit(resource_id: str) -> None:
@@ -86,8 +86,8 @@ def measure_builtin_resource(context: RuleContext, params: Mapping[str, Any], *,
         if source.get("kind") == "base_lib" and source.get("id") in base_ids:
             selected_files.add(source["path"])
     ownership, descriptors = registered_implementation_requests(facts["catalogs"], project_root=Path(facts["project_root"]), selected_files=tuple(selected_files))
-    selected_ids = {context.subject.get("type_key", context.subject.get("id", "")), *base_ids}
-    ownership = [item for item in ownership if item["type_key"] in selected_ids]
+    selected_ids = {context.subject.get("definition_id", context.subject.get("id", "")), *base_ids}
+    ownership = [item for item in ownership if item["id"] in selected_ids]
     descriptors = {key: value for key, value in descriptors.items() if key[0] in selected_ids}
     # Project scans have file facts but no descriptor/export implementation facts.
     # Native implementation limits inspect the owned files, including BaseLibs;
@@ -109,5 +109,5 @@ def measure_builtin_resource(context: RuleContext, params: Mapping[str, Any], *,
     from vibeflow.targets.javascript.quality.implementation import relative_source_path
     relative_files = {relative_source_path(item["path"], facts["project_root"]) for item in ownership}
     metrics = {"files": [plain(item) for item in extracted.files if item["path"] in relative_files],
-               "implementations": [plain(item) for item in extracted.implementations if item["type_key"] in selected_ids]}
+               "implementations": [plain(item) for item in extracted.implementations if item["id"] in selected_ids]}
     return found, metrics

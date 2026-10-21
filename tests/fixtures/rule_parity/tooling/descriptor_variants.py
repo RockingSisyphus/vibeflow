@@ -14,20 +14,19 @@ REQUIRES = {"type": "parity.input", "cardinality": "exactly_one", "display_name"
 PROVIDES = {"key": "value", "type": "parity.output", "display_name": "Output"}
 CONTRACT = {"requires": [REQUIRES], "provides": [PROVIDES], "input_semantics": {"parity.input": ["Input meaning."]},
             "output_semantics": {"value": ["Output meaning."]}}
-NODE = {"kind": "node", "type_key": "parity.work", "display_name": "Work", "description": "A work unit.",
+NODE = {'node_type': 'vibeflow.node', "kind": "node", 'id': "parity.work", "display_name": "Work", "description": "A work unit.",
         "version": "1.0", "flow_kind": "process", "contract": CONTRACT, "implementations": [JS]}
 BASE = {"kind": "base_lib", "id": "parity.base", "display_name": "Base", "description": "A pure helper.", "implementations": [JS]}
 DATA = {"kind": "data_schema", "type_key": "parity.value", "schema": {"type": "number"}}
 CAPABILITY = {"kind": "capability", "id": "parity.cap", "targets": ["node"],
               "operations": {"read": {"input_type": "parity.input", "output_type": "parity.output"}}}
-HOST = {"kind": "host_extension", "id": "parity.host", "targets": ["node"], "implementations": [JS]}
 PLUGIN = {"kind": "plugin", "id": "parity.plugin", "type": "runtime", "targets": ["node"], "implementations": [JS]}
 
 
 def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None) -> list[dict]:
     from vibeflow.core.descriptors.models import DescriptorModelError
     if variant == "baseline":
-        from vibeflow.tooling.project.descriptor_loader import parse_descriptor_manifest
+        from vibeflow.tooling.project.resources import parse_descriptor_manifest
     else:
         from vibeflow.core.descriptors.decode import decode_resource as parse_descriptor_manifest
 
@@ -49,14 +48,14 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
                      "evidence": "Public parse_descriptor_manifest and immutable Descriptor model checks, baseline/current",
                      "notes": "DESCRIPTOR.MODEL labels the public model exception in this harness; implementation code is never imported."})
 
-    for name, data in (("node", NODE), ("base", BASE), ("data", DATA), ("capability", CAPABILITY), ("host", HOST), ("plugin", PLUGIN)):
+    for name, data in (("node", NODE), ("base", BASE), ("data", DATA), ("capability", CAPABILITY), ("plugin", PLUGIN)):
         emit(name + ".normal", deepcopy(data), kind=data["kind"])
         emit(name + ".unknown_field", {**data, "unexpected": True}, "unknown fields")
     emit("root", [], "single object")
     emit("kind.missing", {}, "kind")
     emit("kind.unknown", {"kind": "unknown"}, "kind must be one of")
     emit("kind.directory_mismatch", NODE, "does not match directory kind", kind="base_lib")
-    for field in ("type_key", "display_name", "description", "version", "flow_kind", "contract"):
+    for field in ("id", "display_name", "description", "version", "flow_kind", "contract"):
         emit("node.missing_" + field, {k: v for k, v in NODE.items() if k != field}, "node." + field)
     emit("node.invalid_flow", {**NODE, "flow_kind": "unknown"}, "flow_kind")
     emit("node.external_boolean", {**NODE, "external": 1}, "node.external must be a boolean")
@@ -110,14 +109,13 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
                                  ("id", [{}], ".id"), ("operations", [{"id": "cap", "operations": "read"}], "list of strings"),
                                  ("unknown", [{"id": "cap", "operations": [], "extra": 1}], "unknown fields")):
         emit("node.capabilities." + label, {**NODE, "capabilities": value}, reason)
-    for name, data in (("base", BASE), ("host", HOST), ("plugin", PLUGIN)):
+    for name, data in (("base", BASE), ("plugin", PLUGIN)):
         emit(name + ".implementations_empty", {**data, "implementations": []}, "implementations cannot be empty")
         emit(name + ".dependencies_self", {**data, "dependencies": [data["id"]]}, "cannot depend on itself")
         for field in ("dependencies", "external_packages"):
             emit(name + "." + field + ".duplicate", {**data, field: ["dep", "dep"]}, "duplicate values")
             emit(name + "." + field + ".list", {**data, field: "dep"}, "list of strings")
-    emit("host.python", {**HOST, "targets": ["node"], "implementations": [PYTHON]}, "must use JavaScript or TypeScript")
-    for name, data in (("capability", CAPABILITY), ("host", HOST), ("plugin", PLUGIN)):
+    for name, data in (("capability", CAPABILITY), ("plugin", PLUGIN)):
         emit(name + ".targets_empty", {**data, "targets": []}, "targets cannot be empty")
         emit(name + ".targets_unknown", {**data, "targets": ["ios"]}, "unsupported targets")
     emit("plugin.target_coverage", {**PLUGIN, "targets": ["browser"]}, "exactly match implementation target coverage")

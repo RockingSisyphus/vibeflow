@@ -7,6 +7,7 @@ import importlib.resources
 import importlib.util
 from importlib.resources.readers import MultiplexedPath
 from pathlib import Path
+from vibeflow.targets.python.project.source_closure import resolve_local_module_path
 import sys
 
 
@@ -27,7 +28,7 @@ def implementation_packages(registry, used, *, roots, framework):
         if kind in {'plugin', 'base_lib'} and hasattr(value, '__module__'):
             modules[value.__module__] = None
     for group in ('plugins', 'base_libs'):
-        for descriptor in getattr(registry.loaded_plugins.catalogs, group):
+        for descriptor in getattr(registry.prepared_resources.catalogs, group):
             if group == 'plugins' and descriptor.plugin_type != 'runtime':
                 continue
             for implementation in descriptor.implementations:
@@ -37,7 +38,7 @@ def implementation_packages(registry, used, *, roots, framework):
                 elif source.kind == 'file':
                     owner = registry.resource_roots[(group, descriptor.id)]
                     files.add((owner.path / source.ref).resolve())
-    for record in registry.loaded_plugins.records:
+    for record in registry.prepared_resources.records:
         source = record['source']
         if source['kind'] in {'module', 'package'}:
             modules.setdefault(source['ref'], None)
@@ -54,9 +55,11 @@ def implementation_packages(registry, used, *, roots, framework):
 
     for name, hint in sorted(modules.items()):
         module = sys.modules.get(name)
-        filename = getattr(module, '__file__', None)
+        local = next((path for root in roots
+                      if (path := resolve_local_module_path(name, project_root=root)) is not None), None)
+        filename = hint or local or getattr(module, '__file__', None)
         specification = None if filename else importlib.util.find_spec(name)
-        filename = filename or hint or getattr(specification, 'origin', None)
+        filename = filename or getattr(specification, 'origin', None)
         if not filename:
             continue
         path = Path(filename).resolve()

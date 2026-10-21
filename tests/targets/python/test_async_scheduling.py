@@ -27,10 +27,10 @@ def test_outputless_branch_completes_before_terminal(tmp_path, execution, revers
     registry = native_registry()
     for key, kind, implementation in (("test.terminal", "terminal", _Terminal), ("test.audit", "process", _Audit)):
         registry.register(NodeDescriptor(key, key, "Native scheduling fixture", "1", kind,
-            contract=NodeContractDescriptor(), rulesets=()), implementation)
+            contract=NodeContractDescriptor(), rulesets=(), node_type="vibeflow.node"), implementation)
     edges = [{"from":"start", "to":"audit"}, {"from":"start", "to":"end"}, {"from":"audit", "to":"end"}]
     graph = parse_graph_config({"pipeline":{"entry_mode":"async", "nodes":[
-        {"id":name, "type_used":"test.audit" if name == "audit" else "test.terminal",
+        {"id":name, "definition_id":"test.audit" if name == "audit" else "test.terminal",
          "display_name":name, "description":"Schedules an outputless ordinary branch",
          **({"join_policy":"all"} if name == "end" else {}),
 }
@@ -62,9 +62,9 @@ def test_inactive_conditional_edge_does_not_start_a_node(tmp_path, execution):
             output_semantics={"flow.route":("Selects the completed mainline",)})),
     ):
         registry.register(NodeDescriptor(key, key, "Conditional scheduling fixture", "1", kind,
-            contract=contract, rulesets=()), implementation)
+            contract=contract, rulesets=(), node_type="vibeflow.node"), implementation)
     graph = parse_graph_config({"pipeline":{"entry_mode":"async", "nodes":[
-        {"id":name, "type_used":"test.audit" if name == "audit" else "test.decision" if name == "route" else "test.terminal",
+        {"id":name, "definition_id":"test.audit" if name == "audit" else "test.decision" if name == "route" else "test.terminal",
          "display_name":name, "description":"Only active task routes execute",
 }
         for name in ("start", "route", "audit", "end")], "edges":[

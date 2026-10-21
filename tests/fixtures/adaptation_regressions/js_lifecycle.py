@@ -125,8 +125,9 @@ def cleanup_cases(work,kernel,toolchain):
         compiler(root,"valid" if variant in {"normal","multiple"} else variant)
         if variant=="multiple":
             marker=json.dumps(str(root/"hooks.jsonl"))
-            (root/"src/bad.ts").write_text('import {definePlugin,defineRuleset} from "@vibeflow/plugin";import {appendFileSync} from "node:fs";\n'+COMPILER_IO_RULESET_SOURCE.replace("audit.compiler_io", "audit.bad.compiler_io")+'export const plugin=definePlugin({id:"audit.bad",resources:[compilerIO],rulesets:["audit.bad.compiler_io"],declaration_rulesets:["vibeflow.plugin_declaration"],compiler(){return {dispose(){appendFileSync('+marker+',JSON.stringify({event:"bad-dispose"})+"\\n");throw Error("BAD_DISPOSE_FAILURE");}};}});\n')
-            config(root,lambda data:data["plugins"].append({"source":{"kind":"file","ref":"src/bad.ts"}}))
+            (root/"plugins/bad").mkdir(parents=True)
+            (root/"plugins/bad/plugin.ts").write_text('import {definePlugin,defineRuleset} from "@vibeflow/plugin";import {appendFileSync} from "node:fs";\n'+COMPILER_IO_RULESET_SOURCE.replace("audit.compiler_io", "audit.bad.compiler_io")+'export const plugin=definePlugin({id:"audit.bad",resources:[compilerIO],rulesets:["audit.bad.compiler_io"],declaration_rulesets:["vibeflow.plugin_declaration"],compiler(){return {dispose(){appendFileSync('+marker+',JSON.stringify({event:"bad-dispose"})+"\\n");throw Error("BAD_DISPOSE_FAILURE");}};}});\n')
+            config(root,lambda data:data["plugins"].append({"source":{"kind":"file","ref":"plugins/bad/plugin.ts"}}))
         result=run_probe(root,_OWNED_WORKER_PROBE,kernel,args=cli_args(root,"build","--target","node","--profile","single-esm","--out-dir",root/"dist"),name="owned-cleanup",toolchain=toolchain)
         observed=result.get("payload") or {}; events=marker_events(root)
         observed["hook_events"]=[item["event"] for item in events]
@@ -152,10 +153,10 @@ def formal_rule_cases(work,kernel,toolchain):
     rows=[]
     for variant,command in (("accepted","validate"),("accepted","build"),("rejected","validate"),("rejected","build"),("preview","review-rules"),("preview","inspect-resources")):
         identifier=f"js.S03.formal.{variant}.{command}";root=project(work/identifier,toolchain);compiler(root)
-        path=root/"src/plugin.ts";text=path.read_text(); marker=json.dumps(str(root/"formal-rule.jsonl"))
+        path=root/"plugins/demo/plugin.ts";text=path.read_text(); marker=json.dumps(str(root/"formal-rule.jsonl"))
         rule='export const check=defineRule({id:"audit.plugin_check",check(context){appendFileSync('+marker+',JSON.stringify({subject:context.subject.id})+"\\n");return {findings:'+('[{code:"CASE.PLUGIN.REJECT",reason:"Selected plugin rule rejected lifecycle",severity:"error",file:'+json.dumps(str(path))+',line:1}]' if variant=="rejected" else '[]')+'};}});\nexport const checks=defineRuleset({id:"audit.plugin_checks",calls:[{id:"native",ruleset_id:"audit.compiler_io"},{id:"check",rule_id:"audit.plugin_check"}],entrypoints:{import:["native"],static:["native","check"]}});\n'
         text=text.replace('import {definePlugin,defineCapability,defineDataSchema,defineRuleset}', 'import {definePlugin,defineCapability,defineDataSchema,defineRule,defineRuleset}')
-        text=text.replace('export const plugin=',rule+'export const plugin=').replace('resources:[start,model,library,host,session,number,compilerIO]', 'resources:[start,model,library,host,session,number,compilerIO,check,checks]').replace('rulesets:["audit.compiler_io"]','rulesets:["audit.plugin_checks"]')
+        text=text.replace('export const plugin=',rule+'export const plugin=').replace('resources:[number,compilerIO]', 'resources:[number,compilerIO,check,checks]').replace('rulesets:["audit.compiler_io"]','rulesets:["audit.plugin_checks"]')
         path.write_text(text)
         result=_build(root,kernel,toolchain) if command=="build" else run_cli(root,cli_args(root,command),kernel,name=command,toolchain=toolchain)
         observed=cli_summary(result)

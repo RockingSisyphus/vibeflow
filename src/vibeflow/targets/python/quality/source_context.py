@@ -63,8 +63,8 @@ class PythonSourceNode:
     calls: tuple[tuple[str, str], ...] = ()
 
     @property
-    def type_key(self) -> str:
-        return self.descriptor.type_key
+    def definition_id(self) -> str:
+        return self.descriptor.id
 
 
 @dataclass(frozen=True)
@@ -90,7 +90,7 @@ class PythonSourceImport:
 
 @dataclass(frozen=True)
 class PythonSourceOwnership:
-    type_key: str
+    definition_id: str
     symbol_id: str
     relation: str
 
@@ -99,7 +99,7 @@ class PythonSourceOwnership:
 class PythonSourceCall:
     owner: str
     node_id: str
-    type_key: str
+    definition_id: str
     params: Mapping[str, object]
     source_path: str = ""
     local_id: str = ""
@@ -139,15 +139,15 @@ class PythonSourceContext:
         from vibeflow.targets.python.quality.analysis_metrics import PythonSourceAnalysis
         object.__setattr__(self, "_analysis", PythonSourceAnalysis())
 
-    def metrics(self, type_key: str) -> Mapping[str, object]:
+    def metrics(self, definition_id: str) -> Mapping[str, object]:
         """Read the same immutable measurements consumed by built-in Rules."""
         from dataclasses import asdict
         from vibeflow.core.rules import RuleContext
         from vibeflow.core.rules.models import readonly
         measured = self._analysis.measurements(RuleContext(facts={"source_context": self},
-            subject={"type_key": type_key, "kind": "node"}, target="python"))
+            subject={"definition_id": definition_id, "kind": "node"}, target="python"))
         if measured is None:
-            raise ValueError(f"implementation measurements unavailable for {type_key}")
+            raise ValueError(f"implementation measurements unavailable for {definition_id}")
         return readonly(asdict(measured))
 
     def import_closure(self, path: str) -> tuple[PythonSourceFile, ...]:
@@ -182,8 +182,8 @@ class PythonSourceContext:
     def call(self, owner: str, node_id: str) -> PythonSourceCall | None:
         return next((item for item in self.calls if item.owner == owner and item.node_id == node_id), None)
 
-    def helpers(self, type_key: str) -> tuple[PythonSymbol, ...]:
-        owned = {item.symbol_id for item in self.ownership if item.type_key == type_key and item.relation == "helper_reference"}
+    def helpers(self, definition_id: str) -> tuple[PythonSymbol, ...]:
+        owned = {item.symbol_id for item in self.ownership if item.definition_id == definition_id and item.relation == "helper_reference"}
         return tuple(item for item in self.symbols if item.id in owned)
 
     def class_members(self, symbol: PythonSymbol) -> Mapping[str, PythonSymbol]:
@@ -233,7 +233,7 @@ class PythonSourceContext:
 
 
 def build_python_source_context(nodes: Iterable[PythonSourceNode], files: Iterable[PythonSourceFile], *, calls: Iterable[PythonSourceCall] = ()) -> PythonSourceContext:
-    selected_nodes = tuple(sorted(nodes, key=lambda item: (item.type_key, item.path, item.symbol)))
+    selected_nodes = tuple(sorted(nodes, key=lambda item: (item.definition_id, item.path, item.symbol)))
     selected_files = tuple(sorted(files, key=lambda item: item.path))
     symbols = tuple(symbol for source in selected_files if source._tree for symbol in _symbols(source))
     by_id = {symbol.id: symbol for symbol in symbols}
@@ -292,7 +292,7 @@ def build_python_source_context(nodes: Iterable[PythonSourceNode], files: Iterab
         root_id = f"{node.path}:{node.symbol}"
         if root_id not in by_id:
             continue
-        ownership.append(PythonSourceOwnership(node.type_key, root_id, "implementation"))
+        ownership.append(PythonSourceOwnership(node.definition_id, root_id, "implementation"))
         from vibeflow.targets.python.quality.source_analysis.class_members import class_members
         try:
             seeds = [item.id for item in class_members(by_id[root_id], symbols, imports).values()]
@@ -306,7 +306,7 @@ def build_python_source_context(nodes: Iterable[PythonSourceNode], files: Iterab
             if symbol_id in visited:
                 continue
             visited.add(symbol_id)
-            ownership.append(PythonSourceOwnership(node.type_key, symbol_id, "helper_reference"))
+            ownership.append(PythonSourceOwnership(node.definition_id, symbol_id, "helper_reference"))
             pending.extend(adjacency.get(symbol_id, ()))
     return PythonSourceContext(selected_nodes, selected_files, symbols, tuple(dict.fromkeys(references)), tuple(dict.fromkeys(ownership)), tuple(calls), imports)
 

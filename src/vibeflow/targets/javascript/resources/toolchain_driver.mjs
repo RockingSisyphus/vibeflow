@@ -226,12 +226,14 @@ function auditParsedSource(ts, sourceFile, profile) {
 
 function normalizeImportPolicy(raw, packageRoot) {
   const policy = raw && typeof raw === "object" ? raw : {};
-  const owners = Array.isArray(policy.owners)
-    ? policy.owners
+  const normalizeOwners = values => Array.isArray(values)
+    ? values
       .filter((item) => item && typeof item === "object" && item.path && item.kind && item.id)
       .map((item) => ({
         path: path.resolve(item.path),
         realPath: path.resolve(item.path),
+        pluginId: String(item.pluginId || ""),
+        packagePath: item.packagePath ? path.resolve(item.packagePath) : "",
         kind: String(item.kind),
         id: String(item.id),
         export: String(item.export ?? "run"),
@@ -241,8 +243,10 @@ function normalizeImportPolicy(raw, packageRoot) {
       }))
       .sort((left, right) => right.path.length - left.path.length)
     : [];
+  const owners = normalizeOwners(policy.owners);
   return {
     owners,
+    knownOwners: normalizeOwners(policy.knownOwners),
     packageRoot: normalizedRealPath({ sys: null }, packageRoot),
     sourceRoots: (policy.sourceRoots || []).map(value => normalizedRealPath({ sys: null }, value)),
     derivedOwners: new Map(),
@@ -252,10 +256,6 @@ function normalizeImportPolicy(raw, packageRoot) {
       ? policy.nodeBaseLibs : {},
     baseLibDependencies: policy.baseLibDependencies && typeof policy.baseLibDependencies === "object"
       ? policy.baseLibDependencies : {},
-    hostExtensionDependencies:
-      policy.hostExtensionDependencies
-      && typeof policy.hostExtensionDependencies === "object"
-        ? policy.hostExtensionDependencies : {},
     pluginDependencies:
       policy.pluginDependencies
       && typeof policy.pluginDependencies === "object"
@@ -303,7 +303,7 @@ function ownerFor(ts, fileName, policy) {
 
 function importDestinationOwner(ts, fileName, policy, sourceOwner, imported) {
   const candidate = normalizedRealPath(ts, fileName);
-  let owners = policy.owners.filter(owner => candidate === normalizedRealPath(ts, owner.path));
+  let owners = [...policy.owners, ...policy.knownOwners].filter(owner => candidate === normalizedRealPath(ts, owner.path));
   const bindings = imported.declaration?.importClause?.namedBindings;
   const names = imported.importedName ? new Set([imported.importedName]) : bindings && ts.isNamedImports(bindings)
     ? new Set(bindings.elements.map(item => (item.propertyName || item.name).text)) : new Set();
@@ -394,6 +394,7 @@ function fallbackResolveSpecifier(specifier, sourceFileName) {
 }
 
 function resolvedImportFile(ts, checker, project, imported, sourceFileName) {
+  if (isBuiltin(imported.value)) return "";
   const symbol = checker.getSymbolAtLocation(imported.node);
   const declaration = symbolDeclarationNodes(symbol, project)[0];
   return declaration?.getSourceFile?.().fileName
@@ -443,7 +444,7 @@ function isWithinPath(root, candidate) {
 function auditImportOwnership(ts, sourceFile, checker, project, policy) {
   const sourceOwner = ownerFor(ts, sourceFile.fileName, policy);
   if (!sourceOwner
-      || !["node", "base_lib", "host_extension", "plugin", "plugin_declaration"].includes(sourceOwner.kind)) return [];
+      || !["node", "base_lib", "plugin", "plugin_declaration"].includes(sourceOwner.kind)) return [];
   const findings = [];
   const imports = importSpecifiers(ts, sourceFile).flatMap(imported => {
     const bindings = imported.declaration?.importClause?.namedBindings;
@@ -496,6 +497,9 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
       ));
       continue;
     }
+    // Package ownership is already validated at loading. Private support code
+    // is part of that atomic Plugin, rather than a separate business resource.
+    if (sourceOwner.pluginId && sourceOwner.packagePath && isWithinPath(sourceOwner.packagePath, resolvedFile)) continue;
     const destination = importDestinationOwner(ts, resolvedFile, policy, sourceOwner, imported);
     if (!destination) {
       findings.push(importFinding(
@@ -530,7 +534,7 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
             `node '${sourceOwner.id}' imports base_lib '${destination.id}' without enabling it`,
           ));
         }
-      } else if (["plugin", "plugin_declaration", "host_extension"].includes(destination.kind)) {
+      } else if (["plugin", "plugin_declaration"].includes(destination.kind)) {
         findings.push(importFinding(
           sourceFile,
           imported.node,
@@ -539,7 +543,7 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
         ));
       }
     } else if (sourceOwner.kind === "base_lib") {
-      if (["node", "plugin", "plugin_declaration", "host_extension"].includes(destination.kind)) {
+      if (["node", "plugin", "plugin_declaration"].includes(destination.kind)) {
         findings.push(importFinding(
           sourceFile,
           imported.node,
@@ -554,28 +558,6 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
             imported.node,
             "VF_IMPORT_BASE_LIB",
             `base_lib '${sourceOwner.id}' imports undeclared base_lib dependency '${destination.id}'`,
-          ));
-        }
-      }
-    } else if (sourceOwner.kind === "host_extension") {
-      if (destination.kind === "base_lib" && (policy.resourceBaseLibs[`host_extension:${sourceOwner.id}`] || []).includes(destination.id)) continue;
-      if (destination.kind !== "host_extension") {
-        findings.push(importFinding(
-          sourceFile,
-          imported.node,
-          "VF_IMPORT_LAYER",
-          `host_extension '${sourceOwner.id}' cannot import ${destination.kind} '${destination.id}'`,
-        ));
-      } else if (destination.id !== sourceOwner.id) {
-        const allowed = new Set(
-          policy.hostExtensionDependencies[sourceOwner.id] || [],
-        );
-        if (!allowed.has(destination.id)) {
-          findings.push(importFinding(
-            sourceFile,
-            imported.node,
-            "VF_IMPORT_HOST_EXTENSION",
-            `host_extension '${sourceOwner.id}' imports undeclared host_extension dependency '${destination.id}'`,
           ));
         }
       }
@@ -815,7 +797,7 @@ function isSdkDeclaration(ts, sourceFile, value) {
     if (bindings?.elements) for (const item of bindings.elements) imports.set(item.name.text, (item.propertyName || item.name).text);
     else if (bindings?.name) imports.set(bindings.name.text, "*");
   }
-  const names = new Set(["defineNode", "defineRule", "defineRuleset", "definePlugin", "defineDataSchema", "defineBaseLib", "defineCapability", "defineHostExtension", "defineResource"]);
+  const names = new Set(["defineNode", "defineNodeType", "defineRule", "defineRuleset", "definePlugin", "defineDataSchema", "defineBaseLib", "defineCapability", "defineResource"]);
   const identified = names.has(imports.get(expression.text)) ||
     (imports.get(expression.expression?.text) === "*" && names.has(expression.name?.text));
   // Constructor arguments remain ordinary expressions. Inline implementations
@@ -835,7 +817,7 @@ function isSdkDeclaration(ts, sourceFile, value) {
 function auditTopLevelPurity(ts, sourceFile, policy, ruleParams = {}) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
   if (!owner
-      || !["node", "base_lib", "host_extension", "plugin", "plugin_declaration"].includes(owner.kind)) return [];
+      || !["node", "base_lib", "plugin", "plugin_declaration"].includes(owner.kind)) return [];
   const findings = [];
   if (hasDecorator(ts, sourceFile)) {
     findings.push(importFinding(
@@ -886,7 +868,9 @@ function hasModifier(ts, node, kind) {
   return Boolean(node?.modifiers?.some((modifier) => modifier.kind === kind));
 }
 
-function implementationDeclaration(ts, sourceFile, exportName) {
+function implementationDeclaration(ts, sourceFile, exportName, seen = new Set()) {
+  if (seen.has(exportName)) return null;
+  seen.add(exportName);
   const [name, member] = exportName.split(".");
   for (const statement of sourceFile.statements) {
     if (ts.isFunctionDeclaration(statement) && statement.name?.text === name && !member) return statement;
@@ -896,10 +880,11 @@ function implementationDeclaration(ts, sourceFile, exportName) {
       let value = declaration.initializer;
       if (member && ts.isCallExpression(value)) {
         const property = declarationProperty(ts, sourceFile, value.arguments[0], member);
-        if (property && ts.isShorthandPropertyAssignment(property)) return implementationDeclaration(ts, sourceFile, member);
+        if (property && ts.isShorthandPropertyAssignment(property)) return implementationDeclaration(ts, sourceFile, member, seen);
         value = property?.initializer || property;
       }
-      if (value && ts.isIdentifier(value) && value.text !== name) return implementationDeclaration(ts, sourceFile, value.text);
+      if (value && ts.isIdentifier(value) && value.text !== name) return implementationDeclaration(ts, sourceFile, value.text, seen);
+      if (value && ts.isPropertyAccessExpression(value)) return implementationDeclaration(ts, sourceFile, value.getText(sourceFile), seen);
       if (value && (ts.isArrowFunction(value) || ts.isFunctionExpression(value) || ts.isMethodDeclaration(value))) return value;
     }
   }
@@ -983,16 +968,12 @@ function promiseLikeType(ts, checker, type, fallbackText = "") {
 
 function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy, project) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
-  if (!owner || owner.role === "support" || !["node", "host_extension", "plugin"].includes(owner.kind)) return [];
+  if (!owner || owner.role === "support" || !["node", "plugin"].includes(owner.kind)) return [];
   const declaration = implementationDeclaration(ts, sourceFile, owner.export);
   if (!declaration) return [];
   const findings = [];
   const completion = owner.completion || "immediate";
-  const subject = owner.kind === "host_extension"
-    ? `host_extension '${owner.id}' factory`
-    : owner.kind === "plugin"
-      ? `plugin '${owner.id}' factory`
-      : `node '${owner.id}'`;
+  const subject = owner.kind === "plugin" ? `plugin '${owner.id}' factory` : `node '${owner.id}'`;
   const declaredAsync = hasModifier(ts, declaration, ts.SyntaxKind.AsyncKeyword);
   const callableReturn = callableReturnType(ts, checker, declaration);
   const returnType = callableReturn.text;
@@ -1019,10 +1000,6 @@ function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy, pro
       `${subject} declares suspend completion but '${owner.export}' does not return a Promise`,
     ));
   }
-  // A host extension's factory must be immediate, but its returned start/stop
-  // methods may suspend. The descriptor check above is therefore the complete
-  // factory audit; Promise ownership rules below remain specific to nodes.
-  if (owner.kind === "host_extension") return findings;
   if (owner.kind === "plugin") {
     if (declaredAsync || returnsPromise) {
       findings.push(importFinding(
@@ -1069,7 +1046,7 @@ function auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy, pro
             sourceFile,
             node,
             "VF_PLUGIN_LONG_LIVED_LISTENER",
-            `runtime plugin '${owner.id}' cannot register long-lived listeners or timers; use a host_extension`,
+            `runtime plugin '${owner.id}' cannot register long-lived listeners or timers; express the resource lifecycle in explicit workflow nodes`,
           ));
         }
         const promiseChain = ts.isPropertyAccessExpression(expression)
@@ -1467,8 +1444,9 @@ function publicSourceViews(ts, sourceFiles, checker, project, policy, rootFiles,
     const names = [statement.name?.text];
     const owned = policy.owners.some(owner => owner.kind === "node" && owner.id === subjectId
       && path.resolve(owner.path) === path.resolve(file.fileName) && names.includes(owner.export?.split(".")[0]));
-    const foreign = !owned && policy.owners.some(owner => owner.kind === "node" && owner.id !== subjectId
-        && path.resolve(owner.path) === path.resolve(file.fileName) && names.includes(owner.export?.split(".")[0]));
+    const foreign = !owned && (policy.owners.some(owner => owner.kind === "node" && owner.id !== subjectId
+        && path.resolve(owner.path) === path.resolve(file.fileName) && names.includes(owner.export?.split(".")[0]))
+      || ts.isVariableDeclaration(statement) && isSdkDeclaration(ts, file, statement.initializer));
     if (foreign) {
       if (!implementation || !ts.isVariableDeclaration(statement) || !ts.isCallExpression(statement.initializer)) return;
       const object = statement.initializer.arguments[0];
@@ -1565,7 +1543,7 @@ function publicSourceViews(ts, sourceFiles, checker, project, policy, rootFiles,
 function auditModuleRegExpState(ts, sourceFile, policy, ruleParams = {}) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
   if (ruleParams.effect_scope === "global_state" || !owner
-      || !["node", "base_lib", "host_extension", "plugin"].includes(owner.kind)) return [];
+      || !["node", "base_lib", "plugin"].includes(owner.kind)) return [];
   const findings = [];
 
   function isFunctionBoundary(node) {
@@ -1618,7 +1596,7 @@ function auditModuleRegExpState(ts, sourceFile, policy, ruleParams = {}) {
 function auditModuleStateWrites(ts, sourceFile, checker, project, policy, ruleParams = {}) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
   if (!owner
-      || !["node", "base_lib", "host_extension", "plugin"].includes(owner.kind)) return [];
+      || !["node", "base_lib", "plugin"].includes(owner.kind)) return [];
   const moduleBindings = new Set();
   const aliases = new Set();
   const builtinPrototypeAliases = new Set();
@@ -1984,7 +1962,7 @@ function auditRuleImportPolicy(ts, sourceFile, ruleParams) {
 
 function auditHostIo(ts, sourceFile, checker, project, policy, ruleParams = {}) {
   const owner = ownerFor(ts, sourceFile.fileName, policy);
-  if (!owner || !["node", "base_lib", "plugin", "host_extension"].includes(owner.kind)) return [];
+  if (!owner || !["node", "base_lib", "plugin"].includes(owner.kind)) return [];
   const scope = ruleParams.effect_scope || "none";
   const code = owner.kind === "plugin" ? "VF_PLUGIN_HOST_IO" : "VF_BASE_LIB_HOST_IO";
   const namespaceGlobals = new Set(["window", "self", "global", "globalThis"]);
@@ -2432,6 +2410,7 @@ function collectQualityFacts(ts, program, checker, project, sourceFiles, request
           source_module: module,
           imported: target,
           raw_import: imported.value,
+          resolved_path: resolved ? path.resolve(resolved) : "",
           path: module,
           line: location.line,
           column: location.column,
@@ -2461,7 +2440,7 @@ function collectQualityFacts(ts, program, checker, project, sourceFiles, request
       const lines = statements => [...new Set([...statements].map(node=>qualityPosition(sourceFile,node).line))].sort((a,b)=>a-b);
       implementations.push({
         path: module,
-        type_key: String(item.type_key || ""),
+        id: String(item.id || ""),
         kind: String(item.kind || "node"),
         export: String(item.export ?? "run"),
         entry_import_lines:lines(ownershipImports.entry),

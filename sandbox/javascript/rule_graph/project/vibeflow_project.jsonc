@@ -3,6 +3,5 @@
   "javascript": {
     "package_root": ".",
     "external_packages": []
-  },
-  "quality_enabled": false
+  }
 }

@@ -12,8 +12,8 @@ class BranchPaths:
     _MAX_PATHS = 128
 
     def __init__(self, graph, compiled):
-        self.incoming = {node.name: [] for node in graph.nodes}
-        outgoing = {node.name: [] for node in graph.nodes}
+        self.incoming = {node.id: [] for node in graph.nodes}
+        outgoing = {node.id: [] for node in graph.nodes}
         self.transfers = tuple(compiled.resolved_transfer_edges)
         for edge in compiled.resolved_schedule_edges:
             self.incoming[edge.target].append(edge)

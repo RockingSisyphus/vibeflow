@@ -7,7 +7,6 @@ import os
 from pathlib import Path
 import re
 import shutil
-import sys
 import xml.etree.ElementTree as ET
 
 import pytest
@@ -28,21 +27,11 @@ def svg_project(request, tmp_path):
     target = request.param
     example = tmp_path / target
     shutil.copytree(ROOT / "sandbox" / target / "domain_rules", example)
-    from tests.fixtures.support.plugins import copy_sdk_inputs
-    copy_sdk_inputs(ROOT / "sandbox" / target / "domain_rules", example)
     project = example / "project"
     if target == "javascript":
         toolchain = Path(os.environ["VIBEFLOW_TEST_TOOLCHAIN_ROOT"])
         (project / "node_modules").symlink_to(toolchain / "node_modules", target_is_directory=True)
-    else:
-        for name in tuple(sys.modules):
-            if name == "domain_nodes" or name.startswith("domain_helpers"):
-                sys.modules.pop(name)
     yield target, example / "vibeflow_config.jsonc", project
-    if target == "python":
-        for name in tuple(sys.modules):
-            if name == "domain_nodes" or name.startswith("domain_helpers"):
-                sys.modules.pop(name)
 
 
 def _edit(path, change):
@@ -146,9 +135,9 @@ def test_formal_domain_svg_preserves_effective_styles_and_native_identity(svg_pr
 
 def test_review_rules_renders_real_svg_without_importing_implementations(svg_project, capsys, tmp_path):
     target, workspace, project = svg_project
-    node_file = project / ("domain_nodes.py" if target == "python" else "nodes/model.ts")
+    node_file = project / ("nodes/domain_nodes.py" if target == "python" else "nodes/model.ts")
     node_file.write_text("raise RuntimeError('must not import')\n" if target == "python" else "throw new Error('must not import');\n")
-    rule_file = project / ("rules/model_definition.py" if target == "python" else "rules/model_definition.ts")
+    rule_file = project / "plugins/code_plugin/rules" / ("model_definition.py" if target == "python" else "model_definition.ts")
     rule_file.write_text("raise RuntimeError('must not import')\n" if target == "python" else "throw new Error('must not import');\n")
     output = tmp_path / "rules.svg"
     assert main(["review-rules", "--workspace", str(workspace), "--config", str(project / "configs/model.jsonc"),

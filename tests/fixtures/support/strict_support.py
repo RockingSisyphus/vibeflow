@@ -38,7 +38,6 @@ from vibeflow.tooling.presentation.mermaid import (
 )
 from vibeflow.tooling.project.config_loader import ConfigLoadError, load_config_document
 from vibeflow.tooling.project.config_schema import collect_config_schema_findings
-from vibeflow.tooling.application.python.project.effective_policy import resolve_effective_policy
 from vibeflow.tooling.application.python.project.quality_scan import scan_code_quality
 from vibeflow.tooling.project.schema_resources import schema_text
 
@@ -79,7 +78,7 @@ def register_node(registry: NodeRegistry, descriptor, node_cls: type, schema: di
     registry.register(configured_declaration(descriptor, schema, defaults), node_cls, **kwargs)
 
 
-BadIoNode_DECLARATION = node_declaration(NodeDescriptor(type_key='test.bad_io', display_name='Bad IO', description='Illegally performs IO.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor()), NodeContractDescriptor(provides=(DataProvider(key='value.out', type='value.out', display_name='value.out'),), output_semantics={'value.out': ('output value',)}), rulesets=("vibeflow.process",))
+BadIoNode_DECLARATION = node_declaration(NodeDescriptor(rulesets=(), id='test.bad_io', display_name='Bad IO', description='Illegally performs IO.', version='0.1.0', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"), NodeContractDescriptor(provides=(DataProvider(key='value.out', type='value.out', display_name='value.out'),), output_semantics={'value.out': ('output value',)}), rulesets=("vibeflow.process",))
 
 class BadIoNode:
 
@@ -133,12 +132,12 @@ def _edge_chain(*names: str) -> list[dict[str, str]]:
 
 def _write_config_file(path: Path, data: dict) -> None:
     payload = dict(data)
-    nodesets = payload.pop("nodesets", None)
+    nodeset_types = payload.pop("nodeset_types", None)
     imports = list(payload.get("nodeset_imports") or [])
-    if isinstance(nodesets, list):
+    if isinstance(nodeset_types, list):
         nodeset_dir = path.parent / f"{path.stem}_nodesets"
         nodeset_dir.mkdir(parents=True, exist_ok=True)
-        for nodeset in nodesets:
+        for nodeset in nodeset_types:
             type_key = str(nodeset.get("type_key") or nodeset.get("name") or "nodeset")
             filename = re.sub(r"[^A-Za-z0-9_.-]+", "_", type_key).replace(".", "_") + ".jsonc"
             nodeset_path = nodeset_dir / filename
@@ -151,20 +150,20 @@ def _write_config_file(path: Path, data: dict) -> None:
 
 def _node_call(name: str, node_type: str, default_description: str, **fields) -> dict:
     node_id = str(fields.pop("id", fields.pop("name", name)))
-    type_used = str(fields.pop("type_used", fields.pop("type", node_type)))
-    if type_used.startswith("nodeset."):
-        type_used = type_used.removeprefix("nodeset.")
+    definition_id = str(fields.pop("definition_id", fields.pop("type", node_type)))
+    if definition_id.startswith("nodeset."):
+        definition_id = definition_id.removeprefix("nodeset.")
     explicit_contract = (
         fields.get("status") == "planned"
-        or type_used == "vibeflow.io"
-        or type_used in {"vibeflow.loop", "vibeflow.loop.while"}
+        or definition_id == "vibeflow.io"
+        or definition_id in {"vibeflow.loop", "vibeflow.loop.while"}
     )
     if explicit_contract:
         fields.setdefault("requires", [])
         fields.setdefault("provides", [])
     return {
         "id": node_id,
-        "type_used": type_used,
+        "definition_id": definition_id,
         "display_name": node_id.replace("_", " ").title(),
         "description": default_description,
         **fields,
@@ -174,10 +173,10 @@ def _node_call(name: str, node_type: str, default_description: str, **fields) ->
 def _seed_add_pipeline(*, seed: dict | None = None, add: dict | None = None) -> dict:
     seed_fields = dict(seed or {})
     seed_defaults = seed_fields
-    seed_node = _node_call(str(seed_defaults.pop("id", seed_defaults.pop("name", "seed"))), str(seed_defaults.pop("type_used", seed_defaults.pop("type", "test.seed"))), "Produces the initial value.", **seed_defaults)
+    seed_node = _node_call(str(seed_defaults.pop("id", seed_defaults.pop("name", "seed"))), str(seed_defaults.pop("definition_id", seed_defaults.pop("type", "test.seed"))), "Produces the initial value.", **seed_defaults)
     add_fields = dict(add or {})
     add_defaults = add_fields
-    add_node = _node_call(str(add_defaults.pop("id", add_defaults.pop("name", "add"))), str(add_defaults.pop("type_used", add_defaults.pop("type", "test.add"))), "Adds delta to value.in.", **add_defaults)
+    add_node = _node_call(str(add_defaults.pop("id", add_defaults.pop("name", "add"))), str(add_defaults.pop("definition_id", add_defaults.pop("type", "test.add"))), "Adds delta to value.in.", **add_defaults)
     return {
         "nodes": [
             _node_call("start", "test.start", "Starts the flow."),
@@ -193,7 +192,7 @@ def _seed_add_pipeline(*, seed: dict | None = None, add: dict | None = None) -> 
 def _seed_only_pipeline(*, seed: dict | None = None) -> dict:
     seed_fields = dict(seed or {})
     seed_defaults = seed_fields
-    seed_node = _node_call(str(seed_defaults.pop("id", seed_defaults.pop("name", "seed"))), str(seed_defaults.pop("type_used", seed_defaults.pop("type", "test.seed"))), "Produces the initial value.", **seed_defaults)
+    seed_node = _node_call(str(seed_defaults.pop("id", seed_defaults.pop("name", "seed"))), str(seed_defaults.pop("definition_id", seed_defaults.pop("type", "test.seed"))), "Produces the initial value.", **seed_defaults)
     return {
         "nodes": [
             _node_call("start", "test.start", "Starts the flow."),
@@ -208,7 +207,7 @@ def _seed_only_pipeline(*, seed: dict | None = None) -> dict:
 def _input_add_pipeline(*, add: dict | None = None) -> dict:
     add_fields = dict(add or {})
     add_defaults = add_fields
-    add_node = _node_call(str(add_defaults.pop("id", add_defaults.pop("name", "add"))), str(add_defaults.pop("type_used", add_defaults.pop("type", "test.add"))), "Adds delta to value.in.", **add_defaults)
+    add_node = _node_call(str(add_defaults.pop("id", add_defaults.pop("name", "add"))), str(add_defaults.pop("definition_id", add_defaults.pop("type", "test.add"))), "Adds delta to value.in.", **add_defaults)
     add_name = str(add_node["id"])
     return {
         "inputs": [INPUT_SPEC("value.in")],

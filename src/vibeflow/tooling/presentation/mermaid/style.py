@@ -33,14 +33,12 @@ MERMAID_MAIN_CLASS_ORDER = (
     "plannedNode",
     "baseLibResource",
     "pluginResource",
-    "hostExtensionResource",
     "plannedResource",
 )
 
 MERMAID_RESOURCE_CLASS_ORDER = (
     "baseLibResource",
     "pluginResource",
-    "hostExtensionResource",
     "plannedResource",
 )
 

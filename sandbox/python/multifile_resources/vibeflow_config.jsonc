@@ -1,1 +1,8 @@
-{"roots":[{"id":"resource-python","path":"."}]}
+{
+  "roots": [
+    {
+      "id": "resource-python",
+      "path": "project"
+    }
+  ]
+}

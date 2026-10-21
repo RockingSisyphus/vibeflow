@@ -15,9 +15,9 @@ from vibeflow.tooling.project.graph_config import parse_graph_config
 def test_parallel_graph_has_normal_explicit_completion_edges():
     registry=NodeRegistry();catalogs=DescriptorCatalogs.empty()
     for key,kind in (("boundary","terminal"),("work","process")):
-        descriptor=NodeDescriptor("fixture."+key,key,key,"1",kind,contract=NodeContractDescriptor(),rulesets=())
+        descriptor=NodeDescriptor("fixture."+key,key,key,"1",kind,contract=NodeContractDescriptor(),rulesets=(), node_type="vibeflow.node")
         registry.register(descriptor,Empty);catalogs.nodes.register(descriptor)
-    graph=parse_graph_config({"pipeline":{"nodes":[{"id":name,"type_used":"fixture."+kind,"display_name":name,
+    graph=parse_graph_config({"pipeline":{"nodes":[{"id":name,"definition_id":"fixture."+kind,"display_name":name,
         "description":"普通图节点",**({"join_policy":"all"} if name=="collect" else {})}
         for name,kind in (("start","boundary"),("left","work"),("right","work"),("collect","work"),("end","boundary"))],
         "edges":[["start","left"],["start","right"],["left","collect"],["right","collect"],["collect","end"]]}})
@@ -35,9 +35,9 @@ def _parallel_fixture(*, descriptor_shape="", call_shape="", external=False):
     for key,kind in (("boundary","terminal"),("dispatch","process"),("work","process"),("collect","process")):
         descriptor=NodeDescriptor("fixture."+key,key,key,"1",kind,contract=NodeContractDescriptor(),rulesets=(),
             external=external and key in {"dispatch","collect"},
-            presentation={"shape":descriptor_shape} if descriptor_shape and key in {"dispatch","collect"} else {})
+            presentation={"shape":descriptor_shape} if descriptor_shape and key in {"dispatch","collect"} else {}, node_type="vibeflow.node")
         registry.register(descriptor,Empty);catalogs.nodes.register(descriptor)
-    graph=parse_graph_config({"pipeline":{"nodes":[{"id":name,"type_used":"fixture."+kind,
+    graph=parse_graph_config({"pipeline":{"nodes":[{"id":name,"definition_id":"fixture."+kind,
         "display_name":name,"description":"Ordinary parallel call",
         **({"join_policy":"all"} if name=="collect" else {}),
         **({"style":{"shape":call_shape}} if call_shape and name in {"dispatch","collect"} else {})}

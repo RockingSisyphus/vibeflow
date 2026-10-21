@@ -42,16 +42,7 @@ _BASE_LIB_COLUMN = _ResourceColumnSpec(
     child_shape="fr-rect",
     label_kind="base_lib",
 )
-_HOST_EXTENSION_COLUMN = _ResourceColumnSpec(
-    column_id="__vibeflow_layout_host_extensions",
-    title="host_extensions",
-    root_id="resource_host_extensions",
-    root_label="host_extensions",
-    root_class="hostExtensionResource",
-    child_class="hostExtensionResource",
-    child_shape="hex",
-    label_kind="host_extension",
-)
+
 
 
 def render_review_columns(renderer: Any, graph: GraphConfig, compiled: CompiledGraph) -> str:
@@ -80,7 +71,7 @@ def _render_main_column(renderer: Any, lines: list[str], graph: GraphConfig, com
     renderer._render_graph_body(lines, graph, compiled, prefix="", indent="    ", visited_nodesets=(), expand_inline=False)
     renderer._render_edges(lines, graph, compiled, prefix="", indent="    ")
     if graph.nodes:
-        renderer._append_edge_line(lines, f"    {anchor} ~~~ {_safe_id(graph.nodes[0].name)}")
+        renderer._append_edge_line(lines, f"    {anchor} ~~~ {_safe_id(graph.nodes[0].id)}")
     lines.append("  end")
     return [anchor]
 
@@ -98,14 +89,8 @@ def _render_resource_columns(renderer: Any, lines: list[str], graph: GraphConfig
     base_lib_anchor = _render_resource_column(renderer, lines, _BASE_LIB_COLUMN, _mapping_items(modules))
     if base_lib_anchor:
         anchors.append(base_lib_anchor)
-    host_extension_anchor = _render_resource_column(
-        renderer,
-        lines,
-        _HOST_EXTENSION_COLUMN,
-        _mapping_items(payload.get("host_extensions", ())),
-    )
-    if host_extension_anchor:
-        anchors.append(host_extension_anchor)
+
+
     return anchors
 
 
@@ -140,7 +125,7 @@ def _render_nodesets_column(renderer: Any, lines: list[str], graph: GraphConfig)
     if not nodeset_nodes:
         return ""
     column_anchor = "__vibeflow_layout_nodesets_anchor"
-    lines.append('  subgraph __vibeflow_layout_nodesets["expanded nodesets"]')
+    lines.append('  subgraph __vibeflow_layout_nodesets["expanded nodeset_types"]')
     lines.append("    direction TB")
     _render_anchor(lines, column_anchor, indent="    ")
     previous_anchor = column_anchor

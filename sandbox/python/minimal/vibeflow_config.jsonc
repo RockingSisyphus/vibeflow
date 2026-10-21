@@ -1,1 +1,8 @@
-{"roots":[{"id":"minimal","path":"."}]}
+{
+  "roots": [
+    {
+      "id": "minimal",
+      "path": "project"
+    }
+  ]
+}

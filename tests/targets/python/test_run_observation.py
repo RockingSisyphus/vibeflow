@@ -25,7 +25,7 @@ def test_annotation_cli_controls(tmp_path):
         if not case["allowed"]:
             finding = next(item for item in case["errors"] if item["code"].endswith("PURITY.BANNED_CALL"))
             assert finding["severity"] == "error"
-            assert finding["source_location"]["path"].endswith(("plugin.py", "helper.py"))
+            assert finding["source_location"]["path"].endswith(("nodes/steps.py", "helper.py"))
             assert finding["source_location"]["line"] > 0
 
 
@@ -105,14 +105,14 @@ def test_same_process_runs_do_not_mix_info_or_output(tmp_path):
 
 def test_default_process_node_can_update_info_and_project_runtime_options(tmp_path):
     write_project(tmp_path, "integer", 1)
-    source = tmp_path / "plugin.py"
+    source = tmp_path / "nodes/steps.py"
     source.write_text('from vibeflow.targets.python.sdk import update_run_info\n' + source.read_text().replace(
         '        value = params["cleanup_record_roots"]',
         '        update_run_info([{"loss": .125}])\n        value = params["cleanup_record_roots"]'))
     monitor = tmp_path / "monitor.json"
     (tmp_path / "vibeflow_project.jsonc").write_text(json.dumps({"project_target": "python", "runtime": {
         "status_interval": .01, "status_file": str(monitor)}}))
-    workspace = load_workspace_config(tmp_path / "vibeflow_config.jsonc")
+    workspace = load_workspace_config(tmp_path.parent / "vibeflow_config.jsonc")
     run_workspace_checked(config_path=tmp_path / "workflow.jsonc", workspace=workspace, run_root=tmp_path / "runs")
     assert json.loads(monitor.read_text())["info"] == [{"loss": .125}]
     assert json.loads(monitor.read_text())["state"] == "succeeded"

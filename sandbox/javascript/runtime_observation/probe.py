@@ -14,8 +14,8 @@ from vibeflow.tooling.application.javascript.build import ProjectBuildRequest, b
 
 ROOT = Path(__file__).resolve().parents[3]
 PLUGIN = '''import {definePlugin, defineNode, defineDataSchema} from "@vibeflow/plugin";
-export const start = defineNode({type_key: "monitor.start", flow_kind: "terminal", contract: {}, rulesets: ["vibeflow.io"], run() {return {};}});
-export const calculate = defineNode({type_key: "monitor.calculate", rulesets: ["vibeflow.python_io"], contract: {
+export const start = defineNode({node_type:"vibeflow.node",id: "monitor.start", flow_kind: "terminal", contract: {}, rulesets: ["vibeflow.io"], run() {return {};}});
+export const calculate = defineNode({node_type:"vibeflow.node",id: "monitor.calculate", rulesets: ["vibeflow.python_io"], contract: {
   requires: [{type: "monitor.number", cardinality: "exactly_one", display_name: "Input value"}],
   provides: [{key: "result", type: "monitor.result", display_name: "Result"}],
   input_semantics: {"monitor.number": ["Input number"]}, output_semantics: {result: ["Input plus one"]}
@@ -30,10 +30,10 @@ export const calculate = defineNode({type_key: "monitor.calculate", rulesets: ["
   if (inputs["monitor.number"].value < 0) throw new Error("sandbox JS failed");
   return {result: inputs["monitor.number"].value + 1};
 }});
-export const end = defineNode({type_key: "monitor.end", flow_kind: "terminal", contract: {}, rulesets: ["vibeflow.io"], run() {return {};}});
+export const end = defineNode({node_type:"vibeflow.node",id: "monitor.end", flow_kind: "terminal", contract: {}, rulesets: ["vibeflow.io"], run() {return {};}});
 export const input = defineDataSchema({type_key: "monitor.number", schema: {type: "number"}});
 export const output = defineDataSchema({type_key: "monitor.result", schema: {type: "number"}});
-export const plugin = definePlugin({id: "monitor.plugin", resources: [start, calculate, end, input, output]});
+export const plugin = definePlugin({id: "monitor.plugin", resources: [input, output]});
 '''
 
 
@@ -44,15 +44,20 @@ def write_project(work, toolchain):
     for name in ("package.json", "package-lock.json", "tsconfig.json"):
         shutil.copy2(ROOT / "sandbox/javascript/minimal/project" / name, project / name)
     (project / "vibeflow_project.jsonc").write_text('{"project_target":"javascript"}')
-    (project / "plugin.ts").write_text(PLUGIN)
+    (project / "nodes").mkdir()
+    (project / "plugins/monitor").mkdir(parents=True)
+    definitions = PLUGIN[:PLUGIN.index("export const input =")]
+    schemas = PLUGIN[PLUGIN.index("export const input ="):]
+    (project / "nodes/steps.ts").write_text(definitions)
+    (project / "plugins/monitor/plugin.ts").write_text('import {definePlugin,defineDataSchema} from "@vibeflow/plugin";\n' + schemas)
     (work / "vibeflow_config.jsonc").write_text(json.dumps({"roots": [{"id": "monitor", "path": "project"}]}))
     pipeline = {"entry_mode": "sync", "inputs": [{"key": "value", "type": "monitor.number", "display_name": "Value", "required": True}],
-                "nodes": [{"id": name, "type_used": "monitor." + name, "display_name": name.title(),
+                "nodes": [{"id": name, "definition_id": "monitor." + name, "display_name": name.title(),
                            "description": "Runtime monitoring " + name} for name in ("start", "calculate", "end")],
                 "edges": [["start", "calculate"], ["calculate", "end"]],
                 "outputs": [{"type": "monitor.result", "as": "result", "display_name": "Result", "cardinality": "exactly_one"}]}
     pipeline["nodes"][2]["similar_to"] = {"node": "start", "relationship": "copy", "reason": "Both boundaries return an empty output"}
-    (project / "workflow.jsonc").write_text(json.dumps({"plugins": [{"source": {"kind": "file", "ref": "plugin.ts"}}],
+    (project / "workflow.jsonc").write_text(json.dumps({"plugins": [{"source": {"kind": "file", "ref": "plugins/monitor/plugin.ts"}}],
                                                      "rulesets": ["vibeflow.workflow"], "pipeline": pipeline}))
     return project
 

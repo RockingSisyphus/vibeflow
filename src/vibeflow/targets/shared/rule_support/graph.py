@@ -57,14 +57,14 @@ def _join(context, inputs, params):
 
 
 def _nodesets(context, inputs, params):
-    from vibeflow.targets.shared.quality_support.nodesets import _nodeset_quality_facts
+    from vibeflow.targets.shared.quality_support.nodeset_types import _nodeset_quality_facts
     return RuleResult(findings=_nodeset_quality_facts(context.require("graph"), max_depth=params["nodeset_max_depth"], warn_width=params["nodeset_warn_width"]))
 
 
 def _duplicates(context, inputs, params):
     from vibeflow.targets.shared.quality_support.workflow_rules.duplicates import _duplicate_logic_facts
     return RuleResult(findings=_duplicate_logic_facts(context.require("fingerprints"), context.require("node_metrics"),
-        node_types=context.facts.get("node_types"), node_similarities=context.facts.get("node_similarities")))
+        call_definitions=context.facts.get("call_definitions"), node_similarities=context.facts.get("node_similarities")))
 
 
 def _planned(context, inputs, params):

@@ -1,7 +1,7 @@
 """Enumerate graph calls and assign unambiguous rule coverage."""
 from dataclasses import dataclass, replace
 
-from vibeflow.core.flow import LOOP_NODE_TYPES
+from vibeflow.core.flow import LOOP_DEFINITION_IDS
 from vibeflow.core.rules.selection import resolve_graph_selection
 from vibeflow.core.config.scope import normalize_config_scope
 
@@ -13,7 +13,7 @@ def graph_rule_subjects(graph, *, global_config=None, node_config_overrides=None
     found = list(graph_call_subjects(graph, global_config=global_config,
         node_config_overrides=node_config_overrides, include_planned=True))
     visited = {id(item.graph) for item in found}
-    definitions = list(graph.nodesets.values())
+    definitions = list(graph.nodeset_types.values())
     while definitions:
         definition = definitions.pop()
         if id(definition.graph) in visited:
@@ -21,8 +21,8 @@ def graph_rule_subjects(graph, *, global_config=None, node_config_overrides=None
         visited.add(id(definition.graph))
         found.append(GraphRuleSubject("nodeset:" + definition.type_key, definition.graph, declaration_only=True,
             definition=definition, global_config=normalize_config_scope(definition.global_config),
-            available_nodesets={**graph.nodesets, **definition.graph.nodesets}))
-        definitions.extend(definition.graph.nodesets.values())
+            available_nodeset_types={**graph.nodeset_types, **definition.graph.nodeset_types}))
+        definitions.extend(definition.graph.nodeset_types.values())
     return tuple(found)
 
 
@@ -78,20 +78,20 @@ def graph_rule_tasks(graph, rulesets, *, global_config=None):
 def scoped_graph(task, subject=None):
     """Return the responsible graph; child definitions are finite boundaries.
 
-    Full background definitions live in global_graph. Traversing graph.nodesets
+    Full background definitions live in global_graph. Traversing graph.nodeset_types
     cannot accidentally recurse into a graph assigned to another task.
     """
     subject = subject or task.subject
     graph = subject.graph
     # Keep first-reference order so Rule findings and event records are stable across processes.
-    keys = dict.fromkeys(node.loop.body if node.type_used in LOOP_NODE_TYPES else node.type_used for node in graph.nodes)
+    keys = dict.fromkeys(node.loop.body if node.definition_id in LOOP_DEFINITION_IDS else node.definition_id for node in graph.nodes)
     definitions = {}
     for key in keys:
-        definition = subject.available_nodesets.get(key)
+        definition = subject.available_nodeset_types.get(key)
         if definition is not None:
-            boundary = replace(definition.graph, nodes=(), edges=(), nodesets={})
+            boundary = replace(definition.graph, nodes=(), edges=(), nodeset_types={})
             definitions[key] = replace(definition, graph=boundary)
-    return replace(graph, nodesets=definitions)
+    return replace(graph, nodeset_types=definitions)
 
 
 def selection_report(graph, catalogs):
@@ -102,9 +102,9 @@ def selection_report(graph, catalogs):
         result.append({"kind":"graph", "owner":subject.owner, "call_path":list(subject.call_path),
             "declaration_only":subject.declaration_only, "selection":choice.to_dict()})
         for node in subject.graph.nodes:
-            descriptor = catalogs.nodes.get(node.type_used)
+            descriptor = catalogs.nodes.get(node.definition_id)
             if descriptor is not None:
-                result.append({"kind":"node", "owner":subject.owner, "type_key":node.type_used,
+                result.append({"kind":"node", "owner":subject.owner, "type_key":node.definition_id,
                     "call_path":list((*subject.call_path,node.id)), "declaration_only":subject.declaration_only,
                     "selection":resolve_node_selection(descriptor,node).to_dict()})
     return result

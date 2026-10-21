@@ -2,29 +2,29 @@
 from vibeflow.targets.python.sdk import node
 
 
-@node(type_key="fixture.port.receive", flow_kind="io", rulesets=["vibeflow.io"],
+@node(id="fixture.port.receive", flow_kind="io", rulesets=["vibeflow.io"],
       capabilities=[{"id": "vibeflow.port", "operations": ["receive"]}],
       contract={"provides": [{"key": "number", "type": "number", "display_name": "Number"}],
                 "output_semantics": {"number": ["Host-provided number"]},
-                "params_schema": {"port": {"type": "string"}}, "params_defaults": {"port": "math.in"}})
+                "params_schema": {"port": {"type": "string"}}, "params_defaults": {"port": "math.in"}}, node_type="vibeflow.node")
 class Receive:
     def run_pure(self, inputs, params, context):
         value = context.capabilities["vibeflow.port"]["receive"]({"port": params["port"]})
         return {"number": value["value"]}
 
 
-@node(type_key="fixture.port.send", flow_kind="io", rulesets=["vibeflow.io"],
+@node(id="fixture.port.send", flow_kind="io", rulesets=["vibeflow.io"],
       capabilities=[{"id": "vibeflow.port", "operations": ["send"]}],
       contract={"requires": [{"type": "answer", "cardinality": "exactly_one", "display_name": "Answer"}],
                 "input_semantics": {"answer": ["Answer to send to the host"]},
-                "params_schema": {"port": {"type": "string"}}, "params_defaults": {"port": "math.out"}})
+                "params_schema": {"port": {"type": "string"}}, "params_defaults": {"port": "math.out"}}, node_type="vibeflow.node")
 class Send:
     def run_pure(self, inputs, params, context):
         context.capabilities["vibeflow.port"]["send"]({"port": params["port"], "value": inputs["answer"]["value"]})
         return {}
 
 
-@node(type_key="fixture.port.boundary", flow_kind="terminal", rulesets=["vibeflow.process"], contract={})
+@node(id="fixture.port.boundary", flow_kind="terminal", rulesets=["vibeflow.process"], contract={}, node_type="vibeflow.node")
 class Boundary:
     def run_pure(self, inputs, params):
         return {}

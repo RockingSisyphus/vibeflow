@@ -11,32 +11,32 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Fans x out into two arithmetic branches."
       },
       {
         "id": "add_one",
-        "type_used": "sandbox.fanout_add",
+        "definition_id": "sandbox.fanout_add",
         "display_name": "Add one",
         "description": "Computes x + 1 on the upper branch."
       },
       {
         "id": "subtract_one",
-        "type_used": "sandbox.fanout_subtract",
+        "definition_id": "sandbox.fanout_subtract",
         "display_name": "Subtract one",
         "description": "Computes x - 1 on the lower branch."
       },
       {
         "id": "join",
-        "type_used": "sandbox.fanout_join",
+        "definition_id": "sandbox.fanout_join",
         "display_name": "Join both branches",
         "description": "Waits for both arithmetic branches.",
         "join_policy": "all"
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends after both joined outputs are available."
       }
@@ -82,7 +82,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

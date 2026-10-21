@@ -11,7 +11,7 @@ window.VFLayout={async body(context,key,prefix="",ancestors=[],override=null,ent
     const localPath=[...localPrefix,original.id];
     const options=VFModel.childOptions(original,body,localPath,data.bodies);
     const facts={...original,preview_operations:architecture.call_policies?.[JSON.stringify(localPath)]?.actions||[],preview_expandable:options.some(o=>!o.error)};
-    const segment=encodeURIComponent(facts.id),path=entity==="resource"?facts.id:prefix?prefix+"/"+segment:segment,card=VFShapes.measure(facts,architecture?.node_types,architecture?.nodesets);
+    const segment=encodeURIComponent(facts.id),path=entity==="resource"?facts.id:prefix?prefix+"/"+segment:segment,card=VFShapes.measure(facts,architecture);
     const item={id:facts.id,path,localPath,body,architecture,options,facts,card,width:card.width,height:card.height};
     const selected=options.find(o=>o.key===state.targets?.get(path))||options.find(o=>!o.error),child=selected?.key;
     if(state.expanded.has(path)&&child&&!selected.error&&data.bodies[child]?.facts.nodes?.length){

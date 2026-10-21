@@ -143,7 +143,7 @@ def test_shared_command_dispatches_javascript_root_without_python_import(
 def test_python_application_services_reject_javascript_owned_workflow(
     tmp_path,
 ) -> None:
-    from vibeflow.tooling.application.python.runner import CheckedRunError
+    from vibeflow.tooling.application.python.execution import CheckedRunError
     from vibeflow.tooling.application.python.workspace_service import (
         load_workspace_graph_for_export,
         run_workspace_checked,
@@ -163,7 +163,6 @@ def test_python_application_services_reject_javascript_owned_workflow(
     assert (graph, compiled, registry) == (None, None, None)
     assert resources.base_libs == ()
     assert resources.plugins == ()
-    assert resources.host_extensions == ()
     assert export_error is not None
     assert export_error.errors[0].rule_id == "CLI.PROJECT_TARGET.MISMATCH"
     with pytest.raises(CheckedRunError) as captured:
@@ -215,21 +214,26 @@ def test_python_review_rejects_javascript_root_before_publishing(
 
     payload = json.loads(capsys.readouterr().out)
     assert exit_code == 1
-    assert payload["failed_stage"] == "preflight"
+    assert payload["failed_stage"] == "workspace"
     assert payload["error"]["rule_id"] == "CLI.PROJECT_TARGET.MISMATCH"
     assert architecture.read_text(encoding="utf-8") == "old architecture\n"
     assert output.read_text(encoding="utf-8") == "old review\n"
 
 
-def test_quality_path_outside_project_requires_explicit_target(
+def test_quality_path_rejects_an_unregistered_directory(
     tmp_path,
     capsys,
 ) -> None:
-    code = cli_main(["quality-check", "--path", str(tmp_path), "--json"])
+    (tmp_path / "registered").mkdir()
+    (tmp_path / "registered/vibeflow_project.jsonc").write_text('{"project_target":"python"}')
+    (tmp_path / "vibeflow_config.jsonc").write_text(json.dumps({"roots":[{"id":"registered","path":"registered"}]}))
+    directory = tmp_path / "unregistered"
+    directory.mkdir()
+    code = cli_main(["quality-check", "--path", str(directory), "--json"])
     payload = json.loads(capsys.readouterr().out)
 
     assert code == 1
-    assert payload["code"] == "WORKSPACE.PROJECT_TARGET.MISSING"
+    assert payload["code"] == "WORKSPACE.ROOT.UNREGISTERED"
 
 
 def test_cli_reports_missing_project_target_before_loading_target(
@@ -264,7 +268,7 @@ def test_project_command_does_not_infer_target_when_no_project_config_exists(
     assert payload["details"]["field"] == "project_target"
 
 
-def test_validate_without_workspace_rejects_cross_target_nodeset_import(
+def test_validate_discovers_project_and_rejects_private_cross_target_nodeset_import(
     tmp_path,
     capsys,
 ) -> None:
@@ -274,6 +278,8 @@ def test_validate_without_workspace_rejects_cross_target_nodeset_import(
     javascript_configs = javascript_root / "configs"
     python_configs.mkdir(parents=True)
     javascript_configs.mkdir(parents=True)
+    (tmp_path / "vibeflow_config.jsonc").write_text(json.dumps({"roots":[
+        {"id":"python","path":"python_project"}, {"id":"javascript","path":"javascript_project"}]}))
     (python_root / "vibeflow_project.jsonc").write_text(
         json.dumps(
             {
@@ -325,11 +331,11 @@ def test_validate_without_workspace_rejects_cross_target_nodeset_import(
 
     assert code == 1
     assert payload["errors"][0]["rule_id"] == (
-        "WORKSPACE.NODESET.TARGET_MISMATCH"
+        "WORKSPACE.NODESET.PRIVATE"
     )
     location = payload["errors"][0]["source_location"]
-    assert location["source_target"] == "python"
-    assert location["import_target"] == "javascript"
+    assert location["path"] == str(workflow)
+    assert location["import_path"] == str(imported)
 
 
 def test_workspace_rejects_cross_target_nodeset_outside_declared_roots(
@@ -403,15 +409,13 @@ def test_workspace_rejects_cross_target_nodeset_outside_declared_roots(
     with pytest.raises(ConfigLoadError) as captured:
         load_workspace_config_document(workflow, workspace=workspace)
 
-    assert captured.value.rule_id == "WORKSPACE.NODESET.TARGET_MISMATCH"
-    assert captured.value.source_location["source_target"] == "javascript"
-    assert captured.value.source_location["import_target"] == "python"
+    assert captured.value.rule_id == "WORKSPACE.NODESET.OUTSIDE_ROOT"
 
 
-def test_low_level_nodeset_loader_without_project_configs_remains_compatible(
+def test_low_level_document_reader_can_parse_without_running_a_project(
     tmp_path,
 ) -> None:
-    imported = tmp_path / "nodesets" / "shared.jsonc"
+    imported = tmp_path / "nodeset_types" / "shared.jsonc"
     imported.parent.mkdir()
     imported.write_text(
         json.dumps(
@@ -430,7 +434,7 @@ def test_low_level_nodeset_loader_without_project_configs_remains_compatible(
     workflow.write_text(
         json.dumps(
             {
-                "nodeset_imports": [{"path": "nodesets/shared.jsonc"}],
+                "nodeset_imports": [{"path": "nodeset_types/shared.jsonc"}],
                 "pipeline": {"nodes": []},
             }
         ),
@@ -439,7 +443,7 @@ def test_low_level_nodeset_loader_without_project_configs_remains_compatible(
 
     document = load_config_document(workflow)
 
-    assert document.data["nodesets"][0]["type_key"] == "shared.flow"
+    assert document.data["nodeset_types"][0]["type_key"] == "shared.flow"
 
 
 @pytest.mark.parametrize("command", ("run", "build", "inspect-node"))
@@ -453,7 +457,7 @@ def test_target_specific_commands_also_require_an_owning_project_root(
     config.write_text("{}", encoding="utf-8")
     module.write_text("class Node: pass\n", encoding="utf-8")
     arguments = (
-        ["inspect-node", "--type", "demo.node", "--module", str(module)]
+        ["inspect-node", "--node-id", "demo.node", "--module", str(module)]
         if command == "inspect-node"
         else [command, "--config", str(config)]
     )
@@ -534,173 +538,8 @@ def test_shared_javascript_svg_help_exposes_nodeset_diagnostics(capsys) -> None:
 
     output = capsys.readouterr()
     assert "--expand-nodesets" in output.out
-    assert "--collapse-nodesets" in output.out
+    assert "--collapse-nodeset_types" in output.out
     assert "--hide-contract" in output.out
     assert "--hide-semantics" in output.out
     assert "--mermaid-layout" in output.out
     assert "--review-fragment-max-width" in output.out
-
-
-def test_mixed_workspace_quality_runs_each_root_in_an_isolated_process(
-    tmp_path,
-    monkeypatch,
-    capsys,
-) -> None:
-    python_root = tmp_path / "python_project"
-    javascript_root = tmp_path / "javascript_project"
-    python_root.mkdir()
-    javascript_root.mkdir()
-    (python_root / "vibeflow_project.jsonc").write_text(
-        json.dumps(
-            {
-                "project_target": "python",
-            }
-        ),
-        encoding="utf-8",
-    )
-    (javascript_root / "vibeflow_project.jsonc").write_text(
-        json.dumps(
-            {
-                "project_target": "javascript",
-                "javascript": {"package_root": "."},
-            }
-        ),
-        encoding="utf-8",
-    )
-    workspace = tmp_path / "vibeflow_config.jsonc"
-    workspace.write_text(
-        json.dumps(
-            {
-                "roots": [
-                    {"id": "python", "path": "python_project"},
-                    {"id": "javascript", "path": "javascript_project"},
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-    import vibeflow.tooling.application.workspace_quality as aggregator
-
-    child_calls: list[tuple[list[str], dict[str, object]]] = []
-
-    def fake_run(command, **kwargs):
-        arguments = list(command[3:])
-        child_calls.append((list(command), dict(kwargs)))
-        target = arguments[arguments.index("--project-target") + 1]
-        return subprocess.CompletedProcess(
-            command,
-            0,
-            stdout=json.dumps({"status": "PASS", "owner": target}),
-            stderr="",
-        )
-
-    monkeypatch.setattr(aggregator.subprocess, "run", fake_run)
-    original_import = builtins.__import__
-
-    def guarded_import(name, *args, **kwargs):
-        if name.startswith("vibeflow.tooling.application.python.cli") or name.startswith(
-            "vibeflow.tooling.application.javascript.cli"
-        ):
-            raise AssertionError(f"Target Application loaded in parent: {name}")
-        return original_import(name, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "__import__", guarded_import)
-    code = cli_main(
-        [
-            "quality-check",
-            "--workspace",
-            str(workspace),
-            "--json",
-            "--max-lines",
-            "50",
-        ]
-    )
-    payload = json.loads(capsys.readouterr().out)
-
-    assert code == 0
-    assert payload["status"] == "PASS"
-    assert [item["target"] for item in payload["roots"]] == [
-        "python",
-        "javascript",
-    ]
-    assert [item["report"]["owner"] for item in payload["roots"]] == [
-        "python",
-        "javascript",
-    ]
-    assert len(child_calls) == 2
-    for command, options in child_calls:
-        assert command[:3] == [sys.executable, "-m", "vibeflow"]
-        arguments = command[3:]
-        assert arguments[arguments.index("--workspace") + 1] == str(workspace)
-        assert options["check"] is False
-        assert options["stdout"] is subprocess.PIPE
-        assert options["stderr"] is subprocess.PIPE
-        assert "PYTHONPATH" in options["env"]
-    assert "--max-lines" in child_calls[0][0]
-    assert "--max-lines" in child_calls[1][0]
-
-
-def test_mixed_workspace_quality_keeps_workspace_for_external_roots(
-    tmp_path,
-    monkeypatch,
-    capsys,
-) -> None:
-    workspace_dir = tmp_path / "workspace"
-    external_dir = tmp_path / "external"
-    workspace_dir.mkdir()
-    external_dir.mkdir()
-    python_root = external_dir / "python_project"
-    javascript_root = external_dir / "javascript_project"
-    python_root.mkdir()
-    javascript_root.mkdir()
-    (python_root / "vibeflow_project.jsonc").write_text(
-        json.dumps(
-            {
-                "project_target": "python",
-            }
-        ),
-        encoding="utf-8",
-    )
-    (javascript_root / "vibeflow_project.jsonc").write_text(
-        json.dumps(
-            {
-                "project_target": "javascript",
-                "javascript": {"package_root": "."},
-            }
-        ),
-        encoding="utf-8",
-    )
-    workspace = workspace_dir / "vibeflow_config.jsonc"
-    workspace.write_text(
-        json.dumps(
-            {
-                "roots": [
-                    {"id": "python", "path": str(python_root)},
-                    {"id": "javascript", "path": str(javascript_root)},
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-    import vibeflow.tooling.application.workspace_quality as aggregator
-
-    captured: list[list[str]] = []
-
-    def fake_run(command, **_kwargs):
-        captured.append(list(command[3:]))
-        return subprocess.CompletedProcess(
-            command,
-            0,
-            stdout=json.dumps({"status": "PASS"}),
-            stderr="",
-        )
-
-    monkeypatch.setattr(aggregator.subprocess, "run", fake_run)
-
-    assert cli_main(
-        ["quality-check", "--workspace", str(workspace), "--json"]
-    ) == 0
-    assert json.loads(capsys.readouterr().out)["status"] == "PASS"
-    assert len(captured) == 2
-    for arguments in captured:
-        assert arguments[arguments.index("--workspace") + 1] == str(workspace)

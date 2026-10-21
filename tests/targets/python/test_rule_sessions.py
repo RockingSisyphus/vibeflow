@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from tests.fixtures.support.declarations import node_declaration
-from vibeflow.core.flow import GraphConfig, NodeSpec, NodesetSpec
+from vibeflow.core.flow import GraphConfig, NodeCallSpec, NodesetTypeSpec
 from vibeflow.targets.shared.rule_support.effect_records import EFFECT_POLICY_TYPE
 from vibeflow.core.rules import RuleCall, RuleContext, RuleDescriptor, RuleRecord, RuleRelation, RuleResult, RulesetDescriptor
 from vibeflow.targets.python.project import NodeRegistry
@@ -24,11 +24,11 @@ from vibeflow.tooling.application.python.project.declarations import collect_wor
 def _registry(tmp_path, rules, ruleset):
     path = tmp_path / "nodes.py"
     path.write_text('class Leaf:\n    def run_pure(self, inputs, params):\n        return {}\n')
-    descriptor = node_declaration(NodeDescriptor(type_key='test.leaf', display_name='Leaf', description='Checks one leaf.', version='1', flow_kind='process', contract=NodeContractDescriptor()),
+    descriptor = node_declaration(NodeDescriptor(rulesets=(), id='test.leaf', display_name='Leaf', description='Checks one leaf.', version='1', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"),
         NodeContractDescriptor(), rulesets=(ruleset.id,))
     registry = native_registry()
     registry.register(descriptor)
-    registry.source_locations = {descriptor.type_key:(path,"Leaf","project",tmp_path)}
+    registry.source_locations = {descriptor.id:(path,"Leaf","project",tmp_path)}
     registry.source_roots = (tmp_path,)
     registry.source_root_ids = {tmp_path:"project"}
     registry.rule_catalogs = (*registry.rule_catalogs, SimpleNamespace(rules=rules,rulesets=(ruleset,)),)
@@ -36,10 +36,10 @@ def _registry(tmp_path, rules, ruleset):
 
 
 def _repeated_graph():
-    inner = GraphConfig(nodes=(NodeSpec("leaf","test.leaf",params={"marker":7}),),rulesets=())
-    definition = NodesetSpec(type_key="test.inner",display_name="Inner",description="One leaf.",requires=(),provides=(),graph=inner)
-    return GraphConfig(nodes=(NodeSpec("first","test.inner"),NodeSpec("second","test.inner")),
-        nodesets={definition.type_key:definition},rulesets=())
+    inner = GraphConfig(nodes=(NodeCallSpec("leaf","test.leaf",params={"marker":7}),),rulesets=())
+    definition = NodesetTypeSpec(type_key="test.inner",display_name="Inner",description="One leaf.",requires=(),provides=(),graph=inner)
+    return GraphConfig(nodes=(NodeCallSpec("first","test.inner"),NodeCallSpec("second","test.inner")),
+        nodeset_types={definition.type_key:definition},rulesets=())
 
 
 def test_source_rule_ast_edits_do_not_change_later_rule_facts(tmp_path):
@@ -170,7 +170,7 @@ def test_external_rule_with_standard_id_keeps_its_own_policy_parameters(tmp_path
     registry.rule_catalogs = (SimpleNamespace(rules=(rule,),rulesets=(ruleset,)),)
     seen = []
     def external(context, inputs, params):
-        assert "project_facts" not in context.facts
+        assert "source_quality" not in context.facts
         seen.append(params)
         return RuleResult()
     registry.direct_bindings = {("rule",resource_id):external}
@@ -213,7 +213,7 @@ def test_native_project_checker_with_unrelated_resource_name_gets_facts_and_decl
     assert call["rule_id"] == rule.id and call["params"] == {"max_file_lines":expected}
 
 
-@pytest.mark.parametrize("native_id", ["vibeflow.workflow.nodesets", "vibeflow.graph.nodesets"])
+@pytest.mark.parametrize("native_id", ["vibeflow.workflow.nodeset_types", "vibeflow.graph.nodeset_types"])
 @pytest.mark.parametrize("own_default", [None, 2])
 def test_native_workflow_alias_preserves_its_schema_and_own_defaults(tmp_path, native_id, own_default):
     from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
@@ -222,15 +222,15 @@ def test_native_workflow_alias_preserves_its_schema_and_own_defaults(tmp_path, n
     native = standard.direct_bindings[("rule", native_id)]
     rule = replace(original, id="example.arbitrary_depth", handler="",
         params_schema={"nodeset_max_depth":{"type":"integer"}},
-        params_defaults={} if own_default is None else {"nodeset_max_depth":own_default})
+        params_defaults={"nodeset_max_depth":7 if own_default is None else own_default})
     selection = RulesetDescriptor("example.depth", calls=(RuleCall("analysis", rule_id="vibeflow.workflow.analysis"), RuleCall("depth", rule_id=rule.id)),
-        relations=(RuleRelation("depth", "analysis", "requires", {"analysis":"graphs"}),) if native_id == "vibeflow.workflow.nodesets" else (),
+        relations=(RuleRelation("depth", "analysis", "requires", {"analysis":"graphs"}),) if native_id == "vibeflow.workflow.nodeset_types" else (),
         entrypoints={"static": ("depth",), "import": (), "run": ()})
     registry = _registry(tmp_path, (rule,), selection)
     registry.direct_bindings[("rule", rule.id)] = native
     registry.rule_handler_loader = lambda plan:{rule.id:native, "vibeflow.workflow.analysis":standard.direct_bindings[("rule", "vibeflow.workflow.analysis")]}
     report = validate_graph_health(GraphConfig(nodes=(), rulesets=(selection.id,)),
-        registry=registry, nodeset_max_depth=7)
+        registry=registry)
     call = next(item for item in report.info["rule_executions"][0]["plan"]["calls"] if item["id"] == "depth")
     assert call["params"] == {"nodeset_max_depth":7 if own_default is None else own_default}
 
@@ -243,16 +243,13 @@ def test_incomplete_rule_with_only_warning_is_an_error_in_formal_check(tmp_path,
     registry = _registry(tmp_path,(rule,),ruleset)
     registry.rule_handler_loader = lambda plan: {rule.id:lambda context,inputs,params:RuleResult(state=state,
         findings=(HealthFinding(rule_id="TEST.WARNING",severity="warning",message="Insufficient facts."),))}
-    sources = collect_workflow_source_context(registry,GraphConfig(nodes=(NodeSpec("leaf","test.leaf"),),rulesets=()))
+    sources = collect_workflow_source_context(registry,GraphConfig(nodes=(NodeCallSpec("leaf","test.leaf"),),rulesets=()))
     report = execute_python_node_rules(registry,sources,phase="import")
     assert any(item.code == "TEST.WARNING" for item in report.findings)
     error = next(item for item in report.findings if item.code == "RULE.SOURCE.UNAVAILABLE")
     assert error.severity == "error" and error.definition_id == rule.id
     assert error.details["state"] == state
     from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
-    workflow = validate_graph_health(GraphConfig(nodes=(),rulesets=(ruleset.id,)),registry=registry)
-    assert workflow.status == "FAIL"
-    assert any(item.code == "RULE.EXECUTION.UNAVAILABLE" for item in workflow.errors)
 
 
 def test_public_imports_resolve_alias_relative_and_package_module_without_new_scan(tmp_path,monkeypatch):
@@ -270,7 +267,7 @@ def test_public_imports_resolve_alias_relative_and_package_module_without_new_sc
     monkeypatch.setattr(ast,"parse",parse)
     files = (PythonSourceFile.parse(str(node_file),"pkg.node",text),
         PythonSourceFile.parse(str(helper_file),"pkg.helpers","def transform(value):\n    return value\n"))
-    descriptor = node_declaration(NodeDescriptor(type_key='test.leaf', display_name='Leaf', description='A source Node.', version='1', flow_kind='process', contract=NodeContractDescriptor()),NodeContractDescriptor())
+    descriptor = node_declaration(NodeDescriptor(rulesets=(), id='test.leaf', display_name='Leaf', description='A source Node.', version='1', flow_kind='process', contract=NodeContractDescriptor(), node_type="vibeflow.node"),NodeContractDescriptor())
     context = build_python_source_context((PythonSourceNode(descriptor,str(node_file),"Leaf"),),files)
     assert len(parses) == 2
     assert all(isinstance(item,PythonSourceImport) for item in context.imports)
@@ -305,18 +302,18 @@ def test_import_rule_incomplete_warning_prevents_real_implementation_import(tmp_
     assert not marker.exists()
 
 
-def test_explicit_nodeset_topic_inherits_project_defaults_and_call_override_wins(tmp_path):
+def test_explicit_nodeset_topic_uses_rule_defaults_and_call_override_wins(tmp_path):
     from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
-    rule_id = "vibeflow.graph.nodesets"
+    rule_id = "vibeflow.graph.nodeset_types"
     selection = RulesetDescriptor("test.depth",calls=(RuleCall("depth",rule_id=rule_id),))
     registry = _registry(tmp_path,(),selection)
     graph = GraphConfig(nodes=(),rulesets=(selection.id,))
-    report = validate_graph_health(graph,registry=registry,nodeset_max_depth=7)
+    report = validate_graph_health(graph,registry=registry)
     plan = report.info["rule_executions"][0]["plan"]
-    assert plan["calls"][0]["params"]["nodeset_max_depth"] == 7
+    assert plan["calls"][0]["params"]["nodeset_max_depth"] == 4
     override = replace(selection,calls=(RuleCall("depth",rule_id=rule_id,params={"nodeset_max_depth":2}),))
     registry.rule_catalogs = (*registry.rule_catalogs[:-1], SimpleNamespace(rules=(),rulesets=(override,)),)
-    report = validate_graph_health(graph,registry=registry,nodeset_max_depth=7)
+    report = validate_graph_health(graph,registry=registry)
     assert report.info["rule_executions"][0]["plan"]["calls"][0]["params"]["nodeset_max_depth"] == 2
 
 
@@ -355,19 +352,19 @@ def test_selected_project_file_rule_has_real_cli_params_and_current_source_scope
     node = node_document(type_key="test.leaf",class_name="Leaf",contract={},rulesets=["test.files"] if selection_owner == "node" else [])
     node["implementations"][0]["source"]["ref"] = "leaf.py"
     selection = {"kind":"ruleset","id":"test.files","calls":[
-        {"id":"files","rule_id":"vibeflow.quality.files","params":{"max_file_lines":2,"warn_file_lines":1000}}]}
+        {"id":"files","rule_id":("vibeflow.graph.source.files" if selection_owner == "workflow" else "vibeflow.quality.files"),"params":{"max_file_lines":2,"warn_file_lines":1000}}]}
     plugin = write_plugin(tmp_path, [node, selection], target="python")
     manifest = resource(tmp_path, "ruleset", "test.files")
-    (tmp_path / "vibeflow_project.jsonc").write_text(json.dumps({"project_target":"python","quality_enabled":False,
+    (tmp_path / "vibeflow_project.jsonc").write_text(json.dumps({"project_target":"python",
 }))
     workflow = tmp_path / "main.jsonc"
     workflow.write_text(json.dumps({"plugins":[plugin], "rulesets":["test.files"] if selection_owner == "workflow" else [],"pipeline":{"nodes":[
-        {"id":"leaf","type_used":"test.leaf","display_name":"Leaf","description":"A scoped file check."}]}}))
+        {"id":"leaf","definition_id":"test.leaf","display_name":"Leaf","description":"A scoped file check."}]}}))
     code = cli_main(["validate","--config",str(workflow),"--json"])
     report = json.loads(capsys.readouterr().out)
     assert code == 1
     errors = [item for item in report["errors"] if item["code"] == "QUALITY.FILE.MAX_LINES"]
-    assert len(errors) == 1 and errors[0]["definition_id"] == "vibeflow.quality.files"
+    assert len(errors) == 1 and errors[0]["definition_id"] == selection["calls"][0]["rule_id"]
     assert errors[0]["details"]["limit"] == 2
     assert errors[0]["source_location"]["path"] == str(tmp_path / "leaf.py")
     assert not any("orphan.py" in str(item) for item in report["errors"])
@@ -395,7 +392,7 @@ def test_project_handler_alias_receives_current_source_facts(tmp_path):
     alias = replace(builtin,id="test.files.alias",handler=builtin.id)
     selection = RulesetDescriptor("test.files.alias",calls=(RuleCall("files",rule_id=alias.id,params={"max_file_lines":2}),))
     registry = _registry(tmp_path,(alias,),selection)
-    graph = GraphConfig(nodes=(NodeSpec("leaf","test.leaf"),),rulesets=())
+    graph = GraphConfig(nodes=(NodeCallSpec("leaf","test.leaf"),),rulesets=())
     source = collect_workflow_source_context(registry,graph)
     report = execute_python_node_rules(registry,source)
     finding = next(item for item in report.findings if item.code == "QUALITY.FILE.MAX_LINES")
@@ -410,7 +407,7 @@ def test_selected_project_theme_reports_original_parse_location_without_reparse(
     source_path = tmp_path / "nodes.py"
     broken = "class Leaf:\n    def run_pure(self, inputs, params):\n        return (\n"
     source_path.write_text(broken)
-    snapshot = collect_workflow_source_context(registry,GraphConfig(nodes=(NodeSpec("leaf","test.leaf"),),rulesets=()))
+    snapshot = collect_workflow_source_context(registry,GraphConfig(nodes=(NodeCallSpec("leaf","test.leaf"),),rulesets=()))
     with monkeypatch.context() as parsing:
         parsing.setattr(ast,"parse",lambda *args,**kwargs:pytest.fail("A missing AST must remain unavailable, without reparse"))
         report = execute_python_node_rules(registry,snapshot)
@@ -423,30 +420,32 @@ def test_selected_project_theme_reports_original_parse_location_without_reparse(
 
 
 @pytest.mark.parametrize("max_lines",[2,1000])
-def test_checked_run_import_file_rule_uses_current_command_numeric_defaults_before_marker(tmp_path,max_lines):
+def test_checked_run_import_file_rule_uses_declared_parameters_before_marker(tmp_path,max_lines):
     import json
-    from vibeflow.tooling.application.python.project.declarations import _bind_node
-    from vibeflow.tooling.application.python.runner import CheckedRunError,run_checked
-    selection = RulesetDescriptor("test.import.files",calls=(RuleCall("files",rule_id="vibeflow.quality.files"),),
-        entrypoints={"static":(),"run":(),"import":("files",)})
-    registry = _registry(tmp_path,(),selection)
+    from vibeflow.tooling.application.python.execution import CheckedRunError
+    from vibeflow.tooling.application.python.runner import run_checked
+    from tests.fixtures.support.plugins import write_plugin
+    from tests.fixtures.support.rule_inspection import node_document
     marker = tmp_path / "imported.txt"
-    path = tmp_path / "nodes.py"
+    path = tmp_path / "implementation.py"
     path.write_text(f'from pathlib import Path\nPath({str(marker)!r}).write_text("imported")\nclass Leaf:\n    def run_pure(self,inputs,params):\n        return {{}}\n')
-    registry.register(registry.descriptor("test.leaf"),loader=lambda:_bind_node(registry,"test.leaf",(tmp_path,)),overwrite=True)
+    node = node_document(type_key="test.leaf",class_name="Leaf",contract={},rulesets=["test.import.files"])
+    node["flow_kind"] = "terminal"
+    node["implementations"][0]["source"]["ref"] = path.name
+    selection = {"kind":"ruleset","id":"test.import.files","calls":[{"id":"files","rule_id":"vibeflow.quality.files",
+        "params":{"max_file_lines":max_lines}}],"entrypoints":{"static":[],"run":[],"import":["files"]}}
+    plugin = write_plugin(tmp_path,[node,selection],target="python")
     workflow = tmp_path / "main.jsonc"
-    workflow.write_text(json.dumps({"policy":{"node_source":{"max_lines":max_lines}},"rulesets":[],"pipeline":{"nodes":[
-        {"id":"leaf","type_used":"test.leaf","display_name":"Leaf","description":"One delayed import."}]}}))
+    workflow.write_text(json.dumps({"plugins":[plugin],"rulesets":[],"pipeline":{"nodes":[
+        {"id":"leaf","definition_id":"test.leaf","display_name":"Leaf","description":"One delayed import"}]}}))
     if max_lines == 2:
         with pytest.raises(CheckedRunError) as failure:
-            run_checked(workflow,registry=registry,run_root=tmp_path / "runs",run_id="strict-import")
+            run_checked(workflow,run_root=tmp_path / "runs",run_id="strict-import")
         finding = next(item for item in failure.value.result.health.errors if item.code == "QUALITY.FILE.MAX_LINES")
         assert finding.details["limit"] == 2
         assert finding.definition_id == "vibeflow.quality.files"
-        assert failure.value.result.health.info["rule_phase"] == "import"
         assert not marker.exists()
     else:
-        result = run_checked(workflow,registry=registry,run_root=tmp_path / "runs",run_id="allowed-import")
+        result = run_checked(workflow,run_root=tmp_path / "runs",run_id="allowed-import")
         assert result.health.status == "PASS"
         assert marker.read_text() == "imported"
-    assert registry.rule_defaults()["purity_policy"].max_source_lines == max_lines

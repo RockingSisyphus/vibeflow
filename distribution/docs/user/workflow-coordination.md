@@ -153,7 +153,7 @@ node kernel/javascript/workflow_node.mjs build/worker/workflow.js
 
 ## 普通端口节点与迁移
 
-原生 `type_used:"vibeflow.io"` 和 `io` 字段已移除，旧配置收到 `GRAPH.IO.MIGRATION`。把 receive/send 实现写成普通 SDK Node，在 Plugin 中声明具体输入输出契约、端口 Capability 和 Schema，并显式选择端口授权规则。`vibeflow.io` Ruleset 仍保留终端 IO 检查用途。
+原生 `definition_id:"vibeflow.io"` 和 `io` 字段已移除，旧配置收到 `GRAPH.IO.MIGRATION`。把 receive/send 实现写成普通 SDK Node，在 Plugin 中声明具体输入输出契约、端口 Capability 和 Schema，并显式选择端口授权规则。`vibeflow.io` Ruleset 仍保留终端 IO 检查用途。
 
 Python 的核心实现可以直接是：
 

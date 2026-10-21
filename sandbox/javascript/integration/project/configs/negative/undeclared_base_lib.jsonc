@@ -11,19 +11,19 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts the isolated undeclared base_lib fixture."
       },
       {
         "id": "invalid",
-        "type_used": "sandbox.invalid.undeclared_base_lib",
+        "definition_id": "sandbox.invalid.undeclared_base_lib",
         "display_name": "Undeclared base_lib import",
         "description": "Must fail because the imported base_lib is not in the node descriptor allowlist."
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends the isolated undeclared base_lib fixture."
       }
@@ -51,7 +51,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

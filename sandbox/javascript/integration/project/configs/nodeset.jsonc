@@ -1,7 +1,7 @@
 {
   "nodeset_imports": [
     {
-      "path": "nodesets/arithmetic.jsonc"
+      "path": "nodeset_types/arithmetic.jsonc"
     }
   ],
   "pipeline": {
@@ -28,19 +28,19 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts the reusable arithmetic nodeset workflow."
       },
       {
         "id": "arithmetic",
-        "type_used": "sandbox.arithmetic_nodeset",
+        "definition_id": "sandbox.arithmetic_nodeset",
         "display_name": "Run arithmetic nodeset",
         "description": "Computes (x + a) - b inside a nested block."
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends after the nodeset result is available."
       }
@@ -68,7 +68,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

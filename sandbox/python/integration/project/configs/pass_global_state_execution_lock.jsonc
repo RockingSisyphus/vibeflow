@@ -6,13 +6,13 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.start",
+        "definition_id": "sandbox.start",
         "display_name": "Start",
         "description": "Starts the dedicated global-state sandbox case."
       },
       {
         "id": "state",
-        "type_used": "sandbox.global_state_probe",
+        "definition_id": "sandbox.global_state_probe",
         "display_name": "Global State Probe",
         "description": "Changes audited process-local ambient state.",
         "execution_lock": {
@@ -21,7 +21,7 @@
       },
       {
         "id": "end",
-        "type_used": "sandbox.out_value_end",
+        "definition_id": "sandbox.out_value_end",
         "display_name": "End",
         "description": "Ends after the global-state probe."
       }
@@ -48,7 +48,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

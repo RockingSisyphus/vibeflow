@@ -19,10 +19,11 @@
 | 位置 | 缺省 | 非空显式列表 | 显式 `[]` |
 | --- | --- | --- | --- |
 | Workflow | 内置及所选 Plugin 的 Workflow 默认 | 替代全部默认 | 取消根图选择 |
-| Nodeset 定义 | 继承上级有效图选择 | 接管内部 | 接管内部并停止继承 |
-| Node 调用 | 类型的局部默认 | 替代当前调用默认 | 取消当前调用局部选择 |
+| NodesetType 定义 | 继承上级有效图选择 | 接管内部 | 接管内部并停止继承 |
+| Node 定义 | NodeType 的局部默认 | 替代类型默认 | 取消类型局部默认 |
+| Node 调用 | 业务 Node 的有效局部默认 | 替代当前调用默认 | 取消当前调用局部选择 |
 
-Workflow 默认由既有 `RulesetDescriptor.workflow_default` 标记贡献，按资源 ID 稳定排序；不新增全局注册表或独立默认文件。Node 类型声明本身未选择规则时，其局部默认为空。
+Workflow 默认由既有 `RulesetDescriptor.workflow_default` 标记贡献，按资源 ID 稳定排序；不新增全局注册表或独立默认文件。NodeType 未选择规则时，其局部默认为空；业务 Node 可以显式替换类型默认规则，再由调用选择替换。
 
 如果类型默认要求十个 t，调用 Config 改选十个 d，那么该调用只检查 d。整表替代消除“替换后旧默认仍偷偷执行”的歧义。同类型其他调用的默认不变；不能修改 canonical Descriptor 来实现调用覆盖。
 
@@ -30,11 +31,19 @@ Workflow 默认由既有 `RulesetDescriptor.workflow_default` 标记贡献，按
 
 所有选择位置共用引用契约：字符串是 Ruleset，直接 Rule 是 `{rule_id, params}`。Rule 依赖只由 Ruleset 的 `requires/bindings` 表达，不以选择列表的先后顺序传递结果。
 
+## 四级检查对象
+
+Rule.level 为 project、root、graph、node。level 决定可读信息边界，scope 保留调用/源码范围与结果复用语义，不能把 scope=source 改名为项目治理。不同 level 的规则不能放进不匹配的上下文执行。
+
+project_rules.jsonc 和 root_rules.jsonc 分别选择治理 Plugin、Rule/Ruleset 与参数。未提供选择使用本层默认，显式列表整表替代，[] 只取消可选规则。项目规则读取全项目清单、所有 root 的声明引用和目录用途；root 规则读取本 root 及其可见资源，不能读取其他 root 的私有源码事实。
+
+完整 review 与 quality-check 执行所有治理对象，局部构建和源码运行只检查所属 root、当前 workflow 与资源。项目共享统计以真实不同 root 引用计数，损坏配置必须报告分析不完整。AOT 运行只使用已准备的计划和授权结果。
+
 ## 为什么分开局部资料与图资料
 
 使用位置决定公开上下文，而不是规则来源或实现语言。
 
-Node 类型或调用选择的规则仅获得当前声明、当前调用、实现与继承实现、实际 helper 和相关引用。`scope="source"` 进一步移除调用参数及调用列表。共享文件不是授权边界：同文件另一个 Node 的文本、AST、符号、引用或归属查询不能从当前局部视图取得。这样源码检查不必依赖全局 Catalog，也使局部计算能独立复用。
+NodeType、业务 Node 或调用选择的局部规则仅获得当前声明、当前调用、实现与继承实现、实际 helper 和相关引用。`scope="source"` 进一步移除调用参数及调用列表。共享文件不是授权边界：同文件另一个 Node 的文本、AST、符号、引用或归属查询不能从当前局部视图取得。这样源码检查不必依赖全局 Catalog，也使局部计算能独立复用。
 
 Workflow/Nodeset 选择的图规则可读取当前命令取得的图、相关声明、源码闭包与语言事实，以实现连接、可达性、跨层路径或数量约束。“全局”不包含整个磁盘项目及未关联文件。
 
@@ -56,7 +65,7 @@ B 可以检查 S 在父图中的输入输出和外部连接，内部节点与连
 
 因此图上下文同时表达当前检查对象、有限的全局背景、本任务负责的图/调用路径及接管边界。`facts.graph` 将子 Nodeset 保留为外部契约；`facts.graphs` 给出本任务负责的各图；`facts.global_graph` 支持查询背景。`scope.graph_paths`、`call_path` 和 `boundaries` 提供对应范围事实。默认遍历必须消费负责图，不递归整个背景。
 
-同一 Nodeset 定义在 left/right 调用时分别解析继承与边界，按完整路径记录。未调用定义独立审查：自身显式选择优先，否则使用 Workflow 静态默认，不假装属于根的实际调用。Loop 按静态调用结构检查，运行迭代不新增规则任务。
+同一 NodesetType 定义在 left/right 调用时分别解析继承与边界，按完整路径记录。未调用定义独立审查：自身显式选择优先，否则使用 Workflow 静态默认，不假装属于根的实际调用。Loop 按静态调用结构检查，运行迭代不新增规则任务。
 
 ## 为什么明确两种图范围后再去重
 
@@ -74,7 +83,7 @@ B 可以检查 S 在父图中的输入输出和外部连接，内部节点与连
 
 同范围分析 Rule 输出 Records，消费者以 `requires/bindings` 显式绑定具名输入。提供者先执行，消费者不读取可变全局状态、不猜测其他任务已完成。完成且满足契约的 Records 可以伴随诊断；失败、不可用或缺失所需输出时，依赖消费者不能假造空输入继续检查。
 
-内置 `vibeflow.workflow` 保留用户可见综合能力，采用整体范围的明确 analysis、flow、join、nodesets、duplicates、planned、review 和 summary 计划。叶检查消费各图分析 Records，保留 `planned_events`、`workflow_review` 及实际归属。handler 不私下递归其他检查。不要为共享分析新增第二个执行状态机或跨范围结果分发系统。
+内置 `vibeflow.workflow` 保留用户可见综合能力，采用整体范围的明确 analysis、flow、join、nodeset_types、duplicates、planned、review 和 summary 计划。叶检查消费各图分析 Records，保留 `planned_events`、`workflow_review` 及实际归属。handler 不私下递归其他检查。不要为共享分析新增第二个执行状态机或跨范围结果分发系统。
 
 import、static、run 是独立阶段。import 阶段没有伪造编译资料；固定 Plugin 入口及直接导入可能已经初始化，延迟实现则在有效 import 检查之后绑定。首次运行不能重新执行已被调用选择替代的类型规则。独立 Node 查询没有当前调用时才使用类型默认。空规则列表不能绕过原生语法、符号绑定、ABI 或编译错误。
 
@@ -90,7 +99,7 @@ targets/python/                 targets/javascript/
     project.py    项目源码检查         project.py
     plugin.py     标准 Plugin 装配     plugin.py
   rulesets/       组合与默认          rulesets/
-  nodetypes/      节点声明与接口       nodetypes/
+  resources/      SDK 与运行资源       resources/
   quality/        事实与执行适配       quality/
 targets/shared/
   quality_support/ 纯分析、数据与报告
@@ -114,7 +123,7 @@ src/vibeflow/core/rules/
 
 读取器不执行规则；规划不解析语言源码。Python/JavaScript Target 提供语言事实、局部符号视图及实现绑定，消费相同选择和范围；不能各自再实现继承或接管。Tooling 负责配置、Plugin 装配、命令与报告投影，不增加隐式默认注入。
 
-JavaScript 的公开源码服务对未知路径报 `RULE.SOURCE.UNAVAILABLE`，不回退磁盘读取；有限图引用避免完整注册结构形成循环 JSON。Rule ABI 为 v2，Plugin ABI v3 与 Workflow ABI v9 继续承担各自原生协议。
+JavaScript 的公开源码服务对未知路径报 `RULE.SOURCE.UNAVAILABLE`，不回退磁盘读取；有限图引用避免完整注册结构形成循环 JSON。Rule ABI 为 v3，Plugin ABI v4 与 Workflow ABI v10 继续承担各自原生协议。
 
 ## 复用与可解释报告
 

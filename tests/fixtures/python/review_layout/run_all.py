@@ -14,6 +14,7 @@ import xml.etree.ElementTree as ET
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[3]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "src"))
 from tests.fixtures.python.review_layout.fixtures import write_project
 
 CASES = json.loads((HERE / "cases.json").read_text())
@@ -167,7 +168,7 @@ def observe(identifier, args):
     else:
         command = "export-svg"
     expanded = ".review." in identifier or ".expanded_svg." in identifier
-    commands = [command, "--workspace", str(project / "vibeflow_config.jsonc"),
+    commands = [command, "--workspace", str(project.parent / "vibeflow_config.jsonc"),
                 "--config", str(project / "workflow.jsonc"), "--output", str(output)]
     if ".expanded_svg." in identifier:
         commands.append("--expand-nodesets")
@@ -188,7 +189,7 @@ def observe(identifier, args):
         if command == "review":
             document = json.loads("\n".join(line for line in (project/"ARCHITECTURE.jsonc").read_text().splitlines()
                                           if not line.strip().startswith("//")))
-            nodes = {item["id"]:item for item in document["nodesets"]["layout.leaf_a"]["body"]["nodes"]}
+            nodes = {item["id"]:item for item in document["nodeset_types"]["layout.leaf_a"]["body"]["nodes"]}
             left, right = nodes["left"]["presentation"], nodes["right"]["presentation"]
             if left["values"]["fill"] != "#d6eaff" or left["values"]["shape"] != "rounded" or left["sources"]["fill"] != "node":
                 failures.append("Architecture lost the Node's declared colour, shape or source")

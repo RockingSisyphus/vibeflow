@@ -163,7 +163,7 @@ def runtime_plugin_contract_check(bindings: object) -> str:
     checks: list[str] = [
         ABORT_SIGNAL_DECLARATION.rstrip(),
         "type Json = null | boolean | number | string | readonly Json[] | { readonly [key: string]: Json };",
-        "type Context = Readonly<{ abiVersion: 'vibeflow.plugin.v3'; pluginId: string; pluginType: 'runtime'; target: 'node' | 'browser'; workflowId: string; config: Readonly<Record<string, Json>>; signal: VibeFlowAbortSignal }> ;",
+        "type Context = Readonly<{ abiVersion: 'vibeflow.plugin.v4'; pluginId: string; pluginType: 'runtime'; target: 'node' | 'browser'; workflowId: string; config: Readonly<Record<string, Json>>; signal: VibeFlowAbortSignal }> ;",
         "type RuntimePlugin = Readonly<Record<string, unknown>>;",
         "type Factory = (context: Context) => RuntimePlugin;",
     ]

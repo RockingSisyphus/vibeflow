@@ -1,0 +1,2 @@
+import {defineBaseLib} from "@vibeflow/plugin";
+export const resource_0=defineBaseLib({"id": "example.text", "display_name": "Text helpers", "description": "Pure text normalization helpers.", "implementations": [{"language": "typescript", "targets": ["browser", "node"], "source": {"kind": "file", "ref": "base_lib/text.ts"}}], "dependencies": [], "external_packages": [], "rulesets": ["vibeflow.base_lib"]});

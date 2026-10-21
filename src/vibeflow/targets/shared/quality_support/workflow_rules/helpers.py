@@ -65,7 +65,7 @@ __all__: list[str] = []
 def _provider_source_details(nodes) -> list[dict[str, object]]:
     return [
         {
-            "node": node.name,
+            "node": node.id,
             "provides": [
                 {
                     "key": provider.key,

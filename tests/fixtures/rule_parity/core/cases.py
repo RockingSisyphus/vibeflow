@@ -17,18 +17,18 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     from vibeflow.core.contracts import PipelineInputSpec, DataProvider, DataRequirement
     from vibeflow.core.flow import (
         EdgeSpec, ExecutionLockSpec, GraphConfig, LoopSpec, NodeMetadata,
-        NodeSpec, NodesetSpec,
+        NodeCallSpec, NodesetTypeSpec,
     )
     from vibeflow.core.models import CoreCompileRequest, ImplementationFact, ImplementationFacts, TargetFeatureSet
     from vibeflow.targets.shared.quality_support import (
-        FileQuality, FunctionQuality, ImportSite, ProjectQualityFacts, QualityPolicy,
+        FileQuality, FunctionQuality, ImportSite, SourceQualityFacts, QualityPolicy,
         QualityStructureLimits, QualityStructureRoles,
         QualityThresholds,
     )
     from vibeflow.targets.shared.quality_support.implementation import (
         ImplementationLimits, ImplementationMetrics, analyze_call_graph,
     )
-    from vibeflow.targets.shared.quality_support.nodesets import nodeset_quality_findings
+    from vibeflow.targets.shared.quality_support.nodeset_types import nodeset_quality_findings
     from vibeflow.targets.shared.quality_support.workflow_rules.duplicates import duplicate_logic_findings
     from vibeflow.targets.shared.quality_support.workflow_rules.flow import append_flowchart_health
     from vibeflow.targets.shared.quality_support.workflow_rules.joins import append_join_policy_health
@@ -36,11 +36,11 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     from vibeflow.targets.shared.quality_support.workflow_rules.planned import planned_health_events
 
     if variant == "baseline":
-        from vibeflow.targets.shared.quality_support import evaluate_project_quality
+        from vibeflow.targets.shared.quality_support import evaluate_source_quality
         from vibeflow.targets.shared.quality_support.implementation import (evaluate_node_implementation,
             evaluate_base_lib_implementation, evaluate_base_lib_dependency_chain)
     else:
-        from tests.fixtures.rule_parity.core.support import evaluate_standard_project_quality as evaluate_project_quality
+        from tests.fixtures.rule_parity.core.support import evaluate_standard_project_quality as evaluate_source_quality
         from vibeflow.targets.shared.rule_support.implementation import (check_node_implementation as evaluate_node_implementation,
             check_base_lib_implementation as evaluate_base_lib_implementation, check_base_lib_dependency_chain as evaluate_base_lib_dependency_chain)
 
@@ -105,7 +105,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         return replace(FileQuality(path, path[:-3].replace("/", "."), 1, 1, 0, 0, 0, 0, 0, (), ()), **changes)
 
     def project(files, policy=None):
-        return evaluate_project_quality(ProjectQualityFacts(str(work_root), tuple(files)), policy)
+        return evaluate_source_quality(SourceQualityFacts(str(work_root), tuple(files)), policy)
 
     project_evidence = "baseline/core/quality/evaluator.py:21-92 → core/rules/builtin/project_quality.py:88-173"
     emit("project.normal", "无超限源码事实", "project.files", lambda: project([file()]), codes(), evidence=project_evidence)
@@ -221,7 +221,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             kinds={"nodes":"node", "base_lib":"base_lib", "plugins":"plugin"}
             owners=[{"path":path,"id":resource_id,"kind":kinds[role],"role":"entry",
                      "base_libs":["b"] if source_role == "nodes" and target_role == "base_lib" and resource_id == "a" else [],
-                     "dependencies":[],"plugin_id":"test"}
+                     "dependencies":[],"plugin_id":"test" if role == "plugins" else ""}
                     for resource_id,path,role in (("a","a.py",source_role),("b","b.py",target_role))]
             roles=QualityStructureRoles(_resource_scopes=({"id":"selected","owners":owners},))
         policy=QualityPolicy(structure_limits=replace(quiet,enforce_role_imports=True),structure_roles=roles)
@@ -259,23 +259,23 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     native_evidence="core/compiler.py:99-228; baseline identical checks except effect_scope facts fallback"
     features=TargetFeatureSet("probe",frozenset({"execution_locks","global_state"}))
     def retired(mode, *, locked=False):
-        return parse_graph_config_data({'pipeline':{'nodes':[{'id':'worker','type_used':'probe.worker',
+        return parse_graph_config_data({'pipeline':{'nodes':[{'id':'worker','definition_id':'probe.worker',
             'async':mode, **({'result_key':'value'} if mode == 'result_key' else {})}],
             **({'execution_lock':{'key':'resource'}} if locked else {})}})
     def node(name,kind="process",**kwargs):
-        return NodeSpec(name,"probe."+name,flow_kind=kind,metadata=NodeMetadata(name,"Parity source-free node."),**kwargs)
+        return NodeCallSpec(name,"probe."+name,flow_kind=kind,metadata=NodeMetadata(name,"Parity source-free node."),**kwargs)
     def compile_graph(graph, supplied=None, supported=features):
         if supplied is None:
-            supplied=ImplementationFacts(tuple(ImplementationFact(spec.type_used, flow_kind=spec.flow_kind,
+            supplied=ImplementationFacts(tuple(ImplementationFact(spec.definition_id, flow_kind=spec.flow_kind,
                 requires=spec.requires, provides=spec.provides) for spec in graph.nodes
-                if not spec.type_used.startswith("vibeflow.loop.") and spec.type_used not in graph.nodesets))
+                if not spec.definition_id.startswith("vibeflow.loop.") and spec.definition_id not in graph.nodeset_types))
         return compile_core(CoreCompileRequest(graph, supplied, supported))
     def healthy(mid=()):
         nodes=(node("start","terminal"),*mid,node("end","terminal"))
         return GraphConfig(nodes,tuple(EdgeSpec(a.id,b.id) for a,b in zip(nodes,nodes[1:])))
     emit("native.normal", "真实编译显式 terminal→process→terminal", "native.graph", lambda:compile_graph(healthy((node("work"),))), {"should_accept":True},evidence=native_evidence)
     emit("native.strict_unknown", "严格实现事实表中缺 Node", "native.facts",
-        lambda:compile_graph(GraphConfig((node("missing"),)),ImplementationFacts(strict=True)),codes(("NODE.TYPE.UNKNOWN","error")),evidence=native_evidence)
+        lambda:compile_graph(GraphConfig((node("missing"),)),ImplementationFacts(strict=True)),codes(("NODE.DEFINITION.UNKNOWN","error")),evidence=native_evidence)
     emit("native.duplicate_provider", "两个节点声明同一输出 key", "native.contract",
         lambda:compile_graph(GraphConfig((node("a",provides=(DataProvider("value","value"),)),node("b",provides=(DataProvider("value","value"),))))),
         codes(("GRAPH.COMPILE","error")),evidence=native_evidence)
@@ -330,12 +330,12 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     emit("native.effect_fallback","flow身份不隐式授予Rule权限","native.facts",
         lambda:compile_graph(GraphConfig((node("work"),))),{"should_accept":True,"metrics":{"effect_scopes.work":"none" if variant == "baseline" else "unconstrained"}},
         classification="approved_change",notes="已批准由Rule输出决定权限；flow_kind仍保留原生语义。",evidence="core/compiler.py:800-824")
-    child=NodesetSpec("probe.child","Child","A declared graph block.",(),(),GraphConfig((node("body"),)))
+    child=NodesetTypeSpec("probe.child","Child","A declared graph block.",(),(),GraphConfig((node("body"),)))
     emit("native.type_conflict","同type_key同时是实现与Nodeset","native.facts",
-        lambda:compile_graph(GraphConfig((NodeSpec("call","probe.child"),),nodesets={child.type_key:child}),
-            ImplementationFacts((ImplementationFact("probe.child"),),strict=True)),codes(("NODE.TYPE.CONFLICT","error")),evidence=native_evidence)
+        lambda:compile_graph(GraphConfig((NodeCallSpec("call","probe.child"),),nodeset_types={child.type_key:child}),
+            ImplementationFacts((ImplementationFact("probe.child"),),strict=True)),codes(("NODE.DEFINITION.CONFLICT","error")),evidence=native_evidence)
     def parsed_document(nodes=None,edges=None,**pipeline):
-        calls=nodes if nodes is not None else [{"id":"work","type_used":"probe.work"}]
+        calls=nodes if nodes is not None else [{"id":"work","definition_id":"probe.work"}]
         calls=[{"display_name":"Parity call","description":"Exercises actual config parser.",**call} for call in calls]
         raw={"pipeline":{"nodes":calls,**pipeline}}
         if edges is not None:
@@ -344,11 +344,11 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         return compile_graph(parsed)
     for name,operation,reason in [
         ("empty_nodes",lambda:parsed_document(nodes=[]),"nodes must be a non-empty list"),
-        ("duplicate_id",lambda:parsed_document(nodes=[{"id":"work","type_used":"probe.a"},{"id":"work","type_used":"probe.b"}]),"duplicate node id"),
+        ("duplicate_id",lambda:parsed_document(nodes=[{"id":"work","definition_id":"probe.a"},{"id":"work","definition_id":"probe.b"}]),"duplicate node id"),
         ("unknown_edge_endpoint",lambda:parsed_document(edges=[{"from":"work","to":"missing"}]),"edge references unknown node"),
-        ("ordinary_contract_authority",lambda:parsed_document(nodes=[{"id":"work","type_used":"probe.work","requires":[]}]),"requires is derived from type_used"),
+        ("ordinary_contract_authority",lambda:parsed_document(nodes=[{"id":"work","definition_id":"probe.work","requires":[]}]),"requires is derived from definition_id"),
         ("max_steps_zero",lambda:parsed_document(max_steps=0),"max_steps"),
-        ("unsupported_join",lambda:parsed_document(nodes=[{"id":"work","type_used":"probe.work","join_policy":"unknown"}]),"join_policy"),
+        ("unsupported_join",lambda:parsed_document(nodes=[{"id":"work","definition_id":"probe.work","join_policy":"unknown"}]),"join_policy"),
         ("invalid_execution_lock",lambda:parsed_document(execution_lock={"key":""}),"execution_lock.key"),
         ("legacy_boundary",lambda:parsed_document(boundary={}),"boundary is removed"),
         ("legacy_loops",lambda:parsed_document(loops=[]),"pipeline.loops is removed"),
@@ -357,9 +357,9 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             notes="Parser没有独立Finding；记录真实异常类别和完整message，不伪造诊断code。",evidence="core/config/graph.py:67-214,385-424")
     def loop_document(**overrides):
         loop={"body":"probe.child","max_iterations":2,**overrides}
-        raw={"nodesets":[{"type_key":"probe.child","display_name":"Child","description":"Loop body.","requires":[],"provides":[],
-            "pipeline":{"nodes":[{"id":"body","type_used":"probe.body","display_name":"Body","description":"A source-free body declaration."}]}}],
-            "pipeline":{"nodes":[{"id":"loop","type_used":"vibeflow.loop.while","display_name":"Loop","description":"Exercises actual Loop parsing.","requires":[],"provides":[],"loop":loop}]}}
+        raw={"nodeset_types":[{"type_key":"probe.child","display_name":"Child","description":"Loop body.","requires":[],"provides":[],
+            "pipeline":{"nodes":[{"id":"body","definition_id":"probe.body","display_name":"Body","description":"A source-free body declaration."}]}}],
+            "pipeline":{"nodes":[{"id":"loop","definition_id":"vibeflow.loop.while","display_name":"Loop","description":"Exercises actual Loop parsing.","requires":[],"provides":[],"loop":loop}]}}
         return compile_graph(parse_graph_config_data(raw))
     for name,overrides,allowed in [("bounded",{},True),("unbounded",{"max_iterations":None},True),
         ("zero_iterations",{"max_iterations":0},False),("unknown_body",{"body":"missing"},False),
@@ -430,45 +430,45 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     for shape,similar in [("body",False),("wrapper",False),("body",True)]:
         similarities={"a":{"node":"b","relationship":"copy","reason":"Deliberately same."}} if similar else {}
         emit(f"workflow.duplicate_logic.{shape}.{similar}","Workflow重复逻辑/合法声明对照","workflow.duplicates",
-            lambda shape=shape,similarities=similarities:duplicate_logic_findings({"a":"same","b":"same"},{"a":{"run_pure_shape":shape},"b":{"run_pure_shape":shape}},node_types={"a":"probe.a","b":"probe.b"},node_similarities=similarities),
+            lambda shape=shape,similarities=similarities:duplicate_logic_findings({"a":"same","b":"same"},{"a":{"run_pure_shape":shape},"b":{"run_pure_shape":shape}},call_definitions={"a":"probe.a","b":"probe.b"},node_similarities=similarities),
             codes(*(("GRAPH.SMELL.DUPLICATE_LOGIC","warning"),) if shape != "wrapper" and not similar else ()),evidence="core/quality/workflow_rules/duplicates.py:8-71")
 
-    nodeset_evidence="core/nodeset_dependencies.py; core/quality/nodesets.py:15-71"
+    nodeset_evidence="core/nodeset_dependencies.py; core/quality/nodeset_types.py:15-71"
     def nested_graph(depth,width=1,used=True):
         definitions={}
         for index in range(depth):
-            body_nodes=(NodeSpec("nested",f"probe.layer{index-1}"),) if index else tuple(node(f"leaf{i}",status="planned") for i in range(width))
+            body_nodes=(NodeCallSpec("nested",f"probe.layer{index-1}"),) if index else tuple(node(f"leaf{i}",status="planned") for i in range(width))
             child=GraphConfig(body_nodes)
-            definitions[f"probe.layer{index}"]=NodesetSpec(f"probe.layer{index}","Layer","Depth parity block.",(),(),child,status="planned")
-        return GraphConfig((NodeSpec("top",f"probe.layer{depth-1}"),) if used else (),nodesets=definitions)
+            definitions[f"probe.layer{index}"]=NodesetTypeSpec(f"probe.layer{index}","Layer","Depth parity block.",(),(),child,status="planned")
+        return GraphConfig((NodeCallSpec("top",f"probe.layer{depth-1}"),) if used else (),nodeset_types=definitions)
     for depth in (4,5):
-        emit(f"workflow.nodeset.depth.{depth}",f"Nodeset声明链深度 {depth}","workflow.nodesets",lambda depth=depth:nodeset_quality_findings(nested_graph(depth)),
+        emit(f"workflow.nodeset.depth.{depth}",f"Nodeset声明链深度 {depth}","workflow.nodeset_types",lambda depth=depth:nodeset_quality_findings(nested_graph(depth)),
             codes(*(("NODESET.NESTING.DEPTH_EXCEEDED","error"),) if depth > 4 else ()),evidence=nodeset_evidence)
-    emit("workflow.nodeset.unused_depth","未调用声明链仍有深度事实","workflow.nodesets",lambda:nodeset_quality_findings(nested_graph(5,used=False)),codes(("NODESET.NESTING.DEPTH_EXCEEDED","error")),evidence=nodeset_evidence)
-    emit("workflow.nodeset.configured_depth","深度上限显式提高为5","workflow.nodesets",lambda:nodeset_quality_findings(nested_graph(5),max_depth=5),codes(),evidence=nodeset_evidence)
+    emit("workflow.nodeset.unused_depth","未调用声明链仍有深度事实","workflow.nodeset_types",lambda:nodeset_quality_findings(nested_graph(5,used=False)),codes(("NODESET.NESTING.DEPTH_EXCEEDED","error")),evidence=nodeset_evidence)
+    emit("workflow.nodeset.configured_depth","深度上限显式提高为5","workflow.nodeset_types",lambda:nodeset_quality_findings(nested_graph(5),max_depth=5),codes(),evidence=nodeset_evidence)
     for width in (10,11):
-        emit(f"workflow.nodeset.width.{width}",f"Nodeset内部节点数 {width}","workflow.nodesets",lambda width=width:nodeset_quality_findings(nested_graph(1,width)),
+        emit(f"workflow.nodeset.width.{width}",f"Nodeset内部节点数 {width}","workflow.nodeset_types",lambda width=width:nodeset_quality_findings(nested_graph(1,width)),
             codes(*(("NODESET.SMELL.TOO_WIDE","warning"),) if width > 10 else ()),evidence=nodeset_evidence)
     for mode in ("nodeset","loop"):
-        child_call=NodeSpec("again","probe.recursive") if mode == "nodeset" else NodeSpec("again","vibeflow.loop.while",loop=LoopSpec(body="probe.recursive"))
-        definition=NodesetSpec("probe.recursive","Recursive","Forbidden finite recursive definition.",(),(),GraphConfig((child_call,)))
-        graph=GraphConfig((NodeSpec("call","probe.recursive"),),nodesets={definition.type_key:definition})
-        emit("workflow.nodeset.recursion."+mode,"Nodeset递归引用 "+mode,"workflow.nodesets",lambda graph=graph:nodeset_quality_findings(graph),codes(("NODESET.RECURSION","error")),evidence=nodeset_evidence)
+        child_call=NodeCallSpec("again","probe.recursive") if mode == "nodeset" else NodeCallSpec("again","vibeflow.loop.while",loop=LoopSpec(body="probe.recursive"))
+        definition=NodesetTypeSpec("probe.recursive","Recursive","Forbidden finite recursive definition.",(),(),GraphConfig((child_call,)))
+        graph=GraphConfig((NodeCallSpec("call","probe.recursive"),),nodeset_types={definition.type_key:definition})
+        emit("workflow.nodeset.recursion."+mode,"Nodeset递归引用 "+mode,"workflow.nodeset_types",lambda graph=graph:nodeset_quality_findings(graph),codes(("NODESET.RECURSION","error")),evidence=nodeset_evidence)
     graph=GraphConfig((node("future",status="planned"),))
     emit("workflow.planned.node","planned声明警告/非业务执行","workflow.planned",lambda:planned_health_events(graph),codes(("GRAPH.PLANNED.NODE","warning")),evidence="core/quality/workflow_rules/planned.py:30-63")
-    definition=NodesetSpec("probe.planned","Planned","Unimplemented block.",(),(),GraphConfig(()),status="planned")
-    emit("workflow.planned.nodeset","planned Nodeset声明警告","workflow.planned",lambda:planned_health_events(GraphConfig((),nodesets={definition.type_key:definition})),codes(("GRAPH.PLANNED.NODESET","warning")),evidence="core/quality/workflow_rules/planned.py:30-63")
+    definition=NodesetTypeSpec("probe.planned","Planned","Unimplemented block.",(),(),GraphConfig(()),status="planned")
+    emit("workflow.planned.nodeset","planned Nodeset声明警告","workflow.planned",lambda:planned_health_events(GraphConfig((),nodeset_types={definition.type_key:definition})),codes(("GRAPH.PLANNED.NODESET","warning")),evidence="core/quality/workflow_rules/planned.py:30-63")
     from vibeflow.core.planned import PlannedBehavior
     for kind,severity in [("blocking","error"),("transparent","warning")]:
         child=GraphConfig((node("future",status="planned",planned_behavior=PlannedBehavior(kind)),))
-        definition=NodesetSpec("probe.parent","Parent","Implemented block with future child.",(),(),child)
+        definition=NodesetTypeSpec("probe.parent","Parent","Implemented block with future child.",(),(),child)
         emit("workflow.planned.parent."+kind,"已实现Nodeset含planned "+kind,"workflow.planned",
-            lambda definition=definition:planned_health_events(GraphConfig((),nodesets={definition.type_key:definition})),
+            lambda definition=definition:planned_health_events(GraphConfig((),nodeset_types={definition.type_key:definition})),
             codes(("GRAPH.PLANNED.NODE","warning"),("GRAPH.PLANNED.PARENT_HAS_PLANNED_CHILD",severity)),evidence="core/quality/workflow_rules/planned.py:30-63")
     def finite_recursive_plan():
         from vibeflow.block_compiler import compile_graph_plan
-        definition=NodesetSpec("probe.recursive","Recursive","Cannot produce finite portable blocks.",(),(),GraphConfig((NodeSpec("again","probe.recursive"),)))
-        graph=GraphConfig((NodeSpec("call","probe.recursive"),),nodesets={definition.type_key:definition})
+        definition=NodesetTypeSpec("probe.recursive","Recursive","Cannot produce finite portable blocks.",(),(),GraphConfig((NodeCallSpec("again","probe.recursive"),)))
+        graph=GraphConfig((NodeCallSpec("call","probe.recursive"),),nodeset_types={definition.type_key:definition})
         compilation=compile_graph(graph)
         return compile_graph_plan(compilation.workflow.graph,compilation.compiled_graph,compile_nested=True)
     emit("native.portable_recursion","真正有限block编译拒绝递归Nodeset","native.blocks",finite_recursive_plan,
@@ -483,9 +483,9 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             from vibeflow.tooling.application.python.project.declarations import default_python_registry as NodeRegistry
         from vibeflow.targets.python.quality.workflow.validation import validate_graph_health
         child=GraphConfig(()) if variant == "baseline" else GraphConfig((),rulesets=())
-        definition=NodesetSpec("probe.child","Child","A valid empty source-free child.",(),(),child)
-        graph=healthy((NodeSpec("stage","probe.child",metadata=NodeMetadata("Stage","Calls child.")),))
-        graph=replace(graph,nodesets={definition.type_key:definition}, **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
+        definition=NodesetTypeSpec("probe.child","Child","A valid empty source-free child.",(),(),child)
+        graph=healthy((NodeCallSpec("stage","probe.child",metadata=NodeMetadata("Stage","Calls child.")),))
+        graph=replace(graph,nodeset_types={definition.type_key:definition}, **({"rulesets": ("vibeflow.workflow",)} if variant == "current" else {}))
         from tests.fixtures.rule_parity.core.support import boundary_registry
         registry=boundary_registry(graph,NodeRegistry()) if variant == "current" else NodeRegistry()
         return validate_graph_health(graph,registry=registry)
@@ -498,13 +498,13 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         from vibeflow.targets.python.rules import builtin_rule_resources
         rules,sets=builtin_rule_resources()
         for selected,phase,count in [("vibeflow.workflow","import",0),("vibeflow.workflow","static",8),("vibeflow.workflow","run",8),
-            ("vibeflow.quality.project","import",0),("vibeflow.quality.project","static",4),("vibeflow.quality.project","run",0),
+            ("vibeflow.quality.source","import",0),("vibeflow.quality.source","static",4),("vibeflow.quality.source","run",0),
             ("vibeflow.process","import",1),("vibeflow.process","static",6),("vibeflow.process","run",6)]:
             def inspect_plan(selected=selected,phase=phase):
                 plan=compile_ruleset(selected,rules={r.id:r for r in rules},rulesets={s.id:s for s in sets},entrypoint=phase)
                 return {"status":"PASS","codes":[],"positions":[],"metrics":{"invocation_count":len(plan.invocations),"rules":[item.rule.id for item in plan.invocations]},"message":"No business Node was imported or executed."}
             emit("selection."+selected+"."+phase,"默认Ruleset入口 "+selected+"/"+phase,"rule.selection",inspect_plan,{"should_accept":True,"metrics":{"invocation_count":count}},classification="new_feature",evidence="core/rules/builtin/effects.py:27-36; project_quality.py:160-173")
-        emit("selection.project.explicit_empty","显式空选集只返回事实且诚实标记","rule.selection",lambda:evaluate_project_quality(ProjectQualityFacts(str(work_root),(file(lines=501),)),rulesets=()),
+        emit("selection.project.explicit_empty","显式空选集只返回事实且诚实标记","rule.selection",lambda:evaluate_source_quality(SourceQualityFacts(str(work_root),(file(lines=501),)),rulesets=()),
             {"should_accept":True,"codes":[],"exact_codes":True},classification="new_feature",evidence="core/quality/evaluator.py:21-64; rule_report.py:48-85")
     # Keep formal dispatch evidence separate from portable algorithm probes.
     import importlib.util

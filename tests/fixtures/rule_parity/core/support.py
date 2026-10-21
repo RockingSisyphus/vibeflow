@@ -59,15 +59,15 @@ def append(rows, case_id, title, family, operation, expected, *, classification=
         "expected": expected, "actual": observe(operation), "classification": classification, "notes": notes, "evidence": evidence})
 
 def evaluate_standard_project_quality(facts, policy=None, **kwargs):
-    from vibeflow.targets.python.rules.project import bound_project_quality_defaults
-    from vibeflow.targets.shared.quality_support import evaluate_project_quality
+    from vibeflow.targets.python.rules.source_quality import bound_source_quality_defaults
+    from vibeflow.targets.shared.quality_support import evaluate_source_quality
     from vibeflow.targets.shared.bindings import native_binding
-    from vibeflow.tooling.project.descriptor_loader import load_builtin_plugins
-    catalog = load_builtin_plugins("project").catalogs
+    from vibeflow.tooling.project.resources import load_builtin_plugins
+    catalog = load_builtin_plugins("python").catalogs
     handlers = {item.id:native_binding(catalog,"rule",item.id) for item in catalog.rules}
     handlers.update(kwargs.pop("handlers", {}) or {})
     declared = {item.id:item for item in catalog.rules}
-    defaults = bound_project_quality_defaults(handlers, policy, rules=declared, origins=catalog.origins)
+    defaults = bound_source_quality_defaults(handlers, policy, rules=declared, origins=catalog.origins)
     rules = {item.id:replace(item,params_defaults={**item.params_defaults,**defaults.get(item.id,{})})
              for item in catalog.rules}
     extra = kwargs.pop("rules", ()) or ()
@@ -75,8 +75,8 @@ def evaluate_standard_project_quality(facts, policy=None, **kwargs):
     rulesets = {item.id:item for item in catalog.rulesets}
     extra = kwargs.pop("ruleset_catalog", ()) or ()
     rulesets.update(extra if hasattr(extra,"items") else {item.id:item for item in extra})
-    selected = kwargs.pop("rulesets", ("vibeflow.quality.project",))
-    return evaluate_project_quality(facts,policy,rulesets=selected,rules=rules,
+    selected = kwargs.pop("rulesets", ("vibeflow.quality.source",))
+    return evaluate_source_quality(facts,policy,rulesets=selected,rules=rules,
         ruleset_catalog=rulesets,handlers=handlers,**kwargs)
 
 
@@ -96,13 +96,13 @@ def boundary_registry(graph, registry):
         if id(current) in visited:
             continue
         visited.add(id(current))
-        pending.extend(item.graph for item in current.nodesets.values())
+        pending.extend(item.graph for item in current.nodeset_types.values())
         for call in current.nodes:
-            if not (call.type_used.startswith("probe.boundary.") or call.type_used in {"probe.start", "probe.end"}) or call.type_used in declared:
+            if not (call.definition_id.startswith("probe.boundary.") or call.definition_id in {"probe.start", "probe.end"}) or call.definition_id in declared:
                 continue
-            declared.add(call.type_used)
-            registry.register(NodeDescriptor(call.type_used, "Boundary", "Explicit fact-probe boundary.", "1.0.0", call.flow_kind or "terminal",
+            declared.add(call.definition_id)
+            registry.register(NodeDescriptor(call.definition_id, "Boundary", "Explicit fact-probe boundary.", "1.0.0", call.flow_kind or "terminal",
                 contract=NodeContractDescriptor(requires=call.requires,provides=call.provides,
                     input_semantics={item.type:("Boundary input",) for item in call.requires},
-                    output_semantics={item.key:("Boundary output",) for item in call.provides}),rulesets=()), Boundary)
+                    output_semantics={item.key:("Boundary output",) for item in call.provides}),rulesets=(), node_type="vibeflow.node"), Boundary)
     return registry

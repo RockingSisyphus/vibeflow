@@ -12,11 +12,11 @@ _EXPORTS = {
     "PythonBundle": ("vibeflow.tooling.application.python.bundle", "PythonBundle"),
     "load_bundle": ("vibeflow.tooling.application.python.bundle", "load_bundle"),
     "CheckedRunError": (
-        "vibeflow.tooling.application.python.runner",
+        "vibeflow.tooling.application.python.execution",
         "CheckedRunError",
     ),
     "CheckedRunResult": (
-        "vibeflow.tooling.application.python.runner",
+        "vibeflow.tooling.application.python.execution",
         "CheckedRunResult",
     ),
     "run_checked": (

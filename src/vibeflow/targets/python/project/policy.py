@@ -1,8 +1,6 @@
 """Pure Python Target policy calculation.
 
-The functions in this module operate only on in-memory values.  Policy file
-discovery, JSONC loading and workspace path handling belong to the outer
-loading layer.
+The functions in this module operate only on in-memory values.  These are native Rule defaults; project policy files and merging are retired.
 """
 
 from __future__ import annotations
@@ -12,7 +10,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from vibeflow.core.findings import HealthFinding
-from vibeflow.targets.shared.quality_support.policy_data import COMMON_POLICY_DATA, merge_policy_data
+from vibeflow.targets.shared.quality_support.policy_data import COMMON_POLICY_DATA
 from vibeflow.targets.python.rules.node.policy import PurityPolicy
 
 
@@ -61,17 +59,8 @@ class EffectivePolicy:
         )
 
 
-@dataclass(frozen=True)
-class PolicyResolveResult:
-    effective_policy: EffectivePolicy
-    findings: tuple[HealthFinding, ...] = ()
-
-
 def default_effective_policy() -> EffectivePolicy:
     return EffectivePolicy(deepcopy(DEFAULT_POLICY_DATA), ("kernel.default_policy",))
 
 
-def merge_policy(base: dict[str, Any], override: Mapping[str, Any]) -> None:
-    merge_policy_data(base, override)
-
-__all__ = ["DEFAULT_POLICY_DATA", "EffectivePolicy", "PolicyResolveResult", "default_effective_policy", "merge_policy"]
+__all__ = ["DEFAULT_POLICY_DATA", "EffectivePolicy", "default_effective_policy"]

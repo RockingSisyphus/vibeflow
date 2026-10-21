@@ -29,10 +29,10 @@ from vibeflow.block_compiler.model import (
 )
 from vibeflow.core.compiler import CompiledGraph, GraphCompiler as CoreGraphCompiler
 from vibeflow.core.flow import (
-    LOOP_NODE_TYPES,
+    LOOP_DEFINITION_IDS,
     GraphConfig,
     LoopSpec,
-    NodeSpec,
+    NodeCallSpec,
     STATUS_PLANNED,
 )
 from vibeflow.core.constants import (
@@ -92,12 +92,12 @@ def compile_workflow(
         graph,
         implementation_facts=implementation_facts,
         target_features=workflow.target_features,
-        known_nodesets=set(graph.nodesets),
+        known_nodeset_types=set(graph.nodeset_types),
     )
     return compile_graph_plan(
         graph,
         compiled,
-        source_by_type=_sources_from_facts(implementation_facts),
+        source_by_definition=_sources_from_facts(implementation_facts),
         implementation_facts=implementation_facts,
         call_execution_facts=call_execution_facts,
         target_features=workflow.target_features,
@@ -110,7 +110,7 @@ def compile_graph_plan(
     compiled: CompiledGraph,
     *,
     workflow_id: str | None = None,
-    source_by_type: Mapping[str, SourceRef] | None = None,
+    source_by_definition: Mapping[str, SourceRef] | None = None,
     compiled_by_path: Mapping[tuple[str, ...], CompiledGraph] | None = None,
     params_by_path: Mapping[tuple[str, ...], Mapping[str, object]] | None = None,
     pipeline_inputs: Sequence[PipelineInputSpec] | None = None,
@@ -125,7 +125,7 @@ def compile_graph_plan(
     resolved_inputs = _root_inputs(graph, pipeline_inputs)
     resolved_outputs = _root_outputs(graph, pipeline_outputs)
     state = _PlannerState(
-        source_by_type,
+        source_by_definition,
         compiled_by_path=compiled_by_path,
         params_by_path=params_by_path,
         implementation_facts=implementation_facts,
@@ -173,7 +173,7 @@ def compile_graph_plan(
 class _PlannerState:
     def __init__(
         self,
-        source_by_type: Mapping[str, SourceRef] | None,
+        source_by_definition: Mapping[str, SourceRef] | None,
         *,
         compiled_by_path: Mapping[tuple[str, ...], CompiledGraph] | None = None,
         params_by_path: Mapping[tuple[str, ...], Mapping[str, object]] | None = None,
@@ -184,8 +184,8 @@ class _PlannerState:
     ) -> None:
         self.implementation_facts = implementation_facts or ImplementationFacts()
         self.call_execution_facts = dict(call_execution_facts or {})
-        self.source_by_type = _sources_from_facts(self.implementation_facts)
-        self.source_by_type.update(_normalize_source_map(source_by_type))
+        self.source_by_definition = _sources_from_facts(self.implementation_facts)
+        self.source_by_definition.update(_normalize_source_map(source_by_definition))
         self.compiled_by_path = dict(compiled_by_path or {})
         self.params_by_path = {
             tuple(path): dict(params)
@@ -230,9 +230,9 @@ class _PlannerState:
         ] = []
         nodes: list[NodeCallPlan] = []
         for spec in graph.nodes:
-            is_loop = spec.type_used in LOOP_NODE_TYPES
-            is_nodeset = spec.type_used in graph.nodesets and not is_loop
-            nodeset = graph.nodesets.get(spec.loop.body if is_loop else spec.type_used) if (is_loop or is_nodeset) else None
+            is_loop = spec.definition_id in LOOP_DEFINITION_IDS
+            is_nodeset = spec.definition_id in graph.nodeset_types and not is_loop
+            nodeset = graph.nodeset_types.get(spec.loop.body if is_loop else spec.definition_id) if (is_loop or is_nodeset) else None
             behavior = effective_planned_behavior(spec, nodeset)
             planned_invocation = (
                 spec.status == STATUS_PLANNED
@@ -284,7 +284,7 @@ class _PlannerState:
                     nodeset.graph,
                     implementation_facts=self.implementation_facts,
                     target_features=self.target_features,
-                    known_nodesets=set(nodeset.graph.nodesets),
+                    known_nodeset_types=set(nodeset.graph.nodeset_types),
                     owner=f"block {_block_id(child_path)}",
                 )
             if child_compiled is None:
@@ -358,7 +358,7 @@ class _PlannerState:
 
     def _graph_node(
         self,
-        spec: NodeSpec,
+        spec: NodeCallSpec,
         *,
         compiled: CompiledGraph,
         nodeset: object | None,
@@ -369,7 +369,7 @@ class _PlannerState:
         call_path: tuple[str, ...],
     ) -> NodeCallPlan:
         exports = tuple(getattr(nodeset, "provides", ())) if nodeset is not None else ()
-        nodeset_type_key = str(getattr(nodeset, "type_key", ""))
+        nodeset_type_id = str(getattr(nodeset, "type_key", ""))
         flow_kind = compiled.flow_kinds.get(spec.id, spec.flow_kind)
         status = (
             STATUS_PLANNED
@@ -389,8 +389,8 @@ class _PlannerState:
         config = self.params_by_path.get(call_path, spec.params)
         return NodeCallPlan(
             id=spec.id,
-            type_used=spec.type_used,
-            implementation=self._source(spec.type_used),
+            definition_id=spec.definition_id,
+            implementation=self._source(spec.definition_id),
             requires=_requirements(spec.requires),
             provides=_providers(spec.provides),
             params=freeze_json_object(
@@ -412,7 +412,7 @@ class _PlannerState:
             ),
             is_nodeset=is_nodeset,
             is_loop=is_loop,
-            nodeset_type_key=nodeset_type_key,
+            nodeset_type_id=nodeset_type_id,
             child_block=child_block,
             exports=_providers(exports),
             allow_config_override=spec.allow_config_override,
@@ -433,13 +433,13 @@ class _PlannerState:
             ),
         )
 
-    def _source(self, type_used: str) -> SourceRef:
-        return self.source_by_type.get(type_used, SourceRef(kind="catalog", ref=type_used))
+    def _source(self, definition_id: str) -> SourceRef:
+        return self.source_by_definition.get(definition_id, SourceRef(kind="catalog", ref=definition_id))
 
-    def _execution_semantics(self, spec: NodeSpec, *, call_path, native=False):
+    def _execution_semantics(self, spec: NodeCallSpec, *, call_path, native=False):
         fact = self.call_execution_facts.get(call_path)
         if fact is None and not native:
-            fact = self.implementation_facts.get(spec.type_used)
+            fact = self.implementation_facts.get(spec.definition_id)
         if fact is None:
             return ("immediate", "inline", "current")
         return (fact.completion, fact.schedule, fact.executor)
@@ -554,9 +554,9 @@ def _sources_from_facts(
     facts: ImplementationFacts,
 ) -> dict[str, SourceRef]:
     return {
-        fact.type_key: SourceRef(
+        fact.definition_id: SourceRef(
             kind=fact.source_kind or "catalog",
-            ref=fact.source_ref or fact.type_key,
+            ref=fact.source_ref or fact.definition_id,
             export=fact.source_export,
         )
         for fact in facts.nodes
@@ -567,16 +567,16 @@ def _normalize_source_map(
     values: Mapping[str, SourceRef] | None,
 ) -> dict[str, SourceRef]:
     sources: dict[str, SourceRef] = {}
-    for type_key, source in (values or {}).items():
-        if not isinstance(type_key, str) or not type_key.strip():
+    for definition_id, source in (values or {}).items():
+        if not isinstance(definition_id, str) or not definition_id.strip():
             raise PortablePlanError(
                 "implementation source keys must be non-empty strings"
             )
         if not isinstance(source, SourceRef):
             raise PortablePlanError(
-                f"implementation source for '{type_key}' must be a SourceRef"
+                f"implementation source for '{definition_id}' must be a SourceRef"
             )
-        sources[type_key] = source
+        sources[definition_id] = source
     return sources
 
 

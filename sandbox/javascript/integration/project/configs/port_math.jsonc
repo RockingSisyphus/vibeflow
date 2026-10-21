@@ -4,13 +4,13 @@
     "nodes": [
       {
         "id": "receive_start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Explicit entry before receiving a host value."
       },
       {
         "id": "receive",
-        "type_used": "sandbox.port_receive_0",
+        "definition_id": "sandbox.port_receive_0",
         "display_name": "Receive number",
         "description": "Waits for one number from the fake sandbox host.",
         "config": {
@@ -19,7 +19,7 @@
       },
       {
         "id": "calculate",
-        "type_used": "sandbox.math",
+        "definition_id": "sandbox.math",
         "display_name": "Affine calculation",
         "description": "Combines a TS node and TS base_lib into x * 3 + 2.",
         "config": {
@@ -29,7 +29,7 @@
       },
       {
         "id": "send",
-        "type_used": "sandbox.port_send_1",
+        "definition_id": "sandbox.port_send_1",
         "display_name": "Send result",
         "description": "Submits the calculated value to the fake sandbox host.",
         "config": {
@@ -38,7 +38,7 @@
       },
       {
         "id": "send_end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Explicit end after sending a host value."
       }
@@ -74,7 +74,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

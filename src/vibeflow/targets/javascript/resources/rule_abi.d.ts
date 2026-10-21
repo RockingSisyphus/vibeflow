@@ -1,4 +1,4 @@
-export const VIBEFLOW_RULE_ABI: "vibeflow.rule.v2";
+export const VIBEFLOW_RULE_ABI: "vibeflow.rule.v3";
 export type JsonValue = null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue };
 export interface RuleRecord { readonly type_id: string; readonly value: JsonValue; }
 export interface Finding {
@@ -19,13 +19,13 @@ export interface SourceAnalysis {
   symbols(path: string): readonly SourceNode[];
   imports(path: string): readonly Readonly<{specifier: string; resolved_path: string | null; path: string; line: number; column: number; type_only: boolean}>[];
   reachable(path: string): readonly string[];
-  ownership(path: string): Readonly<{path: string; declared: readonly JsonValue[]; node_types: readonly string[]}>;
+  ownership(path: string): Readonly<{path: string; declared: readonly JsonValue[]; node_definitions: readonly string[]}>;
   nodes(path: string, kind: string): readonly SourceNode[];
 }
 export interface RuleContext {
-  readonly abiVersion: "vibeflow.rule.v2"; readonly ruleId: string;
+  readonly abiVersion: "vibeflow.rule.v3"; readonly ruleId: string;
   readonly phase: "static" | "run" | "import"; readonly target: string;
-  /** Workflow graph facts contain finite Nodeset declarations; nested graph.nodeset_refs refer to graph.nodesets. compiled exists only after native compilation. */
+  /** Workflow graph facts contain finite Nodeset declarations; nested graph.nodeset_refs refer to graph.nodeset_types. compiled exists only after native compilation. */
   readonly facts: Readonly<Record<string, JsonValue>>;
   readonly subject: Readonly<Record<string, JsonValue>>;
   readonly scope: Readonly<Record<string, JsonValue>>;

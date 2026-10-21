@@ -23,10 +23,10 @@ def _python_runtime(tmp_path, groups, make_worker, execution, *, wrapped=False):
 
     for name, kind in (("boundary", "terminal"), ("dispatch", "process")):
         registry.register(NodeDescriptor("budget." + name, name, name, "1", kind,
-            contract=NodeContractDescriptor(), rulesets=()), Empty)
+            contract=NodeContractDescriptor(), rulesets=(), node_type="vibeflow.node"), Empty)
     nodes = [_call("start", "budget.boundary")]
     edges = []
-    nodesets = []
+    nodeset_types = []
     for group, count, limit in groups:
         options = {} if limit is None else {"config": {"max_concurrency": limit}}
         nodes.append(_call(group, "budget.dispatch", **options))
@@ -34,11 +34,11 @@ def _python_runtime(tmp_path, groups, make_worker, execution, *, wrapped=False):
         for index in range(count):
             name = f"{group}{index}"
             registry.register(NodeDescriptor("budget." + name, name, name, "1", "process",
-                contract=NodeContractDescriptor(), rulesets=()), make_worker(group, index))
+                contract=NodeContractDescriptor(), rulesets=(), node_type="vibeflow.node"), make_worker(group, index))
             target = "budget." + name
             if wrapped:
                 body = "budget.body." + name
-                nodesets.append(dict(type_key=body, display_name=name, description="One queued job",
+                nodeset_types.append(dict(type_key=body, display_name=name, description="One queued job",
                     requires=[], provides=[], pipeline=dict(nodes=[_call("start", "budget.boundary"),
                         _call("work", target), _call("end", "budget.boundary")],
                         edges=[["start", "work"], ["work", "end"]])))
@@ -48,7 +48,7 @@ def _python_runtime(tmp_path, groups, make_worker, execution, *, wrapped=False):
         nodes.append(_call(group + "_join", "budget.dispatch", join_policy="all"))
         edges.append([group + "_join", "end"])
     nodes.append(_call("end", "budget.boundary", join_policy="all"))
-    graph = parse_graph_config({"nodesets": nodesets, "pipeline": {"nodes": nodes, "edges": edges}})
+    graph = parse_graph_config({"nodeset_types": nodeset_types, "pipeline": {"nodes": nodes, "edges": edges}})
     return PipelineRuntime(graph, registry=registry, run_dir=tmp_path,
         runtime_options=RuntimeOptions(execution=execution))
 
@@ -187,32 +187,32 @@ def test_python_failure_does_not_start_queued_calls_and_waits_for_cleanup(tmp_pa
 
 
 def _javascript(tmp_path, groups, assertion, *, wrapped=False):
-    nodes = [dict(id="start", type_used="budget.start", flow_kind="terminal", is_terminal=True,
+    nodes = [dict(id="start", definition_id="budget.start", flow_kind="terminal", is_terminal=True,
                   implementation={"kind": "file", "ref": "./nodes.mjs", "export": "empty"})]
     routes = []
     for group, count, limit in groups:
-        nodes.append(dict(id=group, type_used="budget." + group, flow_kind="process",
+        nodes.append(dict(id=group, definition_id="budget." + group, flow_kind="process",
             max_concurrency=8 if limit is None else limit,
             implementation={"kind": "file", "ref": "./nodes.mjs", "export": "empty"}))
         routes.append(dict(source="start", target=group))
         for index in range(count):
             name = f"{group}{index}"
-            call = dict(id=name, type_used="budget." + name, flow_kind="process",
+            call = dict(id=name, definition_id="budget." + name, flow_kind="process",
                 completion="suspend", params={"group": group, "index": index},
                 implementation={"kind": "file", "ref": "./nodes.mjs", "export": "worker"})
             if wrapped:
-                boundary = lambda label: dict(id=label, type_used="budget." + label, flow_kind="terminal",
+                boundary = lambda label: dict(id=label, definition_id="budget." + label, flow_kind="terminal",
                     is_terminal=True, implementation={"kind": "file", "ref": "./nodes.mjs", "export": "empty"})
-                call = dict(id=name, type_used="budget.body." + name, flow_kind="predefined", is_nodeset=True,
+                call = dict(id=name, definition_id="budget.body." + name, flow_kind="predefined", is_nodeset=True,
                     subplan=dict(nodes=[boundary("start"), dict(call, id="work"), boundary("end")],
                         routes=[dict(source="start", target="work"), dict(source="work", target="end")]))
             nodes.append(call)
             routes.extend([dict(source=group, target=name), dict(source=name, target=group + "_join")])
-        nodes.append(dict(id=group + "_join", type_used="budget." + group + "_join",
+        nodes.append(dict(id=group + "_join", definition_id="budget." + group + "_join",
             flow_kind="process", join_policy="all",
             implementation={"kind": "file", "ref": "./nodes.mjs", "export": "empty"}))
         routes.append(dict(source=group + "_join", target="end"))
-    nodes.append(dict(id="end", type_used="budget.end", flow_kind="terminal", is_terminal=True,
+    nodes.append(dict(id="end", definition_id="budget.end", flow_kind="terminal", is_terminal=True,
         join_policy="all", implementation={"kind": "file", "ref": "./nodes.mjs", "export": "empty"}))
     emitted = emit_fixture({"entry_mode": "async", "nodes": nodes, "routes": routes})
     (tmp_path / "workflow.mjs").write_text(emitted.source)

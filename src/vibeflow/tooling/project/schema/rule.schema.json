@@ -76,6 +76,15 @@
         },
         "additionalProperties": false
       }
+    },
+    "level": {
+      "enum": [
+        "node",
+        "graph",
+        "root",
+        "project"
+      ],
+      "default": "node"
     }
   },
   "additionalProperties": false

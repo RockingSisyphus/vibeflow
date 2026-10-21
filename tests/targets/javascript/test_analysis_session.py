@@ -25,12 +25,12 @@ def package(tmp_path):
 def test_source_analysis_views_keep_current_owners_and_deep_immutability(package):
     source=package/"same.ts";source.write_text("export const value=1;\n")
     rule=package/"check.ts"
-    rule.write_text('export function check(context){const file=context.facts.source_files[0];const first=context.sources.ast(file);const second=context.sources.ast(file);return {records:{data:{type_id:"test.owner.v1",value:{ids:context.sources.ownership(file).declared.map(item=>item.id),nodes:context.sources.ownership(file).node_types,same:first===second,frozen:Object.isFrozen(first)&&Object.isFrozen(first.children)&&Object.isFrozen(first.children[0]),text:context.sources.text(file)}}}};}\n')
+    rule.write_text('export function check(context){const file=context.facts.source_files[0];const first=context.sources.ast(file);const second=context.sources.ast(file);return {records:{data:{type_id:"test.owner.v1",value:{ids:context.sources.ownership(file).declared.map(item=>item.id),nodes:context.sources.ownership(file).node_definitions,same:first===second,frozen:Object.isFrozen(first)&&Object.isFrozen(first.children)&&Object.isFrozen(first.children[0]),text:context.sources.text(file)}}}};}\n')
     with JavascriptPluginSession() as session:
         session.open_rule("owners",rule={"id":"test.owners","module":str(rule),"export":"check"},package_root=package)
         for owner in ("left","right"):
             facts={"sources":[{"path":str(source),"text":source.read_text(),"owner":owner}],"source_files":[str(source)],
-                "source_owners":[{"path":str(source),"kind":"node","id":owner}],"node_types":{owner:{}}}
+                "source_owners":[{'node_type': 'vibeflow.node', "path":str(source),"kind":"node","id":owner}],"node_definitions":{owner:{}}}
             value=session.evaluate_rule("owners",context={"facts":facts},inputs={},params={})["records"]["data"]["value"]
             assert value=={"ids":[owner],"nodes":[owner],"same":True,"frozen":True,"text":source.read_text()}
 
@@ -61,7 +61,7 @@ def test_program_sharing_does_not_share_base_lib_permissions(package):
     source=package/"same.ts";helper=package/"helper.ts"
     source.write_text('import {value} from "./helper.ts";export function run(){return value;}\n')
     helper.write_text('export const value=1;\n')
-    owners=[{"path":str(source),"kind":"node","id":"test.node","export":"run"},
+    owners=[{'node_type': 'vibeflow.node', "path":str(source),"kind":"node","id":"test.node","export":"run"},
         {"path":str(helper),"kind":"base_lib","id":"test.helper","export":"value"}]
     with DriverScope():
         for libraries in ([],["test.helper"],[]):
@@ -104,7 +104,7 @@ def test_quality_ownership_separates_entry_types_and_real_initialization(package
     (package/"helper.ts").write_text('export const value=1;export type Input=Record<string,unknown>;\n')
     with DriverScope():
         result=run_quality_facts_driver({"qualityRoot":str(package),"qualityFiles":[str(source)],
-            "qualityImplementations":[{"path":str(source),"kind":"node","type_key":"model","export":"model.run"}]},package_root=package)
+            "qualityImplementations":[{'node_type': 'vibeflow.node', "path":str(source),"kind":"node",'id':"model","export":"model.run"}]},package_root=package)
     facts=result.implementations[0]
     assert facts["entry_import_lines"]==entry_lines
     assert facts["module_initialization_import_lines"]==module_lines

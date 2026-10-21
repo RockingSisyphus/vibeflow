@@ -23,43 +23,43 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.start",
+        "definition_id": "sandbox.start",
         "display_name": "Start",
         "description": "Runs start."
       },
       {
         "id": "training_input",
-        "type_used": "sandbox.training_input",
+        "definition_id": "sandbox.training_input",
         "display_name": "Training Input",
         "description": "Runs training_input."
       },
       {
         "id": "forward_loss",
-        "type_used": "sandbox.forward_loss",
+        "definition_id": "sandbox.forward_loss",
         "display_name": "Forward Loss",
         "description": "Runs forward_loss."
       },
       {
         "id": "backward_grad",
-        "type_used": "sandbox.backward_grad",
+        "definition_id": "sandbox.backward_grad",
         "display_name": "Backward Grad",
         "description": "Runs backward_grad."
       },
       {
         "id": "optimizer_step",
-        "type_used": "sandbox.optimizer_step",
+        "definition_id": "sandbox.optimizer_step",
         "display_name": "Optimizer Step",
         "description": "Runs optimizer_step."
       },
       {
         "id": "training_metrics",
-        "type_used": "sandbox.training_metrics",
+        "definition_id": "sandbox.training_metrics",
         "display_name": "Training Metrics",
         "description": "Runs training_metrics."
       },
       {
         "id": "end",
-        "type_used": "sandbox.training_metrics_end",
+        "definition_id": "sandbox.training_metrics_end",
         "display_name": "End",
         "description": "Runs end."
       }
@@ -139,7 +139,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

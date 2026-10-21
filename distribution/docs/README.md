@@ -9,10 +9,10 @@
 - [python-development](user/python-development.md)
 - [javascript-development](user/javascript-development.md)
 - [普通图并发](user/graph-concurrency.md)：1.0.1 的局部额度、排队补位、独立汇合、断路错误和旧配置迁移。
-- [nodesets-and-loops](user/nodesets-and-loops.md)
+- [NodesetType、Nodeset 与 Loop](user/nodeset-types-and-loops.md)
 - [plugins-and-integrations](user/plugins-and-integrations.md)
 - [multifile-resources](user/multifile-resources.md)
-- [Rule、Ruleset 与 Node](user/rules-and-nodes.md)：两种默认、三处配置选择，以及 Python/TypeScript 插件定义与接入。
+- [Rule、Ruleset 与 Node](user/rules-and-nodes.md)：四级检查、默认替换，以及 Python/TypeScript 插件定义与接入。
 - [rule-system-migration](user/rule-system-migration.md)
 - [runtime-observation](user/runtime-observation.md)
 - [本地预览与历史](user/local-preview.md)：离线页面、结构化展开、分类时间线和跨 workflow 关联。

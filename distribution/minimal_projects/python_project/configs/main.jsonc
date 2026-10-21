@@ -11,31 +11,31 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "minimal.start",
+        "definition_id": "minimal.start",
         "display_name": "Start request workflow",
         "description": "Starts this generic input-to-output workflow."
       },
       {
         "id": "input_boundary",
-        "type_used": "minimal.input_boundary",
+        "definition_id": "minimal.input_boundary",
         "display_name": "Receive request",
         "description": "Converts the public request into the internal payload."
       },
       {
         "id": "process_payload",
-        "type_used": "minimal.process_payload",
+        "definition_id": "minimal.process_payload",
         "display_name": "Apply business processing",
         "description": "Runs the project-specific transformation implemented in nodes/workflow_nodes.py."
       },
       {
         "id": "output_boundary",
-        "type_used": "minimal.output_boundary",
+        "definition_id": "minimal.output_boundary",
         "display_name": "Return response",
         "description": "Converts the processed payload into the public response."
       },
       {
         "id": "end",
-        "type_used": "minimal.end",
+        "definition_id": "minimal.end",
         "display_name": "End request workflow",
         "description": "Ends after the declared public response is available.",
         "similar_to": {
@@ -75,7 +75,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "plugins/code_plugin.py"
+        "ref": "plugins/code_plugin/plugin.py"
       }
     }
   ]

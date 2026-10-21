@@ -10,11 +10,11 @@ from vibeflow.core.flow import (
     LoopOutputSpec,
     LoopSpec,
     LoopStopWhenSpec,
-    LOOP_NODE_TYPES,
+    LOOP_DEFINITION_IDS,
 )
 
-def _parse_loop_spec(value: Any, *, type_used: str, provides: tuple[DataProvider, ...], field: str) -> LoopSpec:
-    if type_used not in LOOP_NODE_TYPES:
+def _parse_loop_spec(value: Any, *, definition_id: str, provides: tuple[DataProvider, ...], field: str) -> LoopSpec:
+    if definition_id not in LOOP_DEFINITION_IDS:
         if value not in (None, {}):
             raise GraphConfigError(f"{field} is only allowed on VibeFlow loop nodes")
         return LoopSpec()

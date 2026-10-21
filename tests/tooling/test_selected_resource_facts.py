@@ -1,20 +1,21 @@
 """Architecture retains selected project source facts independently of SVG."""
-from vibeflow.core.descriptors import ContributionBuilder, ResourceOrigin, compose_contributions
+from vibeflow.core.descriptors import ContributionBuilder, ResourceOrigin, ResourceOwner, compose_contributions
 from vibeflow.core.descriptors.decode import decode_resource
 from vibeflow.tooling.presentation.resource_architecture import resource_architecture
 
 
 def _catalogs(definitions):
-    builder = ContributionBuilder("example")
-    for index, definition in enumerate(definitions):
-        builder.add(decode_resource(definition), origin=ResourceOrigin("example", "plugin.py", index + 1))
-    return compose_contributions((builder.finish(),))
+    from vibeflow.core.descriptors.contributions import ResourceDeclaration
+    entries = tuple(ResourceDeclaration(decode_resource(definition),
+        ResourceOrigin(ResourceOwner("root", "app", "app"), "nodes/declarations.py", index + 1))
+        for index, definition in enumerate(definitions))
+    return compose_contributions((), resources=entries)
 
 
 def _node(identifier, **extra):
-    return {"kind":"node", "type_key":identifier, "display_name":identifier,
+    return {"node_type":"vibeflow.node", "kind":"node", 'id':identifier, "display_name":identifier,
             "description":"Selected project implementation", "version":"1.0",
-            "flow_kind":"process", "contract":{}, **extra}
+            "flow_kind":"process", "contract":{}, "rulesets":[], **extra}
 
 
 def _implementation(path, *, support=()):
@@ -34,7 +35,7 @@ def test_selected_resources_keep_effective_rule_facts_without_svg_projection(tmp
     assert set(facts) == {"resources", "files", "relations"}
     assert set(facts["resources"]) == {"node:example.step"}
     resource = facts["resources"]["node:example.step"]
-    assert resource["origin"] == {"plugin_id":"example", "path":"plugin.py", "line":3, "symbol":""}
+    assert resource["origin"] == {"owner":{"kind":"root","id":"app","root_id":"app","path":""}, "path":"nodes/declarations.py", "line":3, "symbol":""}
     assert resource["rulesets"] == ["checks"]
     assert resource["effective_rules"]["static"][0]["calls"][0]["rule_id"] == "health"
 

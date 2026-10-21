@@ -22,9 +22,9 @@ VibeFlow 的公开命令分别报告结构、质量、构建、审核产物或�
 
 `review` 生成并校验审核产物。collaborative profile 中，产物成功仍需后续人工批准；autonomous profile 按任务直接完成适用门禁。
 
-对实际 Config 的完整工作流执行 `review`，得到根目录的离线 HTML 预览和历史快照，并更新已登记的 `ARCHITECTURE.jsonc`。审核时交付 `preview` 完整路径、`preview_id` 与 `#snapshot=<preview_id>&view=flow` 定位链接，让用户查看当次 workflow。默认不调用 Mermaid；使用 `--with-svg` 添加对照附件，显式指定 `--output` 时另交付原有展开 SVG。JSONC 保存声明、入口与支撑文件、真实依赖、有效规则和展示来源。多文件图形内容见[图形与 Architecture](multifile-resources.md#图形与-architecture)，页面交互和目录见[本地预览与历史](local-preview.md)。
+对实际 Config 的完整工作流执行 `review`，得到根目录的离线 HTML 预览和历史快照，并更新已登记的 `ARCHITECTURE.jsonc`。审核时交付 `preview` 完整路径、`preview_id` 与 `#snapshot=<preview_id>&view=flow` 定位链接，让用户查看当次 workflow。默认不调用 Mermaid；使用 `--with-svg` 添加对照附件，显式指定 `--output` 时另交付原有展开 SVG。JSONC 保存声明、入口与支撑文件、真实依赖、有效规则和展示来源。多文件图形内容见[图形与 Architecture](multifile-resources.md#审查与交付)，页面交互和目录见[本地预览与历史](local-preview.md)。
 
-可选 SVG 展开图的资源目录按 `plugins`、`base_lib`、`host_extensions` 排列：目录父节点连接当前配置使用的资源。Node 显示在流程的实际调用位置；Nodeset 按定义的 `expand` 设置展开。`export-svg --expand-nodesets` 和 `export-mermaid --mermaid-layout review-columns` 沿用这一展示方式。有效规则与参数来源通过 `review-rules --json` 查询。
+可选 SVG 展开图的资源目录按 `plugins`、`base_lib` 排列：目录父节点连接当前配置使用的资源。Node 显示在流程的实际调用位置；Nodeset 按定义的 `expand` 设置展开。`export-svg --expand-nodesets` 和 `export-mermaid --mermaid-layout review-columns` 沿用这一展示方式。有效规则与参数来源通过 `review-rules --json` 查询。
 
 ## 运行日志与监控
 
@@ -57,15 +57,11 @@ quality、build 和 review 会增加各自实际完成的检查。失败或无�
 
 ### Python 与 JavaScript 项目质量
 
-`quality-check` 检查当前根的手写源码与找到的工作流；即使没有工作流，也会输出 `source_quality`。JSON 同时包含 `source_quality`、逐工作流的 `reports` 和顶层状态；Python 原有的源码报告字段仍保留在顶层。警告产生 `CONCERNS`、退出码 0，错误产生 `FAIL`、退出码 1。
+`quality-check` 检查项目、全部已注册 root 及现存 workflow。`--path` 用于定位所属项目，指定某个 root 或源码文件也会完成项目级检查。JSON 包含顶层 `errors`、`warnings`、逐 workflow 的 `reports`、治理 `governance` 和 `project_architecture`；警告为 `CONCERNS`、退出码 0，错误为 `FAIL` 或 `ERROR`、退出码 1。
 
-在已选择的 workspace 中，`quality --path <root>` 只扫描该 root 的源码与工作流。依赖定位保留完整 workspace 的 root 解析上下文，资源来自当前 workflow 选中的插件；兄弟 root 的 BaseLib 与 Node 通过显式插件 source 和 root 接入。发行包装器会自动选用同目录的 `vibeflow_config.jsonc`；直接调用内核 CLI 时用 `--workspace` 指定。没有 workspace 的独立项目仍按自身 `vibeflow_project.jsonc` 加载。
+项目必须有 `vibeflow_config.jsonc`，至少注册一个独立子目录 root；各 root 用 `vibeflow_project.jsonc` 声明 Target。项目和 root 的可选规则及参数分别写入 `project_rules.jsonc`、`root_rules.jsonc`。显式 `[]` 只取消本层可选规则，不能跳过 workflow 检查或加载契约。质量检查不再提供独立源码扫描、`--exclude-dir`、`--exclude-path` 或全局阈值开关；目录用途和源码质量限制通过对应 Rule 参数配置，详见[项目治理](project-governance.md)。
 
-JavaScript/TypeScript 扫描 `.js`、`.jsx`、`.ts`、`.tsx`、`.mjs`、`.cjs`、`.mts`、`.cts` 及声明源码，包括未注册的手写文件和测试文件；自动排除 `generated`、`dist`、`build`、`node_modules` 等产物目录。可重复使用 `--exclude-dir NAME` 和 `--exclude-path ROOT_RELATIVE_PATH` 排除其他目录或文件。独立 `--path` 源码扫描需要项目本地安装的 TypeScript；`--enable-structure-limits` 可为独立扫描启用根目录结构上限。
-
-Node、BaseLib、Plugin 和 Host 的入口与支撑文件由各自所选 Ruleset 检查。默认可维护性规则逐文件检查 500 行上限；默认依赖链包含入口本身，长度超过 4 为警告、超过 6 为错误，仅计入可解析的项目内导入。`policy` 数值配置提供内置 Rule 的默认参数，显式规则参数和覆盖关系优先。参数组合见[Rule 与 Node](rules-and-nodes.md#ruleset-与局部覆盖)，旧写法调整见[声明迁移](rule-system-migration.md)。
-
-`validate`、`review` 和 JS `build` 执行当前范围的静态入口；Python `run` 和 Python AOT 构建执行运行入口的静态审查，bundle 运行复用构建结果，新增领域规则默认进入静态入口。`review-rules --config CONFIG --node CALL_PATH` 展示该调用的有效规则及参数来源，支持 JSON、Mermaid 或 SVG。查询和预览的加载顺序见[加载与检查](plugins-and-integrations.md#加载与检查)。
+单 workflow 的构建和源码运行检查所属 root、当前 workflow 与所用资源；共享资源从项目层解析，不能直接引用其他 root 的私有资源。AOT 执行不扫描项目、不审图、不生成预览。发行包装器自动使用同级项目配置，直接调用内核可显式指定 `--workspace`。
 
 ## 工作流执行探针
 

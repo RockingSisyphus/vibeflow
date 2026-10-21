@@ -1,146 +1,109 @@
-"""Selected workflows preserve shared-source and cross-root import permissions."""
-
+"""Real independent declarations isolate symbol permissions and project sharing."""
 from pathlib import Path
+from tests.fixtures.adaptation_regressions.common import row,run_cli,write_json
+from tests.fixtures.adaptation_regressions.structure import CONTRACT,findings,write,source_rules
 
-from tests.fixtures.adaptation_regressions.common import row, run_cli, write_json
-from tests.fixtures.adaptation_regressions.structure import CONTRACT, findings, write
 
-
-def workspace(root, *, cross_root=False):
-    root.mkdir(parents=True)
-    roots = [{"id":"app","path":"app"}, {"id":"shared","path":"shared"}] if cross_root else [{"id":"app","path":"."}]
-    write_json(root / "vibeflow_config.jsonc", {"roots":roots})
+def workspace(root,*,cross_root=False):
+    roots=[{'id':'app','path':'app'}]+([{'id':'peer','path':'peer'}] if cross_root else [])
+    write_json(root/'vibeflow_config.jsonc',{'roots':roots});write_json(root/'project_rules.jsonc',{'rulesets':[]})
     for item in roots:
-        write_json(root / item["path"] / "vibeflow_project.jsonc", {"project_target":"python"})
-    return root / ("app" if cross_root else ".")
+        app=root/item['path'];write_json(app/'vibeflow_project.jsonc',{'project_target':'python'});source_rules(app)
+    return root/'app'
 
 
-def workflow(app, name, plugin, types):
-    path = app / "configs" / (name + ".jsonc")
-    write_json(path, {"plugins":[{"source":{"kind":"file","ref":plugin}}],"rulesets":[],
-        "pipeline":{"nodes":[{"id":"leaf" + str(index),"type_used":type_key,
-            "display_name":"Leaf " + str(index),"description":"Review the selected implementation."}
-            for index,type_key in enumerate(types)]}})
+def workflow(app,name,definitions,plugins=()):
+    path=app/'configs'/(name+'.jsonc')
+    write_json(path,{'plugins':list(plugins),'rulesets':[],'pipeline':{'nodes':[{
+        'id':'leaf'+str(i),'definition_id':key,'display_name':'Leaf '+str(i),'description':'Explicit source permission.'}
+        for i,key in enumerate(definitions)]}})
     return path
 
 
-def shared_fixture(root, *, denied):
-    app = workspace(root)
-    second_contract = {"provides":[{"key":"result2","type":"number","display_name":"Second result"}],
-                       "output_semantics":{"result2":["The second calculated result."]}}
-    write(app,"parts/util.py","def value():\n    return 7\n")
-    write(app,"nodes/shared.py", "from parts.util import value\n"
+def shared_fixture(root,*,denied):
+    app=workspace(root)
+    write(app,'parts/util.py','def value():\n    return 7\n')
+    second={'provides':[{'key':'result2','type':'number','display_name':'Second result'}],
+            'output_semantics':{'result2':['A separately named result.']}}
+    write(app,'nodes/shared.py','from vibeflow.targets.python.sdk import node\nfrom parts.util import value\n'
+        f"@node(id='audit.first',node_type='vibeflow.node',contract={CONTRACT!r},rulesets=['vibeflow.process'],implementation_files=['../parts/util.py'])\n"
         "class First:\n    def run_pure(self,inputs,params):\n        return {'result':value()}\n"
-        "class Second:\n    def run_pure(self,inputs,params):\n        return {'result2':" + ("value()" if denied else "7") + "}\n")
-    write(app,"plugins/entry.py", "from vibeflow.targets.python.sdk import Plugin,node,SourceLocator\n"
-        f"first=node(type_key='audit.first',contract={CONTRACT!r},rulesets=['vibeflow.process'],"
-        "source=SourceLocator('file','nodes/shared.py','First'),implementation_files=['../parts/util.py'])\n"
-        f"second=node(type_key='audit.second',contract={second_contract!r},rulesets=['vibeflow.process'],"
-        "source=SourceLocator('file','nodes/shared.py','Second'))\n"
-        "plugin=Plugin(id='audit.shared',resources=[first,second],declaration_rulesets=['vibeflow.plugin_declaration'])\n")
-    return workflow(app,"workflow","plugins/entry.py",("audit.first","audit.second"))
+        f"@node(id='audit.second',node_type='vibeflow.node',contract={second!r},rulesets=['vibeflow.process'])\n"
+        "class Second:\n    def run_pure(self,inputs,params):\n        return {'result2':"+('value()' if denied else '7')+"}\n")
+    return workflow(app,'workflow',('audit.first','audit.second'))
 
 
-def library_fixture(root, *, cross_root=False, both=False, denied=False):
-    app = workspace(root,cross_root=cross_root)
-    library_root = root / "shared" if cross_root else app
-    write(library_root,"libraries/math.py","def value():\n    return 7\n")
-    write(app,"nodes/leaf.py","from libraries.math import value\n"
-        "class Leaf:\n    def run_pure(self,inputs,params):\n        return {'result':value()}\n")
-    for selection in (("allowed","denied") if both else (("denied",) if denied else ("allowed",))):
-        source = ("from vibeflow.targets.python.sdk import Plugin,node,base_lib,SourceLocator\n"
-            f"library=base_lib(id='audit.library',rulesets=['vibeflow.base_lib'],source=SourceLocator('file',"
-            f"{'../shared/libraries/math.py' if cross_root else 'libraries/math.py'!r},'value'))\n"
-            f"leaf=node(type_key='audit.leaf',contract={CONTRACT!r},rulesets=['vibeflow.process'],"
-            "source=SourceLocator('file','nodes/leaf.py','Leaf'),base_libs="
-            + ("[]" if selection == "denied" else "['audit.library']") + ")\n"
-            "plugin=Plugin(id='audit." + selection + "',resources=[leaf,library],"
-            "declaration_rulesets=['vibeflow.plugin_declaration'])\n")
-        write(app,"plugins/" + selection + ".py",source)
-        workflow(app,selection,"plugins/" + selection + ".py",("audit.leaf",))
+def library_fixture(root,*,cross_root=False,both=False,denied=False):
+    app=workspace(root,cross_root=cross_root)
+    library_root=root if cross_root else app
+    write(library_root,'base_lib/math.py',"from vibeflow.targets.python.sdk import base_lib\n@base_lib(id='audit.library',rulesets=['vibeflow.base_lib'])\ndef value():\n    return 7\n")
+    for selection in (('allowed','denied') if both else (('denied',) if denied else ('allowed',))):
+        libs=[] if selection=='denied' else ['audit.library']
+        write(app,'nodes/'+selection+'.py','from vibeflow.targets.python.sdk import node\nfrom base_lib.math import value\n'
+            f"@node(id='audit.{selection}',node_type='vibeflow.node',contract={CONTRACT!r},rulesets=['vibeflow.process'],base_libs={libs!r})\n"
+            "class Leaf:\n    def run_pure(self,inputs,params):\n        return {'result':value()}\n")
+        workflow(app,selection,('audit.'+selection,))
+    if cross_root:
+        # The shared library has an actual second consumer, not a private-root escape.
+        peer=root/'peer'
+        write(peer,'nodes/leaf.py',(app/'nodes'/('denied.py' if denied else 'allowed.py')).read_text().replace("base_libs=[]","base_libs=['audit.library']"))
+        workflow(peer,'workflow',('audit.denied' if denied else 'audit.allowed',))
     return app
 
 
-def lifecycle_fixture(root, *, denied=True):
-    app = workspace(root)
-    write(app,"nodes/leaf.py", "from vibeflow.targets.python.sdk import node\n"
-        f"@node(type_key='audit.leaf',contract={CONTRACT!r},rulesets=[])\n"
+def lifecycle_fixture(root,*,denied):
+    app=workspace(root)
+    write(app,'nodes/leaf.py','from vibeflow.targets.python.sdk import node\n'
+        f"@node(id='audit.leaf',node_type='vibeflow.node',contract={CONTRACT!r},rulesets=[])\n"
         "class Leaf:\n    def run_pure(self,inputs,params):\n        return {'result':7}\n")
-    write(app,"libraries/math.py","def value():\n    return 7\n")
-    write(app,"plugins/factory.py", ("from nodes.leaf import Leaf\n" if denied else "from libraries.math import value\n")
-        + "class Compiler:\n    def before_compile(self,graph):\n        self.value = " + ("Leaf" if denied else "value()") + "\n"
-        "def compiler(context):\n    return Compiler()\n")
-    write(app,"plugins/entry.py", "from vibeflow.targets.python.sdk import Plugin,lifecycle,base_lib,SourceLocator\n"
-        "from nodes.leaf import Leaf\n"
-        "library=base_lib(id='audit.library',rulesets=['vibeflow.base_lib'],source=SourceLocator('file','libraries/math.py','value'))\n"
-        "factory=lifecycle(id='audit.compiler',type='compiler',rulesets=[],"
-        "source=SourceLocator('file','plugins/factory.py','compiler'),base_libs=['audit.library'])\n"
-        "plugin=Plugin(id='audit.lifecycle',resources=[Leaf,factory,library],declaration_rulesets=['vibeflow.plugin_declaration'])\n")
-    return workflow(app,"workflow","plugins/entry.py",("audit.leaf",))
+    write(app,'plugins/audit/helper.py','def value():\n    return 7\n')
+    write(app,'plugins/audit/plugin.py','from vibeflow.targets.python.sdk import Plugin\n'+
+        ('from nodes.leaf import Leaf\n' if denied else 'from .helper import value\n')+
+        'class Compiler:\n    def before_compile(self,graph):\n        self.value='+('Leaf' if denied else 'value()')+'\n'
+        'def compiler(context):\n    return Compiler()\n'
+        "plugin=Plugin(id='audit.lifecycle',resources=[],compiler=compiler,declaration_rulesets=[])\n")
+    return workflow(app,'workflow',('audit.leaf',),[{'source':{'kind':'file','ref':'plugins/audit/plugin.py'}}])
 
 
-def checked(root, config, kernel, identifier, *, command="validate", denied=False, suffix="nodes/leaf.py", code="VF_IMPORT_LAYER"):
-    args = [command,"--json", *( ["--config",str(config),"--workspace",str(root / "vibeflow_config.jsonc")]
-        if command == "validate" else ["--workspace",str(root / "vibeflow_config.jsonc")])]
-    raw = run_cli(root,args,kernel,name=identifier + "-" + command)
-    diagnostics = [item for item in findings(raw["payload"]) if item.get("severity") == "error"]
-    targets = [item for item in diagnostics if item.get("code",item.get("rule_id")) == code]
-    resource = "audit.second" if identifier == "shared-denied" else "audit.compiler" if identifier == "lifecycle-contribution-denied" else "audit.leaf"
-    target_path = config.parent.parent / suffix
-    object_id = ("nodes.shared -> parts.util" if suffix == "nodes/shared.py" else
-                 "plugins.factory -> nodes.leaf" if suffix == "plugins/factory.py" else "nodes.leaf -> libraries.math")
-    target_exact = bool(targets) and all(item["severity"] == "error"
-        and item.get("source_location") == {"path":str(target_path) if code == "VF_IMPORT_LAYER" else "app/" + suffix,"line":1,"column":1}
-        and item.get("source_path") == str(target_path) and item.get("root_id") == "app"
-        and item.get("object_type") == ("node" if code == "VF_IMPORT_LAYER" else "module_dependency")
-        and item.get("object_id") == (resource if code == "VF_IMPORT_LAYER" else object_id)
-        and (code == "VF_IMPORT_LAYER" or item.get("details",{}).get("resource_id") == resource) for item in targets)
-    actual = {"exit_code":raw["exit_code"],"target_exact":target_exact,
-        "error_codes":sorted({item.get("code",item.get("rule_id")) for item in diagnostics}),
-        "diagnostics":diagnostics,"stdout_path":raw["stdout_path"],"stderr_path":raw["stderr_path"]}
-    expected = {"exit_code":1 if denied else 0,"target_exact":denied}
-    if identifier == "workflow-isolation-mixed":
-        actual["workflow_states"] = {Path(item["config"]).stem:item["status"] for item in raw["payload"].get("reports",())}
-        expected["workflow_states"] = {"allowed":"PASS","denied":"FAIL"}
-    failures = []
-    if actual["exit_code"] != expected["exit_code"] or actual["target_exact"] != expected["target_exact"]:
-        failures.append(f"expected {expected}, got exit={actual['exit_code']} targeted={target_exact}: {actual['error_codes']}")
-    if actual.get("workflow_states") != expected.get("workflow_states"):
-        failures.append("one workflow borrowed the other's permission: " + repr(actual.get("workflow_states")))
-    permitted = {code,"VF_IMPORT_LAYER","QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT",
-                 "QUALITY.STRUCTURE.PLUGIN_NODE_IMPORT"} if denied else set()
-    if set(actual["error_codes"]) - permitted:
-        failures.append("unrelated errors masked the relationship: " + repr(actual["error_codes"]))
-    return row("A05.python." + identifier + "." + command,"A05", "Explicit source ownership: " + identifier,
-               expected,actual,failures,root)
+def checked(root,config,kernel,identifier,*,command='validate',denied=False,suffix='nodes/allowed.py',codes=()):
+    args=[command,'--json','--workspace',str(root/'vibeflow_config.jsonc')]
+    if command=='validate':args+=['--config',str(config)]
+    raw=run_cli(root,args,kernel,name=identifier+'-'+command)
+    errors=[x for x in findings(raw['payload']) if x.get('severity')=='error']
+    actual_codes=sorted({x.get('code',x.get('rule_id')) for x in errors})
+    targets=[x for x in errors if x.get('code',x.get('rule_id')) in codes]
+    exact=bool(targets) and all(x.get('source_path',x.get('source_location',{}).get('path'))==str(config.parent.parent/suffix)
+        and x.get('source_location',{}).get('line')==2 for x in targets)
+    lifecycle=identifier.startswith('lifecycle')
+    actual={'exit_code':raw['exit_code'],'codes':actual_codes,'target_exact':exact,'diagnostics':errors}
+    expected={'exit_code':1 if denied else 0};failures=[]
+    if raw['exit_code']!=expected['exit_code']:failures.append(f"unexpected exit {raw['exit_code']}: {actual_codes}")
+    if denied and not lifecycle and not exact:failures.append('ownership failure lost its resource source and import line')
+    if denied and lifecycle and not any('outside its package' in x.get('message','') for x in errors):failures.append('missing package boundary diagnostic')
+    if not denied and errors:failures.append('allowed ownership rejected: '+repr(actual_codes))
+    if identifier=='workflow-isolation-mixed':
+        actual['workflow_states']={Path(x['config']).stem:x['status'] for x in raw['payload'].get('reports',())}
+        if actual['workflow_states']!={'allowed':'PASS','denied':'FAIL'}:failures.append('selected workflow permissions were not isolated')
+    return row('A05.python.'+identifier+'.'+command,'A05','Explicit ownership: '+identifier,expected,actual,failures,root)
 
 
-def observe(work: Path,kernel: Path,toolchain=None,renderer=None):
-    rows = []
+def observe(work:Path,kernel:Path,toolchain=None,renderer=None):
+    rows=[]
     for denied in (False,True):
-        name = "shared-denied" if denied else "shared-symbol-isolated"
-        root = work / name
-        config = shared_fixture(root,denied=denied)
-        for command in ("validate","quality-check"):
-            rows.append(checked(root,config,kernel,name,command=command,denied=denied,suffix="nodes/shared.py",
-                code="QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT" if command == "quality-check" else "VF_IMPORT_LAYER"))
-        name = "cross-root-denied" if denied else "cross-root-allowed"
-        root = work / name
-        app = library_fixture(root,cross_root=True,denied=denied)
-        for command in ("validate","quality-check"):
-            rows.append(checked(root,app / "configs" / (("denied" if denied else "allowed") + ".jsonc"),kernel,
-                name,command=command,denied=denied))
-    root = work / "workflow-isolation"
-    app = library_fixture(root,both=True)
-    for name in ("allowed","denied"):
-        rows.append(checked(root,app / "configs" / (name + ".jsonc"),kernel,"workflow-isolation-" + name,
-                            denied=name == "denied"))
-    rows.append(checked(root,app / "configs/allowed.jsonc",kernel,"workflow-isolation-mixed",command="quality-check",
-                        denied=True,code="QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT"))
+        name='shared-denied' if denied else 'shared-symbol-isolated';root=work/name;config=shared_fixture(root,denied=denied)
+        for command in ('validate','quality-check'):
+            rows.append(checked(root,config,kernel,name,command=command,denied=denied,suffix='nodes/shared.py',
+                codes=('VF_IMPORT_LAYER','QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT')))
+        name='cross-root-denied' if denied else 'cross-root-allowed';root=work/name;app=library_fixture(root,cross_root=True,denied=denied)
+        for command in ('validate','quality-check'):
+            rows.append(checked(root,app/'configs'/('denied.jsonc' if denied else 'allowed.jsonc'),kernel,name,command=command,denied=denied,
+                suffix='nodes/denied.py' if denied else 'nodes/allowed.py',codes=('VF_IMPORT_LAYER','QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT')))
+    root=work/'workflow-isolation';app=library_fixture(root,both=True)
+    for name in ('allowed','denied'):
+        rows.append(checked(root,app/'configs'/(name+'.jsonc'),kernel,'workflow-isolation-'+name,denied=name=='denied',suffix='nodes/'+name+'.py',codes=('VF_IMPORT_LAYER','QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT',)))
+    rows.append(checked(root,app/'configs/allowed.jsonc',kernel,'workflow-isolation-mixed',command='quality-check',denied=True,
+        suffix='nodes/denied.py',codes=('QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT',)))
     for denied in (False,True):
-        name = "lifecycle-contribution-denied" if denied else "lifecycle-library-allowed"
-        root = work / name
-        config = lifecycle_fixture(root,denied=denied)
-        rows.append(checked(root,config,kernel,name,command="quality-check",denied=denied,
-                            suffix="plugins/factory.py",code="QUALITY.STRUCTURE.PLUGIN_NODE_IMPORT"))
+        name='lifecycle-contribution-denied' if denied else 'lifecycle-library-allowed';root=work/name;config=lifecycle_fixture(root,denied=denied)
+        rows.append(checked(root,config,kernel,name,command='quality-check',denied=denied))
     return rows

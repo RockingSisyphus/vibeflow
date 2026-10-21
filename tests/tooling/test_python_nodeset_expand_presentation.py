@@ -17,17 +17,17 @@ from vibeflow.tooling.project.graph_config import parse_graph_config
 def test_python_display_stops_at_folded_definition(tmp_path, monkeypatch, loop, outer, inner, visible):
     registry = NodeRegistry()
     registry.register(NodeDescriptor("fixture.work", "Work", "Work", "1", "process",
-        contract=NodeContractDescriptor(), rulesets=()),
+        contract=NodeContractDescriptor(), rulesets=(), node_type="vibeflow.node"),
         loader=lambda: pytest.fail("display must not bind Node implementations"))
     def call(identifier, kind, **fields):
-        return {"id": identifier, "type_used": kind, "display_name": identifier,
+        return {"id": identifier, "definition_id": kind, "display_name": identifier,
                 "description": identifier, **fields}
     def definition(key, nodes, expand):
         return {"type_key": key, "display_name": key, "description": key, "expand": expand,
                 "requires": [], "provides": [], "pipeline": {"nodes": nodes}}
     spec = call("outer_call", "vibeflow.loop.while", requires=[], provides=[],
                 loop={"body": "detail.outer", "max_iterations": 1, "stop_after": 1}) if loop else call("outer_call", "detail.outer")
-    graph = parse_graph_config({"rulesets": [], "nodesets": [
+    graph = parse_graph_config({"rulesets": [], "nodeset_types": [
         definition("detail.inner", [call("leaf_work", "fixture.work")], inner),
         definition("detail.outer", [call("inner_call", "detail.inner")], outer),
     ], "pipeline": {"nodes": [spec]}}, project_root=tmp_path, root_path=tmp_path,
@@ -53,5 +53,5 @@ def test_python_display_stops_at_folded_definition(tmp_path, monkeypatch, loop, 
         assert (name in ascii_text) == (name in visible)
     if outer and not inner:
         assert next(text for title, text in rendered if "inner_call" in text).startswith("flowchart TD")
-    assert set(prepared.graph.nodesets) == {"detail.outer", "detail.inner"}
+    assert set(prepared.graph.nodeset_types) == {"detail.outer", "detail.inner"}
     assert len(prepared._graphs) == 3

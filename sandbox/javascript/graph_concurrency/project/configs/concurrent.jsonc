@@ -3,7 +3,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "plugin.ts",
+        "ref": "plugins/schemas/plugin.ts",
         "export": "plugin"
       }
     }
@@ -30,7 +30,7 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "native.terminal",
+        "definition_id": "native.terminal",
         "display_name": "start",
         "description": "Explicit graph call",
         "config": {
@@ -39,86 +39,86 @@
       },
       {
         "id": "w0",
-        "type_used": "native.worker0",
+        "definition_id": "native.worker0",
         "display_name": "w0",
         "description": "Explicit graph call"
       },
       {
         "id": "w1",
-        "type_used": "native.worker1",
+        "definition_id": "native.worker1",
         "display_name": "w1",
         "description": "Explicit graph call"
       },
       {
         "id": "w2",
-        "type_used": "native.worker2",
+        "definition_id": "native.worker2",
         "display_name": "w2",
         "description": "Explicit graph call"
       },
       {
         "id": "w3",
-        "type_used": "native.worker3",
+        "definition_id": "native.worker3",
         "display_name": "w3",
         "description": "Explicit graph call"
       },
       {
         "id": "w4",
-        "type_used": "native.worker4",
+        "definition_id": "native.worker4",
         "display_name": "w4",
         "description": "Explicit graph call"
       },
       {
         "id": "w5",
-        "type_used": "native.worker5",
+        "definition_id": "native.worker5",
         "display_name": "w5",
         "description": "Explicit graph call"
       },
       {
         "id": "w6",
-        "type_used": "native.worker6",
+        "definition_id": "native.worker6",
         "display_name": "w6",
         "description": "Explicit graph call"
       },
       {
         "id": "w7",
-        "type_used": "native.worker7",
+        "definition_id": "native.worker7",
         "display_name": "w7",
         "description": "Explicit graph call"
       },
       {
         "id": "w8",
-        "type_used": "native.worker8",
+        "definition_id": "native.worker8",
         "display_name": "w8",
         "description": "Explicit graph call"
       },
       {
         "id": "w9",
-        "type_used": "native.worker9",
+        "definition_id": "native.worker9",
         "display_name": "w9",
         "description": "Explicit graph call"
       },
       {
         "id": "w10",
-        "type_used": "native.worker10",
+        "definition_id": "native.worker10",
         "display_name": "w10",
         "description": "Explicit graph call"
       },
       {
         "id": "w11",
-        "type_used": "native.worker11",
+        "definition_id": "native.worker11",
         "display_name": "w11",
         "description": "Explicit graph call"
       },
       {
         "id": "collect",
-        "type_used": "native.collect",
+        "definition_id": "native.collect",
         "display_name": "collect",
         "description": "Explicit graph call",
         "join_policy": "all"
       },
       {
         "id": "end",
-        "type_used": "native.terminal",
+        "definition_id": "native.terminal",
         "display_name": "end",
         "description": "Explicit graph call"
       }

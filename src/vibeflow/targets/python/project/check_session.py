@@ -91,6 +91,9 @@ def begin_python_check(registry, *, _parse_cache=None):
     previous = current_python_check(registry)
     if previous is not None:
         previous.clear()
+    if _parse_cache is None:
+        prepared = getattr(registry, "prepared_resources", None)
+        _parse_cache = getattr(prepared, "syntax_caches", {}).setdefault("python", {}) if prepared is not None else None
     session = PythonCheckSession(_parse_cache=_parse_cache)
     registry._python_check_session = session
     return session

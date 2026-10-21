@@ -5,9 +5,9 @@ from typing import Mapping
 
 from vibeflow.core.flow import (
     GraphConfig,
-    LOOP_NODE_TYPES,
-    NodeSpec,
-    NodesetSpec,
+    LOOP_DEFINITION_IDS,
+    NodeCallSpec,
+    NodesetTypeSpec,
     STATUS_PLANNED,
 )
 from vibeflow.core.findings import HealthFinding
@@ -19,8 +19,8 @@ from vibeflow.core.config.scope import ConfigScope, config_override_conflicts, n
 @dataclass(frozen=True)
 class _OverrideContext:
     caller_name: str
-    nodeset: NodesetSpec
-    nodes_by_name: dict[str, NodeSpec]
+    nodeset: NodesetTypeSpec
+    nodes_by_name: dict[str, NodeCallSpec]
     registry: NodeRegistry
     findings: list[HealthFinding]
 
@@ -29,7 +29,7 @@ class _OverrideContext:
 class _CompositeChild:
     kind: str
     type_key: str
-    nodeset: NodesetSpec | None
+    nodeset: NodesetTypeSpec | None
 
 
 def current_node_configuration_findings(graph, *, registry, owner, global_config=None, overrides=None):
@@ -63,7 +63,7 @@ def current_node_configuration_findings(graph, *, registry, owner, global_config
 
 
 def _append_node_config_finding(
-    node: NodeSpec,
+    node: NodeCallSpec,
     *,
     registry: NodeRegistry,
     findings: list[HealthFinding],
@@ -79,26 +79,26 @@ def _append_node_config_finding(
         base=business_config(node.params),
         override=business_config(global_scope.values),
         allow=global_scope.allow_config_override,
-        details={"owner": owner, "type_used": node.type_used},
+        details={"owner": owner, "definition_id": node.definition_id},
     )
     try:
-        config_spec = registry.get_config_spec(node.type_used)
+        config_spec = registry.get_config_spec(node.definition_id)
         scoped_params = scoped_node_params(node.params, global_scope, declared_keys=set(config_spec.schema))
-        registry.merge_config(node.type_used, {**scoped_params, **dict(overrides.get(node.id, {}))})
+        registry.merge_config(node.definition_id, {**scoped_params, **dict(overrides.get(node.id, {}))})
     except NodeRegistryError as exc:
         findings.append(
             _node_config_finding(
                 "NODE.CONFIG.INVALID",
                 node.id,
                 str(exc),
-                details={"type_used": node.type_used, "owner": owner, "params": dict(node.params), "global_config": dict(global_scope.values)},
+                details={"definition_id": node.definition_id, "owner": owner, "params": dict(node.params), "global_config": dict(global_scope.values)},
             )
         )
 
 
 def _validate_override_map(
     caller_name: str,
-    nodeset: NodesetSpec,
+    nodeset: NodesetTypeSpec,
     overrides: Mapping[str, Mapping[str, object]],
     *,
     registry: NodeRegistry,
@@ -131,7 +131,7 @@ def _validate_override_path(path: str, value: dict[str, object], context: _Overr
                     "nodeset": context.nodeset.type_key,
                     "path": path,
                     "node": target.id,
-                    "type_used": target.type_used,
+                    "definition_id": target.definition_id,
                     "composite_kind": "none",
                 },
             )
@@ -152,10 +152,10 @@ def _validate_override_path(path: str, value: dict[str, object], context: _Overr
 
 def _validate_direct_override(
     caller_name: str,
-    target: NodeSpec,
+    target: NodeCallSpec,
     value: dict[str, object],
     *,
-    nodeset: NodesetSpec,
+    nodeset: NodesetTypeSpec,
     registry: NodeRegistry,
     findings: list[HealthFinding],
 ) -> None:
@@ -173,27 +173,27 @@ def _validate_direct_override(
     if target.status == STATUS_PLANNED:
         return
     try:
-        registry.merge_config(target.type_used, {**target.params, **value})
+        registry.merge_config(target.definition_id, {**target.params, **value})
     except NodeRegistryError as exc:
-        findings.append(_node_config_finding("NODESET.CONFIG.INVALID", caller_name, str(exc), details={"nodeset": nodeset.type_key, "node": target.id, "type_used": target.type_used}))
+        findings.append(_node_config_finding("NODESET.CONFIG.INVALID", caller_name, str(exc), details={"nodeset": nodeset.type_key, "node": target.id, "definition_id": target.definition_id}))
 
 
-def _resolve_composite_child(target: NodeSpec, graph: GraphConfig) -> _CompositeChild | None:
-    if target.type_used in LOOP_NODE_TYPES:
+def _resolve_composite_child(target: NodeCallSpec, graph: GraphConfig) -> _CompositeChild | None:
+    if target.definition_id in LOOP_DEFINITION_IDS:
         body = target.loop.body
-        return _CompositeChild("loop", body, graph.nodesets.get(body))
-    if target.type_used in graph.nodesets:
-        return _CompositeChild("nodeset", target.type_used, graph.nodesets.get(target.type_used))
+        return _CompositeChild("loop", body, graph.nodeset_types.get(body))
+    if target.definition_id in graph.nodeset_types:
+        return _CompositeChild("nodeset", target.definition_id, graph.nodeset_types.get(target.definition_id))
     return None
 
 
-def _override_path_details(nodeset: NodesetSpec, path: str, target: NodeSpec, child: _CompositeChild) -> dict[str, object]:
+def _override_path_details(nodeset: NodesetTypeSpec, path: str, target: NodeCallSpec, child: _CompositeChild) -> dict[str, object]:
     details: dict[str, object] = {
         "owner": f"nodeset:{nodeset.type_key}",
         "nodeset": nodeset.type_key,
         "path": path,
         "node": target.id,
-        "type_used": target.type_used,
+        "definition_id": target.definition_id,
         "composite_kind": child.kind,
     }
     if child.kind == "loop":

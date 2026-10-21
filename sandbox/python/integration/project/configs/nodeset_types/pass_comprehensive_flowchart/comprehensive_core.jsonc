@@ -1,0 +1,76 @@
+{
+  "display_name": "\u7efc\u5408\u793a\u4f8b\u6838\u5fc3\u8ba1\u7b97\u5b50\u6d41\u7a0b",
+  "description": "\u8fd9\u662f\u7efc\u5408\u6d41\u7a0b\u56fe\u4e2d\u7684\u9884\u5b9a\u4e49\u8fc7\u7a0b\u8282\u70b9\uff0c\u7528\u6765\u9a8c\u8bc1 nodeset \u5728\u6298\u53e0\u89c6\u56fe\u548c\u5c55\u5f00\u89c6\u56fe\u4e2d\u90fd\u80fd\u4fdd\u7559\u5951\u7ea6\u3001\u4e2d\u6587\u8bf4\u660e\u3001\u5185\u90e8\u5f00\u59cb\u7ed3\u675f\u8282\u70b9\u4ee5\u53ca\u663e\u5f0f\u8fb9\u5173\u7cfb\u3002",
+  "requires": [
+    {
+      "type": "value.prepared",
+      "cardinality": "exactly_one",
+      "display_name": "Value Prepared"
+    }
+  ],
+  "provides": [
+    {
+      "key": "value.out",
+      "type": "value.out",
+      "display_name": "Value Out"
+    }
+  ],
+  "pipeline": {
+    "inputs": [
+      {
+        "key": "value.prepared",
+        "type": "value.prepared",
+        "display_name": "Value Prepared",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "definition_id": "sandbox.start",
+        "display_name": "Start",
+        "description": "Runs start."
+      },
+      {
+        "factor": 2,
+        "id": "compute",
+        "definition_id": "sandbox.core_compute",
+        "display_name": "Compute",
+        "description": "Runs compute."
+      },
+      {
+        "id": "end",
+        "definition_id": "sandbox.out_value_end",
+        "display_name": "End",
+        "description": "Runs end."
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "compute"
+      },
+      {
+        "from": "compute",
+        "to": "end"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "value.out",
+        "cardinality": "exactly_one",
+        "display_name": "Value Out"
+      }
+    ]
+  },
+  "type_key": "comprehensive.core",
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugins/code_plugin/plugin.py",
+        "export": "plugin"
+      }
+    }
+  ]
+}

@@ -10,7 +10,6 @@ import subprocess
 import sys
 import threading
 
-from tests.fixtures.support.plugins import copy_sdk_inputs
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -27,7 +26,6 @@ def copy_project(work, target, *, example="domain_rules", toolchain=None):
     destination = work / target
     shutil.copytree(ROOT / "sandbox" / target / example, destination,
                     ignore=shutil.ignore_patterns("node_modules", "__pycache__", "*.pyc", ".artifacts"))
-    copy_sdk_inputs(ROOT / "sandbox" / target / example, destination)
     project = destination / "project"
     if target == "javascript":
         if toolchain is None:

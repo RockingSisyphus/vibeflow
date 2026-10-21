@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from typing import Mapping
 
-from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, STATUS_PLANNED
+from vibeflow.core.flow import GraphConfig, LOOP_DEFINITION_IDS, STATUS_PLANNED
 from vibeflow.core.planned import (
     PLANNED_BEHAVIOR_PYTHON_STUB,
     effective_planned_behavior,
@@ -47,7 +47,7 @@ def planned_items(graph: GraphConfig, *, prefix: str = "") -> tuple[dict[str, ob
         active_nodes.add(id(spec))
         try:
             if spec.status == STATUS_PLANNED:
-                add(label, "node", effective_planned_behavior(spec, current.nodesets.get(spec.type_used)))
+                add(label, "node", effective_planned_behavior(spec, current.nodeset_types.get(spec.definition_id)))
         finally:
             active_nodes.remove(id(spec))
 
@@ -57,7 +57,7 @@ def planned_items(graph: GraphConfig, *, prefix: str = "") -> tuple[dict[str, ob
         seen_graphs.add(id(current))
         for spec in current.nodes:
             node(spec, current, f"{path}{spec.id}")
-        for name, definition in current.nodesets.items():
+        for name, definition in current.nodeset_types.items():
             if id(definition) in seen_definitions:
                 continue
             seen_definitions.add(id(definition))
@@ -79,9 +79,9 @@ def all_planned_are_python_stub(graph: GraphConfig) -> bool:
 def referenced_nodeset_names(graph: GraphConfig) -> tuple[str, ...]:
     refs: list[str] = []
     for node in graph.nodes:
-        if node.type_used in graph.nodesets:
-            refs.append(node.type_used)
-        elif node.type_used in LOOP_NODE_TYPES and node.loop.body:
+        if node.definition_id in graph.nodeset_types:
+            refs.append(node.definition_id)
+        elif node.definition_id in LOOP_DEFINITION_IDS and node.loop.body:
             refs.append(node.loop.body)
     return tuple(sorted(set(refs)))
 
@@ -122,5 +122,5 @@ def assert_planned_runtime_allowed(graph: GraphConfig, options) -> None:
         return
     if options.allow_planned_stub:
         blocked = [str(item.get("id", "")) for item in items if item.get("behavior") != "python_stub"]
-        raise PipelineRuntimeError("only planned python_stub nodes/nodesets can run with allow_planned_stub: " + ", ".join(blocked))
-    raise PipelineRuntimeError("planned nodes/nodesets cannot run")
+        raise PipelineRuntimeError("only planned python_stub nodes/nodeset_types can run with allow_planned_stub: " + ", ".join(blocked))
+    raise PipelineRuntimeError("planned nodes/nodeset_types cannot run")

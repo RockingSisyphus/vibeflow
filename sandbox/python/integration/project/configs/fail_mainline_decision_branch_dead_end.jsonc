@@ -13,41 +13,41 @@
         "display_name": "Start",
         "description": "Starts the decision dead-end fixture.",
         "id": "start",
-        "type_used": "sandbox.start"
+        "definition_id": "sandbox.start"
       },
       {
         "display_name": "Prepare Value",
         "description": "Produces value.out for the route decision.",
         "delta": 1,
         "id": "prepare",
-        "type_used": "sandbox.add"
+        "definition_id": "sandbox.add"
       },
       {
         "display_name": "Route",
         "description": "Routes either to the valid end branch or to a dead end.",
         "threshold": 10,
         "id": "route",
-        "type_used": "sandbox.route_decision"
+        "definition_id": "sandbox.route_decision"
       },
       {
         "display_name": "Dead Branch",
         "description": "A decision branch that cannot reach an end terminal.",
         "delta": 1,
         "id": "dead",
-        "type_used": "sandbox.add_out"
+        "definition_id": "sandbox.add_out"
       },
       {
         "display_name": "Dead Sink",
         "description": "Continues the dead branch without ever reaching an end terminal.",
         "delta": 1,
         "id": "sink",
-        "type_used": "sandbox.add_final_to_dead"
+        "definition_id": "sandbox.add_final_to_dead"
       },
       {
         "display_name": "End",
         "description": "Ends the valid external branch.",
         "id": "end",
-        "type_used": "sandbox.out_value_end"
+        "definition_id": "sandbox.out_value_end"
       }
     ],
     "edges": [
@@ -86,7 +86,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

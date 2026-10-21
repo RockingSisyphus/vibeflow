@@ -11,7 +11,7 @@ from vibeflow.tooling.application.python.presentation.review_model import node_f
 from vibeflow.tooling.application.python.presentation.review_model import node_review_effect_scope
 
 from vibeflow.tooling.application.python.presentation.mermaid.labels import _comment_text, _edge_contract_text, _edge_style, _escape_edge_label, _escape_label, _expanded_nodeset_title, _health_findings, _join_label_sections, _loop_stop_text, _mapping_items, _node_metadata_lines, _node_shape, _nodeset_node_ids, _resource_label, _rendered_resources_payload, _safe_id, _section_label, _source_lines
-from vibeflow.core.flow import GraphConfig, LOOP_NODE_TYPES, NodeSpec, NodesetSpec, STATUS_PLANNED
+from vibeflow.core.flow import GraphConfig, LOOP_DEFINITION_IDS, NodeCallSpec, NodesetTypeSpec, STATUS_PLANNED
 from vibeflow.core.constants import EFFECT_SCOPE_GLOBAL_STATE, EFFECT_SCOPE_NONE, FLOW_KIND_DOCUMENT, FLOW_KIND_GLOBAL_STATE, FLOW_KIND_PROCESS
 from vibeflow.core.planned import effective_planned_behavior, planned_behavior_label
 from vibeflow.tooling.presentation.mermaid.style import MERMAID_MAIN_CLASS_ORDER, mermaid_class_def_lines
@@ -171,7 +171,7 @@ class _MermaidRenderer:
                 lines.append(f"{indent}style {node_id} {mermaid_style(presentation)};")
                 continue
             flow_kind = node_flow_kind(node, compiled) or nodeset.flow_kind
-            is_loop = node.type_used in LOOP_NODE_TYPES
+            is_loop = node.definition_id in LOOP_DEFINITION_IDS
             native_class = "loopNode" if is_loop else "nodesetNode"
             class_name = self._class_for_node(node_id, preferred_class=native_class, planned=node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED)
             presentation = self._presentation(node, compiled, native_class=native_class, status_class=class_name, flow_kind=flow_kind)
@@ -273,20 +273,7 @@ class _MermaidRenderer:
             label_kind="plugin",
             indent=indent,
         )
-        host_extensions = _mapping_items(
-            payload.get("host_extensions", ())
-        )
-        self._render_resource_group(
-            lines,
-            root_id="resource_host_extensions",
-            root_label="host_extensions",
-            root_class="hostExtensionResource",
-            child_class="hostExtensionResource",
-            child_shape="hex",
-            resources=host_extensions,
-            label_kind="host_extension",
-            indent=indent,
-        )
+
 
     def _render_resource_group(
         self,
@@ -356,11 +343,11 @@ class _MermaidRenderer:
         return "defaultNode"
 
 
-    def _presentation(self, node: NodeSpec, compiled: CompiledGraph, *, native_class: str, status_class: str, flow_kind: str):
-        descriptor = registry_descriptor(self.registry, node.type_used)
+    def _presentation(self, node: NodeCallSpec, compiled: CompiledGraph, *, native_class: str, status_class: str, flow_kind: str):
+        descriptor = registry_descriptor(self.registry, node.definition_id)
         return resolve_presentation(descriptor, native_class=native_class, status_class=status_class if status_class in {"healthError", "healthWarning", "plannedNode"} else "", call_style=node.style, flow_kind=flow_kind, node=node, compiled=compiled)
 
-    def _node_is_external(self, node: NodeSpec) -> bool:
+    def _node_is_external(self, node: NodeCallSpec) -> bool:
         return node_is_external(node, self.registry)
 
     def _finding_targets(self, graph: GraphConfig, compiled: CompiledGraph, *, object_type: str, object_id: str) -> tuple[str, ...]:
@@ -382,21 +369,21 @@ class _MermaidRenderer:
 
     def _node_label(
         self,
-        node: NodeSpec,
+        node: NodeCallSpec,
         graph: GraphConfig,
         compiled: CompiledGraph,
         *,
         effective_lock: tuple[str, str, bool] | None,
         is_external: bool,
     ) -> str:
-        sections: list[list[str]] = [[self._node_title(node, is_external=is_external)], [f"id: {node.id}", f"type_used: {node.type_used}"]]
-        descriptor = registry_descriptor(self.registry, node.type_used)
+        sections: list[list[str]] = [[self._node_title(node, is_external=is_external)], [f"id: {node.id}", f"definition_id: {node.definition_id}"]]
+        descriptor = registry_descriptor(self.registry, node.definition_id)
         presentation = resolve_presentation(descriptor, call_style=node.style)
         icon = presentation.values.get("icon", "")
         if icon:
             sections[0][0] = f"{icon} {sections[0][0]}"
         if descriptor is not None:
-            selections = node.rulesets if node.rulesets is not None else self.registry.rulesets(node.type_used)
+            selections = node.rulesets if node.rulesets is not None else self.registry.rulesets(node.definition_id)
             sections.append([f"rulesets: {', '.join(str(getattr(ref, 'rule_id', ref)) for ref in selections) or 'unconstrained'}"])
             if descriptor.tags:
                 sections.append([f"tags: {', '.join(descriptor.tags)}"])
@@ -422,15 +409,15 @@ class _MermaidRenderer:
 
     def _nodeset_label(
         self,
-        node: NodeSpec,
-        nodeset: NodesetSpec,
+        node: NodeCallSpec,
+        nodeset: NodesetTypeSpec,
         graph: GraphConfig,
         compiled: CompiledGraph,
         *,
         effective_lock: tuple[str, str, bool] | None,
     ) -> str:
         title = node.metadata.display_name or nodeset.display_name or node.id
-        sections: list[list[str]] = [[title], [f"id: {node.id}", f"type_used: {node.type_used}"]]
+        sections: list[list[str]] = [[title], [f"id: {node.id}", f"definition_id: {node.definition_id}"]]
         source_lines = _source_lines(
             nodeset.root_id or graph.root_id,
             nodeset.root_path or graph.root_path,
@@ -473,15 +460,15 @@ class _MermaidRenderer:
 
     def _loop_label(
         self,
-        node: NodeSpec,
-        nodeset: NodesetSpec,
+        node: NodeCallSpec,
+        nodeset: NodesetTypeSpec,
         graph: GraphConfig,
         compiled: CompiledGraph,
         *,
         effective_lock: tuple[str, str, bool] | None,
     ) -> str:
         title = node.metadata.display_name or nodeset.display_name or node.id
-        sections: list[list[str]] = [[title], [f"id: {node.id}", f"type_used: {node.type_used}"]]
+        sections: list[list[str]] = [[title], [f"id: {node.id}", f"definition_id: {node.definition_id}"]]
         source_lines = _source_lines(
             nodeset.root_id or graph.root_id,
             nodeset.root_path or graph.root_path,
@@ -513,12 +500,12 @@ class _MermaidRenderer:
                 sections.append([_section_label("meta"), *call_lines])
         return _join_label_sections(sections)
 
-    def _node_title(self, node: NodeSpec, *, is_external: bool) -> str:
+    def _node_title(self, node: NodeCallSpec, *, is_external: bool) -> str:
         title = ""
         if node.metadata.display_name:
             title = node.metadata.display_name
         elif self.registry is not None and node.status != STATUS_PLANNED:
-            info = registry_descriptor(self.registry, node.type_used)
+            info = registry_descriptor(self.registry, node.definition_id)
             display_name = str(getattr(info, "display_name", "")).strip() if info is not None else ""
             if display_name:
                 title = display_name
@@ -539,7 +526,7 @@ class _MermaidRenderer:
 
     def _node_semantic_lines(
         self,
-        node: NodeSpec,
+        node: NodeCallSpec,
         graph: GraphConfig,
         compiled: CompiledGraph,
         *,
@@ -549,7 +536,7 @@ class _MermaidRenderer:
         lines = list(_node_metadata_lines(node))
         lines.append(f"flow_kind: {node_flow_kind(node, compiled) or 'process'}")
         if self.registry is not None and node.status != STATUS_PLANNED:
-            info = registry_descriptor(self.registry, node.type_used)
+            info = registry_descriptor(self.registry, node.definition_id)
             if info is not None and not lines:
                 for label, value in (
                     ("version", getattr(info, "version", "")),

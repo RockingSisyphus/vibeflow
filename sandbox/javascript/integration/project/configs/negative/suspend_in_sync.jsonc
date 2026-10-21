@@ -12,19 +12,19 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts the invalid sync/suspend fixture."
       },
       {
         "id": "invalid",
-        "type_used": "sandbox.async_double",
+        "definition_id": "sandbox.async_double",
         "display_name": "Suspending node in sync workflow",
         "description": "Must fail because a sync entry cannot contain a suspending node."
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Would end the invalid fixture."
       }
@@ -52,7 +52,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

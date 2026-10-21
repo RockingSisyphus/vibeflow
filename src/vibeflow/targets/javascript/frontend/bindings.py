@@ -174,7 +174,7 @@ class JavascriptCallBinding:
     """Static JavaScript source and contract facts for one node call."""
 
     path: tuple[str, ...]
-    type_key: str
+    definition_id: str
     implementation: SourceRef
     params: Mapping[str, object] | PortableObject = field(default_factory=dict)
     base_libs: tuple[str, ...] = ()
@@ -187,7 +187,7 @@ class JavascriptCallBinding:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "path", _binding_path(self.path))
-        object.__setattr__(self, "type_key", _required_text(self.type_key, "type_key"))
+        object.__setattr__(self, "definition_id", _required_text(self.definition_id, "definition_id"))
         if not isinstance(self.implementation, SourceRef):
             raise TypeError("implementation must be a SourceRef")
         object.__setattr__(self, "params", _portable_object(self.params, "params"))
@@ -214,7 +214,7 @@ class JavascriptCallBinding:
     def to_dict(self) -> dict[str, object]:
         return {
             "path": list(self.path),
-            "type_key": self.type_key,
+            "definition_id": self.definition_id,
             "implementation": self.implementation.to_dict(),
             "params": self.params.to_value(),
             "base_libs": list(self.base_libs),
@@ -256,14 +256,14 @@ class JavascriptSchemaMemberOrder:
 
 @dataclass(frozen=True)
 class JavascriptBindingPlan:
-    """JavaScript-only source, resource, host, and import-policy sidecar."""
+    """JavaScript-only source, resource and import-policy sidecar."""
 
     workflow_id: str
     calls: tuple[JavascriptCallBinding, ...] = ()
     schemas: Mapping[str, object] | PortableObject = field(default_factory=dict)
     base_libs: Mapping[str, object] | PortableObject = field(default_factory=dict)
     capabilities: Mapping[str, object] | PortableObject = field(default_factory=dict)
-    host_extensions: tuple[Mapping[str, object] | PortableObject, ...] = ()
+
     runtime_plugins: tuple[JavascriptPluginBinding, ...] = ()
     import_policy: Mapping[str, object] | PortableObject = field(default_factory=dict)
     schema_member_orders: tuple[JavascriptSchemaMemberOrder, ...] = ()
@@ -281,14 +281,7 @@ class JavascriptBindingPlan:
         for name in ("schemas", "base_libs", "capabilities", "import_policy"):
             value = _portable_object(getattr(self, name), name)
             object.__setattr__(self, name, value)
-        object.__setattr__(
-            self,
-            "host_extensions",
-            tuple(
-                _portable_object(value, f"host_extensions[{index}]")
-                for index, value in enumerate(self.host_extensions)
-            ),
-        )
+
         runtime_plugins = tuple(self.runtime_plugins)
         if not all(
             isinstance(item, JavascriptPluginBinding)
@@ -337,7 +330,7 @@ class JavascriptBindingPlan:
             "schemas": self.schemas.to_value(),
             "base_libs": self.base_libs.to_value(),
             "capabilities": self.capabilities.to_value(),
-            "host_extensions": [item.to_value() for item in self.host_extensions],
+
             "runtime_plugins": [item.to_dict() for item in self.runtime_plugins],
             "import_policy": self.import_policy.to_value(),
             "schema_member_orders": [
@@ -351,36 +344,20 @@ class JavascriptBindingPlan:
             separators=(",", ":"),
         )
 
-def build_javascript_binding_plan(
-    plan: WorkflowPlan,
-    *,
-    implementations: Mapping[str, Mapping[str, object]] | None = None,
-    base_libs_by_type: Mapping[str, Sequence[str]] | None = None,
-    capabilities_by_type: Mapping[
-        str,
-        Sequence[CapabilityRequirement | Mapping[str, object]],
-    ]
-    | None = None,
-    schemas: Mapping[str, object] | None = None,
-    base_libs: Mapping[str, object] | None = None,
-    capabilities: Mapping[str, object] | None = None,
-    host_extensions: Sequence[Mapping[str, object]] = (),
-    runtime_plugins: Sequence[JavascriptPluginBinding] = (),
-    import_policy: Mapping[str, object] | None = None,
-) -> JavascriptBindingPlan:
+def build_javascript_binding_plan(plan: WorkflowPlan, *, implementations: Mapping[str, Mapping[str, object]] | None=None, base_libs_by_definition: Mapping[str, Sequence[str]] | None=None, capabilities_by_definition: Mapping[str, Sequence[CapabilityRequirement | Mapping[str, object]]] | None=None, schemas: Mapping[str, object] | None=None, base_libs: Mapping[str, object] | None=None, capabilities: Mapping[str, object] | None=None, runtime_plugins: Sequence[JavascriptPluginBinding]=(), import_policy: Mapping[str, object] | None=None) -> JavascriptBindingPlan:
     """Build a JavaScript sidecar from plain, in-memory Target facts."""
 
     if not isinstance(plan, WorkflowPlan):
         raise TypeError("plan must be a WorkflowPlan")
     implementation_facts = implementations or {}
-    base_lib_facts = base_libs_by_type or {}
-    capability_facts = capabilities_by_type or {}
+    base_lib_facts = base_libs_by_definition or {}
+    capability_facts = capabilities_by_definition or {}
     calls: list[JavascriptCallBinding] = []
     schema_orders: list[JavascriptSchemaMemberOrder] = []
     for block in plan.blocks:
         for node in block.nodes:
             path = (*block.path, node.id)
-            metadata = implementation_facts.get(node.type_used, {})
+            metadata = implementation_facts.get(node.definition_id, {})
             completion = _completion(node, metadata)
             executor = _javascript_executor(completion)
             params_schema = _mapping_fact(metadata, "params_schema")
@@ -390,12 +367,12 @@ def build_javascript_binding_plan(
             calls.append(
                 JavascriptCallBinding(
                     path=path,
-                    type_key=node.type_used,
+                    definition_id=node.definition_id,
                     implementation=node.implementation,
                     params=node.params,
-                    base_libs=_base_lib_ids(node.type_used, base_lib_facts),
+                    base_libs=_base_lib_ids(node.definition_id, base_lib_facts),
                     capabilities=_call_capabilities(
-                        node.type_used,
+                        node.definition_id,
                         capability_facts,
                     ),
                     completion=completion,
@@ -418,7 +395,7 @@ def build_javascript_binding_plan(
         schemas=schema_mapping,
         base_libs=base_libs or {},
         capabilities=capabilities or {},
-        host_extensions=tuple(host_extensions),
+
         runtime_plugins=tuple(runtime_plugins),
         import_policy=import_policy or {},
         schema_member_orders=tuple(schema_orders),
@@ -446,11 +423,11 @@ def _content_hash(value: object, field_name: str) -> str:
 
 
 def _base_lib_ids(
-    type_key: str,
+    definition_id: str,
     facts: Mapping[str, Sequence[str]],
 ) -> tuple[str, ...]:
-    label = f"base_libs_by_type[{type_key!r}]"
-    return tuple(sorted({_required_text(value, label) for value in facts.get(type_key, ())}))
+    label = f"base_libs_by_definition[{definition_id!r}]"
+    return tuple(sorted({_required_text(value, label) for value in facts.get(definition_id, ())}))
 
 
 def _implementation_language(
@@ -540,20 +517,20 @@ def _javascript_executor(completion: str) -> str:
 
 
 def _call_capabilities(
-    type_key: str,
+    definition_id: str,
     facts: Mapping[
         str,
         Sequence[CapabilityRequirement | Mapping[str, object]],
     ],
 ) -> tuple[CapabilityRequirement, ...]:
     normalized: list[CapabilityRequirement] = []
-    for index, raw in enumerate(facts.get(type_key, ())):
+    for index, raw in enumerate(facts.get(definition_id, ())):
         if isinstance(raw, CapabilityRequirement):
             requirement = raw
         elif isinstance(raw, Mapping):
             capability_id = _required_text(
                 raw.get("id"),
-                f"capabilities_by_type[{type_key!r}][{index}].id",
+                f"capabilities_by_definition[{definition_id!r}][{index}].id",
             )
             operations = raw.get("operations", ())
             if not isinstance(operations, (tuple, list)):

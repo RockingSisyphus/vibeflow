@@ -28,7 +28,6 @@ def add_delegate_cli_parser(subparsers, add_runtime_options: Callable[[object], 
         type=_non_empty_path_argument,
         help="workspace vibeflow_config.jsonc path",
     )
-    parser.add_argument("--policy", required=False, help="explicit kernel_policy.jsonc/governance.jsonc path")
     parser.add_argument("--run-root", required=False, help="directory where run artifacts are created")
     parser.add_argument(
         "--run-id",
@@ -49,12 +48,12 @@ def _non_empty_path_argument(value: str) -> str:
 
 def handle_delegate_cli(args) -> int:
     from vibeflow.tooling.application.python.cli import (
-        _load_workspace_for_cli,
+        workspace_or_report,
         _runtime_options_from_args,
     )
     from vibeflow.tooling.application.python.run_directory import prepare_run_dir as _prepare_run_dir
     from vibeflow.tooling.application.python.execution import (CheckedRunError, CheckedRunResult, _new_run_id, _write_refused_artifacts)
-    from vibeflow.tooling.application.python.runner import (RunDirectoryExistsError)
+    from vibeflow.tooling.application.python.run_directory import RunDirectoryExistsError
 
     try:
         actual_run_id = _new_run_id() if args.run_id is None else validate_run_id(args.run_id)
@@ -86,7 +85,7 @@ def handle_delegate_cli(args) -> int:
     try:
         owned_run_dir = getattr(args, "_prepared_run_dir", None) or _prepare_run_dir(run_root, actual_run_id)
         with core_diagnostic_sink(collect):
-            workspace = _load_workspace_for_cli(Path(args.workspace))
+            workspace = workspace_or_report(Path(args.workspace))
             if isinstance(workspace, HealthReport):
                 _write_refused_artifacts(owned_run_dir, workspace, include_effective_policy=True)
                 result = CheckedRunResult(actual_run_id, owned_run_dir, workspace)
@@ -96,7 +95,7 @@ def handle_delegate_cli(args) -> int:
             options = _runtime_options_from_args(args)
             from vibeflow.tooling.application.python.workspace_service import run_workspace_checked
 
-            with source_paths(root.path for root in workspace.roots if root.project_target == "python"):
+            with source_paths((workspace.root_for_path(Path(args.config).resolve()).path, workspace.root)):
                 result = run_workspace_checked(
                     Path(args.config),
                     workspace=workspace,

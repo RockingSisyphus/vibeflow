@@ -12,19 +12,19 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "Start",
         "description": "Starts the unowned Promise fixture."
       },
       {
         "id": "invalid",
-        "type_used": "sandbox.invalid.unowned_promise",
+        "definition_id": "sandbox.invalid.unowned_promise",
         "display_name": "Unowned Promise",
         "description": "Must fail because Promise work is discarded instead of awaited by its Node."
       },
       {
         "id": "end",
-        "type_used": "sandbox.terminal",
+        "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends the unowned Promise fixture."
       }
@@ -52,7 +52,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "code_plugin.ts",
+        "ref": "plugins/code_plugin/plugin.ts",
         "export": "plugin"
       }
     }

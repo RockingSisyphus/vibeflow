@@ -244,8 +244,8 @@ def build_manifest(
     return artifact_manifest(staging, workflow=workflow, project_target="javascript",
         entry="index.html" if profile == "web-app" else entry_name,plan_sha256=emitted.plan_sha256,
         target_metadata=dict(target=target,profile=profile,toolchain=driver_result.toolchain.to_dict(),
-            external_packages=sorted(set(external_packages)),host_extensions=list(emitted.host_extensions),
-            plugin_abi_version="vibeflow.plugin.v3",
+            external_packages=sorted(set(external_packages)),
+            plugin_abi_version="vibeflow.plugin.v4",
             plugins=_plain_json_value(plugin_manifest) if plugin_manifest else dict(active=[],annotations=[],declared=[],planned=[])))
 
 

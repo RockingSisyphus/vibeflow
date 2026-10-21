@@ -3,7 +3,7 @@
     {
       "source": {
         "kind": "file",
-        "ref": "plugin.ts",
+        "ref": "plugins/addition/plugin.ts",
         "export": "plugin"
       }
     }
@@ -26,25 +26,25 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "addition.boundary",
+        "definition_id": "addition.boundary",
         "display_name": "start",
         "description": "start"
       },
       {
         "id": "read",
-        "type_used": "addition.read",
+        "definition_id": "addition.read",
         "display_name": "read",
         "description": "read"
       },
       {
         "id": "add",
-        "type_used": "addition.add",
+        "definition_id": "addition.add",
         "display_name": "add",
         "description": "add"
       },
       {
         "id": "end",
-        "type_used": "addition.boundary",
+        "definition_id": "addition.boundary",
         "display_name": "end",
         "description": "end"
       }

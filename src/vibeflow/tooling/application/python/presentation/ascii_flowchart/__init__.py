@@ -9,7 +9,7 @@ from vibeflow.tooling.application.python.presentation.ascii_flowchart.shapes imp
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.tooling.application.python.presentation.helpers import effective_graph_for_render, compile_for_render, node_is_external, shorten
 from vibeflow.tooling.application.python.presentation.review_model import node_flow_kind, nodeset_for_node
-from vibeflow.core.flow import GraphConfig, NodeSpec, NodesetSpec, STATUS_PLANNED
+from vibeflow.core.flow import GraphConfig, NodeCallSpec, NodesetTypeSpec, STATUS_PLANNED
 from vibeflow.core.constants import (
     FLOW_KIND_DATA_STORE,
     FLOW_KIND_DECISION,
@@ -154,10 +154,10 @@ class _Renderer:
             lines.append(f"{indent}  {node.id}: " + "; ".join(self._contract_details(graph, node, compiled)))
         lines.append("")
 
-    def _contract_details(self, graph: GraphConfig, node: NodeSpec, compiled: CompiledGraph) -> list[str]:
+    def _contract_details(self, graph: GraphConfig, node: NodeCallSpec, compiled: CompiledGraph) -> list[str]:
         nodeset = nodeset_for_node(graph, node)
         flow_kind = node_flow_kind(node, compiled) or (nodeset.flow_kind if nodeset else FLOW_KIND_PROCESS)
-        details = [f"kind={flow_kind}", f"type_used={node.type_used}"]
+        details = [f"kind={flow_kind}", f"definition_id={node.definition_id}"]
         if node.status == STATUS_PLANNED:
             behavior = effective_planned_behavior(node, nodeset)
             details.append(f"status={planned_behavior_label(behavior).replace(' ', '_')}")
@@ -184,7 +184,7 @@ class _Renderer:
             message = shorten(finding.get("message", ""), limit=160)
             lines.append(f"  [{severity}] {rule_id} {object_type}:{object_id} - {message}")
 
-    def _node_label(self, node: NodeSpec, flow_kind: str) -> tuple[str, ...]:
+    def _node_label(self, node: NodeCallSpec, flow_kind: str) -> tuple[str, ...]:
         lines = [_badge(flow_kind, node), node.id]
         if node.status == STATUS_PLANNED:
             lines.append(planned_behavior_label(node.planned_behavior).upper())
@@ -194,7 +194,7 @@ class _Renderer:
             lines.append("external")
         return tuple(line for line in lines if line)
 
-    def _nodeset_label(self, node: NodeSpec, nodeset: NodesetSpec | None, flow_kind: str) -> tuple[str, ...]:
+    def _nodeset_label(self, node: NodeCallSpec, nodeset: NodesetTypeSpec | None, flow_kind: str) -> tuple[str, ...]:
         if nodeset is None:
             return self._node_label(node, flow_kind)
         lines = [_badge(flow_kind, node), node.id]
@@ -205,11 +205,11 @@ class _Renderer:
                 lines.append(f"stub: {behavior.stub_module}")
         return tuple(line for line in lines if line)
 
-    def _node_is_external(self, node: NodeSpec) -> bool:
+    def _node_is_external(self, node: NodeCallSpec) -> bool:
         return node_is_external(node, self.registry)
 
 
-def _badge(flow_kind: str, node: NodeSpec) -> str:
+def _badge(flow_kind: str, node: NodeCallSpec) -> str:
     if flow_kind == FLOW_KIND_TERMINAL:
         node_id = node.id.lower()
         return "● END" if node_id.endswith("end") or node_id == "end" else "● START"

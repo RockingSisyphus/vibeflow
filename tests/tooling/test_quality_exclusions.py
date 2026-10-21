@@ -79,45 +79,8 @@ def test_root_exclusions_do_not_hide_same_named_canonical_packages(
     }
 
 
-def test_quality_cli_accepts_repeated_top_level_exclusions(
-    tmp_path: Path,
-    capsys,
-) -> None:
-    _write_quality_fixture(tmp_path)
 
-    code = cli_main(
-        [
-            "quality-check",
-            "--project-target",
-            "python",
-            "--path",
-            str(tmp_path),
-            "--json",
-            "--enable-structure-limits",
-            "--exclude-dir",
-            "purity",
-            "--exclude-dir",
-            "portable",
-        ]
-    )
-
-    assert code == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["source_quality"]["status"] == payload["status"]
-    assert payload["reports"] == []
-    assert payload["details_summary"]["files"] == 2
-    assert {
-        item["path"] for item in payload["files"]
-    } == {
-        "block_compiler/canonical.py",
-        "targets/python/purity/canonical.py",
-    }
-    root_layout = payload["structure_summary"]["root_layout"]
-    assert root_layout["code_files"] == 2
-    assert root_layout["max_child_code_dirs_per_dir"] == 2
-
-
-def test_quality_cli_exact_paths_exclude_files_and_directories_only_at_root(
+def test_source_scan_exact_paths_exclude_files_and_directories_only_at_root(
     tmp_path: Path,
     capsys,
 ) -> None:
@@ -132,28 +95,8 @@ def test_quality_cli_exact_paths_exclude_files_and_directories_only_at_root(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(source, encoding="utf-8")
 
-    code = cli_main(
-        [
-            "quality-check",
-            "--project-target",
-            "python",
-            "--path",
-            str(tmp_path),
-            "--json",
-            "--enable-structure-limits",
-            "--exclude-path",
-            "legacy.py",
-            "--exclude-path",
-            "compat",
-        ]
-    )
-
-    assert code == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert {item["path"] for item in payload["files"]} == {
-        "nested/compat/visible.py",
-        "nested/legacy.py",
-    }
-    root_layout = payload["structure_summary"]["root_layout"]
+    report = scan_code_quality(tmp_path, structure_limits=QualityStructureLimits(enforce_role_imports=False,warn_root_code_files=20,max_root_code_files=30), excluded_dirs=(*DEFAULT_EXCLUDED_DIRS,"./legacy.py","./compat"))
+    assert {item.path for item in report.files} == {"nested/compat/visible.py", "nested/legacy.py"}
+    root_layout = report.structure_summary["root_layout"]
     assert root_layout["code_files"] == 2
     assert root_layout["max_child_code_dirs_per_dir"] == 1

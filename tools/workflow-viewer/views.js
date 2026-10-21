@@ -94,16 +94,9 @@ window.VFViews=({getData,getMode,getCurrent,getEntry=()=>"",getVisible,getEdgeFa
     return group;
   }
   async function drawResources(descriptor,token) {
-    const data=getData(),mode=getMode();
-    const implementation=data.architecture.implementation_graph||{},all=Object.entries(implementation.resources||{}).map(([id,facts])=>({...facts,resource_id:facts.id,id}));
-    const kinds=new Set(descriptor.kinds),selected=all.filter(r=>kinds.has(r.kind));
-    if(!selected.length){empty("当前 workflow 没有此类资源的展示事实。");return null;}
-    const selectedIds=new Set(selected.map(v=>v.id)),relations=implementation.relations||[];
-    const relatedIds=new Set(relations.filter(e=>selectedIds.has(e.from)||selectedIds.has(e.to)).flatMap(e=>[e.from,e.to]));
-    const values=all.filter(v=>selectedIds.has(v.id)||relatedIds.has(v.id)),ids=new Set(values.map(v=>v.id));
-    const source=data.bodies.resources;if(!source)throw new Error("缺少资源事实。");
-    const indexes=(source.facts.edges||[]).map((e,i)=>i).filter(i=>ids.has(source.facts.edges[i].from)&&ids.has(source.facts.edges[i].to));
-    const body={...source,facts:{nodes:values,edges:indexes.map(i=>source.facts.edges[i])}};
+    const source=getData().bodies.resources;if(!source)throw new Error("缺少资源事实。");
+    const body=VFModel.resourceView(source,descriptor.kinds);
+    if(!body.facts.nodes.length){empty("当前 workflow 没有此类资源的展示事实。");return null;}
     const layout=await layoutBody("resources","",[],body,"resource");if(!isCurrent(token))return null;return drawBody(layout);
   }
   async function drawLinks(descriptor,token) {

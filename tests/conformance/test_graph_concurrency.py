@@ -15,7 +15,7 @@ from vibeflow.tooling.project.graph_config import parse_graph_config
 
 
 def _call(name, key, **options):
-    return dict(id=name, type_used=key, display_name=name, description=name, **options)
+    return dict(id=name, definition_id=key, display_name=name, description=name, **options)
 
 
 @pytest.mark.parametrize('execution', ['plan', 'block', 'compiled'])
@@ -36,10 +36,10 @@ def test_python_dispatch_limit_can_exceed_default_and_repeats_in_nested_loops(tm
             return {'report': [item['value'] for item in inputs['receipt']]}
 
     registry.register(NodeDescriptor('native.terminal', 'Terminal', 'Boundary', '1', 'terminal',
-        contract=NodeContractDescriptor(), rulesets=()), Terminal)
+        contract=NodeContractDescriptor(), rulesets=(), node_type="vibeflow.node"), Terminal)
     registry.register(NodeDescriptor('native.collect', 'Collect', 'Collect complete results', '1', 'process',
         contract=NodeContractDescriptor(requires=(DataRequirement('receipt','all',display_name='Receipt'),),
-            provides=(DataProvider('report','report',display_name='Report'),), input_semantics={'receipt':('Independent receipt',)}, output_semantics={'report':('Collected values',)}), rulesets=()), Collector)
+            provides=(DataProvider('report','report',display_name='Report'),), input_semantics={'receipt':('Independent receipt',)}, output_semantics={'report':('Collected values',)}), rulesets=(), node_type="vibeflow.node"), Collector)
     for index in range(count):
         def implementation(value):
             class Worker:
@@ -49,7 +49,7 @@ def test_python_dispatch_limit_can_exceed_default_and_repeats_in_nested_loops(tm
                     return {f'receipt{value}': value}
             return Worker
         registry.register(NodeDescriptor(f'native.work{index}', 'Work', 'Independent work', '1', 'process',
-            contract=NodeContractDescriptor(provides=(DataProvider(f'receipt{index}','receipt',display_name='Receipt'),), output_semantics={f'receipt{index}':('Independent receipt',)}), rulesets=()), implementation(index))
+            contract=NodeContractDescriptor(provides=(DataProvider(f'receipt{index}','receipt',display_name='Receipt'),), output_semantics={f'receipt{index}':('Independent receipt',)}), rulesets=(), node_type="vibeflow.node"), implementation(index))
     nodes = [_call('start','native.terminal',config={'max_concurrency':count}), *[_call(f'w{i}',f'native.work{i}') for i in range(count)],
              _call('collect','native.collect',join_policy='all'), _call('end','native.terminal')]
     graph = parse_graph_config({'pipeline':{'nodes':nodes,
@@ -57,14 +57,14 @@ def test_python_dispatch_limit_can_exceed_default_and_repeats_in_nested_loops(tm
         'outputs':[{'type':'report','cardinality':'exactly_one','as':'report','display_name':'Report'},
                    {'type':'receipt','cardinality':'all','as':'receipts','display_name':'Receipts'}]}})
     if nested:
-        from vibeflow.core.flow import GraphConfig,NodeSpec,NodesetSpec,LoopSpec,LoopOutputSpec,EdgeSpec
+        from vibeflow.core.flow import GraphConfig,NodeCallSpec,NodesetTypeSpec,LoopSpec,LoopOutputSpec,EdgeSpec
         from vibeflow.core.contracts import PipelineOutputSpec
-        definition=NodesetSpec("native.batch","Batch","Ordinary parallel graph",(),(),graph)
-        graph=GraphConfig(nodes=(NodeSpec("start","native.terminal"),
-            NodeSpec("batch","vibeflow.loop.while",provides=(DataProvider("report","report",display_name="Report"),),
+        definition=NodesetTypeSpec("native.batch","Batch","Ordinary parallel graph",(),(),graph)
+        graph=GraphConfig(nodes=(NodeCallSpec("start","native.terminal"),
+            NodeCallSpec("batch","vibeflow.loop.while",provides=(DataProvider("report","report",display_name="Report"),),
                 loop=LoopSpec(body="native.batch",stop_after=3,outputs=(LoopOutputSpec("report","report"),))),
-            NodeSpec("end","native.terminal")),edges=(EdgeSpec("start","batch"),EdgeSpec("batch","end")),
-            nodesets={definition.type_key:definition},outputs=(PipelineOutputSpec("report","exactly_one",display_name="Report"),))
+            NodeCallSpec("end","native.terminal")),edges=(EdgeSpec("start","batch"),EdgeSpec("batch","end")),
+            nodeset_types={definition.type_key:definition},outputs=(PipelineOutputSpec("report","exactly_one",display_name="Report"),))
     runtime = PipelineRuntime(graph,registry=registry,run_dir=tmp_path,
                               runtime_options=RuntimeOptions(execution=execution))
     for round in range(3):
@@ -100,7 +100,7 @@ def test_python_failure_waits_for_sibling_finally(tmp_path, execution):
 
     for key,kind,implementation in [('terminal','terminal',Terminal),('work','process',Worker),('fail','process',Failure)]:
         registry.register(NodeDescriptor('native.'+key,key,key,'1',kind,
-            contract=NodeContractDescriptor(),rulesets=()),implementation)
+            contract=NodeContractDescriptor(),rulesets=(), node_type="vibeflow.node"),implementation)
     graph = parse_graph_config({'pipeline':{'nodes':[_call('start','native.terminal'),
         _call('work','native.work'),_call('fail','native.fail'),
         _call('collect','native.terminal',join_policy='all')],
@@ -114,7 +114,7 @@ def test_python_failure_waits_for_sibling_finally(tmp_path, execution):
 def test_javascript_all_ready_branches_execute_and_join_once(tmp_path):
     count = 12
     def node(name, export, **extra):
-        return {'id':name,'type_used':'native.'+name,'flow_kind':'process',
+        return {'id':name,'definition_id':'native.'+name,'flow_kind':'process',
                     'implementation':{'kind':'file','ref':'./nodes.mjs','export':export},**extra}
     terminal = lambda name: node(name,'terminal',flow_kind='terminal',is_terminal=True,max_concurrency=count)
     workers = [node(f'w{i}','work',completion='suspend',params={'index':i},

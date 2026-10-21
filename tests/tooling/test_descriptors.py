@@ -18,11 +18,12 @@ from vibeflow.core.descriptors import (
     NodeDescriptor,
     SourceLocator,
 )
-from vibeflow.tooling.project.descriptor_loader import (
-    DescriptorLoadError,
+from vibeflow.tooling.project.resources import (
+    ResourcePreparationError,
 )
-from vibeflow.core.descriptors import ContributionBuilder, ResourceOrigin, compose_contributions, DescriptorCatalogError
+from vibeflow.core.descriptors import ContributionBuilder, ResourceOrigin, ResourceOwner, compose_contributions, DescriptorCatalogError
 from vibeflow.core.descriptors.decode import decode_resource
+from vibeflow.core.descriptors.contributions import ResourceDeclaration
 from vibeflow.targets.python.project.registry import NodeRegistry
 
 
@@ -37,9 +38,9 @@ def _node_payload(
     *,
     display_name: str = "Add",
 ) -> dict[str, object]:
-    return {
+    return {'node_type': 'vibeflow.node',
         "kind": "node",
-        "type_key": type_key,
+        'id': type_key,
         "display_name": display_name,
 
         "description": "Adds one.",
@@ -94,21 +95,22 @@ def test_explicit_contributions_build_all_catalogs() -> None:
         {"kind": "data_schema", "type_key": "value.out", "representation": "json", "schema": {"type": "number"}},
         {"kind": "capability", "id": "demo.storage", "targets": ["browser", "node"],
          "operations": {"read": {"input_type": "storage.read.request", "output_type": "storage.read.result"}}},
-        {"kind": "host_extension", "id": "demo.storage_host", "targets": ["browser", "node"],
-         "implementations": [{"language": "typescript", "targets": ["browser", "node"],
-             "source": {"kind": "file", "ref": "project/host_extensions/storage.ts", "export": "createHostExtension"}}],
-         "provides": ["demo.storage"]}]
+]
     builder = ContributionBuilder("demo", source="demo_plugin.ts")
+    resources = []
     for value in values:
-        builder.add(decode_resource(value), origin=ResourceOrigin("demo", "demo_plugin.ts"))
-    catalogs = compose_contributions((builder.finish(),))
+        descriptor = decode_resource(value)
+        if value["kind"] in {"node", "base_lib"}:
+            resources.append(ResourceDeclaration(descriptor, ResourceOrigin(ResourceOwner("root", "app"), "demo_resources.ts")))
+        else:
+            builder.add(descriptor, origin=ResourceOrigin(ResourceOwner("plugin", "demo"), "demo_plugin.ts"))
+    catalogs = compose_contributions((builder.finish(),), resources=tuple(resources))
     assert catalogs.nodes.available() == ("demo.add",)
     assert catalogs.base_libs.available() == ("demo.math",)
     assert catalogs.schemas.available() == ("value.out",)
     assert catalogs.capabilities.available() == ("demo.storage",)
-    assert catalogs.host_extensions.available() == ("demo.storage_host",)
     assert catalogs.nodes.require("demo.add").contract.params_defaults["delta"] == 1
-    assert catalogs.source_files == ("demo_plugin.ts",)
+    assert set(catalogs.source_files) == {"demo_plugin.ts", "demo_resources.ts"}
     json.dumps(catalogs.to_dict())
 
 
@@ -121,47 +123,44 @@ def test_loader_reports_duplicate_and_conflicting_ids(
     second_name: str,
     expected_code: str,
 ) -> None:
-    contributions = []
-    for name, payload in (("a.py", _node_payload()), ("b.py", _node_payload(display_name=second_name))):
-        builder = ContributionBuilder(name, source=name)
-        builder.add(decode_resource(payload), origin=ResourceOrigin(name, name))
-        contributions.append(builder.finish())
+    declarations = tuple(ResourceDeclaration(decode_resource(payload), ResourceOrigin(ResourceOwner("root", "app"), name))
+        for name, payload in (("a.py", _node_payload()), ("b.py", _node_payload(display_name=second_name))))
     with pytest.raises(DescriptorCatalogError) as captured:
-        compose_contributions(tuple(contributions))
+        compose_contributions((), resources=declarations)
     assert captured.value.code == expected_code
     assert captured.value.source == "b.py"
     assert captured.value.previous_source == "a.py"
 
 
 def test_selected_plugin_rejects_file_escape_and_symlink(tmp_path: Path) -> None:
-    from vibeflow.tooling.project.descriptor_loader import load_workflow_plugins
+    from vibeflow.tooling.project.resources import prepare_workflow_resources
     from vibeflow.tooling.project.workspace_loader import load_workspace_config
     root, outside = tmp_path / "root", tmp_path / "outside"
     root.mkdir(); outside.mkdir()
     (root / "vibeflow_project.jsonc").write_text('{"project_target":"python"}')
-    (root / "vibeflow_config.jsonc").write_text('{"roots":[{"id":"p","path":"."}]}')
+    (tmp_path / "vibeflow_config.jsonc").write_text('{"roots":[{"id":"p","path":"root"}]}')
     (outside / "plugin.py").write_text('raise RuntimeError("escaped plugin was loaded")')
     (root / "linked.py").symlink_to(outside / "plugin.py")
-    workspace = load_workspace_config(root / "vibeflow_config.jsonc")
+    workspace = load_workspace_config(tmp_path / "vibeflow_config.jsonc")
     for ref in ("../outside/plugin.py", "linked.py"):
         config = root / "workflow.jsonc"
-        config.write_text(json.dumps({"plugins":[{"source":{"kind":"file","ref":ref}}]}))
-        with pytest.raises(DescriptorLoadError, match="selected workspace root"):
-            load_workflow_plugins(workspace, config)
+        config.write_text(json.dumps({"plugins":[{"source":{"kind":"file","ref":ref}}],"pipeline":{"nodes":[{"id":"future","definition_id":"future","display_name":"Future","description":"Planned","status":"planned","flow_kind":"process","requires":[],"provides":[]}]}}))
+        with pytest.raises(ResourcePreparationError, match="selected workspace root"):
+            prepare_workflow_resources(workspace, config)
 
 
 def test_catalogs_sort_ids_and_preserve_source_diagnostics() -> None:
     contract = NodeContractDescriptor()
     first = NodeDescriptor(
-        type_key="demo.z",
+        rulesets=(), id="demo.z",
         display_name="Z",
 
         description="Z.",
         version="1",
         flow_kind="process",
         contract=contract,
-    )
-    second = replace(first, type_key="demo.a", display_name="A")
+     node_type="vibeflow.node")
+    second = replace(first, id="demo.a", display_name="A")
     catalog = NodeCatalog()
     catalog.register(first, source="z.jsonc")
     catalog.register(second, source="a.jsonc")
@@ -178,7 +177,7 @@ class _DeclaredNode:
 def test_declared_metadata_is_authoritative_for_python_bindings() -> None:
     registry = NodeRegistry()
     descriptor = NodeDescriptor(
-        type_key="demo.declared", display_name="Declared",
+        id="demo.declared", display_name="Declared",
         description="A declared node.", version="1.0.0", flow_kind="process",
         rulesets=("vibeflow.process",),
         contract=NodeContractDescriptor(
@@ -186,7 +185,7 @@ def test_declared_metadata_is_authoritative_for_python_bindings() -> None:
             output_semantics={"value.out": ("result",)},
             params_schema={"value": {"type": "number"}}, params_defaults={"value": 1},
         ),
-    )
+     node_type="vibeflow.node")
     registry.register(descriptor, _DeclaredNode, source="nodes/declared.jsonc")
     assert registry.descriptor("demo.declared") is descriptor
     assert registry.get("demo.declared") is _DeclaredNode

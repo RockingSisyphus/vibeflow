@@ -57,6 +57,8 @@ def resolve_presentation(
     if resource_kind != "node":
         values["shape"] = "fr-rect" if resource_kind == "base_lib" else "hex"
     apply(_get(descriptor, "presentation", {}), resource_kind)
+    if resource_kind == "node":
+        sources.update(_get(descriptor, "presentation_sources", {}))
     if status_class in SYSTEM_STYLE_COLORS:
         status = SYSTEM_STYLE_COLORS[status_class]
         apply({"fill": status.fill, "stroke": status.stroke, "text": status.text}, "status")
@@ -75,11 +77,11 @@ def _parallel_call(node: object | None, compiled: object | None) -> bool:
     return len(outgoing) > 1 or (_get(node, "join_policy", "") == "all" and len(incoming) > 1)
 
 
-def registry_descriptor(registry: object | None, type_key: str) -> object | None:
+def registry_descriptor(registry: object | None, definition_id: str) -> object | None:
     method = getattr(registry, "descriptor", None)
     if callable(method):
         try:
-            return method(type_key)
+            return method(definition_id)
         except (KeyError, ValueError):
             return None
     return None

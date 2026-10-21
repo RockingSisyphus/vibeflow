@@ -7,7 +7,7 @@ import pytest
 
 from tests.fixtures.support.declarations import node_declaration
 from vibeflow.core.contracts import DataProvider, DataRequirement, PipelineInputSpec, PipelineOutputSpec
-from vibeflow.core.flow import EdgeSpec, GraphConfig, NodeSpec
+from vibeflow.core.flow import EdgeSpec, GraphConfig, NodeCallSpec
 from vibeflow.core.rules import RuleCall, RuleRelation, RulesetDescriptor
 from vibeflow.targets.python.project import NodeRegistry
 from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
@@ -40,12 +40,12 @@ def _runtime(tmp_path, *, selection, managed, flow_kind="process", delegate_cli=
     )
     selected = {"terminal":(custom.id,), "none":("vibeflow.process",), "unconstrained":()}[selection]
     contract = NodeContractDescriptor(requires=(DataRequirement('cli.argv', 'exactly_one', display_name='CLI argv'),), provides=(DataProvider('cli.exit_code', 'cli.exit_code', display_name='CLI exit code'),), input_semantics={'cli.argv': ('business arguments',)}, output_semantics={'cli.exit_code': ('business status',)})
-    descriptor = node_declaration(NodeDescriptor(type_key='test.exit', display_name='Exit', description='Ends the delegated application.', version='1', flow_kind=flow_kind, contract=NodeContractDescriptor()),
+    descriptor = node_declaration(NodeDescriptor(rulesets=(), id='test.exit', display_name='Exit', description='Ends the delegated application.', version='1', flow_kind=flow_kind, contract=NodeContractDescriptor(), node_type="vibeflow.node"),
                                   contract, rulesets=selected)
-    end = node_declaration(NodeDescriptor(type_key='test.end', display_name='End', description='Consumes application status.', version='1', flow_kind='terminal', contract=NodeContractDescriptor()),
+    end = node_declaration(NodeDescriptor(rulesets=(), id='test.end', display_name='End', description='Consumes application status.', version='1', flow_kind='terminal', contract=NodeContractDescriptor(), node_type="vibeflow.node"),
                           NodeContractDescriptor(requires=(DataRequirement('cli.exit_code', 'exactly_one', display_name='CLI exit code'),), input_semantics={item.type: ('Fixture ' + item.type,) for item in (DataRequirement('cli.exit_code', 'exactly_one', display_name='CLI exit code'),)}), rulesets=())
     registry = native_registry()
-    start = node_declaration(NodeDescriptor(type_key='test.start', display_name='Start', description='Starts the application.', version='1', flow_kind='terminal', contract=NodeContractDescriptor()),
+    start = node_declaration(NodeDescriptor(rulesets=(), id='test.start', display_name='Start', description='Starts the application.', version='1', flow_kind='terminal', contract=NodeContractDescriptor(), node_type="vibeflow.node"),
                             NodeContractDescriptor(), rulesets=())
     registry.register(start, namespace["StartNode"])
     registry.register(descriptor, namespace["ExitNode"])
@@ -55,17 +55,17 @@ def _runtime(tmp_path, *, selection, managed, flow_kind="process", delegate_cli=
     registry.source_root_ids = {tmp_path:"project"}
     registry.rule_catalogs = (*registry.rule_catalogs, SimpleNamespace(rules=(),rulesets=(custom,)),)
     graph = GraphConfig(
-        nodes=(NodeSpec("start","test.start"), NodeSpec("exit","test.exit"),
-               NodeSpec("end","test.end")), edges=(EdgeSpec("start","exit"), EdgeSpec("exit","end")),
+        nodes=(NodeCallSpec("start","test.start"), NodeCallSpec("exit","test.exit"),
+               NodeCallSpec("end","test.end")), edges=(EdgeSpec("start","exit"), EdgeSpec("exit","end")),
         inputs=(PipelineInputSpec("cli.argv","cli.argv",display_name="CLI argv",required=False),),
         outputs=(PipelineOutputSpec("cli.exit_code","exactly_one",display_name="CLI exit code"),), rulesets=(),
     )
     if managed:
         from dataclasses import replace
-        from vibeflow.core.flow import NodesetSpec
-        body=GraphConfig(nodes=(NodeSpec("start","test.start"),NodeSpec("worker","test.exit"),NodeSpec("end","test.end")),edges=(EdgeSpec("start","worker"),EdgeSpec("worker","end")),inputs=graph.inputs,outputs=graph.outputs,rulesets=())
-        definition=NodesetSpec("test.child","Child","Ordinary nested permission scope",contract.requires,contract.provides,body)
-        graph=replace(graph,nodes=(graph.nodes[0],NodeSpec("exit","test.child"),graph.nodes[-1]),nodesets={"test.child":definition})
+        from vibeflow.core.flow import NodesetTypeSpec
+        body=GraphConfig(nodes=(NodeCallSpec("start","test.start"),NodeCallSpec("worker","test.exit"),NodeCallSpec("end","test.end")),edges=(EdgeSpec("start","worker"),EdgeSpec("worker","end")),inputs=graph.inputs,outputs=graph.outputs,rulesets=())
+        definition=NodesetTypeSpec("test.child","Child","Ordinary nested permission scope",contract.requires,contract.provides,body)
+        graph=replace(graph,nodes=(graph.nodes[0],NodeCallSpec("exit","test.child"),graph.nodes[-1]),nodeset_types={"test.child":definition})
     rules = execute_python_node_rules(registry,collect_workflow_source_context(registry,graph),phase="run")
     runtime = PipelineRuntime(graph,registry=registry,run_dir=tmp_path / "run",delegate_cli=delegate_cli)
     return runtime, rules

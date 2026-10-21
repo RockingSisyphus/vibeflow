@@ -14,7 +14,7 @@ from vibeflow.targets.python.rules.node.effects import no_side_effects
 from vibeflow.targets.python.quality.source_context import PythonSourceFile, PythonSourceNode, build_python_source_context
 from vibeflow.targets.shared.bindings import native_binding
 from vibeflow.tooling.application.python.project.quality_scan import scan_code_quality
-from vibeflow.tooling.project.descriptor_loader import load_builtin_plugins
+from vibeflow.tooling.project.resources import load_builtin_plugins
 
 
 def _context(kind, body):
@@ -22,22 +22,22 @@ def _context(kind, body):
         body = "\n".join(line.removeprefix("return ") if line.startswith("return ") else line
                          for line in body.splitlines()) + "\nreturn {}"
         text = "class Task:\n    def run_pure(self, inputs, params):\n" + indent(body, "        ") + "\n"
-        descriptor = NodeDescriptor(type_key="example.task", display_name="Task", description="One effect probe.",
-            version="1", flow_kind="process", contract=NodeContractDescriptor())
+        descriptor = NodeDescriptor(rulesets=(), id="example.task", display_name="Task", description="One effect probe.",
+            version="1", flow_kind="process", contract=NodeContractDescriptor(), node_type="vibeflow.node")
         nodes = (PythonSourceNode(descriptor, "/virtual/example.py", "Task"),)
     else:
         text = "def task():\n" + indent(body, "    ") + "\n"
         nodes = ()
     parsed = PythonSourceFile("/virtual/example.py", "example", text, _tree=ast.parse(text))
     sources = build_python_source_context(nodes, (parsed,))
-    facts = {"source_context":sources, "node_catalog":(), "source_owners":()}
+    facts = {"source_context":sources, "node_definitions":(), "source_owners":()}
     if kind == "python_source":
         facts.update(python_source=PythonSource("example", "example.py", parsed.path, text), source_file=parsed)
     elif kind == "base_lib":
         facts.update(base_lib_file=parsed, resource_symbol="")
     if kind == "plugin":
         facts.update(resource_source_file=parsed, resource_symbol="")
-    return RuleContext(subject={"kind":kind, "type_key":"example.task"}, facts=facts, target="python")
+    return RuleContext(subject={"kind":kind, "definition_id":"example.task"}, facts=facts, target="python")
 
 
 @pytest.mark.parametrize("scope", ["none", "terminal", "python_io", "global_state", "trusted"])
@@ -144,7 +144,7 @@ def _resource_context(kind, text, helpers=()):
     sources = build_python_source_context((), (parsed, *helpers))
     owners = tuple({"kind":kind, "id":"example.resource", "role":"entry" if file.path == parsed.path else "support",
         "path":file.path, "symbol":""} for file in sources.files)
-    return RuleContext(subject={"kind":kind, "id":"example.resource", "type_key":"example.resource"}, target="python",
+    return RuleContext(subject={"kind":kind, "id":"example.resource", "definition_id":"example.resource"}, target="python",
         facts={"source_context":sources,"resource_source_file":parsed,"base_lib_file":parsed,
                "source_owners":owners,"resource_symbol":""})
 
@@ -226,11 +226,11 @@ def test_branch_alias_candidates_are_also_consumed_by_attribute_effects(scope):
 def test_node_class_body_uses_shared_effect_traversal_through_catalog_plan(statement, allowed, scope):
     text = "class Task:\n" + indent(statement, "    ") + "\n    def run_pure(self, inputs, params):\n        return {}\n"
     parsed = PythonSourceFile.parse("/virtual/class_body.py", "class_body", text)
-    descriptor = NodeDescriptor(type_key="example.task", display_name="Task", description="Class body effect probe.",
-        version="1", flow_kind="process", contract=NodeContractDescriptor())
+    descriptor = NodeDescriptor(rulesets=(), id="example.task", display_name="Task", description="Class body effect probe.",
+        version="1", flow_kind="process", contract=NodeContractDescriptor(), node_type="vibeflow.node")
     sources = build_python_source_context((PythonSourceNode(descriptor, parsed.path, "Task"),), (parsed,))
-    context = RuleContext(subject={"kind":"node", "type_key":"example.task"}, target="python",
-        facts={"source_context":sources,"node_catalog":(),"source_owners":()})
+    context = RuleContext(subject={"kind":"node", "definition_id":"example.task"}, target="python",
+        facts={"source_context":sources,"node_definitions":(),"source_owners":()})
     catalog = load_builtin_plugins("python").catalogs
     rules = {item.id:item for item in catalog.rules}
     handlers = {item.id:native_binding(catalog, "rule", item.id) for item in catalog.rules}
@@ -289,11 +289,11 @@ def test_node_class_base_and_decorator_arguments_use_shared_effects(header, scop
     text = ('def constructor(value):\n    return object\n' + header
             + '\n    def run_pure(self, inputs, params):\n        return {}\n')
     parsed = PythonSourceFile.parse("/virtual/class_header.py", "class_header", text)
-    descriptor = NodeDescriptor(type_key="example.task", display_name="Task", description="Class header effect probe.",
-        version="1", flow_kind="process", contract=NodeContractDescriptor())
+    descriptor = NodeDescriptor(rulesets=(), id="example.task", display_name="Task", description="Class header effect probe.",
+        version="1", flow_kind="process", contract=NodeContractDescriptor(), node_type="vibeflow.node")
     sources = build_python_source_context((PythonSourceNode(descriptor, parsed.path, "Task"),), (parsed,))
-    context = RuleContext(subject={"kind":"node", "type_key":"example.task"}, target="python",
-        facts={"source_context":sources,"node_catalog":(),"source_owners":()})
+    context = RuleContext(subject={"kind":"node", "definition_id":"example.task"}, target="python",
+        facts={"source_context":sources,"node_definitions":(),"source_owners":()})
     result = no_side_effects(context, {}, {"effect_scope":scope})
     assert result.state == "completed"
     assert bool(result.findings) == (scope != "python_io"), (scope, header, result.findings)
@@ -451,11 +451,11 @@ def test_function_headers_keep_enclosing_input_ownership_until_body(target, in_b
         module += "def helper(" + signature + "):\n" + body
         module += "class Task:\n    def run_pure(self, inputs, params):\n        helper(inputs)\n        return {}\n"
     parsed = PythonSourceFile.parse("/virtual/definition_inputs.py", "definition_inputs", module)
-    descriptor = NodeDescriptor(type_key="example.task", display_name="Task", description="Definition input scope probe.",
-        version="1", flow_kind="process", contract=NodeContractDescriptor())
+    descriptor = NodeDescriptor(rulesets=(), id="example.task", display_name="Task", description="Definition input scope probe.",
+        version="1", flow_kind="process", contract=NodeContractDescriptor(), node_type="vibeflow.node")
     sources = build_python_source_context((PythonSourceNode(descriptor, parsed.path, "Task"),), (parsed,))
-    context = RuleContext(subject={"kind":"node", "type_key":"example.task"}, target="python",
-        facts={"source_context":sources, "node_catalog":(), "source_owners":()})
+    context = RuleContext(subject={"kind":"node", "definition_id":"example.task"}, target="python",
+        facts={"source_context":sources, "node_definitions":(), "source_owners":()})
     result = input_writes(context, {}, {})
     assert result.state == "completed"
     assert bool(result.findings) == (in_body and target == "method"), (target, in_body, result.findings)
@@ -469,20 +469,20 @@ def test_nested_global_restores_module_host_alias_beyond_enclosing_parameter_sha
             "\n        return " + name + ".argv\n    return helper\nclass Task:\n"
             "    def run_pure(self, inputs, params):\n        outer(None)\n        return {}\n")
     parsed = PythonSourceFile.parse("/virtual/global_function.py", "global_function", text)
-    descriptor = NodeDescriptor(type_key="example.task", display_name="Task", description="Global header scope probe.",
-        version="1", flow_kind="process", contract=NodeContractDescriptor())
+    descriptor = NodeDescriptor(rulesets=(), id="example.task", display_name="Task", description="Global header scope probe.",
+        version="1", flow_kind="process", contract=NodeContractDescriptor(), node_type="vibeflow.node")
     nodes = (PythonSourceNode(descriptor, parsed.path, "Task"),) if kind == "node" else ()
     sources = build_python_source_context(nodes, (parsed,))
     owners = ({"kind":kind, "id":"example.task", "role":"entry", "path":parsed.path,
                "symbol":"Task" if kind == "node" else ""},)
-    facts = {"source_context":sources, "node_catalog":(), "source_owners":owners}
+    facts = {"source_context":sources, "node_definitions":(), "source_owners":owners}
     if kind == "python_source":
         facts.update(python_source=PythonSource(parsed.module, "global_function.py", parsed.path, text), source_file=parsed)
     elif kind == "base_lib":
         facts.update(base_lib_file=parsed, resource_symbol="")
     elif kind == "plugin":
         facts.update(resource_source_file=parsed, resource_symbol="")
-    context = RuleContext(subject={"kind":kind, "id":"example.task", "type_key":"example.task"}, facts=facts, target="python")
+    context = RuleContext(subject={"kind":kind, "id":"example.task", "definition_id":"example.task"}, facts=facts, target="python")
     result = no_side_effects(context, {}, {"effect_scope":"global_state"})
     assert result.state == "completed"
     assert any("sys.argv" in item.message for item in result.findings), (kind, name, result.findings)
@@ -491,20 +491,20 @@ def test_nested_global_restores_module_host_alias_beyond_enclosing_parameter_sha
 
 def _module_definition_context(kind, text, path):
     parsed = PythonSourceFile.parse(path, "definition_scope", text)
-    descriptor = NodeDescriptor(type_key="example.task", display_name="Task", description="Definition scope probe.",
-        version="1", flow_kind="process", contract=NodeContractDescriptor())
+    descriptor = NodeDescriptor(rulesets=(), id="example.task", display_name="Task", description="Definition scope probe.",
+        version="1", flow_kind="process", contract=NodeContractDescriptor(), node_type="vibeflow.node")
     nodes = (PythonSourceNode(descriptor, parsed.path, "Task"),) if kind == "node" else ()
     sources = build_python_source_context(nodes, (parsed,))
     owners = ({"kind":kind, "id":"example.task", "role":"entry", "path":parsed.path,
                "symbol":"Task" if kind == "node" else ""},)
-    facts = {"source_context":sources, "node_catalog":(), "source_owners":owners}
+    facts = {"source_context":sources, "node_definitions":(), "source_owners":owners}
     if kind == "python_source":
         facts.update(python_source=PythonSource(parsed.module, "definition_scope.py", parsed.path, text), source_file=parsed)
     elif kind == "base_lib":
         facts.update(base_lib_file=parsed, resource_symbol="")
     elif kind == "plugin":
         facts.update(resource_source_file=parsed, resource_symbol="")
-    return RuleContext(subject={"kind":kind, "id":"example.task", "type_key":"example.task"}, facts=facts, target="python")
+    return RuleContext(subject={"kind":kind, "id":"example.task", "definition_id":"example.task"}, facts=facts, target="python")
 
 
 @pytest.mark.parametrize("kind", ["python_source", "node", "base_lib", "plugin"])
@@ -572,15 +572,15 @@ def _cross_file_callable_scope_context(kind, text, *, helper_effect=False):
     entry = PythonSourceFile.parse("/virtual/callable_entry.py", "callable_entry", text)
     helper_text = "def close():\n    return " + ("open('never-open').read()" if helper_effect else "1") + "\n"
     helper = PythonSourceFile.parse("/virtual/callable_helper.py", "callable_helper", helper_text)
-    descriptor = NodeDescriptor(type_key="example.task", display_name="Task", description="Callable scope facts probe.",
-        version="1", flow_kind="process", contract=NodeContractDescriptor())
+    descriptor = NodeDescriptor(rulesets=(), id="example.task", display_name="Task", description="Callable scope facts probe.",
+        version="1", flow_kind="process", contract=NodeContractDescriptor(), node_type="vibeflow.node")
     nodes = (PythonSourceNode(descriptor, entry.path, "Task"),) if kind == "node" else ()
     sources = build_python_source_context(nodes, (entry, helper))
     assert helper.path in {item.path for item in sources.import_closure(entry.path)}
     owners = tuple({"kind":kind, "id":"example.task", "role":"entry" if source is entry else "support",
                    "path":source.path, "symbol":"Task" if kind == "node" and source is entry else ""}
                    for source in (entry, helper))
-    facts = {"source_context":sources, "node_catalog":(), "source_owners":owners}
+    facts = {"source_context":sources, "node_definitions":(), "source_owners":owners}
     if kind == "python_source":
         pairs = tuple((PythonSource(source.module, source.module + ".py", source.path, source.text), source)
                       for source in (entry, helper))
@@ -589,7 +589,7 @@ def _cross_file_callable_scope_context(kind, text, *, helper_effect=False):
         facts.update(base_lib_file=entry, resource_symbol="")
     elif kind == "plugin":
         facts.update(resource_source_file=entry, resource_symbol="")
-    context = RuleContext(subject={"kind":kind, "id":"example.task", "type_key":"example.task"}, facts=facts, target="python")
+    context = RuleContext(subject={"kind":kind, "id":"example.task", "definition_id":"example.task"}, facts=facts, target="python")
     return context, sources, entry, helper
 
 

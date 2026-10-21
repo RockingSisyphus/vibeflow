@@ -264,10 +264,10 @@ def test_cached_source_diagnostics_preserve_execution_status_without_duplicate_f
 
 def test_rule_context_freezes_graph_compiled_and_result_dataclass_fields():
     from vibeflow.core.compiler import CompiledGraph
-    from vibeflow.core.flow import GraphConfig, NodeSpec
+    from vibeflow.core.flow import GraphConfig, NodeCallSpec
     from vibeflow.core.findings import HealthFinding
 
-    graph = GraphConfig(nodes=(NodeSpec("one", "example.one", params={"nested": {"values": [1]}}),))
+    graph = GraphConfig(nodes=(NodeCallSpec("one", "example.one", params={"nested": {"values": [1]}}),))
     compiled = CompiledGraph(order=("one",), explicit_edges=(), data_edges=(), effective_edges=(),
                              providers={"value": "one"}, consumers={}, flow_kinds={"one": "process"})
     context = RuleContext(facts={"graph": graph, "compiled": compiled})
@@ -372,16 +372,16 @@ def test_mutable_dataclass_or_opaque_outputs_fail_before_consumers_run():
 
 
 def test_builtin_planned_records_preserve_frozen_event_types():
-    from vibeflow.core.flow import GraphConfig, NodeSpec
+    from vibeflow.core.flow import GraphConfig, NodeCallSpec
     from vibeflow.core.planned import PlannedBehavior
     from vibeflow.targets.shared.quality_support.workflow_rules.planned import PlannedImplementationCheck
     from vibeflow.targets.python.rules.graph import workflow_topic_resources, workflow_topic_handlers
 
-    graph = GraphConfig(nodes=(NodeSpec("future", "example.future", status="planned",
+    graph = GraphConfig(nodes=(NodeCallSpec("future", "example.future", status="planned",
         planned_behavior=PlannedBehavior("python_stub", "stubs/future.py")),))
     resources = {item.id:item for item in workflow_topic_resources()}
     plan = compile_ruleset(RulesetDescriptor("planned", (RuleCall("check", "vibeflow.graph.planned"),)), rules=resources)
-    result = execute_rule_plan(plan, RuleContext(facts={"graph":graph}), handlers=workflow_topic_handlers()).results["check"]
+    result = execute_rule_plan(plan, RuleContext(facts={"graph":graph}, scope={"level":"graph"}), handlers=workflow_topic_handlers()).results["check"]
     assert result.state == "completed"
     assert any(isinstance(event, PlannedImplementationCheck) for event in result.records["events"].value)
     json.dumps(result.to_dict())

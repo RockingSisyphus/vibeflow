@@ -20,6 +20,15 @@ from vibeflow.core.flow import ENTRY_MODES
 STATUSES = {"planned", "implemented"}
 
 
+class ConfigSchemaError(ValueError):
+    """Preserve formal schema findings across Target adapters."""
+    def __init__(self, findings):
+        self.findings = tuple(findings)
+        self.code = self.findings[0].rule_id
+        self.diagnostics = tuple(item.to_dict() for item in self.findings)
+        super().__init__(self.findings[0].message)
+
+
 def collect_config_schema_findings(config: Mapping[str, Any]) -> tuple[HealthFinding, ...]:
     findings: list[HealthFinding] = []
     if "rulesets" in config:
@@ -40,11 +49,11 @@ def collect_config_schema_findings(config: Mapping[str, Any]) -> tuple[HealthFin
             parse_targets(config["workflow_targets"])
         except ValueError as error:
             findings.append(_error("CONFIG.WORKFLOW_TARGET.INVALID", str(error), "workflow_targets"))
-    if "nodesets" in config:
+    if "nodeset_types" in config:
         if config.get("__vibeflow_expanded_nodesets__") is True:
-            _validate_nodesets(config["nodesets"], findings)
+            _validate_nodesets(config["nodeset_types"], findings)
         else:
-            findings.append(_error("CONFIG.NODESETS.INLINE_REMOVED", "inline nodesets are removed; import one nodeset JSONC file per type_key with nodeset_imports", "nodesets"))
+            findings.append(_error("CONFIG.NODESETS.INLINE_REMOVED", "inline nodeset_types are removed; import one nodeset JSONC file per type_key with nodeset_imports", "nodeset_types"))
     if "nodeset_imports" in config:
         _validate_nodeset_imports(config["nodeset_imports"], findings)
     if "boundary" in config:
@@ -56,21 +65,14 @@ def collect_config_schema_findings(config: Mapping[str, Any]) -> tuple[HealthFin
     if "plugins" in config:
         _validate_plugins(config["plugins"], findings)
     if "host_extensions" in config:
-        _validate_host_extensions(config["host_extensions"], findings)
+        findings.append(_error("CONFIG.HOST_EXTENSION.RETIRED",
+            "Host Extension is retired; express initialization, receive and close as workflow Nodes using Capabilities",
+            "host_extensions"))
     if "policy" in config:
-        _validate_policy(config["policy"], "policy", findings, rule_source="config.inline_policy")
+        findings.append(_error("CONFIG.POLICY.RETIRED", "policy is retired; configure Rule parameters in root_rules.jsonc or project_rules.jsonc", "policy"))
     return tuple(findings)
 
 
-def collect_policy_schema_findings(
-    policy: Any,
-    *,
-    object_prefix: str = "policy",
-    rule_source: str = "config.inline_policy",
-) -> tuple[HealthFinding, ...]:
-    findings: list[HealthFinding] = []
-    _validate_policy(policy, object_prefix, findings, rule_source=rule_source)
-    return tuple(findings)
 
 
 def _validate_pipeline(value: Mapping[str, Any], prefix: str, findings: list[HealthFinding]) -> None:
@@ -179,10 +181,10 @@ def _validate_removed_edge_fields(value: Mapping[str, Any], prefix: str, finding
 
 def _validate_nodesets(value: Any, findings: list[HealthFinding]) -> None:
     if not isinstance(value, list):
-        findings.append(_error("CONFIG.SCHEMA.NODESETS_LIST", "nodesets must be a list", "nodesets"))
+        findings.append(_error("CONFIG.SCHEMA.NODESETS_LIST", "nodeset_types must be a list", "nodeset_types"))
         return
     for index, item in enumerate(value):
-        prefix = f"nodesets[{index}]"
+        prefix = f"nodeset_types[{index}]"
         if not isinstance(item, Mapping):
             findings.append(_error("CONFIG.SCHEMA.NODESET_OBJECT", f"{prefix} must be an object", prefix))
             continue
@@ -263,59 +265,14 @@ def _validate_nodeset_imports(value: Any, findings: list[HealthFinding]) -> None
             findings.append(_error("CONFIG.SCHEMA.NODESET_IMPORT_NAMES_REMOVED", f"{prefix}.names is removed; each nodeset file defines exactly one type_key", f"{prefix}.names"))
 
 
-def _validate_policy(value: Any, prefix: str, findings: list[HealthFinding], *, rule_source: str) -> None:
-    if not isinstance(value, Mapping):
-        findings.append(_error("CONFIG.SCHEMA.POLICY_ROOT", f"{prefix} must be an object", prefix, rule_source=rule_source))
-        return
-    if "node_source" in value:
-        _validate_node_source_policy(value["node_source"], f"{prefix}.node_source", findings, rule_source=rule_source)
-    if "complexity" in value:
-        _validate_int_policy(value["complexity"], f"{prefix}.complexity", ("max_functions", "max_branches", "max_nesting_depth", "max_params", "max_contract_keys"), findings, rule_source=rule_source, allow_null=True)
-    if "imports" in value:
-        _validate_string_list_policy(value["imports"], f"{prefix}.imports", ("allowed_roots", "banned_roots", "allowed_modules", "banned_modules"), findings, rule_source=rule_source)
-    if "base_lib" in value:
-        findings.append(_error("CONFIG.POLICY.BASE_LIB.REMOVED", "policy.base_lib is removed; declare BaseLib dependencies on resources and configure external imports through policy.imports", f"{prefix}.base_lib", rule_source=rule_source))
-    if "maintainability" in value:
-        _validate_int_policy(value["maintainability"], f"{prefix}.maintainability", ("warn_call_chain_length", "max_call_chain_length", "warn_dependency_chain_length", "max_dependency_chain_length"), findings, rule_source=rule_source, allow_null=False)
-    if "rules" in value:
-        findings.append(_error("CONFIG.POLICY.RULES.REMOVED", "policy rules are removed; select a Ruleset with overrides", f"{prefix}.rules"))
 
 
-def _validate_node_source_policy(value: Any, prefix: str, findings: list[HealthFinding], *, rule_source: str) -> None:
-    _validate_int_policy(value, prefix, ("max_lines", "max_bytes", "warn_lines", "warn_bytes"), findings, rule_source=rule_source, allow_null=False)
 
 
-def _validate_int_policy(value: Any, prefix: str, fields: tuple[str, ...], findings: list[HealthFinding], *, rule_source: str, allow_null: bool) -> None:
-    _validate_policy_section(value, prefix, findings, rule_source=rule_source)
-    if isinstance(value, Mapping):
-        _validate_policy_int_fields(value, prefix, fields, findings, rule_source=rule_source, allow_null=allow_null)
 
 
-def _validate_policy_int_fields(value: Mapping[str, Any], prefix: str, fields: tuple[str, ...], findings: list[HealthFinding], *, rule_source: str, allow_null: bool) -> None:
-    for field in fields:
-        if field in value and not (allow_null and value[field] is None):
-            _validate_positive_int(
-                value[field],
-                f"{prefix}.{field}",
-                findings,
-                "CONFIG.SCHEMA.POLICY_POSITIVE_INT",
-                rule_source=rule_source,
-            )
 
 
-def _validate_string_list_policy(value: Any, prefix: str, fields: tuple[str, ...], findings: list[HealthFinding], *, rule_source: str) -> None:
-    _validate_policy_section(value, prefix, findings, rule_source=rule_source)
-    if not isinstance(value, Mapping):
-        return
-    for field in fields:
-        if field in value:
-            _validate_string_list(
-                value[field],
-                f"{prefix}.{field}",
-                findings,
-                "CONFIG.SCHEMA.POLICY_STRING_LIST",
-                rule_source=rule_source,
-            )
 
 
 def collect_plugin_selection_findings(value: Any) -> list[HealthFinding]:
@@ -329,7 +286,7 @@ def _validate_plugins(value: Any, findings: list[HealthFinding]) -> None:
     if not isinstance(value, list):
         findings.append(_error("CONFIG.SCHEMA.PLUGINS_LIST", "plugins must be a list", "plugins"))
         return
-    allowed = {"id", "source", "root", "config", "enabled", "status", "style"}
+    allowed = {"id", "source", "scope", "language", "config", "enabled", "status", "style"}
     planned_fields = {"type", "targets", "display_name", "description", "version", "priority"}
     for index, item in enumerate(value):
         prefix = f"plugins[{index}]"
@@ -352,9 +309,13 @@ def _validate_plugins(value: Any, findings: list[HealthFinding]) -> None:
         unknown = set(item) - allowed - (planned_fields if status == "planned" else set())
         if unknown:
             findings.append(_error("PLUGIN.SELECTION.MIGRATION", f"unsupported plugin fields: {sorted(unknown)}; use an SDK plugin source", prefix))
-        for field in ("id", "root"):
+        for field in ("id",):
             if field in item and not _non_empty_string(item[field]):
                 findings.append(_error("PLUGIN.SELECTION.SHAPE", f"{field} must be a non-empty string", prefix + "." + field))
+        if "scope" in item and item["scope"] not in {"root", "project"}:
+            findings.append(_error("PLUGIN.SELECTION.SCOPE", "scope must be root or project", prefix + ".scope"))
+        if "language" in item and item["language"] not in {"python", "javascript"}:
+            findings.append(_error("PLUGIN.SELECTION.LANGUAGE", "language must be python or javascript", prefix + ".language"))
         if "config" in item and not isinstance(item["config"], Mapping):
             findings.append(_error("CONFIG.SCHEMA.PLUGIN_CONFIG", "plugin config must be an object", prefix + ".config"))
         if status == "planned":
@@ -381,107 +342,7 @@ def _validate_plugins(value: Any, findings: list[HealthFinding]) -> None:
             findings.append(_error("PLUGIN.SELECTION.SOURCE", "export must be a non-empty string", prefix + ".source.export"))
 
 
-def _validate_host_extensions(
-    value: Any,
-    findings: list[HealthFinding],
-) -> None:
-    if not isinstance(value, list):
-        findings.append(
-            _error(
-                "CONFIG.SCHEMA.HOST_EXTENSIONS_LIST",
-                "host_extensions must be a list",
-                "host_extensions",
-            )
-        )
-        return
-    seen: set[str] = set()
-    for index, item in enumerate(value):
-        prefix = f"host_extensions[{index}]"
-        active = True
-        if isinstance(item, str):
-            extension_id = item.strip()
-            if not extension_id:
-                findings.append(
-                    _error(
-                        "CONFIG.SCHEMA.HOST_EXTENSION_ID",
-                        f"{prefix} must be a non-empty host_extension id",
-                        prefix,
-                    )
-                )
-                continue
-        elif isinstance(item, Mapping):
-            extension_id = str(
-                item.get("id", item.get("name", ""))
-            ).strip()
-            if not extension_id:
-                findings.append(
-                    _error(
-                        "CONFIG.SCHEMA.HOST_EXTENSION_ID",
-                        f"{prefix}.id must be a non-empty string",
-                        f"{prefix}.id",
-                    )
-                )
-            status = (
-                str(item.get("status", "implemented")).strip()
-                or "implemented"
-            )
-            if status not in STATUSES:
-                findings.append(
-                    _error(
-                        "CONFIG.SCHEMA.RESOURCE_STATUS",
-                        (
-                            f"{prefix}.status must be implemented "
-                            "or planned"
-                        ),
-                        f"{prefix}.status",
-                    )
-                )
-            if "enabled" in item and not isinstance(item["enabled"], bool):
-                findings.append(
-                    _error(
-                        "CONFIG.SCHEMA.HOST_EXTENSION_ENABLED",
-                        f"{prefix}.enabled must be a boolean",
-                        f"{prefix}.enabled",
-                    )
-                )
-            active = item.get("enabled", True) is not False
-            for field in ("config", "settings"):
-                if field in item and not isinstance(item[field], Mapping):
-                    findings.append(
-                        _error(
-                            "CONFIG.SCHEMA.HOST_EXTENSION_CONFIG",
-                            f"{prefix}.{field} must be an object",
-                            f"{prefix}.{field}",
-                        )
-                    )
-            for field in ("targets", "provides", "dependencies"):
-                if field in item:
-                    _validate_string_list(
-                        item[field],
-                        f"{prefix}.{field}",
-                        findings,
-                        "CONFIG.SCHEMA.HOST_EXTENSION_STRING_LIST",
-                    )
-            _validate_resource_metadata_strings(item, prefix, findings)
-        else:
-            findings.append(
-                _error(
-                    "CONFIG.SCHEMA.HOST_EXTENSION_OBJECT",
-                    f"{prefix} must be a string or object",
-                    prefix,
-                )
-            )
-            continue
-        if active and extension_id and extension_id in seen:
-            findings.append(
-                _error(
-                    "CONFIG.SCHEMA.HOST_EXTENSION_DUPLICATE",
-                    f"duplicate host_extension id: {extension_id}",
-                    prefix,
-                )
-            )
-        if active and extension_id:
-            seen.add(extension_id)
+
 
 
 def _validate_base_lib_resources(value: Any, findings: list[HealthFinding]) -> None:
@@ -541,9 +402,6 @@ def _validate_resource_metadata_strings(value: Mapping[str, Any], prefix: str, f
             findings.append(_error("CONFIG.SCHEMA.RESOURCE_METADATA_STRING", f"{prefix}.{field} must be a string", f"{prefix}.{field}"))
 
 
-def _validate_policy_section(value: Any, prefix: str, findings: list[HealthFinding], *, rule_source: str) -> None:
-    if not isinstance(value, Mapping):
-        findings.append(_error("CONFIG.SCHEMA.POLICY_SECTION", f"{prefix} must be an object", prefix, rule_source=rule_source))
 
 
 def _is_nodeset_definition(config: Mapping[str, Any]) -> bool:
@@ -552,5 +410,4 @@ def _is_nodeset_definition(config: Mapping[str, Any]) -> bool:
 
 __all__ = [
     "collect_config_schema_findings",
-    "collect_policy_schema_findings",
 ]

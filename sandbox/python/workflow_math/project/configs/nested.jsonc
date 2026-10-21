@@ -17,32 +17,32 @@
     "nodes": [
       {
         "id": "start",
-        "type_used": "sandbox.start",
+        "definition_id": "sandbox.start",
         "display_name": "Start",
         "description": "Runs start."
       },
       {
         "id": "arithmetic",
-        "type_used": "semantic.arithmetic",
+        "definition_id": "semantic.arithmetic",
         "display_name": "Arithmetic",
         "description": "Runs arithmetic."
       },
       {
         "id": "use_scaled",
-        "type_used": "semantic.use_scaled",
+        "definition_id": "semantic.use_scaled",
         "display_name": "Use Scaled",
         "description": "Runs use_scaled."
       },
       {
         "offset": 5,
         "id": "finalize",
-        "type_used": "semantic.finalize",
+        "definition_id": "semantic.finalize",
         "display_name": "Finalize",
         "description": "Runs finalize."
       },
       {
         "id": "end",
-        "type_used": "semantic.final_end",
+        "definition_id": "semantic.final_end",
         "display_name": "End",
         "description": "Runs end."
       }
@@ -85,14 +85,14 @@
   },
   "nodeset_imports": [
     {
-      "path": "nodesets/pass_semantic_nodeset_arithmetic/semantic_arithmetic.jsonc"
+      "path": "nodeset_types/pass_semantic_nodeset_arithmetic/semantic_arithmetic.jsonc"
     }
   ],
   "plugins": [
     {
       "source": {
         "kind": "file",
-        "ref": "plugin.py",
+        "ref": "plugins/code_plugin/plugin.py",
         "export": "plugin"
       }
     }

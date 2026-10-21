@@ -16,7 +16,7 @@ def preview_project(root):
         python_project(location)
     worker_config = root / "worker/workflow.jsonc"
     worker = json.loads(worker_config.read_text())
-    worker["pipeline"]["nodes"].append({"id":"alternate", "type_used":"peer.boundary", "display_name":"Other entry", "description":"Not selected by the call"})
+    worker["pipeline"]["nodes"].append({"id":"alternate", "definition_id":"peer.boundary", "display_name":"Other entry", "description":"Not selected by the call"})
     worker["pipeline"]["edges"].append(["alternate","work"])
     worker["pipeline"]["entries"] = {"main":{"start":"start"},"other":{"start":"alternate"}}
     worker["pipeline"]["default_entry"] = "main"
@@ -25,7 +25,7 @@ def preview_project(root):
     caller = json.loads(config.read_text())
     caller["workflow_targets"] = {"worker": {"root": "worker", "workflow": "workflow.jsonc",
         "command": ["python", "-m", "vibeflow.coordination", "run-python", "--config", "workflow.jsonc"], "cwd": "../worker"}}
-    caller["pipeline"]["nodes"].append({"id": "gui", "type_used": "peer.boundary", "display_name": "GUI entry", "description": "GUI preprocessing"})
+    caller["pipeline"]["nodes"].append({"id": "gui", "definition_id": "peer.boundary", "display_name": "GUI entry", "description": "GUI preprocessing"})
     caller["pipeline"]["edges"].append(["gui", "work"])
     caller["pipeline"]["entries"] = {"cli": {"start": "start"}, "gui": {"start": "gui"}}
     caller["pipeline"]["default_entry"] = "cli"
@@ -35,7 +35,7 @@ def preview_project(root):
     grant["actions"] = [{"operation": "call", "target": "worker", "wait": True},
         {"operation": "wait"}, {"operation": "send"}, {"operation": "receive"}]
     config.write_text(json.dumps(caller))
-    plugin = root / "caller/plugin.py"
+    plugin = root / "caller/nodes/steps.py"
     source = plugin.read_text().replace('["self","send","receive"]', '["self","send","receive","call","wait"]')
     source = source.replace('        message=api["receive"]({"port":"request"})',
         '        peer=api["call"]({"target":"worker"})\n        api["send"]({"id":peer["id"],"port":"request","payload":{"value":7}})\n        message=api["receive"]({"port":"reply"})\n        api["wait"]({"id":peer["id"]})')
@@ -112,7 +112,49 @@ const all=model.bodies(root,{{'peer:flow':{{architecture:peer,workflow:{{id:'pee
 const first=model.childOptions({{id:'call'}},all.workflow,['call'],all)[0];
 assert.equal(first.key,'workflow:peer:flow:entry:main');assert.equal(first.error,'');
 const cyclic=model.childOptions({{id:'main'}},all[first.key],['main'],all)[0];assert.equal(cyclic.key,'workflow');assert.equal(cyclic.error,'');
-const empty=model.bodies({{workflow:{{nodes:[]}},nodesets:{{empty:{{body:{{nodes:[]}}}}}}}});
+const empty=model.bodies({{workflow:{{nodes:[]}},nodeset_types:{{empty:{{body:{{nodes:[]}}}}}}}});
 assert.match(model.childOptions({{invokes:{{target:'empty'}}}},empty.workflow,['empty'],empty)[0].error,/内部定义不可用/);
 '''],capture_output=True,text=True,timeout=10)
     assert result.returncode==0,result.stdout+result.stderr
+
+
+def test_resource_views_keep_packages_and_library_dependencies_without_implementation_neighbors():
+    script = Path(__file__).resolve().parents[2] / "tools/workflow-viewer/model.js"
+    result = subprocess.run(["node", "--input-type=module", "-e", f'''
+import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
+const context={{window:{{}}}};vm.runInNewContext(fs.readFileSync({json.dumps(str(script))},'utf8'),context);
+const model=context.window.VFModel;
+const resources={{
+  'plugin_declaration:layout':{{id:'layout',kind:'plugin_declaration',display_name:'Layout'}},
+  'plugin_declaration:other':{{id:'other',kind:'plugin_declaration',display_name:'Layout',status:'planned'}},
+  'plugin:layout.compiler':{{id:'layout.compiler',kind:'plugin',plugin_id:'layout'}},
+  'plugin:layout.runtime':{{id:'layout.runtime',kind:'plugin',plugin_id:'layout'}},
+  'node:step':{{id:'step',kind:'node',plugin_id:'layout'}},
+  'base_lib:math':{{id:'math',kind:'base_lib',plugin_id:'layout'}},
+  'base_lib:shared':{{id:'shared',kind:'base_lib'}},
+  'host_extension:ui':{{id:'ui',kind:'host_extension'}}
+}};
+const relations=[
+  {{from:'plugin_declaration:layout',to:'plugin:layout.runtime',relation:'contributes'}},
+  {{from:'plugin_declaration:layout',to:'node:step',relation:'contributes'}},
+  {{from:'plugin_declaration:layout',to:'base_lib:math',relation:'contributes'}},
+  {{from:'plugin:layout.runtime',to:'base_lib:math',relation:'base_lib'}},
+  {{from:'node:step',to:'base_lib:math',relation:'base_lib'}},
+  {{from:'host_extension:ui',to:'base_lib:math',relation:'base_lib'}},
+  {{from:'base_lib:math',to:'base_lib:shared',relation:'dependency'}}
+];
+const body=model.bodies({{implementation_graph:{{resources,relations}}}}).resources;
+const ids=value=>Array.from(value.facts.nodes,n=>n.id);
+for(const kinds of [['plugin_declaration'],['plugin','plugin_declaration']]){{
+  const view=model.resourceView(body,kinds);
+  assert.deepEqual(ids(view),['plugin_declaration:layout','plugin_declaration:other']);
+  assert.equal(view.facts.edges.length,0);
+}}
+const libraries=model.resourceView(body,['base_lib']);
+assert.deepEqual(ids(libraries),['base_lib:math','base_lib:shared']);
+assert.deepEqual(JSON.parse(JSON.stringify(libraries.facts.edges)),[relations[6]]);
+assert.deepEqual(ids(model.resourceView(body,['host_extension'])),['host_extension:ui']);
+assert.equal(model.resourceView(body,[]).facts.nodes.length,0);
+assert.equal(body.facts.nodes.length,8);assert.equal(body.facts.edges.length,7);
+'''], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr

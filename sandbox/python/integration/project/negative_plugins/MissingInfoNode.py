@@ -18,4 +18,3 @@ invalid = node(**{'contract': {'requires': [],
  'source': {'kind': 'file',
             'ref': 'illegal_nodes/metadata_contract_cases.py',
             'export': 'MissingInfoNode'}})
-plugin = Plugin(id='invalid.MissingInfoNode', resources=[invalid])

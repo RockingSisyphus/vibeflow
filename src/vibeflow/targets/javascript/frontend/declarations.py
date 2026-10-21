@@ -53,11 +53,7 @@ export class VibeFlowWorkflowError extends Error {
 )
 
 
-def declarations(
-    workflow: EmissionWorkflow,
-    *,
-    has_host_extensions: bool = False,
-) -> str:
+def declarations(workflow: EmissionWorkflow) -> str:
     input_lines: list[str] = []
     for item in workflow.inputs:
         optional = "" if item.required else "?"
@@ -116,12 +112,11 @@ def declarations(
             "  readonly onStatus?: (status: WorkflowRunStatus) => void;",
             "}",
             "",
-            "export const VIBEFLOW_WORKFLOW_ABI: \"vibeflow.workflow.v9\";",
-            "export const VIBEFLOW_PLUGIN_ABI: \"vibeflow.plugin.v3\";",
+            "export const VIBEFLOW_WORKFLOW_ABI: \"vibeflow.workflow.v10\";",
+            "export const VIBEFLOW_PLUGIN_ABI: \"vibeflow.plugin.v4\";",
             _entry_declaration(workflow),
     ]
-    if has_host_extensions:
-        lines.extend(["", *_host_declarations(workflow)])
+
     lines.append("")
     return "\n".join(lines)
 
@@ -153,35 +148,7 @@ def _entry_declaration(workflow: EmissionWorkflow) -> str:
     )
 
 
-def _host_declarations(workflow: EmissionWorkflow) -> list[str]:
-    invocation = _entry_declaration(workflow).replace("export function ", "") if getattr(workflow, "named_entry_contracts", ()) else (
-        "runWorkflow(inputs: WorkflowInputs, "
-        "options?: WorkflowRunOptions): WorkflowOutputs;"
-        if workflow.entry_mode == "sync"
-        else "runWorkflowAsync(inputs: WorkflowInputs, "
-        "options?: WorkflowRunOptions): Promise<WorkflowOutputs>;"
-    )
-    return [
-        "export interface WorkflowHostOptions {",
-        "  readonly capabilities?: WorkflowCapabilities;",
-        "  readonly runDir?: string;",
-        "  readonly statusFile?: string;",
-        "  readonly statusIntervalMs?: number;",
-        "  readonly onStatus?: (status: WorkflowRunStatus) => void;",
-        "}",
-        "",
-        "export interface WorkflowHost {",
-        "  readonly signal: VibeFlowAbortSignal;",
-        "  readonly started: boolean;",
-        "  start(): Promise<void>;",
-        "  stop(): Promise<void>;",
-        f"  {invocation}",
-        "}",
-        "",
-        "export function createWorkflowHost(",
-        "  options?: WorkflowHostOptions,",
-        "): WorkflowHost;",
-    ]
+
 
 
 def _capability_declarations(workflow: EmissionWorkflow) -> list[str]:
