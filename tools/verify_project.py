@@ -186,7 +186,7 @@ from sandbox.javascript.runtime_observation.probe import observe_browser
 work, toolchain, renderer, report = map(Path, sys.argv[1:])
 work.mkdir(parents=True, exist_ok=True)
 result = observe_browser(work, toolchain, renderer)
-report.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\\n')
+report.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\\n', encoding='utf-8')
 if not result['matched']:
     raise SystemExit('browser runtime observation mismatch')
 """, scratch / "runtime-observation-browser", scratch / "pytest/javascript-toolchain",
@@ -661,7 +661,7 @@ def _distribution_smoke(scratch: Path) -> None:
             f"sys.path.insert(0, {str(distribution_root / 'kernel/vibeflow-kernel.zip')!r})",
             "from vibeflow.tooling.application.python import load_bundle",
             f"bundle=load_bundle({str(bundle)!r})",
-            f"initial=json.loads(open({str(input_path)!r}).read())",
+            f"initial=json.loads(open({str(input_path)!r}, encoding='utf-8').read())",
             f"result=bundle.run(initial,run_root={str(scratch / f'aot-api-runs-{index}')!r},runtime_options={{'execution':'compiled','trace':'off'}})",
             "assert result.health.status not in {'FAIL','ERROR'},result.health",
             "assert result.context is not None",
@@ -691,10 +691,11 @@ def _clean_tree_check(_scratch: Path) -> None:
     completed = subprocess.run(
         command,
         cwd=ROOT,
-        env=_environment(),
+        env=_environment({"PYTHONIOENCODING":"utf-8"}),
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
     print(f"$ {shlex.join(command)}", flush=True)
     print(completed.stdout, end="")
@@ -750,7 +751,7 @@ def _run_steps(steps: Sequence[Step], *, scratch: Path) -> None:
         else:
             observations.append({'step':step.name,'status':'passed','seconds':perf_counter()-started})
             print(f"PASS: {step.name}", flush=True)
-        (scratch/'verification.json').write_text(json.dumps({'steps':observations,'failures':failures},indent=2)+'\n')
+        (scratch/'verification.json').write_text(json.dumps({'steps':observations,'failures':failures},indent=2)+'\n',encoding='utf-8')
     if failures:
         raise VerificationError('\n'.join(failures))
 

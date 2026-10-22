@@ -100,7 +100,7 @@ try {
 }
 process.stdout.write(entry);
 """
-        result = subprocess.run([node_command, "--input-type=module", "-e", script, source.ref], cwd=package_root, capture_output=True, text=True, check=True)
+        result = subprocess.run([node_command, "--input-type=module", "-e", script, source.ref], cwd=package_root, capture_output=True, text=True, encoding="utf-8", check=True)
         module = Path(result.stdout)
     else:
         raise ValueError("plugin source must be a file, module or package")

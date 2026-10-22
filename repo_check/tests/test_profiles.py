@@ -48,6 +48,70 @@ class ProfileTests(unittest.TestCase):
     def codes(self, profile: str) -> list[str]:
         return [item.code for item in run_profile(self.fixture.root, profile).findings]
 
+    def test_text_io_requires_explicit_encoding_at_public_check_entry(self) -> None:
+        self.fixture.write("src/vibeflow/tooling/project/text.py", '''
+from pathlib import Path as P
+import io as streams
+import subprocess as processes
+from tempfile import NamedTemporaryFile
+from gzip import open as compressed
+path = P("input.json")
+path.read_text()
+path.write_text("中文")
+path.open()
+open("input.json")
+streams.open("input.json", "w", encoding=None)
+streams.TextIOWrapper(raw)
+NamedTemporaryFile(mode="w+t")
+compressed("input.gz", "rt")
+processes.run(["node"], text=True)
+P.read_text(path)
+path.read_text(encoding="locale")
+''')
+        findings = [item for item in run_profile(self.fixture.root, "base").findings
+                    if item.code == "TEXT_ENCODING_UNSPECIFIED"]
+        self.assertEqual(len(findings), 11)
+        self.assertEqual({item.source_location.line for item in findings}, set(range(8, 19)))
+        self.assertTrue(all(item.subject_id.endswith("project/text.py") for item in findings))
+        self.assertTrue(all('encoding="utf-8"' in item.suggested_fix for item in findings))
+
+    def test_text_io_accepts_formats_bytes_and_unrelated_open_methods(self) -> None:
+        self.fixture.write("src/vibeflow/tooling/project/text.py", '''
+from pathlib import Path
+from io import open as file_open
+import subprocess
+import tempfile
+import gzip
+from vibeflow.targets.javascript import resources
+path = Path("input")
+path.read_text("utf-8")
+path.write_text("text", "utf-8")
+path.open("w", -1, "utf-8")
+open("input", "r", -1, "gbk")
+file_open("input", encoding="ascii")
+open("input", "rb")
+path.open("wb")
+tempfile.NamedTemporaryFile()
+gzip.open("input.gz")
+subprocess.run(["node"], text=True, encoding="utf-8")
+subprocess.run(["node"], stdout=subprocess.PIPE)
+session.open()
+session.open("connection")
+resources.read_text("runtime_helpers.mjs")
+Path.read_text(path, encoding="utf-8")
+''')
+        self.assertNotIn("TEXT_ENCODING_UNSPECIFIED", self.codes("base"))
+
+    def test_text_encoding_check_covers_owned_tools_without_auditing_fixtures(self) -> None:
+        for name in ("tools/check.py", "distribution/build.py", "repo_check/src/checker.py"):
+            self.fixture.write(name, 'open("data.json").read()\n')
+        self.fixture.write("tests/encoding_fixture.py", 'open("legacy.txt").read()\n')
+        self.fixture.write("sandbox/encoding_fixture.py", 'open("legacy.txt").read()\n')
+        findings = [item for item in run_profile(self.fixture.root, "base").findings
+                    if item.code == "TEXT_ENCODING_UNSPECIFIED"]
+        self.assertEqual({item.subject_id for item in findings},
+                         {"tools/check.py", "distribution/build.py", "repo_check/src/checker.py"})
+
     def test_directory_roles_reject_workdirs_and_audit_archives(self) -> None:
         self.fixture.write("dist/independent-review/result.json", "{}")
         self.fixture.write("archive/review-performance-observations.zip", "audit")

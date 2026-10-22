@@ -6,7 +6,7 @@ def run_python(args):
     from vibeflow.coordination.host import run_host
     from vibeflow.targets.python.runtime.lifecycle import CancellationSignal
     signal = CancellationSignal()
-    initial = json.loads(Path(args.input).read_text()) if args.input else {}
+    initial = json.loads(Path(args.input).read_text(encoding="utf-8")) if args.input else {}
     if args.bundle:
         from vibeflow.tooling.application.python.bundle import load_bundle
         bundle = load_bundle(args.bundle)

@@ -23,6 +23,25 @@ Exit status `0` means the selected profile passed, `1` means it found repository
 violations, and `2` means the checker could not run (for example, the requested
 repository or Node.js executable was missing).
 
+The base profile reports `TEXT_ENCODING_UNSPECIFIED` when owned Python text
+I/O relies on the platform default. It checks `src`, `tools`, `distribution`
+and `repo_check/src`, including nested functions. Common `read_text` /
+`write_text`, builtin/io/compressed-file `open`, statically identifiable Path
+`open`, text temporary files, `TextIOWrapper` and explicit text-mode subprocess
+calls must specify an encoding. Import aliases and positional encodings are
+supported; binary modes and unrelated `open` methods are left alone. This is a
+source check, not full type inference: dynamically selected APIs/modes and
+arbitrary custom wrappers and Python code embedded in strings cannot all be
+resolved. Tests and sandbox fixtures
+are excluded because they also exercise deliberately unspecified encodings.
+
+Framework-owned JSON, configuration, architecture, logs and generated source
+use UTF-8. External formats may explicitly use another encoding; kernel byte
+interfaces such as procfs remain bytes or use their specified ASCII format.
+Captured Python subprocess protocols set both `PYTHONIOENCODING=utf-8` for the
+child and `encoding="utf-8"` for the parent. This does not change global Python
+defaults, user file APIs or business file formats.
+
 The checker builds an AST import graph for every module under `src/vibeflow`.
 Imports at module scope, inside functions, under `TYPE_CHECKING`, and fixed-string
 `importlib.import_module()`/`__import__()` calls are included. Python and

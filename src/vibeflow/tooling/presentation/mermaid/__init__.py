@@ -108,7 +108,8 @@ def render_mermaid_svg(
                 "--timeout",
                 str(timeout_seconds),
             ]
-            completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout_seconds + 20)
+            completed = subprocess.run(command, capture_output=True, text=True, encoding="utf-8",
+                env={**os.environ, "PYTHONIOENCODING":"utf-8"}, timeout=timeout_seconds + 20)
             if completed.returncode == 0:
                 if not output.exists():
                     raise MermaidRenderError(f"Mermaid renderer did not create {output}")
@@ -121,7 +122,7 @@ def render_mermaid_svg(
                 if normalized != text:
                     output.write_text(normalized, encoding="utf-8")
                 return output
-            state = process_state.read_text() if process_state.exists() else "not available"
+            state = process_state.read_text(encoding="utf-8") if process_state.exists() else "not available"
             detail = (f"Renderer supervisor returncode={completed.returncode}; process state: {state}\n"
                       f"stderr:\n{completed.stderr or '(empty)'}\nstdout:\n{completed.stdout or '(empty)'}")
             errors.append((label, detail))
