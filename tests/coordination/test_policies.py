@@ -76,9 +76,8 @@ def test_same_node_type_cannot_borrow_another_calls_grant_and_aot_saves_policy(t
 
 
 def test_javascript_rule_adapter_bakes_the_same_call_policy(tmp_path):
-    from vibeflow.tooling.application.javascript.build import ProjectBuildRequest, ProjectBuildError, prepare_project_build
+    from vibeflow.tooling.application.javascript.build import ProjectBuildRequest, ProjectBuildError, prepare_project_build, build_project_aot
     from tests.targets.javascript.test_aot_core import _run_esm
-    from vibeflow.targets.javascript.frontend.emitter import emit_workflow_module
     source = Path(__file__).resolve().parents[2] / "sandbox/javascript/integration"
     destination = tmp_path / "integration"
     shutil.copytree(source, destination, ignore=shutil.ignore_patterns("node_modules", "__pycache__"))
@@ -96,12 +95,11 @@ def test_javascript_rule_adapter_bakes_the_same_call_policy(tmp_path):
     read["rulesets"] = ["vibeflow.process", {"rule_id": "vibeflow.capability.allow", "params": {
         "capability": "sandbox.storage", "operations": ["read"]}}]
     config.write_text(json.dumps(data))
-    prepared = prepare_project_build(request)
-    policy = prepared.plan.block(prepared.plan.entry_block).node("read").capability_policy.to_value()
+    built = build_project_aot(request)
+    policy = built.prepared.plan.block(built.prepared.plan.entry_block).node("read").capability_policy.to_value()
     assert policy["capabilities"] == {"sandbox.storage": ["read"]}
-    path = tmp_path / "workflow.mjs"
-    path.write_text(emit_workflow_module(prepared.plan, javascript_bindings=prepared.javascript_bindings).source)
-    result = _run_esm(path, '''
+    shutil.rmtree(destination)
+    result = _run_esm(built.build.entry, '''
 const result=await workflow.runWorkflowAsync({x:4,key:"answer"},{capabilities:{"sandbox.storage":{read:()=>({value:"stored"})}}});
 console.log(JSON.stringify(result));
 ''')
