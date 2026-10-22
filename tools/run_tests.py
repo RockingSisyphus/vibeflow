@@ -67,7 +67,8 @@ def _prepare_toolchain(scratch: Path, *, environment: dict[str, str]) -> Path:
     toolchain_root.mkdir(parents=True, exist_ok=True)
     for name in ("package.json", "package-lock.json"):
         shutil.copy2(ROOT / "sandbox/javascript/minimal/project" / name, toolchain_root / name)
-    subprocess.run(("npm", "ci"), cwd=toolchain_root, env=environment, check=True)
+    # Resolve Windows' npm.cmd shim before CreateProcess searches for an executable.
+    subprocess.run((shutil.which("npm") or "npm", "ci"), cwd=toolchain_root, env=environment, check=True)
     return toolchain_root
 
 
