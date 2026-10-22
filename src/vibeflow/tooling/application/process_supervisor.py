@@ -25,14 +25,14 @@ def _subreaper() -> bool:
 def _children() -> list[int]:
     path = Path(f"/proc/self/task/{os.getpid()}/children")
     if path.exists():
-        return [int(pid) for pid in path.read_text().split()]
+        return [int(pid) for pid in path.read_text(encoding="ascii").split()]
     # Some managed procfs implementations omit task/*/children.
     children = []
     for entry in Path("/proc").iterdir():
         if not entry.name.isdigit():
             continue
         try:
-            fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
+            fields = (entry / "stat").read_bytes().rsplit(b")", 1)[1].split()
             if int(fields[1]) == os.getpid():
                 children.append(int(entry.name))
         except (FileNotFoundError, PermissionError, ProcessLookupError):
@@ -54,7 +54,7 @@ def supervise(command: list[str], *, state_path: Path | None = None,
         if state_path:
             state_path.parent.mkdir(parents=True, exist_ok=True)
             temp = state_path.with_suffix(state_path.suffix + ".tmp")
-            temp.write_text(json.dumps(state, ensure_ascii=False, indent=2))
+            temp.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
             temp.replace(state_path)
 
     def received(number, _frame):

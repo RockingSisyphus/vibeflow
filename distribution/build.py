@@ -598,6 +598,7 @@ def _verify_staged_distribution(output: Path) -> None:
 
     environment = os.environ.copy()
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    environment["PYTHONIOENCODING"] = "utf-8"
     environment.pop("PYTHONPATH", None)
     checks = (
         ("kernel integrity", [sys.executable, "run.py", "verify-kernel"]),
@@ -636,6 +637,7 @@ def _verify_staged_distribution(output: Path) -> None:
             cwd=output,
             env=environment,
             text=True,
+            encoding="utf-8",
             capture_output=True,
             check=False,
         )
@@ -973,7 +975,7 @@ def _javascript_declaration_tools(output: Path):
             for name in ("package.json", "package-lock.json"):
                 shutil.copy2(project / name, tools / name)
             installed = subprocess.run(["npm", "ci", "--no-audit", "--no-fund"], cwd=tools,
-                capture_output=True, text=True, check=False)
+                capture_output=True, text=True, encoding="utf-8", check=False)
             if installed.returncode:
                 raise BuildDistributionError("declaration toolchain install failed: " + installed.stderr)
         link = project / "node_modules"
@@ -1007,6 +1009,7 @@ sys.stdout.write(render_architecture(result))
 """.strip()
     environment = os.environ.copy()
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    environment["PYTHONIOENCODING"] = "utf-8"
     environment["PYTHONPATH"] = str(ROOT / "src")
     environment["VF_DISTRIBUTION_WORKSPACE"] = str(
         output / "vibeflow_config.jsonc"
@@ -1021,6 +1024,7 @@ sys.stdout.write(render_architecture(result))
             cwd=ROOT,
             env=environment,
             text=True,
+            encoding="utf-8",
             capture_output=True,
             check=False,
         )
@@ -1042,6 +1046,7 @@ raise SystemExit(main(sys.argv[1:]))
 """.strip()
     environment = os.environ.copy()
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    environment["PYTHONIOENCODING"] = "utf-8"
     environment["PYTHONPATH"] = str(ROOT / "src")
     command = [
         sys.executable,
@@ -1060,6 +1065,7 @@ raise SystemExit(main(sys.argv[1:]))
         cwd=ROOT,
         env=environment,
         text=True,
+        encoding="utf-8",
         capture_output=True,
         check=False,
     )
@@ -1074,6 +1080,7 @@ def _write_preview_entry(output: Path) -> None:
     """Install the unpacked entry from the bundled tool without generating history."""
     environment = os.environ.copy()
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    environment["PYTHONIOENCODING"] = "utf-8"
     environment.pop("PYTHONPATH", None)
     # Generated templates have no user edit time; preserve reproducible catalogs.
     environment.setdefault("SOURCE_DATE_EPOCH", "0")
@@ -1082,6 +1089,7 @@ def _write_preview_entry(output: Path) -> None:
         cwd=output,
         env=environment,
         text=True,
+        encoding="utf-8",
         capture_output=True,
         check=False,
     )

@@ -21,12 +21,12 @@ from vibeflow.targets.python.sdk.source_namespace import source_namespace
 class PythonBundle:
     def __init__(self, path):
         self.path = Path(path).resolve()
-        self.metadata = json.loads((self.path / 'vibeflow-build.json').read_text())
+        self.metadata = json.loads((self.path / 'vibeflow-build.json').read_text(encoding='utf-8'))
         if self.metadata.get('format') != 'vibeflow.aot-build.v4' or self.metadata.get('abi_version') != WORKFLOW_ABI_VERSION:
             raise ValueError('unsupported Python AOT format or workflow ABI; rebuild the bundle')
         if self.metadata.get('project_target') != 'python':
             raise ValueError('bundle is not a Python workflow')
-        self.data = json.loads((self.path / self.metadata['target_metadata']['bindings']).read_text())
+        self.data = json.loads((self.path / self.metadata['target_metadata']['bindings']).read_text(encoding='utf-8'))
         relocate = lambda value: str(self.path / value[len('@bundle/'):]) if isinstance(value,str) and value.startswith('@bundle/') else value
         self.workflow = map_plan_sources(workflow_plan_from_dict(self.data['workflow']),
             lambda source:replace(source,ref=relocate(source.ref)))

@@ -135,13 +135,13 @@ def audit(wheel=None):
         if (ROOT / relative).exists():
             failures.append({'path': relative, 'reason': 'test conversion bridge remains'})
     for path in (ROOT / 'src/vibeflow').rglob('*.py'):
-        failures.extend(_retired_source_references(path.read_text(), str(path.relative_to(ROOT))))
+        failures.extend(_retired_source_references(path.read_text(encoding="utf-8"), str(path.relative_to(ROOT))))
     for directory in ('src', 'tests', 'sandbox', 'distribution', 'tools'):
         for path in (ROOT / directory).rglob('*.py'):
             if '__pycache__' in path.parts:
                 continue
             try:
-                tree = ast.parse(path.read_text())
+                tree = ast.parse(path.read_text(encoding="utf-8"))
             except SyntaxError:
                 # Negative regression fixtures deliberately contain invalid source.
                 continue
@@ -189,7 +189,7 @@ def main():
     result = audit(args.wheel)
     output = json.dumps(result, ensure_ascii=False, indent=2) + '\n'
     if args.output:
-        args.output.write_text(output)
+        args.output.write_text(output, encoding="utf-8")
     print(output, end='')
     return int(result['status'] != 'PASS')
 

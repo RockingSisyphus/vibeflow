@@ -19,7 +19,7 @@ def package_facts(contribution, *, owner, package_path, source_kind, source_path
         "source_kind": source_kind, "scope": owner_scope, "owner_path": str(owner.path), "owner_id": owner.id,
         "project_path": str(project_path), "resources": resources,
         "source_paths": tuple(str(Path(path).resolve()) for path in source_paths
-            if not (Path(path).name == "__init__.py" and Path(path).is_file() and not Path(path).read_text().strip()))}
+            if not (Path(path).name == "__init__.py" and Path(path).is_file() and not Path(path).read_text(encoding="utf-8").strip()))}
 
 
 def dependency_fact(workspace, source, target, *, kind, **details):

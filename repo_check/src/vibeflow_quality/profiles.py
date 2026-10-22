@@ -19,6 +19,7 @@ from .application_scan import (
     python_application_findings,
 )
 from .models import Finding, Report, SourceLocation, make_report
+from .text_io import text_encoding_findings
 from .python_scan import (
     build_import_graph,
     iter_python_files,
@@ -405,7 +406,7 @@ def _directory_role_findings(root: Path) -> list[Finding]:
         metadata = dist / name / "DISTRIBUTION.json"
         if metadata.is_file():
             try:
-                version = json.loads(metadata.read_text())["version"]
+                version = json.loads(metadata.read_text(encoding="utf-8"))["version"]
             except (OSError, ValueError, KeyError, TypeError):
                 continue  # Package content validation belongs to the builder.
             if isinstance(version, str):
@@ -615,8 +616,12 @@ def check_base(root: Path, *, node_executable: str | None = None) -> list[Findin
     del node_executable
     findings: list[Finding] = []
     for path in _iter_source_python(root):
-        _, parse_findings = parse_python(path, root)
+        tree, parse_findings = parse_python(path, root)
         findings.extend(parse_findings)
+        relative = path.relative_to(root)
+        if tree is not None and (relative.parts[0] in {"src", "tools", "distribution"}
+                or relative.parts[:2] == ("repo_check", "src")):
+            findings.extend(text_encoding_findings(tree, path, root))
 
     package_root = root / "src" / "vibeflow"
     for relative in _REQUIRED_DIRECTORIES:
@@ -780,6 +785,7 @@ def _node_version(command: str) -> int:
         result = subprocess.run(
             [command, "--version"],
             text=True,
+            encoding="utf-8",
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=15,
@@ -809,6 +815,7 @@ def _check_mjs(root: Path, node_executable: str | None) -> list[Finding]:
             result = subprocess.run(
                 [command, "--check", str(path)],
                 text=True,
+                encoding="utf-8",
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 timeout=30,

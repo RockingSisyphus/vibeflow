@@ -45,7 +45,7 @@ def main(path, argv=None):
                 try:
                     initial = {'cli.argv':delegated} if delegate else {}
                     if not delegate and args.input:
-                        initial = json.loads(Path(args.input).read_text())
+                        initial = json.loads(Path(args.input).read_text(encoding='utf-8'))
                     result = bundle.run(initial,runtime_options=options,
                         run_id=run_id,delegate_cli=delegate,_prepared_run_dir=directory,entry=args.entry)
                     if delegate:

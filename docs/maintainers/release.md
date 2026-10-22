@@ -1,16 +1,20 @@
 # 发行与文档装配
 
-当前分发版本为 1.3.6，Workflow/AOT/Plugin ABI 维持 10/4/4。1.3.6 统一架构审核资料及节点自身的 workflow/launch 声明，修复 planned Call 被加入服务启动清单的问题；planned 结构与调用意图仍保留在 HTML 审核材料中。渲染依赖与使用文档同步更新。
+当前分发版本为 1.3.7，Workflow/AOT/Plugin ABI 维持 10/4/4。1.3.7 修复自有 UTF-8 文本在 Windows 等非 UTF-8 默认环境中的读取问题，并在仓库自检中加入遗漏编码检查。
 
 1.3.5 修复 JavaScript 核心 SDK 解压到 workspace 内时被误认成业务资源的问题：Target 按既有资源清单识别准确文件，在形成业务引用与插件源码闭包时排除核心内部依赖；原始分析保留，用户贡献声明及共享 Rule 政策不变。1.3.4 统一资源使用 Rule 与 `vibeflow.resource_use.v1` 结果：独立 BaseLib（包括间接依赖）必须显式声明，Plugin 贡献资源整包引入并禁止重复声明，贡献代码实际路径必须位于所属 Plugin 目录。Python、JavaScript 的验证、构建、运行准备和展示共同消费规则结果；旧选择器及重复许可检查已删除。Python AOT 按实际引用收集实现，未引用的可用库不随包加载或复制。预览最新快照覆盖各注册 root 当前仍存在的 workflow，继续隐藏 Plugin 贡献资源。1.3.3 的 global_state 环境变量能力保留。
 
 既有版本 ZIP 保留原始字节，ABI 不变。两个 profile 使用下述工具构建；正式发布需验证解压运行、wheel、sdist 与完整门禁，禁止同名覆盖既有 ZIP。
 
-## 1.3.6 构建内容
+## 1.3.7 构建内容
 
-1.3.6 包含统一的 `tooling/architecture`、项目架构索引 v2 和预览快照 v4，并将原顶层 `workflow_targets` 替换为节点自身的 `workflow` / `launch` 声明。planned Call 仅保留审查意图，启动清单只包含已实现调用；未补齐的 planned 启动配置不影响已实现调用。通用原子写入由 `tooling/file_io` 包负责，架构、预览和部署声明共用该实现。
+自有 JSON、AOT 元数据与绑定、workflow 启动声明、CLI 输入、源码及工具输出明确使用 UTF-8；文本子进程按协议指定编码，Python 子进程同时明确标准流编码。procfs 的数字内容按 ASCII 读取，可能包含任意进程名称字节的 stat 文件按二进制解析。外部业务文件仍可显式选择自身格式的编码，不改变 Python 全局默认值。
 
-候选验证在仓库外构建，正式产物由项目构建器生成到 `dist`，保留既有 1.3.5 ZIP 的原始字节。版本号与文档同步不代表完整门禁或 GitHub 发布已经完成，验收结论按实际执行范围报告。
+仓库自检的 base/all profile 新增 `TEXT_ENCODING_UNSPECIFIED`，检查常见文本文件及子进程调用未明确编码的情况，输出源码位置和修复建议。检查范围、动态调用和字符串内嵌代码等静态分析边界见 [repo checker 说明](../../repo_check/README.md)。回归测试从真实 AOT 包调用 API、CLI 和协同宿主，在移除源项目及非 UTF-8 默认环境下验证中文配置、输入和输出。
+
+1.3.6 的统一架构审核、节点自身 workflow/launch 声明与 planned Call 启动修复继续保留。已有业务配置无需因本次编码修复迁移；要使用修复后的内核，需重新构建和部署 AOT 包。
+
+候选验证在仓库外构建，正式产物由项目构建器生成到 `dist`，保留既有版本 ZIP 的原始字节。版本号与文档同步不代表完整门禁或 GitHub 发布已经完成，验收结论按实际执行范围报告。
 
 ## Profile 配置
 
