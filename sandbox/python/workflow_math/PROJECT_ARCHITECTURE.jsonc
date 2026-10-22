@@ -29,85 +29,6 @@
       "role": "root",
       "purpose": "",
       "target": "python",
-      "directories": [
-        {
-          "path": "base_lib",
-          "project_path": "project/base_lib",
-          "purpose": "Independent BaseLib resources",
-          "role": "directory",
-          "root_ids": []
-        },
-        {
-          "path": "configs",
-          "project_path": "project/configs",
-          "purpose": "Workflow and NodesetType declarations",
-          "role": "directory",
-          "root_ids": []
-        },
-        {
-          "path": "nodes",
-          "project_path": "project/nodes",
-          "purpose": "Business Node declarations and implementations",
-          "role": "directory",
-          "root_ids": []
-        },
-        {
-          "path": "plugins",
-          "project_path": "project/plugins",
-          "purpose": "Atomic Plugin packages",
-          "role": "directory",
-          "root_ids": []
-        },
-        {
-          "path": "configs/nodeset_types",
-          "project_path": "project/configs/nodeset_types",
-          "purpose": "",
-          "role": "directory",
-          "root_ids": []
-        },
-        {
-          "path": "configs/nodeset_types/pass_loop_nested_outer_after_inner_when_accumulate",
-          "project_path": "project/configs/nodeset_types/pass_loop_nested_outer_after_inner_when_accumulate",
-          "purpose": "",
-          "role": "directory",
-          "root_ids": []
-        },
-        {
-          "path": "configs/nodeset_types/pass_loop_nested_outer_when_inner_after_accumulate",
-          "project_path": "project/configs/nodeset_types/pass_loop_nested_outer_when_inner_after_accumulate",
-          "purpose": "",
-          "role": "directory",
-          "root_ids": []
-        },
-        {
-          "path": "configs/nodeset_types/pass_loop_while_inside_nodeset",
-          "project_path": "project/configs/nodeset_types/pass_loop_while_inside_nodeset",
-          "purpose": "",
-          "role": "directory",
-          "root_ids": []
-        },
-        {
-          "path": "configs/nodeset_types/pass_loop_while_nodeset_retry",
-          "project_path": "project/configs/nodeset_types/pass_loop_while_nodeset_retry",
-          "purpose": "",
-          "role": "directory",
-          "root_ids": []
-        },
-        {
-          "path": "configs/nodeset_types/pass_semantic_nodeset_arithmetic",
-          "project_path": "project/configs/nodeset_types/pass_semantic_nodeset_arithmetic",
-          "purpose": "",
-          "role": "directory",
-          "root_ids": []
-        },
-        {
-          "path": "plugins/code_plugin",
-          "project_path": "project/plugins/code_plugin",
-          "purpose": "",
-          "role": "directory",
-          "root_ids": []
-        }
-      ],
       "workflows": [
         {
           "root_id": "workflow_math",
@@ -115,6 +36,7 @@
           "id": "workflow_math:configs/nested.jsonc",
           "name": "nested",
           "target": "python",
+          "filename": "nested.jsonc",
           "description": "",
           "project_path": "project/configs/nested.jsonc",
           "exists": true,
@@ -130,6 +52,7 @@
           "id": "workflow_math:configs/outer_condition.jsonc",
           "name": "outer_condition",
           "target": "python",
+          "filename": "outer_condition.jsonc",
           "description": "",
           "project_path": "project/configs/outer_condition.jsonc",
           "exists": true,
@@ -145,6 +68,7 @@
           "id": "workflow_math:configs/outer_fixed.jsonc",
           "name": "outer_fixed",
           "target": "python",
+          "filename": "outer_fixed.jsonc",
           "description": "",
           "project_path": "project/configs/outer_fixed.jsonc",
           "exists": true,
@@ -160,6 +84,7 @@
           "id": "workflow_math:configs/retry.jsonc",
           "name": "retry",
           "target": "python",
+          "filename": "retry.jsonc",
           "description": "",
           "project_path": "project/configs/retry.jsonc",
           "exists": true,
@@ -175,6 +100,7 @@
           "id": "workflow_math:configs/wrapped_retry.jsonc",
           "name": "wrapped_retry",
           "target": "python",
+          "filename": "wrapped_retry.jsonc",
           "description": "",
           "project_path": "project/configs/wrapped_retry.jsonc",
           "exists": true,

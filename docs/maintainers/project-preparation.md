@@ -39,6 +39,6 @@ JavaScript Target 的 `resources/identity.py` 复用现有资源清单与本次�
 
 ## 架构文档与启动声明
 
-`tooling/architecture` 消费本次 inventory、资源使用、规则与 Target 准备结果，统一组装两端的公共 workflow/Nodeset 文档和项目索引。project 索引 v2 包含完整目录路径、root 标记、workflow 入口与 architecture.documents 映射。发布后刷新文档存在状态复用本次事实，不重复分析。预览目录由保存的项目索引投影，不重新发现 workflow。
+`tooling/architecture` 消费本次 inventory、资源使用、规则与 Target 准备结果，统一组装两端的公共 workflow/Nodeset 文档和项目索引。project 索引 v2 仅列项目一级目录的完整相对路径和 root/root 容器标记，按 root 列出 workflow 文件名、路径、宏观用途、入口与 architecture.documents 映射；不递归展示普通子目录。发布后刷新文档存在状态复用本次事实，不重复分析。预览目录由保存的项目索引投影，不重新发现 workflow。
 
 Call 的目标、入口和 launch 只在调用节点配置中维护；Kill 声明目标并使用实例 ID；收发可声明预期交互。`workflow_launches` 从准备图提取服务启动声明，构建将其保存为 workflow-launches.json；部署读取声明，不依赖源工程或 architecture 文档。

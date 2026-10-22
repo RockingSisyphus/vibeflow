@@ -106,8 +106,11 @@ def test_preview_cli_exports_root_workflow_and_registered_document_index(tmp_pat
     document=json.loads("\n".join((tmp_path/"PROJECT_ARCHITECTURE.jsonc").read_text().splitlines()[2:]))
     assert document["format"]=="vibeflow.project-architecture.v2"
     assert {row["path"] for row in document["directories"] if row["role"]=="root"}=={"desktop","backend"}
+    assert all("/" not in row["path"] for row in document["directories"])
     for owner in document["roots"]:
+        assert "directories" not in owner
         row=owner["workflows"][0]
+        assert row["filename"]=="workflow.jsonc" and row["path"]=="configs/workflow.jsonc"
         assert row["description"]=="Workflow for "+owner["id"]
         assert row["entries"]=={"main":{"start":"step"}} and row["default_entry"]=="main"
         assert row["architecture"]==owner["id"]+"/docs/custom-main.jsonc"

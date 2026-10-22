@@ -4,7 +4,8 @@ const {pathToFileURL}=require('node:url');
 const {join,dirname}=require('node:path');
 const {writeFile,readFile}=require('node:fs/promises');
 const assert=require('node:assert/strict');
-const [renderer,entry,pythonId,javascriptId,standalone]=process.argv.slice(2);
+const [renderer,entry,pythonId,javascriptId,standalone,encodedShapes]=process.argv.slice(2);
+const shapeNames=encodedShapes?JSON.parse(encodedShapes):[];
 const puppeteer=createRequire(renderer)('puppeteer');
 (async()=>{
   const browser=await puppeteer.launch({headless:true,args:['--no-sandbox'],executablePath:process.env.PUPPETEER_EXECUTABLE_PATH||'/usr/bin/google-chrome'});
@@ -49,9 +50,8 @@ const puppeteer=createRequire(renderer)('puppeteer');
     await page.goto(pathToFileURL(entry).href+'#'+new URLSearchParams({snapshot:pythonId,view:'flow'}));
     const wait=async count=>page.waitForFunction(n=>document.querySelectorAll('[data-call-path]').length===n,{},count);
     await wait(4);
-    const geometry=await page.evaluate(()=>{
+    const geometry=await page.evaluate(shapes=>{
       const svg=VFShapes.node('svg',{width:1200,height:1000});document.body.append(svg);
-      const shapes=['rect','rounded','stadium','circle','dbl-circ','diamond','lean-r','lean-l','trap-b','hex','fr-rect','cyl','doc','cloud'];
       const failures=[];
       for(const shape of shapes){
         const facts={id:shape,display_name:'Readable card',presentation:{values:{shape}}};
@@ -71,7 +71,7 @@ const puppeteer=createRequire(renderer)('puppeteer');
       const resourceCard=VFShapes.measure(resource,{node_definitions:{'fixture.external':{external:true,contract:{requires:[{key:'input'}],provides:[]}}}});
       const rows=resourceCard.rows.map(r=>r.text);
       svg.remove();return {failures,rows};
-    });
+    },shapeNames);
     assert.deepEqual(geometry.failures,[]);assert(geometry.rows.includes('外部依赖'));
     assert(geometry.rows.includes('fixture.external'));assert(geometry.rows.includes('1 输入 · 0 输出'));
     const icons=await page.evaluate(async()=>{
@@ -100,7 +100,7 @@ const puppeteer=createRequire(renderer)('puppeteer');
     }
     async function locate(query,path=query){await page.$eval('#search',(e,p)=>e.value=p,query);await page.click('#search-form button');await page.waitForFunction(p=>document.querySelector(`[data-call-path="${p}"]`),{},path);}
     await locate('first/inner/shape_cloud');
-    await page.waitForFunction(()=>document.querySelectorAll('[data-call-path^="first/inner/shape_"]').length===14);
+    await page.waitForFunction(n=>document.querySelectorAll('[data-call-path^="first/inner/shape_"]').length===n,{},shapeNames.length);
     // Expanded calls are groups, never a disconnected invocation card above their body.
     const groups=await page.evaluate(()=>['first','first/inner'].map(path=>{
       const g=document.querySelector(`[data-call-path="${path}"]`),header=g.querySelector(':scope > .group-header');
@@ -119,15 +119,15 @@ const puppeteer=createRequire(renderer)('puppeteer');
       return {path:e.dataset.callPath,fill:getComputedStyle(graphic).fill,shape:card.dataset.shape,bbox:card.getBBox().width};
     }));
     assert.match(await page.$eval('[data-call-path="first/inner/shape_circle"]',e=>e.textContent),/外部依赖/);
-    assert.equal(shapes.length,14);assert(shapes.every(s=>s.fill==='rgb(214, 234, 255)'&&s.bbox>0));
-    assert.equal(new Set(shapes.map(s=>s.shape)).size,14);
+    assert.equal(shapes.length,shapeNames.length);assert(shapes.every(s=>s.fill==='rgb(214, 234, 255)'&&s.bbox>0));
+    assert.deepEqual(shapes.map(s=>s.shape).sort(),shapeNames);
     assert.equal(await page.$eval('[data-call-path="first/inner/shape_circle"] .card-outline',e=>e.tagName),'ellipse');
     assert.equal(await page.$eval('[data-call-path="first/inner/shape_diamond"] .card-outline',e=>e.tagName),'polygon');
     assert.equal(await page.$eval('[data-call-path="first/inner/shape_cloud"] .card-outline',e=>e.tagName),'path');
     const endpoints=await page.$$eval('path[data-from^="first/inner/shape_"]',paths=>paths.flatMap(path=>{
       const length=path.getTotalLength();return [path.getPointAtLength(0),path.getPointAtLength(length)].map(p=>({x:p.x,y:p.y}));
     }));
-    assert.equal(endpoints.length,26);assert(endpoints.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)));
+    assert.equal(endpoints.length,(shapeNames.length-1)*2);assert(endpoints.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)));
     // ELK needs actual label text to place it between nodes rather than at (0,0).
     const labelPosition=await page.evaluate(async()=>{
       const data={bodies:VFModel.bodies({workflow:{nodes:[{id:'a'},{id:'b'}],edges:[{from:'a',to:'b',when:'ready'}]}})};
@@ -240,7 +240,7 @@ const puppeteer=createRequire(renderer)('puppeteer');
     assert.match(await page.$eval('#details',e=>e.textContent),/absent.jsonc/);
     await page.goto(pathToFileURL(entry).href+'#'+new URLSearchParams({snapshot:javascriptId,view:'flow'}));await page.reload();await wait(4);
     await locate('loop/inner/shape_dbl_circ');
-    await page.waitForFunction(()=>document.querySelectorAll('[data-call-path^="loop/inner/shape_"]').length===14);
+    await page.waitForFunction(n=>document.querySelectorAll('[data-call-path^="loop/inner/shape_"]').length===n,{},shapeNames.length);
     assert(await page.$('[data-call-path="loop"] > .group-header'));
     assert(!await page.$('[data-call-path="loop"] > .node-card'));
     await page.select('#mode','original');

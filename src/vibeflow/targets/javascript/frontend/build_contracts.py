@@ -325,6 +325,7 @@ def _node_context_type(
     return (
         "Readonly<{ "
         "signal?: VibeFlowAbortSignal; "
+        "workflow: Readonly<{self(): {id: string}}>; "
         f"capabilities: {capabilities_type}; "
         "trace(kind: string, details?: Readonly<Record<string, unknown>>): void; "
         "updateInfo(info: readonly Readonly<Record<string, unknown>>[]): void"

@@ -11,9 +11,9 @@ window.VFOverview=(project,records,navigate)=>{
   for(const owner of architecture.roots){
     const group=element("details");group.append(element("summary",owner.id+" · "+owner.path+" · "+owner.target+" · "+owner.workflows.length+" workflow"));
     group.append(element("p",owner.purpose||"未声明 root 用途"));
-    group.append(table([["目录","功能"],...owner.directories.map(d=>[d.project_path,d.purpose||"未声明"])]));
     for(const workflow of owner.workflows){
       const item=element("article");item.append(element("strong",workflow.name+" · "+workflow.project_path));
+      item.append(element("p","文件："+(workflow.filename||workflow.path.split("/").pop())+" · root 内路径："+workflow.path));
       item.append(element("p",workflow.description||"未声明 workflow 用途"));
       item.append(element("p","入口："+(Object.keys(workflow.entries||{}).join("、")||"未命名")+(workflow.default_entry?" · 默认 "+workflow.default_entry:"")));
       item.append(element("p","Architecture："+(workflow.architecture?(workflow.architecture+(workflow.architecture_exists?"":" · 尚未生成")):"未登记")));

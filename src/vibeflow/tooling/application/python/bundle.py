@@ -120,7 +120,7 @@ class PythonBundle:
             for item in self.data['blocks'].get(block_id, ()) if item['kind'] == 'graph' or item['entry'] in plan.frames)
 
     def create_runtime(self, *, runtime_options=None, capabilities=None, run_dir=None,
-                       node_config_overrides=None, global_config=None, delegate_cli=False, entry=None):
+                       node_config_overrides=None, global_config=None, delegate_cli=False, entry=None, workflow_instance_id=None):
         from vibeflow.targets.python.runtime.engine import PipelineRuntime
         effective = self.effective_options(runtime_options)
         registry = self._registry()
@@ -136,6 +136,7 @@ class PythonBundle:
             plan = bind(False)
             runtime = PipelineRuntime(plan.graph, registry=registry,
                 run_dir=run_dir, runtime_options=effective, capabilities=capabilities,
+                workflow_instance_id=workflow_instance_id,
                 delegate_cli=delegate_cli, _execution_plan=plan)
         from vibeflow.tooling.application.python.execution import (_checked_runtime_binding)
         runtime._runtime_plan_factory = lambda plugins: _checked_runtime_binding(
@@ -189,7 +190,7 @@ class PythonBundle:
         return merge_runtime_options(self.data['runtime_options'], overrides)
 
     def run(self, initial=None, *, runtime_options=None, capabilities=None, run_root=None, run_id=None,
-            delegate_cli=False, node_config_overrides=None, global_config=None, _prepared_run_dir=None, entry=None, signal=None):
+            delegate_cli=False, node_config_overrides=None, global_config=None, _prepared_run_dir=None, entry=None, signal=None, workflow_instance_id=None):
         from vibeflow.tooling.application.python.run_directory import prepare_run_dir as _prepare_run_dir
         from vibeflow.tooling.application.python.execution import (CheckedRunResult, _new_run_id, _write_json, _summarize_run_result, _ensure_trace_files)
         from vibeflow.targets.python.runtime.observation import observe_run
@@ -209,6 +210,7 @@ class PythonBundle:
             from vibeflow.targets.python.runtime.summaries import summarize_mapping
             _write_json(directory / 'input_summary.json', summarize_mapping(dict(initial or {})))
             runtime = self.create_runtime(runtime_options=effective, capabilities=capabilities,
+                workflow_instance_id=workflow_instance_id,
                 run_dir=directory, delegate_cli=delegate_cli,
                 node_config_overrides=node_config_overrides, global_config=global_config, entry=entry)
             unsubscribe = signal.subscribe(runtime.request_stop) if signal is not None else lambda: None

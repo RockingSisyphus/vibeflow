@@ -101,6 +101,7 @@ def declarations(workflow: EmissionWorkflow) -> str:
             *capability_lines,
             "",
             "export interface WorkflowRunOptions {",
+            "  readonly workflowInstanceId?: string;",
             "  readonly entry?: WorkflowEntry;" if named else "  readonly entry?: string;",
             "  readonly signal?: VibeFlowAbortSignal;",
             '  readonly trace?: WorkflowTraceMode;',

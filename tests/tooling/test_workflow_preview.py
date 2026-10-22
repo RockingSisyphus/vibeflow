@@ -46,10 +46,10 @@ def preview_project(root, *, configs=False, expected=False):
         {"operation": "wait"}, {"operation": "send"}, {"operation": "receive"}]
     config.write_text(json.dumps(caller))
     plugin = root / "caller/nodes/steps.py"
-    source = plugin.read_text().replace('["self","send","receive"]', '["self","send","receive","call","wait"]')
+    source = plugin.read_text().replace('["send","receive"]', '["send","receive","call","wait"]')
     source = source.replace('        message=api["receive"]({"port":"request"})',
         '        peer=api["call"]({"workflow":params["workflow"],"launch":params["launch"]})\n        api["send"]({"id":peer["id"],"port":"request","payload":{"value":7}})\n        message=api["receive"]({"port":"reply"})\n        api["wait"]({"id":peer["id"]})')
-    source = source.replace('        api["send"]({"id":message["sender"],"port":"reply","payload":{"value":value,"self":api["self"]({})["id"]}})\n', '')
+    source = source.replace('        api["send"]({"id":message["sender"],"port":"reply","payload":{"value":value,"self":context.workflow.self()["id"]}})\n', '')
     plugin.write_text(source)
     workspace_file = root / "vibeflow_config.jsonc"
     workspace_file.write_text(json.dumps({"roots": [{"id": name, "path": name} for name in ("caller", "worker")]}))
@@ -153,8 +153,9 @@ def test_offline_project_directory_and_workflow_operation_styles(tmp_path):
     publish_project(tmp_path, load_workspace_config(path))
     from types import SimpleNamespace
     from vibeflow.tooling.presentation.node_presentation import resolve_presentation
-    styles={op:resolve_presentation(SimpleNamespace(capabilities=(SimpleNamespace(id="vibeflow.workflow",operations=(op,)),))).to_dict()
-        for op in ("call","wait","send","receive","kill","self")}
+    styles={op:resolve_presentation(SimpleNamespace(capabilities=(SimpleNamespace(id="vibeflow.workflow",
+        operations=(op,"wait") if op in {"call","send","receive","kill"} else (op,)),))).to_dict()
+        for op in ("call","wait","send","receive","kill")}
     browser = Path(__file__).resolve().parents[1] / "fixtures/preview/project-navigation.cjs"
     result = subprocess.run(["node", str(browser), str(_find_mmdc().resolve()), str(tmp_path / "vibeflow-preview.html"), record.metadata["id"], worker.metadata["id"],json.dumps(styles)],
         text=True, capture_output=True, timeout=60)

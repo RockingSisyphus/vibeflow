@@ -669,7 +669,8 @@
             "hex",
             "cloud",
             "circle",
-            "dbl-circ"
+            "dbl-circ",
+            "notch-rect"
           ]
         },
         "icon": {

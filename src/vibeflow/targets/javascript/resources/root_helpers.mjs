@@ -1,5 +1,6 @@
 // Native runtime support; assembled by frontend.templates.
 function createRoot(workflow, normalized) {
+  const instanceId=normalized.workflowInstanceId??Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)),value=>value.toString(16).padStart(2,"0")).join("");
   const controller = new AbortController();
   const parentSignal = normalized.signal;
   const propagate = () => controller.abort(parentSignal.reason);
@@ -8,6 +9,7 @@ function createRoot(workflow, normalized) {
   const root = {
     workflow,
     workflowId: workflow.workflow_id,
+    identity: Object.freeze({self:()=>({id:instanceId})}),
     signal: controller.signal,
     traceMode: normalized.traceMode,
     onTrace: normalized.onTrace,

@@ -20,5 +20,5 @@ accepting responsibility for that background instance. Port nodes require a
 host-provided `vibeflow.port`; coordination nodes require a connected host.
 
 Add explicit start/end terminals around these nodes and select
-`vibeflow.capability.restrict` at graph scope. Workflow operations use `flow_kind: "workflow-io"`. Defaults are Call gold, Kill red, Receive dark blue and Send light blue; planned calls retain these colors and add a dashed outline at 60% opacity. Shapes/colors can be changed
+`vibeflow.capability.restrict` at graph scope. Workflow operations use `flow_kind: "workflow-io"`. Call, Kill, Receive and Send share the notched-card shape (`notch-rect`), with gold, red, dark blue and light blue defaults respectively. `wait` awaits an instance's terminal state without replacing the main operation's color. Every Node can read its current instance ID with `context.workflow.self()` without a Capability declaration or Rule grant; there is no separate Self Node. Planned calls retain these colors and add a dashed outline at 60% opacity. Shapes/colors can be changed
 without granting or removing an operation.

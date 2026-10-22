@@ -2,7 +2,7 @@
 from pathlib import Path
 from os.path import relpath
 from vibeflow.core.rules.models import plain
-from vibeflow.core.project_layout import DIRECTORY_PURPOSES, ROOT_DIRECTORY_PURPOSES
+from vibeflow.core.project_layout import DIRECTORY_PURPOSES
 from vibeflow.core.graph_calls import graph_call_subjects
 from vibeflow.core.workflows.references import node_workflow_actions, action_references, workflow_node_params
 from .documents import render_architecture_payload
@@ -19,10 +19,9 @@ def workflow_identity(config, workspace, *, target="python", name=None):
             "name": name or config.stem, "target": target}
 
 
-def project_architecture(inventory, *, resources=(), directory_purposes=(), root_directory_purposes=None, workflows=None):
+def project_architecture(inventory, *, resources=(), directory_purposes=(), workflows=None):
     workspace = inventory.workspace
     purposes = {**DIRECTORY_PURPOSES, **{row["path"]: row["purpose"] for row in directory_purposes}}
-    root_purposes = root_directory_purposes or {}
     relative = lambda path: Path(relpath(path, workspace.root)).as_posix()
     def directory_role(name):
         contained = [root.id for root in workspace.roots if relative(root.path) == name or relative(root.path).startswith(name + "/")]
@@ -33,7 +32,7 @@ def project_architecture(inventory, *, resources=(), directory_purposes=(), root
         return (exact.purpose or "Registered workflow root") if exact else "Registered root container" if directory_role(name)["root_ids"] else ""
     directories = []
     for entry in inventory.entries["project"]:
-        if entry["kind"] != "directory":
+        if entry["kind"] != "directory" or len(Path(entry["path"]).parts) != 1:
             continue
         name=entry["path"]
         contained = [root.id for root in workspace.roots if relative(root.path) == name or relative(root.path).startswith(name + "/")]
@@ -52,7 +51,7 @@ def project_architecture(inventory, *, resources=(), directory_purposes=(), root
             item = workflow_identity(path, workspace, target=root.project_target,
                 name=data.get("display_name") or data.get("name") or path.stem)
             spec = specs.get(path.resolve())
-            item.update(description=data.get("description", ""), project_path=relative(path), exists=path.is_file(),
+            item.update(filename=path.name, description=data.get("description", ""), project_path=relative(path), exists=path.is_file(),
                 entries=plain(pipeline.get("entries", {})), default_entry=pipeline.get("default_entry", ""),
                 architecture=relative(spec.document_path) if spec else None,
                 architecture_exists=spec.document_path.is_file() if spec else False, relations=[])
@@ -76,12 +75,8 @@ def project_architecture(inventory, *, resources=(), directory_purposes=(), root
                         except ValueError as error:
                             item.setdefault("diagnostics", []).append({"call_path":list((*subject.call_path,node.id)), "message":str(error)})
             rows.append(item)
-        mapping = {**ROOT_DIRECTORY_PURPOSES, **{row["path"]:row["purpose"] for row in root_purposes.get(root.id, ())}}
         roots.append({"id": root.id, "path": relative(root.path), "role":"root", "purpose":root.purpose,
-            "target":root.project_target,
-            "directories":[{"path":name, "project_path":relative(root.path/name), "purpose":mapping.get(name, root_purpose(relative(root.path/name))),
-                            **directory_role(relative(root.path/name))}
-                           for name in (entry["path"] for entry in inventory.entries["roots"][root.id] if entry["kind"]=="directory")], "workflows":rows})
+            "target":root.project_target, "workflows":rows})
     resources = plain(resources)
     for resource in resources:
         resource["path"] = relative(resource["path"])

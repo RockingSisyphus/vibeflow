@@ -60,18 +60,29 @@ SDK 声明也可直接选择这些 Rule，调用配置可以覆盖其规则选�
 
 `actions` 是作者对操作和等待方式的显式声明，用于图审查和展示；框架不分析任意业务代码来证明声明。目标、入口和启动方式统一在节点 `config` 中维护。调整实现或等待方式时同步更新 actions，调整目标时更新 config。Send/Receive 未声明 `expected_workflows` 时，页面保留操作说明而不虚构对端。未提供 actions 时，规则根据明确声明的 operations 输出基本操作说明。
 
+`workflow-io` 是流程分类，不是限制任意函数调用的执行沙箱。本节的授权、目标检查和关联提取作用于已声明的 `vibeflow.workflow` 操作。应用直接调用 AOT 导出的 `runWorkflow`/`runWorkflowAsync`、把另一个 workflow 接成自定义 Capability，或者通过输入对象注入调度函数，都不会自动成为该协议的 Call。现有规则检查声明的 Capability 权限、数据契约和源码依赖等，不证明所有间接调用均已登记为 workflow 关联。普通 `vibeflow.port` 也只声明宿主端口边界，不说明端口背后接的是哪个 workflow。
+
 ## 接口约定
 
 Node 通过 `context.capabilities["vibeflow.workflow"]` 使用接口。Python 再以 `api["call"](...)` 调用，JS 使用 `api.call(...)`。请求采用与其他 Capability 一致的对象参数。
 
 | 操作 | 请求 | 结果与等待行为 |
 |---|---|---|
-| `self` | `{}`，也可省略参数 | `{id}`；属于当前 workflow 实例，进入 Nodeset / Loop 不变 |
 | `call` | `{workflow, launch, inputs?, timeout?}` | 等待宿主注册确认后返回 `{id}`；不等待业务结束 |
 | `wait` | `{id, timeout?}` | 等待真实终态，返回 `state`、`outputs`、`error` 等；可重复读取 |
 | `send` | `{id, port?, payload}` | 交给本地发送适配器后继续；不等待对端处理，无业务返回值 |
 | `receive` | `{port?, timeout?}` | 默认等待消息，返回 `{sender, port, payload}` |
 | `kill` | `{id, workflow, timeout?}` | 请求宿主停止该实例，等待真实终态；不支持时明确失败 |
+
+主要的跨实例动作是 Call、Send、Receive、Kill；`wait` 等待指定实例的真实终态，CallAndWait 是 Call 后接 Wait 的组合。四类主要操作默认共用缺角卡片形状 `notch-rect`，分别使用金色、浅蓝、深蓝、红色；节点卡片直接突出显示操作名。附带 `wait` 不改变主要操作配色；真正同时执行多个主要操作时显示各操作名，采用组合操作样式。作者显式声明的外观仍可覆盖默认值。
+
+### 当前实例身份：所有 Node 均可读取
+
+任意 Node 都可以通过 `context.workflow.self()` 取得 `{id}`：Python 读取 `context.workflow.self()["id"]`，JavaScript/TypeScript 读取 `context.workflow.self().id`。不需要声明 Capability、选择授权 Rule 或增加独立 Self 节点。例如普通“准备请求”节点可以把当前 ID 写入请求的回信地址。
+
+ID 属于一次 workflow 根调用，进入 Nodeset/Loop 不变，另一独立调用得到新的 ID；它不是配置文件名或日志目录名。标准连接宿主将此 ID 绑定到通信服务登记的实例 ID。不连接通信服务时也能读取本地实例 ID，但读取身份本身不创建邮箱或启动服务。自定义宿主可通过 Python 的 `workflow_instance_id` 或 JavaScript 的运行选项 `workflowInstanceId` 传入其登记的 ID。
+
+旧模板中的独立 Self 节点和 `vibeflow.workflow` Capability 的 `self` 操作已移除；读取身份统一使用上述上下文接口。
 
 默认端口是 `default`，超时以秒计。取消等待只结束当前等待，不自动停止对端。JS 的等待操作使用异步 completion；Python 接入 Node 的取消信号。普通退出先完成本地待发交接，强制退出不保证尚未交接的消息。第一版只支持本机、内存中的普通 JSON；大于跨语言安全整数范围的整数须编码为字符串。
 
@@ -159,7 +170,7 @@ node kernel/javascript/workflow_node.mjs build/worker/workflow.js
 
 ## 可复制的普通节点模板
 
-发行包 `kernel/templates/workflow_nodes` 包含 self、call、call 后等待、wait、send、receive、kill 和普通端口收发的 Python / JS 示例。它们是固定 SDK 声明，需由项目 Plugin 显式贡献；可以更改外观、名称和业务契约。JS 的 `interfaces.mjs` 在打包时从公开 Core 契约生成，不维护另一套协议。详见同目录 README。
+发行包 `kernel/templates/workflow_nodes` 包含 call、call 后等待、wait、send、receive、kill 和普通端口收发的 Python / JS 示例。它们是固定 SDK 声明，需由项目 Plugin 显式贡献；可以更改外观、名称和业务契约。JS 的 `interfaces.mjs` 在打包时从公开 Core 契约生成，不维护另一套协议。详见同目录 README。
 
 ## 普通端口节点与迁移
 
@@ -180,7 +191,7 @@ def run_pure(self, inputs, params, context):
 
 ## HTML 审查
 
-页面支持全部入口或指定入口查看，卡片和侧栏显示操作、目标及是否等待。双击、右键或侧栏按钮可原地展开目标 workflow；多目标通过侧栏选择。循环关系按用户选择逐步展开，保留真实调用边界。
+页面支持全部入口或指定入口查看，卡片和侧栏显示操作、目标及是否等待。Call/Kill 通过右键菜单跳转至目标 workflow；Send/Receive 按预期交互列表提供多个跳转按钮，跳转后可返回。Call 的目标入口会被选中。只有 Nodeset 提供原地展开/收起；workflow 之间不原地展开。历史快照优先使用当次准备的目标事实，不静默换用最新快照。
 
 快照只携带本次准备的目标架构事实。缺失目标、入口或资源时局部显示原因，不拿历史快照冒充目标。原 SVG 仍仅作可选对照附件。
 

@@ -5,4 +5,6 @@ This package owns the common workflow projection, project index, resource implem
 
 Target presentation adapters provide declarations, source locations, prepared graph access and resource facts. `workflow.py` assembles their common graph and Nodeset records. `project.py` joins inventory with registered architecture documents and effective node references. `documents.py` owns JSONC and explicit freshness checks. The preview exporter projects saved project documents and publishes snapshots; browser rendering stays in `tools/workflow-viewer`.
 
+The project overview lists only immediate project directories and their purposes. Each registered root separately lists workflow filenames, relative paths, descriptions, entries and architecture documents; ordinary root subdirectories are not recursively catalogued in this document. Inventory discovery and resource usage still keep the scope required for governance.
+
 Known planned coordination calls retain declaration/configuration intent as `planned` operation facts, without evaluating Rules or granting runtime permissions. Core supplies their call identities and inherited configuration scopes.

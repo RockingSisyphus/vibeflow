@@ -1,12 +1,40 @@
 """SDK direct JS code is authoritative without breaking same-object aliases."""
 import json
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
 
 from vibeflow.tooling.project.resources import ResourcePreparationError, prepare_workflow_resources
 from vibeflow.tooling.project.workspace_loader import load_workspace_config
+
+
+@pytest.mark.parametrize("path", [
+    "/root/literal%23#space name/library.ts",
+    r"D:\root\literal%23#space name\library.ts",
+    r"\\server\share\literal%23#space name\library.ts",
+])
+@pytest.mark.parametrize("relative", [False, True])
+def test_sdk_file_references_preserve_native_paths_and_literal_characters(path, relative):
+    sdk = Path(__file__).resolve().parents[3] / "src/vibeflow/targets/javascript/resources/sdk.mjs"
+    reference = "./library.ts" if relative else path
+    script = f'''
+import {{defineBaseLib,definePlugin}} from {json.dumps(sdk.as_uri())};
+import assert from 'node:assert/strict';
+const path={json.dumps(path)},ref={json.dumps(reference)};
+const lib=defineBaseLib({{id:'library',__origin:{{path,symbol:'library'}},
+ implementation(){{}},source:{{kind:'file',ref,export:'library.implementation'}},
+ implementation_files:['./helper%23#file.ts']}});
+const descriptor=definePlugin({{id:'probe',resources:[lib]}}).resources[0].descriptor;
+assert.equal(descriptor.implementations[0].source.ref,path);
+const index=Math.max(path.lastIndexOf('/'),path.lastIndexOf(String.fromCharCode(92)));
+assert.equal(descriptor.implementations[0].implementation_files[0].ref,
+ path.slice(0,index+1)+'helper%23#file.ts');
+'''
+    result = subprocess.run(["node", "--input-type=module", "--eval", script],
+                            capture_output=True, text=True, encoding="utf-8", timeout=15)
+    assert result.returncode == 0, result.stderr
 
 
 def declaration_path(root, kind):
@@ -98,7 +126,7 @@ def test_literal_file_paths_preserve_percent_hash_and_spaces(tmp_path, kind, rel
     workspace, config, _ = project(root, kind, "Alias." + member)
     if relative:
         plugin = declaration_path(root, kind)
-        plugin.write_text(plugin.read_text().replace(str(plugin), "./" + plugin.name))
+        plugin.write_text(plugin.read_text(encoding="utf-8").replace(json.dumps(str(plugin)), json.dumps("./" + plugin.name)))
     loaded = prepare_workflow_resources(workspace, config)
     catalog = getattr(loaded.catalogs, {"node": "nodes", "rule": "rules", "base_lib": "base_libs"}[kind])
     source = catalog.require("actual").implementations[0].source

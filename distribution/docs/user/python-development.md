@@ -2,6 +2,9 @@
 
 使用 `vibeflow.targets.python.sdk` 把 Node、Rule 的声明与实现放在一起，再用固定 `Plugin` 列出贡献资源。workflow 显式选择该插件后，其资源进入本次检查和运行范围。
 
+
+任何 Node 的 `run_pure(self, inputs, params, context)` 都可通过 `context.workflow.self()["id"]` 读取当前 workflow 实例 ID，无需声明 Capability 或授权 Rule。Nodeset 和 Loop 内部读取相同 ID；协同宿主注入注册 ID，普通本地运行生成新 ID。该接口只读取身份，消息路由仍由显式协调操作完成，见 [workflow 协同](workflow-coordination.md)。
+
 ## Node 与固定插件
 
 `nodes/text.py`：

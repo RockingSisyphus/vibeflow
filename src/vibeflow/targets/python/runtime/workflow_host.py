@@ -11,6 +11,8 @@ def run_connected(runtime_factory, *, workflow=None, initial=None, entry=None, u
     def execute(client):
         runtime = runtime_factory(entry=client.entry if client.entry is not None else entry,
             capabilities={"vibeflow.workflow": client.operations()})
+        from vibeflow.core.workflows.identity import WorkflowIdentity
+        runtime.workflow = WorkflowIdentity(client.id)
         unsubscribe = signal.subscribe(runtime.request_stop)
         try:
             result = runtime.run({**(initial or {}), **client.inputs})

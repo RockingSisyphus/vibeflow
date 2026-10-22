@@ -22,6 +22,7 @@ def run_python(args):
         options = dict(initial={**initial, **client.inputs},
             entry=client.entry if client.entry is not None else args.entry,
             capabilities={"vibeflow.workflow": client.operations()}, run_root=args.run_root, signal=signal)
+        options["workflow_instance_id"] = client.id
         if bundle is not None:
             result = bundle.run(**options)
         elif args.workspace:

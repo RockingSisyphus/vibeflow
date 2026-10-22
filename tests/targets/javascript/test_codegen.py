@@ -135,10 +135,10 @@ assert.equal(plugin.resources[0].descriptor.kind,"node_type");
     consumer.write_text('''import {defineNode, type NodeRunContext} from "./kernel/javascript/sdk";
 const node = defineNode({"node_type":"vibeflow.node",id: "sample", contract: {},
     run(inputs: {value: number}, params: {}, context: NodeRunContext) {
-        context.trace("sample", {value: inputs.value});
+        context.trace("sample", {value: inputs.value, instance: context.workflow.self().id});
         return {value: inputs.value + 1};
     }});
-node.run!({value: 4}, {}, {capabilities: {}, trace() {}, updateInfo() {}});
+node.run!({value: 4}, {}, {capabilities: {}, workflow: {self: () => ({id: "sample-instance"})}, trace() {}, updateInfo() {}});
 ''')
     toolchain = Path(os.environ["VIBEFLOW_TEST_TOOLCHAIN_ROOT"])
     result = subprocess.run([str(toolchain / "node_modules/.bin/tsc"),

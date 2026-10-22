@@ -238,6 +238,7 @@ function normalizeOptions(workflow, options) {
     statusUpdate: raw.__vfStatusUpdate,
     kernelLog: raw.__vfKernelLog,
     capabilities: raw.capabilities ?? {},
+    workflowInstanceId: raw.workflowInstanceId,
   };
 }
 
@@ -451,6 +452,7 @@ function nodeContext(node, state, execution) {
   }
   return Object.freeze({
     signal: execution?.signal || state.root.signal,
+    workflow: state.root.identity,
     capabilities: Object.freeze(allowed),
     updateInfo(info) { state.root.statusUpdate?.(info); },
     trace(kind, details = {}) {

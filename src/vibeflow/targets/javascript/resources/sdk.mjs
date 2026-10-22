@@ -4,9 +4,19 @@ const ABI = "vibeflow.plugin.v4";
 const directBindings = new WeakMap();
 // Source references are literal filesystem paths, including %, # and spaces.
 function resolveFileReference(ref, base) {
-  const encodePath = path => String(path).split("/").map(encodeURIComponent).join("/");
-  return decodeURIComponent(new URL(encodePath(ref), `file://${encodePath(base)}`).pathname);
+  const windows = /^[A-Za-z]:[\\/]/.test(base) || base.startsWith("\\\\");
+  const urlPath = value => {
+    const path = windows ? String(value).replaceAll("\\", "/") : String(value);
+    return /^[A-Za-z]:\//.test(path) ? "/" + path : path;
+  };
+  const encodePath = path => path.split("/").map(encodeURIComponent).join("/");
+  const reference = urlPath(ref);
+  const url = new URL(reference.startsWith("/") ? "file://" + encodePath(reference) : encodePath(reference),
+    "file://" + encodePath(urlPath(base)));
+  const path = decodeURIComponent(url.pathname);
+  return windows ? path.replace(/^\/([A-Za-z]:\/)/, "$1").replaceAll("/", "\\") : path;
 }
+
 function freeze(value) {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     for (const item of Object.values(value)) freeze(item);
@@ -87,8 +97,7 @@ function implementationFiles(values, origin) {
     const source = typeof value === "string" ? {kind: "file", ref: value} : value;
     if (!source || source.kind !== "file" || typeof source.ref !== "string" || !source.ref.trim()) invalid("implementation_files accepts file source references");
     if (/[*?\[\]]/.test(source.ref)) invalid("implementation_files requires explicit files, not glob patterns");
-    const base = String(origin.path || "").replaceAll("\\", "/");
-    const ref = source.ref.startsWith("/") ? source.ref : resolveFileReference(source.ref, `${base.startsWith("/") ? "" : "/"}${base}`);
+    const ref = resolveFileReference(source.ref, origin.path || "/__source__");
     return {...source, ref};
   });
 }
