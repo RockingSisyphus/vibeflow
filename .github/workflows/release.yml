@@ -58,7 +58,7 @@ jobs:
           python - <<'PY'
           import os, re, subprocess, tomllib
           from pathlib import Path
-          version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+          version = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
           assert os.environ["RELEASE_TAG"] == "v" + version
           commit = os.environ["EXPECTED_COMMIT"]
           assert re.fullmatch(r"[0-9a-f]{40}", commit)
@@ -83,7 +83,7 @@ jobs:
           python - <<'PY'
           import hashlib, os, tomllib
           from pathlib import Path
-          version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+          version = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
           lines = []
           for prefix, key in (("vibeflow-distribution", "COLLABORATIVE_SHA256"),
                               ("vibeflow-distribution-autonomous", "AUTONOMOUS_SHA256")):
@@ -91,7 +91,7 @@ jobs:
               digest = hashlib.sha256((Path("dist") / name).read_bytes()).hexdigest()
               assert digest == os.environ[key], f"Verified package mismatch: {name}: {digest}"
               lines.append(f"{digest}  {name}\n")
-          Path(f"dist/SHA256SUMS-{version}.txt").write_text("".join(lines))
+          Path(f"dist/SHA256SUMS-{version}.txt").write_text("".join(lines), encoding="utf-8")
           PY
       - name: Upload, download-verify, then publish existing draft
         env:

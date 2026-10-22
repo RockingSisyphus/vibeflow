@@ -44,25 +44,25 @@ def project(root, source=SOURCE, selections=None, *, plugin_source=PLUGIN_SOURCE
     root.mkdir(parents=True, exist_ok=True)
     register_root(root)
     (root / "nodes").mkdir(exist_ok=True)
-    (root / "nodes/steps.py").write_text(source)
+    (root / "nodes/steps.py").write_text(source, encoding="utf-8")
     package = root / "plugins/demo"
     package.mkdir(parents=True, exist_ok=True)
-    (package / "plugin.py").write_text(plugin_source)
+    (package / "plugin.py").write_text(plugin_source, encoding="utf-8")
     config = root / "workflow.jsonc"
     config.write_text(json.dumps({"plugins": selections if selections is not None else [
         {"source":{"kind":"file","ref":"plugins/demo/plugin.py"}}],
-        "pipeline":{"nodes":[{"id":"demo","definition_id":"demo","display_name":"Demo","description":"Fixture business operation"}],"edges":[]}}))
+        "pipeline":{"nodes":[{"id":"demo","definition_id":"demo","display_name":"Demo","description":"Fixture business operation"}],"edges":[]}}), encoding="utf-8")
     return load_project_workspace(root), config
 
 
 def executable_project(root, source=EXECUTABLE, *, plugin_source=PLUGIN_SOURCE):
     workspace, config = project(root, source, plugin_source=plugin_source)
-    data = json.loads(config.read_text())
+    data = json.loads(config.read_text(encoding="utf-8"))
     data["rulesets"] = []
     data["pipeline"]["nodes"].insert(0,{"id":"start","definition_id":"demo.start","display_name":"Start","description":"Start"})
     data["pipeline"]["edges"] = [["start","demo"]]
     data["pipeline"]["outputs"] = [{"type":"number","as":"result","display_name":"Result","cardinality":"exactly_one"}]
-    config.write_text(json.dumps(data))
+    config.write_text(json.dumps(data), encoding="utf-8")
     return workspace, config
 
 
