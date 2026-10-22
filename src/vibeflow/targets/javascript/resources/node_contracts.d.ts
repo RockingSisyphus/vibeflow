@@ -1,6 +1,7 @@
 import type {Options, Resource} from "./sdk";
 
 export interface NodeRunContext {
+  readonly workflow: Readonly<{self(): {id: string}}>;
   readonly signal?: AbortSignal;
   readonly capabilities: Readonly<Record<string, any>>;
   trace(kind: string, details?: Readonly<Record<string, unknown>>): void;

@@ -64,13 +64,13 @@ def test_node_launch_configuration_runs_after_source_project_is_removed(tmp_path
     launch={"command":["node",str(host),str(peer)],"cwd":".","env":{"NODE_LAUNCH_CASE":"bundle"}}
     workspace,config=python_project(source)
     steps=source/"nodes/steps.py"
-    text=steps.read_text().replace('["self","send","receive"]','["self","send","receive","call","wait"]')
+    text=steps.read_text().replace('["send","receive"]','["send","receive","call","wait"]')
     text=text.replace('        message=api["receive"]({"port":"request"})',
         '        peer=api["call"]({"workflow":params["workflow"],"launch":params["launch"]})\n'
         '        api["send"]({"id":peer["id"],"port":"request","payload":{"value":7}})\n'
         '        message=api["receive"]({"port":"reply"})\n'
         '        api["wait"]({"id":peer["id"]})')
-    text=text.replace('        api["send"]({"id":message["sender"],"port":"reply","payload":{"value":value,"self":api["self"]({})["id"]}})\n','')
+    text=text.replace('        api["send"]({"id":message["sender"],"port":"reply","payload":{"value":value,"self":context.workflow.self()["id"]}})\n','')
     steps.write_text(text)
     data=json.loads(config.read_text());call=data["pipeline"]["nodes"][1]
     call["config"]={"workflow":reference,"launch":launch}
@@ -113,7 +113,7 @@ def test_identical_launch_commands_resolve_against_each_calling_root(tmp_path):
         location=tmp_path/name;location.mkdir()
         _,config=python_project(location)
         steps=location/"nodes/steps.py"
-        steps.write_text(steps.read_text().replace('["self","send","receive"]','["self","send","receive","call"]'))
+        steps.write_text(steps.read_text().replace('["send","receive"]','["send","receive","call"]'))
         data=json.loads(config.read_text());data["pipeline"]["nodes"][1]["config"]={"workflow":reference,"launch":launch}
         config.write_text(json.dumps(data))
         (location/"worker.py").write_text('from vibeflow.coordination import WorkflowClient\nc=WorkflowClient.from_environment()\n'
@@ -179,7 +179,7 @@ def test_source_service_never_launches_planned_calls(tmp_path, configured):
     workspace, config = python_project(tmp_path / "source")
     steps = tmp_path / "source/nodes/steps.py"
     steps.write_text(steps.read_text().replace(
-        '["self","send","receive"]', '["self","send","receive","call"]'))
+        '["send","receive"]', '["send","receive","call"]'))
     command = [sys.executable, "-B", "-c",
         'from vibeflow.coordination import WorkflowClient; '
         'c=WorkflowClient.from_environment(); c.finish(outputs={"launched":True})']

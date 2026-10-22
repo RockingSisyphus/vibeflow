@@ -2,7 +2,7 @@
 import json
 from uuid import uuid4
 
-OPERATIONS = frozenset({"self", "call", "wait", "send", "receive", "kill"})
+OPERATIONS = frozenset({"call", "wait", "send", "receive", "kill"})
 TERMINAL = frozenset({"succeeded", "failed", "cancelled"})
 
 

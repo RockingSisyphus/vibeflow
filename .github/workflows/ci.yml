@@ -82,7 +82,7 @@ jobs:
           TMP: ${{ runner.temp }}
           TEMP: ${{ runner.temp }}
         run: |
-          python tools/run_tests.py --workers 4 --scratch "$env:RUNNER_TEMP/workflow-hosts" -- tests/coordination tests/targets/python/test_workflow_entries.py tests/targets/javascript/test_workflow_entries.py tests/integration/test_text_encoding.py 2>&1 | Tee-Object "$env:RUNNER_TEMP/workflow-hosts.log"
+          python tools/run_tests.py --workers 4 --scratch "$env:RUNNER_TEMP/workflow-hosts" -- tests/coordination tests/targets/python/test_workflow_entries.py tests/targets/javascript/test_workflow_entries.py tests/targets/javascript/test_sdk_identity.py tests/integration/test_text_encoding.py 2>&1 | Tee-Object "$env:RUNNER_TEMP/workflow-hosts.log"
           exit $LASTEXITCODE
       - name: Preserve workflow host results
         if: always()

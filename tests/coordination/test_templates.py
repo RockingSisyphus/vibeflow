@@ -19,11 +19,11 @@ def test_shipped_templates_and_contract_resources_use_normal_sdk(tmp_path, monke
     module = importlib.util.module_from_spec(spec)
     monkeypatch.setitem(sys.modules, spec.name, module)
     spec.loader.exec_module(module)
-    names=("Self","Call","CallAndWait","Wait","Send","Receive","Kill","PortReceive","PortSend")
+    names=("Call","CallAndWait","Wait","Send","Receive","Kill","PortReceive","PortSend")
     nodes = [definition(getattr(module,name)).descriptor for name in names]
-    assert len(nodes) == 9
+    assert len(nodes) == 8
     workflow_nodes=[item for item in nodes if item.flow_kind=="workflow-io"]
-    assert len(workflow_nodes)==7
+    assert len(workflow_nodes)==6
     from vibeflow.tooling.presentation.node_presentation import resolve_presentation
     styles={item.id:resolve_presentation(item).to_dict() for item in workflow_nodes}
     assert styles["example.call"]["values"]["fill"]=="#fef3c7"
@@ -127,5 +127,6 @@ def test_copied_templates_build_and_call_through_real_host(tmp_path, target, cap
     node=next(item for item in architecture["workflow"]["nodes"] if item["id"]=="call")
     assert node["presentation"]["modifiers"]["planned"] is True
     assert node["presentation"]["values"]["fill"]=="#fef3c7"
+    assert node["presentation"]["values"]["shape"]=="notch-rect"
     action=node["operations"][0]
     assert action["planned"] is True and action["workflow"]=={"root":"peer","path":"worker.jsonc"}

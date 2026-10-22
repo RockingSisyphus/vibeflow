@@ -8,6 +8,7 @@ export async function runConnected(run, {url,id=null,workflow=null,initial={},en
   try {
     const outputs=await run({...initial,...client.inputs},{...options,
       entry:client.entry??entry,signal:controller.signal,
+      workflowInstanceId:client.id,
       capabilities:{...capabilities,"vibeflow.workflow":client.operations()}});
     await client.finish({outputs});
     return outputs;

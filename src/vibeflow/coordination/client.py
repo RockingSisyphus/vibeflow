@@ -130,8 +130,7 @@ class WorkflowClient:
         return self._wait("ready", launched["id"], timeout=timeout, signal=signal)
 
     def operations(self):
-        return {"self": _Operation(lambda request, signal: {"id": self.id}),
-            "call": _Operation(lambda request, signal: self.call(request["workflow"], launch=request["launch"],
+        return {"call": _Operation(lambda request, signal: self.call(request["workflow"], launch=request["launch"],
                 inputs=request.get("inputs"), timeout=request.get("timeout"), signal=signal)),
             "wait": _Operation(lambda request, signal: self.wait(request["id"], timeout=request.get("timeout"), signal=signal)),
             "send": _Operation(lambda request, signal: self.send(request["id"], request.get("port", "default"), request.get("payload"))),

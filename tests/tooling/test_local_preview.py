@@ -307,6 +307,7 @@ def _presentations(root):
 
 
 def test_real_offline_shapes_nested_browser_and_history(tmp_path):
+    from vibeflow.core.style import NODE_SHAPES
     from vibeflow.tooling.presentation.mermaid import is_mermaid_svg_renderer_available, _find_mmdc
     if not is_mermaid_svg_renderer_available():
         pytest.skip("locked Mermaid renderer required; supplied by the full gate")
@@ -336,10 +337,10 @@ def test_real_offline_shapes_nested_browser_and_history(tmp_path):
     browser = Path(__file__).resolve().parents[1]/"fixtures/preview/browser.cjs"
     renderer = _find_mmdc().resolve()
     result=subprocess.run(["node",str(browser),str(renderer),str(destination/"vibeflow-preview.html"),
-        first.metadata["id"],second.metadata["id"],str(tool/"index.html")],capture_output=True,text=True,timeout=120)
+            first.metadata["id"],second.metadata["id"],str(tool/"index.html"),json.dumps(sorted(NODE_SHAPES))],capture_output=True,text=True,timeout=120)
     assert result.returncode == 0, result.stdout+result.stderr
     report=json.loads(result.stdout)
-    assert report["shapes"] == 14 and report["network_requests"] == [] and not report["page_errors"]
+    assert report["shapes"] == len(NODE_SHAPES) and report["network_requests"] == [] and not report["page_errors"]
 
 
 def test_real_project_resource_views(tmp_path):
@@ -531,4 +532,4 @@ def test_real_resource_cards_express_all_declared_shapes(tmp_path):
     result = subprocess.run(["node",str(browser),str(_find_mmdc().resolve()),str(record.root/"vibeflow-preview.html"),json.dumps(sorted(NODE_SHAPES))],
         capture_output=True,text=True,timeout=90)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert json.loads(result.stdout)["cards"] == 28
+    assert json.loads(result.stdout)["cards"] == len(NODE_SHAPES) * 2

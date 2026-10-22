@@ -1,12 +1,6 @@
 """Copy into nodes/nodes.py; protocol resources live in the separate Plugin."""
 from vibeflow.targets.python.sdk import node
 
-@node(**{'node_type': 'vibeflow.node', 'id': 'example.self', 'display_name': 'Self', 'description': 'Ordinary SDK Self operation.', 'flow_kind': 'workflow-io', 'rulesets': ['vibeflow.process', {'rule_id': 'vibeflow.capability.allow', 'params': {'capability': 'vibeflow.workflow', 'operations': ['self'], 'actions': [{'operation': 'self'}]}}], 'contract': {'requires': [], 'provides': [{'key': 'instance', 'type': 'example.instance', 'display_name': 'instance'}], 'input_semantics': {}, 'output_semantics': {'instance': ['Operation instance']}, 'params_schema': {}, 'params_defaults': {}}, 'capabilities': [{'id': 'vibeflow.workflow', 'operations': ['self']}]})
-class Self:
-    def run_pure(self, inputs, params, context):
-        api=context.capabilities['vibeflow.workflow']
-        return {"instance": api["self"]()["id"]}
-
 @node(**{'node_type': 'vibeflow.node', 'id': 'example.call', 'display_name': 'Call', 'description': 'Ordinary SDK Call operation.', 'flow_kind': 'workflow-io', 'rulesets': ['vibeflow.process', {'rule_id': 'vibeflow.capability.allow', 'params': {'capability': 'vibeflow.workflow', 'operations': ['call'], 'actions': [{'operation': 'call', 'wait': False}]}}], 'contract': {'requires': [], 'provides': [{'key': 'instance', 'type': 'example.instance', 'display_name': 'instance'}], 'input_semantics': {}, 'output_semantics': {'instance': ['Operation instance']}, 'params_schema': {'allow_background': {'type': 'boolean'}, 'workflow': {'type': 'object', 'required': True, 'properties': {'root': {'type': 'string'}, 'path': {'type': 'string'}, 'entry': {'type': 'string'}}}, 'launch': {'type': 'object', 'required': True, 'properties': {'command': {'type': 'array', 'items': {'type': 'string'}}, 'cwd': {'type': 'string'}, 'env': {'type': 'object'}}}}, 'params_defaults': {'allow_background': False}}, 'capabilities': [{'id': 'vibeflow.workflow', 'operations': ['call']}]})
 class Call:
     def run_pure(self, inputs, params, context):

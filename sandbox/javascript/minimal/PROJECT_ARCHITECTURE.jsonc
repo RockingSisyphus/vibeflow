@@ -29,57 +29,6 @@
       "role": "root",
       "purpose": "",
       "target": "javascript",
-      "directories": [
-        {
-          "path": "base_lib",
-          "project_path": "project/base_lib",
-          "purpose": "Independent BaseLib resources",
-          "role": "directory",
-          "root_ids": []
-        },
-        {
-          "path": "configs",
-          "project_path": "project/configs",
-          "purpose": "Workflow and NodesetType declarations",
-          "role": "directory",
-          "root_ids": []
-        },
-        {
-          "path": "node_modules",
-          "project_path": "project/node_modules",
-          "purpose": "JavaScript dependencies",
-          "role": "directory",
-          "root_ids": []
-        },
-        {
-          "path": "nodes",
-          "project_path": "project/nodes",
-          "purpose": "Business Node declarations and implementations",
-          "role": "directory",
-          "root_ids": []
-        },
-        {
-          "path": "plugins",
-          "project_path": "project/plugins",
-          "purpose": "Atomic Plugin packages",
-          "role": "directory",
-          "root_ids": []
-        },
-        {
-          "path": "web",
-          "project_path": "project/web",
-          "purpose": "Browser application",
-          "role": "directory",
-          "root_ids": []
-        },
-        {
-          "path": "plugins/code_plugin",
-          "project_path": "project/plugins/code_plugin",
-          "purpose": "",
-          "role": "directory",
-          "root_ids": []
-        }
-      ],
       "workflows": [
         {
           "root_id": "js-demo",
@@ -87,6 +36,7 @@
           "id": "js-demo:configs/greeting.jsonc",
           "name": "greeting",
           "target": "javascript",
+          "filename": "greeting.jsonc",
           "description": "",
           "project_path": "project/configs/greeting.jsonc",
           "exists": true,

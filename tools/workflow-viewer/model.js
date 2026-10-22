@@ -54,7 +54,16 @@ window.VFModel = (()=>{
   function operationLabel(action){
     if(action.planned&&action.operation==="call")return "计划启动 workflow";
     if(action.operation==="call")return action.wait===true?"启动 workflow · 等待结束":"启动 workflow · 不等待结束";
-    return ({self:"本实例身份",wait:"等待实例结束",send:"发送消息 · 不等待处理",receive:"接收消息 · 等待",kill:"停止实例 · 确认终态"})[action.operation]||action.operation;
+    return ({wait:"等待实例结束",send:"发送消息 · 不等待处理",receive:"接收消息 · 等待",kill:"停止实例 · 确认终态"})[action.operation]||action.operation;
+  }
+  function workflowOperation(actions){
+    const operations=new Set(actions.filter(a=>a.capability==="vibeflow.workflow").map(a=>a.operation));
+    const primary=[...operations].filter(op=>op!=="wait"),visible=primary.length?primary:[...operations];
+    return visible.length===1?visible[0]:visible.length?"multiple":"";
+  }
+  function operationTitle(action){
+    const name=({call:action.wait?"启动并等待":"启动",kill:"停止",send:"发送",receive:"接收",wait:"等待结束"})[action.operation]||action.operation;
+    return action.operation.toUpperCase()+" · "+name;
   }
   const roleNames={mainline:"流程主线",schedule:"触发调度",transfer:"允许数据传递",data_bypass:"仅传递数据"};
   function nodeInfo(facts,architecture={}) {
@@ -108,5 +117,5 @@ window.VFModel = (()=>{
       script.onerror=()=>finish(()=>reject(new Error("无法加载 "+url)));document.head.append(script);
     });
   }
-  return {bodies,childOptions,workflowTarget,workflowOptions,resourceView,operationLabel,nodeInfo,edgeInfo,graphEdges,edgeLabel,loadScript};
+  return {bodies,childOptions,workflowTarget,workflowOptions,resourceView,operationLabel,workflowOperation,operationTitle,nodeInfo,edgeInfo,graphEdges,edgeLabel,loadScript};
 })();

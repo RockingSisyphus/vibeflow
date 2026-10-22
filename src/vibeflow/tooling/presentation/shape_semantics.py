@@ -8,6 +8,7 @@ from vibeflow.core.constants import (
     FLOW_KIND_DOCUMENT,
     FLOW_KIND_GLOBAL_STATE,
     FLOW_KIND_IO,
+    FLOW_KIND_WORKFLOW_IO,
     FLOW_KIND_PREDEFINED,
     FLOW_KIND_PREPARATION,
     FLOW_KIND_PROCESS,
@@ -15,11 +16,14 @@ from vibeflow.core.constants import (
 )
 
 
+WORKFLOW_SHAPE = "notch-rect"
+
 _SHAPE_BY_FLOW_KIND = {
     FLOW_KIND_TERMINAL: "stadium",
     FLOW_KIND_PROCESS: "rect",
     FLOW_KIND_DECISION: "diamond",
     FLOW_KIND_IO: "lean-r",
+    FLOW_KIND_WORKFLOW_IO: WORKFLOW_SHAPE,
     FLOW_KIND_PREDEFINED: "fr-rect",
     FLOW_KIND_DATA_STORE: "cyl",
     FLOW_KIND_DOCUMENT: "doc",

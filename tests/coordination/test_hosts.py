@@ -24,14 +24,14 @@ def python_project(root):
 class Boundary:
     def run_pure(self,inputs,params):return {}
 @node(node_type='vibeflow.node', id="peer.work",rulesets=["vibeflow.process"],
-      capabilities=[{"id":"vibeflow.workflow","operations":["self","send","receive"]}],
+      capabilities=[{"id":"vibeflow.workflow","operations":["send","receive"]}],
       contract={"params_schema":{"workflow":{"type":"object"},"launch":{"type":"object"}},"params_defaults":{"workflow":{},"launch":{}},"provides":[{"key":"out","type":"number","display_name":"Result"}],"output_semantics":{"out":["Tripled message"]}})
 class Work:
     def run_pure(self,inputs,params,context):
         api=context.capabilities["vibeflow.workflow"]
         message=api["receive"]({"port":"request"})
         value=message["payload"]["value"]*3
-        api["send"]({"id":message["sender"],"port":"reply","payload":{"value":value,"self":api["self"]({})["id"]}})
+        api["send"]({"id":message["sender"],"port":"reply","payload":{"value":value,"self":context.workflow.self()["id"]}})
         return {"out":value}
 '''
     plugin_source = "from vibeflow.targets.python.sdk import Plugin,capability,data_schema\n"
@@ -45,7 +45,7 @@ class Work:
         "edges": [["start", "work"], ["work", "end"]],
         "outputs": [{"type": "number", "as": "result", "cardinality": "exactly_one", "display_name": "Result"}]}
     data["pipeline"]["nodes"][1]["rulesets"] = ["vibeflow.process", {"rule_id": "vibeflow.capability.allow",
-        "params": {"capability": "vibeflow.workflow", "operations": ["self", "send", "receive"]}}]
+        "params": {"capability": "vibeflow.workflow", "operations": [ "send", "receive"]}}]
     config.write_text(json.dumps(data))
     return workspace, config
 
@@ -57,11 +57,11 @@ export async function work(inputs,params,context){
   const api=context.capabilities["vibeflow.workflow"];
   const message=await api.receive({port:"request"});
   const value=message.payload.value*3;
-  api.send({id:message.sender,port:"reply",payload:{value,self:api.self({}).id}});
+  api.send({id:message.sender,port:"reply",payload:{value,self:context.workflow.self().id}});
   return {out:value};
 }
 '''
-    operations = ["self", "send", "receive"]
+    operations = [ "send", "receive"]
     if caller:
         operations += ["call", "wait"]
         implementation = implementation.replace('const message=await api.receive({port:"request"});', '''
@@ -70,7 +70,7 @@ export async function work(inputs,params,context){
   const message=await api.receive({port:"reply"});
   const ended=await api.wait({id:peer.id});
   if(ended.state!=="succeeded")throw new Error(JSON.stringify(ended));''')
-        implementation = implementation.replace('  api.send({id:message.sender,port:"reply",payload:{value,self:api.self({}).id}});', '')
+        implementation = implementation.replace('  api.send({id:message.sender,port:"reply",payload:{value,self:context.workflow.self().id}});', '')
     (root / "nodes.mjs").write_text(implementation)
     cap = workflow_capability_descriptor().to_dict()
     plan, bindings = plan_fixture({"entry_mode": "async", "schemas": {**WORKFLOW_SCHEMA_TYPES, "number": {"type": "number"}},
@@ -142,10 +142,10 @@ def test_ordinary_workflow_node_calls_other_target_sends_receives_and_waits(tmp_
         workspace, config = python_project(root)
         if caller:
             plugin = root / "nodes/steps.py"
-            source = plugin.read_text().replace('["self","send","receive"]', '["self","send","receive","call","wait"]')
+            source = plugin.read_text().replace('["send","receive"]', '["send","receive","call","wait"]')
             source = source.replace('        message=api["receive"]({"port":"request"})',
                 '        peer=api["call"]({"workflow":params["workflow"],"launch":params["launch"]})\n        api["send"]({"id":peer["id"],"port":"request","payload":{"value":7}})\n        message=api["receive"]({"port":"reply"})\n        api["wait"]({"id":peer["id"]})')
-            source = source.replace('        api["send"]({"id":message["sender"],"port":"reply","payload":{"value":value,"self":api["self"]({})["id"]}})\n', '')
+            source = source.replace('        api["send"]({"id":message["sender"],"port":"reply","payload":{"value":value,"self":context.workflow.self()["id"]}})\n', '')
             plugin.write_text(source)
             declaration = json.loads(config.read_text())
             declaration["pipeline"]["nodes"][1]["rulesets"][1]["params"]["operations"] += ["call", "wait"]

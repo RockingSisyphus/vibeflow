@@ -11,8 +11,11 @@ def fold_policies(records, call_paths):
         elif record.get("mode") == "allow":
             path = tuple(record["call_path"])
             grants.setdefault(path, {}).setdefault(record["capability"], set()).update(record["operations"])
-            actions.setdefault(path, []).extend({**action, "capability": record["capability"]}
-                for action in record.get("actions", ()))
+            declared = actions.setdefault(path, [])
+            for action in record.get("actions", ()):
+                intent = {**action, "capability": record["capability"]}
+                if intent not in declared:
+                    declared.append(intent)
     return {tuple(path): {"capabilities": {capability: sorted(grants.get(tuple(path), {}).get(capability, ()))
         for capability in sorted(restrictions.get(tuple(path[:-1]), ()))},
         "actions": actions.get(tuple(path), [])} for path in call_paths}

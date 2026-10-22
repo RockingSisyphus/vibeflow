@@ -1,12 +1,22 @@
 # 发行与文档装配
 
-当前分发版本为 1.3.7，Workflow/AOT/Plugin ABI 维持 10/4/4。1.3.7 修复自有 UTF-8 文本在 Windows 等非 UTF-8 默认环境中的读取问题，并在仓库自检中加入遗漏编码检查。
+当前分发版本为 1.3.8，Workflow/AOT/Plugin ABI 维持 10/4/4。1.3.8 将 workflow 身份读取统一为任意 Node 可用的上下文接口，并改进协调节点与项目结构展示。
 
 1.3.5 修复 JavaScript 核心 SDK 解压到 workspace 内时被误认成业务资源的问题：Target 按既有资源清单识别准确文件，在形成业务引用与插件源码闭包时排除核心内部依赖；原始分析保留，用户贡献声明及共享 Rule 政策不变。1.3.4 统一资源使用 Rule 与 `vibeflow.resource_use.v1` 结果：独立 BaseLib（包括间接依赖）必须显式声明，Plugin 贡献资源整包引入并禁止重复声明，贡献代码实际路径必须位于所属 Plugin 目录。Python、JavaScript 的验证、构建、运行准备和展示共同消费规则结果；旧选择器及重复许可检查已删除。Python AOT 按实际引用收集实现，未引用的可用库不随包加载或复制。预览最新快照覆盖各注册 root 当前仍存在的 workflow，继续隐藏 Plugin 贡献资源。1.3.3 的 global_state 环境变量能力保留。
 
 既有版本 ZIP 保留原始字节，ABI 不变。两个 profile 使用下述工具构建；正式发布需验证解压运行、wheel、sdist 与完整门禁，禁止同名覆盖既有 ZIP。
 
-## 1.3.7 构建内容
+## 1.3.8 构建内容
+
+任意 Python、JavaScript/TypeScript Node 都可通过 `context.workflow.self()` 读取本次实例的 `{id}`，无需 Capability 声明或授权。Nodeset、Loop 与父 workflow 共享身份；协同宿主使用服务注册的实例 ID。独立 Self 模板、Capability self 操作及其数据契约已删除，旧节点应迁移到上下文接口并重新构建 AOT。
+
+Call、Kill、Receive、Send 共用新的缺角卡片形状，默认分别为金、红、深蓝、浅蓝；操作名在卡片内加粗显示，CallAndWait 保留 Call 样式。作者样式可覆盖默认值，planned 保留原色并使用虚线及 60% 不透明度。重复的相同声明动作只产生一份展示事实，不合并实际运行调用。
+
+`PROJECT_ARCHITECTURE.jsonc` 仅展示项目一级目录；各 root 记录 workflow 文件名、路径、用途、入口、关联和注册架构文档，移除递归目录展示。治理所需源码清单仍完整扫描。详见 [workflow 协同](../../distribution/docs/user/workflow-coordination.md)。
+
+SDK 的声明与实现附属文件共用文件引用解析，正确处理 Windows 盘符、网络共享路径及字面的 `%`、`#` 和空格，避免合法实现被误报为冲突。Windows CI 同步覆盖 SDK 身份与附属文件场景。
+
+## 1.3.7 历史构建内容
 
 自有 JSON、AOT 元数据与绑定、workflow 启动声明、CLI 输入、源码及工具输出明确使用 UTF-8；文本子进程按协议指定编码，Python 子进程同时明确标准流编码。procfs 的数字内容按 ASCII 读取，可能包含任意进程名称字节的 stat 文件按二进制解析。外部业务文件仍可显式选择自身格式的编码，不改变 Python 全局默认值。
 

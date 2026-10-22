@@ -65,7 +65,6 @@ WORKFLOW_LAUNCH_SCHEMA = {"type":"object", "required":["command"],
     "properties":{"command":{"type":"array","items":{"type":"string"},"minItems":1},
         "cwd":{"type":"string"}, "env":{"type":"object","additionalProperties":{"type":"string"}}}, "additionalProperties":False}
 _REQUESTS = {
-    "self": ({}, []),
     "call": ({"workflow": WORKFLOW_REFERENCE_SCHEMA, "launch":WORKFLOW_LAUNCH_SCHEMA,
               "inputs": {"type": "object"}, "timeout": _TIMEOUT}, ["workflow", "launch"]),
     "wait": ({"id": _ID, "timeout": _TIMEOUT}, ["id"]),
@@ -85,7 +84,6 @@ _STATUS = {"type": "object", "properties": {"id": _ID,
     "workflow": {"type": ["object", "string", "null"]}, "entry": {"type": ["string", "null"]}},
     "required": ["id", "state"], "additionalProperties": False}
 WORKFLOW_SCHEMA_TYPES.update({
-    "vibeflow.workflow.self.result": _IDENTITY,
     "vibeflow.workflow.call.result": _IDENTITY,
     "vibeflow.workflow.wait.result": _STATUS,
     "vibeflow.workflow.kill.result": _STATUS,
@@ -99,5 +97,5 @@ def workflow_capability_descriptor():
     return CapabilityDescriptor(id=WORKFLOW_CAPABILITY_ID, targets=("python", "node", "browser"),
         operations={name: CapabilityOperationDescriptor(
             input_type=f"vibeflow.workflow.{name}.request", output_type=f"vibeflow.workflow.{name}.result",
-            completion="immediate" if name in {"self", "send"} else "suspend") for name in _REQUESTS},
+            completion="immediate" if name == "send" else "suspend") for name in _REQUESTS},
         display_name="Workflow coordination", description="Independent workflow instances and local JSON messages.")

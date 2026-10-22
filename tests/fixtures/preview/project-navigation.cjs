@@ -9,9 +9,13 @@ const [renderer,entry,caller,worker,styleJson]=process.argv.slice(2),puppeteer=c
   await page.setRequestInterception(true);page.on('request',r=>{if(/^https?:/.test(r.url())){network.push(r.url());r.abort();}else r.continue();});
   await page.goto(pathToFileURL(entry).href);await page.waitForSelector('[data-call-path="work"]');
   assert.equal(await page.$eval('[data-call-path="work"] .node-card',e=>e.dataset.workflowOperation),'multiple');
+  const operationTitles=await page.$$eval('[data-call-path="work"] .card-operation',es=>es.map(e=>({text:e.textContent,size:parseFloat(getComputedStyle(e).fontSize),weight:Number(getComputedStyle(e).fontWeight)})));
+  assert(operationTitles.some(row=>row.text.startsWith('CALL · ')));
+  assert(operationTitles.some(row=>row.text.startsWith('SEND · ')));
+  assert(operationTitles.every(row=>row.size>=16&&row.weight>=700));
   await page.click('[data-call-path="work"]');assert.match(await page.$eval('#details',e=>e.textContent),/workflow 操作 · multiple/);
   const styles=await page.evaluate(presentations=>{
-    const rows=['call','wait','send','receive','kill','self'].map(operation=>{
+    const rows=['call','wait','send','receive','kill'].map(operation=>{
       const facts={id:operation,preview_operations:[{capability:'vibeflow.workflow',operation}],presentation:presentations[operation]};
       const card=VFShapes.measure(facts),element=VFShapes.draw(card,facts);
       return {shape:element.dataset.shape,fill:element.querySelector('.card-outline').getAttribute('fill')};
@@ -20,7 +24,15 @@ const [renderer,entry,caller,worker,styleJson]=process.argv.slice(2),puppeteer=c
     const planned=VFShapes.measure({id:'planned',status:'planned',preview_operations:[{capability:'vibeflow.workflow',operation:'wait'}],presentation:{values:{fill:'#abcdef'},sources:{fill:'status'}}});
     return {rows,custom:{shape:custom.shape,fill:custom.values.fill},planned:planned.values.fill};
   },JSON.parse(styleJson));
-  assert.equal(new Set(styles.rows.map(s=>s.shape)).size,6);assert.equal(styles.rows[0].fill,'#fef3c7');assert.equal(styles.rows[2].fill,'#e0f2fe');assert.equal(styles.rows[3].fill,'#1e3a8a');assert.equal(styles.rows[4].fill,'#ffe4e6');
+  for(const index of [0,2,3,4])assert.equal(styles.rows[index].shape,'notch-rect');
+  assert.equal(styles.rows[0].fill,'#fef3c7');assert.equal(styles.rows[2].fill,'#e0f2fe');assert.equal(styles.rows[3].fill,'#1e3a8a');assert.equal(styles.rows[4].fill,'#ffe4e6');
+  const primary=await page.evaluate(()=>['call','send','receive','kill'].map(operation=>{
+    const preview_operations=[{capability:'vibeflow.workflow',operation},{capability:'vibeflow.workflow',operation:'wait'}];
+    const facts={id:operation,preview_operations},card=VFShapes.measure(facts),element=VFShapes.draw(card,facts);
+    return {operation:element.dataset.workflowOperation,titles:[...element.querySelectorAll('.card-operation')].map(e=>e.textContent)};
+  }));
+  assert.deepEqual(primary.map(row=>row.operation),['call','send','receive','kill']);
+  for(const row of primary){assert.equal(row.titles.length,1);assert.match(row.titles[0],new RegExp('^'+row.operation.toUpperCase()+' · '));}
   assert.deepEqual(styles.custom,{shape:'diamond',fill:'#123456'});assert.equal(styles.planned,'#abcdef');
   await page.select('#navigation','project');
   assert.equal(await page.$$eval('.project-root',es=>es.length),3);

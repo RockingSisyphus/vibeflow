@@ -3,7 +3,7 @@
 window.VFShapes=(()=>{
   const ns="http://www.w3.org/2000/svg";
   const node=(tag,attrs={},text=null)=>{const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);if(text!==null)e.textContent=text;return e;};
-  const supported=new Set(["rect","rounded","stadium","circle","dbl-circ","diamond","lean-r","lean-l","trap-b","hex","fr-rect","cyl","doc","cloud"]);
+  const supported=new Set(["rect","rounded","stadium","circle","dbl-circ","diamond","lean-r","lean-l","trap-b","hex","fr-rect","cyl","doc","cloud","notch-rect"]);
   const boundaries=new WeakMap();
   const canvas=document.createElement("canvas"),context=canvas.getContext("2d");
   function width(text,size=13){context.font=`${size}px Arial, sans-serif`;return context.measureText(String(text)).width;}
@@ -25,13 +25,14 @@ window.VFShapes=(()=>{
   function measure(facts,architecture={}) {
     const info=VFModel.nodeInfo(facts,architecture),external=Boolean(info.definitionInfo.external||facts.external||facts.info?.external);
     const presentation=facts.presentation?.values?facts.presentation:facts.effective_presentation||{},values={...presentation.values},sources={...presentation.sources};
-    const operations=[...new Set((facts.preview_operations||[]).filter(a=>a.capability==="vibeflow.workflow").map(a=>a.operation))];
-    const operation=operations.includes("call")&&operations.every(op=>["call","wait"].includes(op))?"call":operations.length>1?"multiple":operations[0];
+    const actions=(facts.preview_operations||[]).filter(a=>a.capability==="vibeflow.workflow"),operation=VFModel.workflowOperation(actions);
+    const primary=actions.filter(a=>a.operation!=="wait");
+    const titles=[...new Map((primary.length?primary:actions).map(a=>[a.operation,VFModel.operationTitle(a)])).values()];
     const requested=values.shape||"rect",canonical=requested,shape=supported.has(canonical)?canonical:"rect";
     const titleLines=wrap(title(facts),260,16),typeLines=wrap(facts.definition_id||facts.kind||"",260,12);
     const contract=(facts.requires??info.contract.requires??[]).length+" 输入 · "+(facts.provides??info.contract.provides??[]).length+" 输出";
     const status=info.status;
-    const rows=[...titleLines.map(t=>({text:t,kind:"title"})),...typeLines.map(t=>({text:t,kind:"type"})),
+    const rows=[...titleLines.map(t=>({text:t,kind:"title"})),...titles.flatMap(t=>wrap(t,260,16).map(text=>({text,kind:"operation"}))),...typeLines.map(t=>({text:t,kind:"type"})),
       {text:status==="planned"?"计划 · 尚未实现":external?"外部依赖":facts.invokes?(facts.invokes.kind==="loop_body"?"Loop":"Nodeset"):facts.flow_kind||facts.kind||"资源",kind:"status"},
       {text:facts.definition_id||facts.kind==="node"?contract:(facts.sources?.length?facts.sources.length+" 个来源":""),kind:"detail"}];
     if(facts.invokes)rows.push({text:info.expandable?"可右键展开内部结构":"暂无内部定义",kind:"detail"});
@@ -42,9 +43,9 @@ window.VFShapes=(()=>{
     }
     if(!facts.invokes&&(facts.preview_operations||[]).some(a=>a.workflow||a.expected_workflows?.length))rows.push({text:"右键跳转到关联 workflow",kind:"detail"});
     const description=info.description;
-    if(description){const brief=wrap(description,260,12);rows.splice(titleLines.length+typeLines.length,0,...brief.slice(0,2).map((t,i)=>({text:t+(i===1&&brief.length>2?"…":""),kind:"description"})));}
+    if(description){const brief=wrap(description,260,12);const index=rows.findIndex(r=>r.kind==="status");rows.splice(index,0,...brief.slice(0,2).map((t,i)=>({text:t+(i===1&&brief.length>2?"…":""),kind:"description"})));}
     if(!supported.has(canonical))rows.push({text:"未支持形状: "+requested,kind:"detail"});
-    const contentWidth=Math.max(190,...rows.map(r=>width(r.text,r.kind==="title"?16:12)))+44,contentHeight=rows.length*23+24+(values.icon?24:0);
+    const contentWidth=Math.max(190,...rows.map(r=>width(r.text,["title","operation"].includes(r.kind)?16:12)))+44,contentHeight=rows.length*23+24+(values.icon?24:0);
     let w=contentWidth,h=contentHeight;
     if(shape==="circle"||shape==="dbl-circ")w=h=Math.ceil(Math.hypot(w,h))+24;
     else if(shape==="diamond"){w*=2;h*=2;}
@@ -53,6 +54,7 @@ window.VFShapes=(()=>{
     else if(shape==="cloud"){w+=58;h+=36;}
     else if(shape==="cyl")h+=64;
     else if(shape==="doc")h+=32;
+    else if(shape==="notch-rect"){w+=24;h+=16;}
     return {planned:status==="planned",width:Math.ceil(w),height:Math.ceil(h),shape,requested,values,rows,contentHeight,operation,presentation:{values,sources}};
   }
   function outline(shape,w,h){
@@ -63,6 +65,7 @@ window.VFShapes=(()=>{
     if(shape==="lean-r")return polygon(`28,0 ${w},0 ${w-28},${h} 0,${h}`);
     if(shape==="lean-l")return polygon(`0,0 ${w-28},0 ${w},${h} 28,${h}`);
     if(shape==="trap-b")return polygon(`28,0 ${w-28},0 ${w},${h} 0,${h}`);
+    if(shape==="notch-rect")return polygon(`24,0 ${w},0 ${w},${h} 0,${h} 0,24`);
     if(shape==="cyl")return node("path",{d:`M0 20 C0 -6 ${w} -6 ${w} 20 L${w} ${h-20} C${w} ${h+6} 0 ${h+6} 0 ${h-20} Z M0 20 C0 46 ${w} 46 ${w} 20`});
     if(shape==="doc")return node("path",{d:`M0 0 H${w} V${h-16} C${w*.66} ${h-48} ${w*.33} ${h+16} 0 ${h-16} Z`});
     if(shape==="cloud")return node("path",{d:`M18 ${h*.38} C-8 ${h*.2} ${w*.12} 0 ${w*.28} 14 C${w*.36} -8 ${w*.6} -8 ${w*.68} 15 C${w*.9} -4 ${w+10} ${h*.12} ${w-16} ${h*.38} C${w+12} ${h*.53} ${w+4} ${h*.83} ${w-24} ${h*.84} C${w*.85} ${h+12} ${w*.63} ${h+8} ${w*.52} ${h-12} C${w*.35} ${h+12} ${w*.12} ${h+8} ${w*.12} ${h-16} C-8 ${h*.88} -10 ${h*.54} 18 ${h*.38} Z`});

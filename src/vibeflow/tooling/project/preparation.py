@@ -142,9 +142,7 @@ class ProjectPreparation:
                 raise ValueError("a root-scoped preparation cannot overwrite the project architecture")
             project_config = configs[0][1]
             purposes = project_config.rule_params.get("vibeflow.project.layout", {}).get("directories", ())
-            self._architecture_inputs = (inventory, dict(resources=resources, workflows=self.workflows, directory_purposes=purposes,
-                root_directory_purposes={root.id: config.rule_params.get("vibeflow.root.layout", {}).get("directories", ())
-                    for root, config in configs if root is not None}))
+            self._architecture_inputs = (inventory, dict(resources=resources, workflows=self.workflows, directory_purposes=purposes))
             architecture_path = self.publish_architecture()
         review = GovernanceReview(inventory, resources, tuple(results), findings, architecture_path)
         self.reviews[write_architecture] = review

@@ -44,6 +44,7 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         runtime_options: RuntimeOptions | Mapping[str, object] | None = None,
         delegate_cli: bool = False,
         capabilities: Mapping[str, object] | None = None,
+        workflow_instance_id: str | None = None,
         entry: str | None = None,
         _execution_plan: ExecutionPlan | None = None,
     ) -> None:
@@ -86,6 +87,8 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         self._trace_sink: RuntimeTraceSink | None = None
         self._trace_path_prefix: tuple[str, ...] = ()
         self._capabilities = dict(capabilities or {})
+        from vibeflow.core.workflows.identity import WorkflowIdentity
+        self.workflow = WorkflowIdentity(workflow_instance_id) if workflow_instance_id is not None else WorkflowIdentity()
         from .lifecycle import CancellationSignal
         self._signal = CancellationSignal()
         self._owns_run = True
@@ -113,6 +116,7 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         runtime.runtime_options = parent.runtime_options
         runtime.delegate_cli = parent.delegate_cli
         runtime._capabilities = parent._capabilities
+        runtime.workflow = parent.workflow
         runtime._signal = parent._signal
         runtime._owns_run = False
         runtime._reset_execution_lock_state()

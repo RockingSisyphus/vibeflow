@@ -78,6 +78,7 @@ class CancellationSignal:
 class NodeRunContext:
     def __init__(self, runtime, frame):
         self.signal = CancellationSignal()
+        self.workflow = runtime.workflow
         allowed = {}
         descriptor = runtime.registry.descriptor(frame.definition_id)
         for requirement in descriptor.capabilities:

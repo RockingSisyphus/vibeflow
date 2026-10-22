@@ -48,8 +48,9 @@ def resolve_presentation(
     sources = dict.fromkeys(values, "native")
     operations = {operation for requirement in _get(descriptor, "capabilities", ())
                   if requirement.id == "vibeflow.workflow" for operation in requirement.operations}
-    operation = "call" if operations <= {"call", "wait"} and "call" in operations else (
-        next(iter(operations)) if len(operations) == 1 else "multiple" if operations else "")
+    primary_operations = operations - {"wait"}
+    visible_operations = primary_operations or operations
+    operation = next(iter(visible_operations)) if len(visible_operations) == 1 else "multiple" if operations else ""
     from vibeflow.tooling.presentation.style import WORKFLOW_OPERATION_STYLES
     if operation in WORKFLOW_OPERATION_STYLES:
         values.update(WORKFLOW_OPERATION_STYLES[operation])

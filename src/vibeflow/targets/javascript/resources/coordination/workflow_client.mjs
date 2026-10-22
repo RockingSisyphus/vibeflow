@@ -73,7 +73,6 @@ export class WorkflowClient {
   async kill(id, options={}) {await this.request("kill",{id,...(options.workflow?{workflow:{...options.workflow,root:options.workflow.root||this.workflow?.root||""}}:{})},options.signal);return this.wait(id,options);}
   operations() {
     return {
-      self:()=>({id:this.id}),
       call:(request,context={})=>this.call(request.workflow,{...request,signal:context.signal}),
       wait:(request,context={})=>this.wait(request.id,{...request,signal:context.signal}),
       send:request=>{this.send(request.id,request.port||"default",request.payload);return null;},

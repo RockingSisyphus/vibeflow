@@ -16,16 +16,27 @@ SOURCE = '''from vibeflow.targets.python.sdk import Plugin,node,capability,data_
 @node(node_type='vibeflow.node', id="example.boundary",flow_kind="terminal",contract={},rulesets=["vibeflow.process"])
 class Boundary:
     def run_pure(self,inputs,params):return {}
-@node(node_type='vibeflow.node', id="example.work",contract={},rulesets=["vibeflow.process"],capabilities=[{"id":"vibeflow.workflow","operations":["self"]}])
+@node(node_type='vibeflow.node', id="example.work",contract={},rulesets=["vibeflow.process"],capabilities=[{"id":"example.external","operations":["read"]}])
 class Work:
     def run_pure(self,inputs,params,context):
-        context.capabilities["vibeflow.workflow"]["self"]({})
+        context.capabilities["example.external"]["read"]({})
         return {}
-interface=capability(id="vibeflow.workflow",targets=["python"],operations={"self":{"input_type":"example.request","output_type":"example.identity"}})
+interface=capability(id="example.external",targets=["python"],operations={"read":{"input_type":"example.request","output_type":"example.identity"}})
 request=data_schema(type_key="example.request",schema={"type":"object"})
 identity=data_schema(type_key="example.identity",schema={"type":"object"})
 plugin=Plugin(id="example",resources=[interface,request,identity])
 '''
+
+
+def test_repeated_policy_records_merge_intent_without_changing_distinct_actions():
+    from vibeflow.core.workflows.policies import fold_policies
+    record = {"mode":"allow","call_path":["call"],"capability":"vibeflow.workflow",
+        "operations":["call"],"actions":[{"operation":"call","wait":False}]}
+    waiting = {**record,"actions":[{"operation":"call","wait":True}]}
+    policy = fold_policies([record,record,waiting],[("call",)])[("call",)]
+    assert policy["actions"] == [
+        {"operation":"call","wait":False,"capability":"vibeflow.workflow"},
+        {"operation":"call","wait":True,"capability":"vibeflow.workflow"}]
 
 
 def test_same_node_type_cannot_borrow_another_calls_grant_and_aot_saves_policy(tmp_path, monkeypatch):
@@ -33,13 +44,13 @@ def test_same_node_type_cannot_borrow_another_calls_grant_and_aot_saves_policy(t
     workspace, config = project(tmp_path, nodes, plugin_source="from vibeflow.targets.python.sdk import Plugin,capability,data_schema\ninterface=" + resources)
     declaration = json.loads(config.read_text())
     grant = {"rule_id": "vibeflow.capability.allow", "params": {
-        "capability": "vibeflow.workflow", "operations": ["self"]}}
+        "capability": "example.external", "operations": ["read"]}}
     nodes = [{"id": name, "definition_id": key, "display_name": name, "description": name}
              for name, key in [("start", "example.boundary"), ("a", "example.work"),
                                ("b", "example.work"), ("end", "example.boundary")]]
     nodes[1]["rulesets"] = ["vibeflow.process", grant]
     nodes[1]["style"] = {"shape": "diamond", "fill": "#F0CC22"}
-    declaration.update(rulesets=["vibeflow.workflow", {"rule_id": "vibeflow.capability.restrict"}],
+    declaration.update(rulesets=["vibeflow.workflow", {"rule_id": "vibeflow.capability.restrict", "params":{"capabilities":["example.external"]}}],
         pipeline={"nodes": nodes, "edges": [["start", "a"], ["a", "b"], ["b", "end"]]})
     config.write_text(json.dumps(declaration))
     report = validate_workspace_config_path(config, workspace=workspace)
@@ -56,12 +67,12 @@ def test_same_node_type_cannot_borrow_another_calls_grant_and_aot_saves_policy(t
 
     monkeypatch.setattr(validation, "validate_graph_health", forbidden)
     calls = []
-    runtime = bundle.create_runtime(capabilities={"vibeflow.workflow": {
-        "self": lambda request: calls.append(request) or {"id": "opaque-instance"}}}, run_dir=tmp_path / "run")
+    runtime = bundle.create_runtime(capabilities={"example.external": {
+        "read": lambda request: calls.append(request) or {"id": "opaque-instance"}}}, run_dir=tmp_path / "run")
     runtime.run({})
     assert len(calls) == 2
     for name in ("a", "b"):
-        assert runtime._frames[name].capability_policy["capabilities"]["vibeflow.workflow"] == ["self"]
+        assert runtime._frames[name].capability_policy["capabilities"]["example.external"] == ["read"]
 
 
 def test_javascript_rule_adapter_bakes_the_same_call_policy(tmp_path):
