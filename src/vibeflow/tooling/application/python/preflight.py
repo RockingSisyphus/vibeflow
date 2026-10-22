@@ -8,7 +8,7 @@ from vibeflow.core.findings import HealthFinding, HealthReport
 from vibeflow.core.flow import GraphConfig
 from vibeflow.targets.python.project.registry import NodeRegistry
 from vibeflow.targets.python.runtime.options import runtime_options as normalize_runtime_options
-from vibeflow.tooling.application.python.project.resource_selection import PythonResources
+from vibeflow.tooling.application.python.project.resource_bindings import PythonResources
 from vibeflow.tooling.application.python.execution import (
     CheckedRunError, CheckedRunResult, _ensure_trace_files, _write_json,
 )

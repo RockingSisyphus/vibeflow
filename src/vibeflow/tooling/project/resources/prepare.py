@@ -55,6 +55,7 @@ class PreparedResources:
     graph: object | None = None
     syntax_caches: Mapping = dataclass_field(default_factory=dict, repr=False, compare=False)
     packages: tuple = ()
+    resource_use: object | None = None
 
 
 def prepare_workflow_resources(workspace, config_path, *, node_command="node", discovery_cache=None, syntax_caches=None, binding_contexts=None) -> PreparedResources:

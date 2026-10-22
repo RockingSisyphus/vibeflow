@@ -19,7 +19,7 @@ from vibeflow.targets.javascript.build.project_paths import (
     javascript_options as _javascript_options,
     safe_project_path as _safe_project_path,
 )
-from vibeflow.targets.javascript.build.project_resources import base_lib_closure as _base_lib_closure, target_neutral_import_policy, required_capabilities as _required_capabilities, schemas_for_types as _schemas_for_types, used_schema_types as _used_schema_types
+from vibeflow.targets.javascript.build.project_resources import bind_base_libs as _bind_base_libs, source_import_facts, required_capabilities as _required_capabilities, schemas_for_types as _schemas_for_types, used_schema_types as _used_schema_types
 from vibeflow.core import (
     CompiledGraph,
     CoreCompileRequest,
@@ -101,6 +101,7 @@ class PreparedProjectBuild:
     plan: WorkflowPlan
     javascript_bindings: JavascriptBindingPlan
     import_policy: Mapping[str, Any]
+    resource_use: object
     external_packages: tuple[str, ...]
     used_node_ids: tuple[str, ...]
     used_base_libs: tuple[str, ...]
@@ -186,6 +187,7 @@ def prepare_project_build(
         raise ProjectBuildError(exc.code, str(exc), diagnostics=exc.diagnostics) from exc
     catalogs = prepared_resources.catalogs
     governance = preparation.review()
+    prepared_resources = preparation.workflow_resources(config_path)
     governance_errors = tuple(item for item in governance.findings if item.severity == "error")
     if governance_errors:
         raise ProjectBuildError(governance_errors[0].rule_id, governance_errors[0].message,
@@ -217,8 +219,14 @@ def prepare_project_build(
         catalogs=catalogs,
         hooks=before_compile_hooks,
     )
+    updated_review = preparation.review_graph(config_path, graph)
+    updated_errors = tuple(item for item in updated_review.findings if item.severity == "error")
+    if updated_errors:
+        raise ProjectBuildError(updated_errors[0].rule_id, updated_errors[0].message,
+                                diagnostics=tuple(item.to_dict() for item in updated_review.findings))
+    prepared_resources = preparation.workflow_resources(config_path)
     plugin_plan = _javascript_plugin_plan(
-        document.data,
+        resource_use=prepared_resources.resource_use,
         catalogs=catalogs,
         target=request.target,
         entry_mode=graph.entry_mode,
@@ -226,7 +234,7 @@ def prepare_project_build(
     )
 
 
-    rule_import_policy, _ = target_neutral_import_policy(resource_inventory=prepared_resources.resource_inventory, catalogs=catalogs, project_root=root.path, allowed_external=set(javascript["external_packages"]), node_ids=frozenset(source_node_calls(graph)),  plugin_ids=frozenset(item.id for item in _active_plugin_bindings(plugin_plan)))
+    rule_import_policy, _ = source_import_facts(resource_use=prepared_resources.resource_use, resource_inventory=prepared_resources.resource_inventory, catalogs=catalogs, project_root=root.path, allowed_external=set(javascript["external_packages"]), node_ids=frozenset(source_node_calls(graph)),  plugin_ids=frozenset(item.id for item in _active_plugin_bindings(plugin_plan)))
     rule_report = run_javascript_rules(graph, catalogs, project_root=root.path, package_root=package_root, phase="static", target=request.target, import_policy=rule_import_policy, node_command=request.node_command,
                                      quality_policy=javascript_quality_policy())
     rule_errors = tuple(item for item in rule_report.findings if item.severity == "error")
@@ -328,13 +336,17 @@ def prepare_project_build(
     compiled_declarations = {key: state.compile_graph(child, set(child.nodeset_types), "nodeset:" + key)
         for key, child in declarations.items()}
     rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={(): compiled, **state.compiled_by_path}, node_report=rule_report, project_root=root.path, package_root=package_root, target=request.target, node_command=request.node_command,
-        compiled_nodeset_types=compiled_declarations, quality_policy=javascript_quality_policy())
+        compiled_nodeset_types=compiled_declarations, quality_policy=javascript_quality_policy(),
+        global_config=raw_global, effective_params=state.params_by_path)
     workflow_errors = tuple(item for item in rule_report.findings if item.severity == "error")
     if workflow_errors:
         first = workflow_errors[0]
         raise ProjectBuildError(first.rule_id, first.message, diagnostics=tuple(item.to_dict() for item in rule_report.findings))
-    base_lib_order, base_lib_implementations = _base_lib_closure(
-        state.used_nodes,
+    from vibeflow.core.descriptors.resource_use import required_base_libs
+    library_ids = required_base_libs(catalogs, node_ids=state.used_nodes,
+        plugin_ids=frozenset(item.id for item in _active_plugin_bindings(plugin_plan)))
+    base_lib_order, base_lib_implementations = _bind_base_libs(
+        tuple(identifier for identifier in library_ids if prepared_resources.resource_use.allows("base_lib", identifier)),
         catalog=base_lib_catalog,
         target=request.target,
         project_root=root.path,
@@ -373,7 +385,7 @@ def prepare_project_build(
 
     for binding in _active_plugin_bindings(plugin_plan):
         allowed_external.update(binding.external_packages)
-    import_policy, _ = target_neutral_import_policy(resource_inventory=prepared_resources.resource_inventory, catalogs=catalogs, project_root=root.path,
+    import_policy, _ = source_import_facts(resource_use=prepared_resources.resource_use, resource_inventory=prepared_resources.resource_inventory, catalogs=catalogs, project_root=root.path,
         allowed_external=allowed_external, node_ids=frozenset(state.used_nodes),
 
         plugin_ids=frozenset(item.id for item in _active_plugin_bindings(plugin_plan)))
@@ -431,6 +443,7 @@ def prepare_project_build(
         catalogs=catalogs,
         plan=plan,
         import_policy=import_policy,
+        resource_use=prepared_resources.resource_use,
         external_packages=project_external,
         used_node_ids=tuple(sorted(state.used_nodes)),
         used_base_libs=tuple(item.id for item in base_lib_order),
@@ -459,8 +472,9 @@ def prepare_project_build(
         ),
         warnings=tuple(warnings),
         javascript_bindings=javascript_bindings,
-        presentation_inputs={"compiled_by_path": dict(state.compiled_by_path),
-                        "declarations": compiled_declarations, "selections": document.data},
+        presentation_inputs={"compiled_by_path": dict(state.compiled_by_path), "global_config":raw_global,
+                        "effective_params":dict(state.params_by_path),
+                        "declarations": compiled_declarations},
     )
 
 
@@ -508,6 +522,7 @@ def build_project_aot(request: ProjectBuildRequest) -> ProjectBuildResult:
     from vibeflow.tooling.presentation.preview.diagnostics import incidental_preview, preview_operation
     from vibeflow.tooling.application.javascript.presentation.preview import publish_build_preview
     record = incidental_preview(publish_build_preview, prepared=prepared, preview_root=request.preview_root)
+    from vibeflow.tooling.project.workflow_launches import graph_launches
     with preview_operation(record):
         result = build_aot(
             BuildRequest(
@@ -525,6 +540,7 @@ def build_project_aot(request: ProjectBuildRequest) -> ProjectBuildResult:
                 app_entry=request.app_entry,
                 node_command=request.node_command,
                 javascript_bindings=prepared.javascript_bindings,
+                resource_use=prepared.resource_use.to_dict(),
                 plugin_manifest={
                     "declared": list(prepared.declared_plugins),
                     "planned": list(prepared.planned_plugins),
@@ -534,6 +550,10 @@ def build_project_aot(request: ProjectBuildRequest) -> ProjectBuildResult:
                     ],
                 },
                 audit_sources=prepared.plugin_audit_sources,
+                workflow_launches=tuple(graph_launches(prepared.graph, prepared.catalogs, root=prepared.root,
+                    global_config=prepared.presentation_inputs["global_config"],
+                    effective_params=prepared.presentation_inputs["effective_params"])),
+                workflow_reference={"root":prepared.root.id,"path":prepared.config_path.relative_to(prepared.root.path).as_posix()},
             )
         )
     return ProjectBuildResult(prepared=prepared, build=result)
@@ -566,21 +586,15 @@ def _apply_before_compile_hooks(
 
 
 def _javascript_plugin_plan(
-    config: Mapping[str, Any],
     *,
+    resource_use,
     catalogs: DescriptorCatalogs,
     target: str,
     entry_mode: str,
     project_root: Path,
 ) -> JavascriptPluginBindingPlan:
-    raw = list(catalogs.lifecycle_selections)
-    if raw in (None, ()):
-        raw = []
-    if not isinstance(raw, list):
-        raise ProjectBuildError(
-            "VF_AOT_PLUGIN_CONFIG",
-            "workflow plugins must be a list of static plugin ids",
-        )
+    raw = [item for item in catalogs.lifecycle_selections
+           if item.get("status") == "planned" or resource_use.allows("plugin", item["id"])]
     try:
         selections = tuple(
             parse_javascript_plugin_selection(item) for item in raw

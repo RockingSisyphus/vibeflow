@@ -32,7 +32,7 @@ from vibeflow.targets.javascript.build.project_paths import (
 from vibeflow.targets.javascript.build.project_resources import (
     driver_import_policy,
     schemas_for_types,
-    target_neutral_import_policy,
+    source_import_facts,
 )
 from vibeflow.targets.javascript.build.toolchain import (
     AotToolchainError,
@@ -59,7 +59,7 @@ from vibeflow.tooling.project.graph_config import parse_graph_config
 from vibeflow.tooling.project.plugin_review import load_plugin_review_resources
 from vibeflow.tooling.project.workspace_loader import load_workspace_config
 from vibeflow.tooling.project.workspace_model import WorkspaceConfig, WorkspaceRoot
-from vibeflow.tooling.application.javascript.presentation.architecture import build_architecture_facts, _effect_scope_label
+from vibeflow.tooling.application.javascript.presentation.architecture import build_architecture_facts
 
 
 @dataclass(frozen=True)
@@ -140,6 +140,7 @@ def audit_javascript_project(
     prepared_resources = preparation.workflow_resources(config_path)
     catalogs = request.catalogs or prepared_resources.catalogs
     governance = request.governance or preparation.review()
+    prepared_resources = preparation.workflow_resources(config_path)
     governance_errors = tuple(item for item in governance.findings if item.severity == "error")
     if governance_errors:
         raise ProjectBuildError(governance_errors[0].rule_id, governance_errors[0].message,
@@ -159,7 +160,7 @@ def audit_javascript_project(
     rule_plugin_records, rule_plugin_ids = _plugin_records(document.data, catalogs=catalogs)
 
 
-    rule_import_policy, _ = target_neutral_import_policy(
+    rule_import_policy, _ = source_import_facts(resource_use=prepared_resources.resource_use,
         resource_inventory=prepared_resources.resource_inventory, catalogs=catalogs, project_root=root.path, allowed_external=set(javascript["external_packages"]),
         node_ids=frozenset(source_node_calls(graph)),  plugin_ids=frozenset(rule_plugin_ids),
     )
@@ -224,7 +225,7 @@ def audit_javascript_project(
         require_directory=True,
     )
     external = set(javascript["external_packages"])
-    import_policy, source_files = target_neutral_import_policy(
+    import_policy, source_files = source_import_facts(resource_use=prepared_resources.resource_use,
         resource_inventory=prepared_resources.resource_inventory, catalogs=catalogs,
         project_root=root.path,
         allowed_external=external,
@@ -252,7 +253,8 @@ def audit_javascript_project(
                 diagnostics=(*exc.diagnostics, *width_warnings),
             ) from exc
     rule_report = run_javascript_workflow_rules(graph, catalogs, compiled_by_path={(): compiled, **compiled_by_path}, compiled_nodeset_types=compiled_nodeset_types, node_report=rule_report, project_root=root.path, package_root=package_root, node_command=request.node_command, evaluate_sources=request.audit_sources,
-                                                 quality_policy=request.quality_policy or javascript_quality_policy())
+                                                 quality_policy=request.quality_policy or javascript_quality_policy(),
+                                                 global_config=document.data.get("global_config", {}))
     workflow_errors = tuple(item for item in rule_report.findings if item.severity == "error")
     if workflow_errors:
         first = workflow_errors[0]
@@ -272,8 +274,9 @@ def audit_javascript_project(
 
         root_id=root.id,
         source_path=config_path.relative_to(root.path).as_posix(),
-        project_root=root.path, selections=document.data, roots={item.id:item.path for item in workspace.roots},
+        project_root=root.path, resource_use=prepared_resources.resource_use, roots={item.id:item.path for item in workspace.roots},
         rule_report=rule_report,
+        global_config=document.data.get("global_config", {}),
     )
     return JavascriptAuditResult(
         workspace=workspace,
@@ -317,11 +320,7 @@ def inspect_payload(result: JavascriptAuditResult) -> dict[str, object]:
                         node.id,
                         node.flow_kind,
                     ),
-                    "effect_scope": _effect_scope_label(
-                        compiled,
-                        node.id,
-                        compiled.flow_kinds.get(node.id, node.flow_kind),
-                    ),
+                    "effect_scope": compiled.effect_scopes.get(node.id, "unconstrained"),
 
                     "effective_execution_lock": (
                         _effective_lock_text(graph, node) or None

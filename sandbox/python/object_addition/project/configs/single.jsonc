@@ -87,5 +87,10 @@
         "as": "object.done"
       }
     ]
+  },
+  "base_lib": {
+    "modules": [
+      "addition.math"
+    ]
   }
 }

@@ -10,6 +10,8 @@ _NUMBER='export const number=defineDataSchema({type_key:"number",schema:{type:"n
 
 
 def minimal(root, variant, *, registered=True):
+    (root/'root_rules.jsonc').write_text('{"rulesets":["vibeflow.root.resource_usage"]}')
+    config(root, lambda data: data.update(base_lib={'modules':['demo.math'] if variant in {'base_support','base_upward'} else []}))
     for name in ('nodes','base_lib','plugins'):
         shutil.rmtree(root/name)
         (root/name).mkdir()
@@ -58,10 +60,10 @@ def observe(work:Path,kernel:Path,toolchain:Path|None,renderer:Path|None):
         identifier=f'js.A05.structure.{variant}.unregistered';root=project(work/identifier,toolchain);minimal(root,variant,registered=False)
         observed=cli_summary(run_cli(root,cli_args(root,'validate'),kernel,name='validate',toolchain=toolchain))
         accepted=variant=='plugin_support'  # Package-private files need no second installation/ownership declaration.
-        rows.append(row(identifier,'A05','Independent support requires declaration; Plugin support is package-owned',{'exit_code':0 if accepted else 1},observed,check_cli(observed,accepted=accepted,code=None if accepted else 'VF_IMPORT_OWNER'),root))
+        rows.append(row(identifier,'A05','Independent support requires declaration; Plugin support is package-owned',{'exit_code':0 if accepted else 1},observed,check_cli(observed,accepted=accepted,code=None if accepted else 'RESOURCE.REFERENCE.UNDECLARED'),root))
     for variant in ('foreign_node','base_upward','declaration_lifecycle_use'):
         identifier=f'js.A05.structure.{variant}';root=project(work/identifier,toolchain);minimal(root,variant)
         observed=cli_summary(run_cli(root,cli_args(root,'validate'),kernel,name='validate',toolchain=toolchain))
-        code={'foreign_node':'VF_IMPORT_NODE_TO_NODE','base_upward':'VF_IMPORT_LAYER','declaration_lifecycle_use':'VF_PLUGIN_IMPORT_POLICY'}[variant]
+        code={'foreign_node':'RESOURCE.REFERENCE.UNDECLARED','base_upward':'RESOURCE.REFERENCE.UNDECLARED','declaration_lifecycle_use':'PLUGIN.PACKAGE.IMPORT'}[variant]
         rows.append(row(identifier,'A05','Ownership cannot grant cross-business or package-boundary imports',{'exit_code':1,'target_code':code},observed,check_cli(observed,accepted=False,code=code),root))
     return rows

@@ -251,15 +251,10 @@ function normalizeImportPolicy(raw, packageRoot) {
     sourceRoots: (policy.sourceRoots || []).map(value => normalizedRealPath({ sys: null }, value)),
     derivedOwners: new Map(),
     resourceBaseLibs: policy.resourceBaseLibs || {},
-    pluginContributions: policy.pluginContributions || {},
     nodeBaseLibs: policy.nodeBaseLibs && typeof policy.nodeBaseLibs === "object"
       ? policy.nodeBaseLibs : {},
     baseLibDependencies: policy.baseLibDependencies && typeof policy.baseLibDependencies === "object"
       ? policy.baseLibDependencies : {},
-    pluginDependencies:
-      policy.pluginDependencies
-      && typeof policy.pluginDependencies === "object"
-        ? policy.pluginDependencies : {},
     allowedExternalPackages: new Set(
       Array.isArray(policy.allowedExternalPackages)
         ? policy.allowedExternalPackages.map(String)
@@ -301,7 +296,8 @@ function ownerFor(ts, fileName, policy) {
   return policy.derivedOwners.get(normalizedRealPath(ts, fileName)) || null;
 }
 
-function importDestinationOwner(ts, fileName, policy, sourceOwner, imported) {
+// Attribution for per-resource effect analysis; resource permission is checked by root Rules.
+function resolvedImportOwner(ts, fileName, policy, sourceOwner, imported) {
   const candidate = normalizedRealPath(ts, fileName);
   let owners = [...policy.owners, ...policy.knownOwners].filter(owner => candidate === normalizedRealPath(ts, owner.path));
   const bindings = imported.declaration?.importClause?.namedBindings;
@@ -441,7 +437,7 @@ function isWithinPath(root, candidate) {
   return candidate === root || candidate.startsWith(`${root}${path.sep}`);
 }
 
-function auditImportOwnership(ts, sourceFile, checker, project, policy) {
+function auditExternalImports(ts, sourceFile, checker, project, policy) {
   const sourceOwner = ownerFor(ts, sourceFile.fileName, policy);
   if (!sourceOwner
       || !["node", "base_lib", "plugin", "plugin_declaration"].includes(sourceOwner.kind)) return [];
@@ -487,100 +483,6 @@ function auditImportOwnership(ts, sourceFile, checker, project, policy) {
         ));
       }
       continue;
-    }
-    if (![policy.packageRoot, ...policy.sourceRoots].some(root => isWithinPath(root, resolvedFile))) {
-      findings.push(importFinding(
-        sourceFile,
-        imported.node,
-        "VF_IMPORT_PACKAGE_ROOT",
-        `${sourceOwner.kind} '${sourceOwner.id}' imports source outside package_root: '${resolvedFile}'`,
-      ));
-      continue;
-    }
-    // Package ownership is evaluated by project/root Rules. Private support code
-    // is part of that atomic Plugin, rather than a separate business resource.
-    if (sourceOwner.pluginId && sourceOwner.packagePath && isWithinPath(sourceOwner.packagePath, resolvedFile)) continue;
-    const destination = importDestinationOwner(ts, resolvedFile, policy, sourceOwner, imported);
-    if (!destination) {
-      findings.push(importFinding(
-        sourceFile,
-        imported.node,
-        "VF_IMPORT_OWNER",
-        `${sourceOwner.kind} '${sourceOwner.id}' imports unowned local source '${resolvedFile}'`,
-      ));
-      continue;
-    }
-    if (sourceOwner.kind === "plugin_declaration") {
-      const contributed = policy.pluginContributions[sourceOwner.id] || [];
-      if (destination.kind === "plugin_declaration" && destination.id === sourceOwner.id
-          || contributed.some(item => item.kind === destination.kind && item.id === destination.id)
-          || destination.kind === "base_lib" && (policy.resourceBaseLibs[`plugin_declaration:${sourceOwner.id}`] || []).includes(destination.id)) continue;
-      findings.push(importFinding(sourceFile, imported.node, "VF_IMPORT_LAYER", `plugin declaration '${sourceOwner.id}' imports a resource outside its contributions`));
-    } else if (sourceOwner.kind === "node") {
-      if (destination.kind === "node" && destination.id !== sourceOwner.id) {
-        findings.push(importFinding(
-          sourceFile,
-          imported.node,
-          "VF_IMPORT_NODE_TO_NODE",
-          `node '${sourceOwner.id}' cannot import node '${destination.id}'`,
-        ));
-      } else if (destination.kind === "base_lib") {
-        const allowed = new Set(policy.nodeBaseLibs[sourceOwner.id] || []);
-        if (!allowed.has(destination.id)) {
-          findings.push(importFinding(
-            sourceFile,
-            imported.node,
-            "VF_IMPORT_BASE_LIB",
-            `node '${sourceOwner.id}' imports base_lib '${destination.id}' without enabling it`,
-          ));
-        }
-      } else if (["plugin", "plugin_declaration"].includes(destination.kind)) {
-        findings.push(importFinding(
-          sourceFile,
-          imported.node,
-          "VF_IMPORT_LAYER",
-          `node '${sourceOwner.id}' cannot import ${destination.kind} '${destination.id}'`,
-        ));
-      }
-    } else if (sourceOwner.kind === "base_lib") {
-      if (["node", "plugin", "plugin_declaration"].includes(destination.kind)) {
-        findings.push(importFinding(
-          sourceFile,
-          imported.node,
-          "VF_IMPORT_LAYER",
-          `base_lib '${sourceOwner.id}' cannot import ${destination.kind} '${destination.id}'`,
-        ));
-      } else if (destination.kind === "base_lib" && destination.id !== sourceOwner.id) {
-        const allowed = new Set(policy.baseLibDependencies[sourceOwner.id] || []);
-        if (!allowed.has(destination.id)) {
-          findings.push(importFinding(
-            sourceFile,
-            imported.node,
-            "VF_IMPORT_BASE_LIB",
-            `base_lib '${sourceOwner.id}' imports undeclared base_lib dependency '${destination.id}'`,
-          ));
-        }
-      }
-    } else if (sourceOwner.kind === "plugin") {
-      if (destination.kind === "base_lib" && (policy.resourceBaseLibs[`plugin:${sourceOwner.id}`] || []).includes(destination.id)) continue;
-      if (destination.kind !== "plugin") {
-        findings.push(importFinding(
-          sourceFile,
-          imported.node,
-          "VF_PLUGIN_IMPORT_POLICY",
-          `plugin '${sourceOwner.id}' cannot import ${destination.kind} '${destination.id}'`,
-        ));
-      } else if (destination.id !== sourceOwner.id) {
-        const allowed = new Set(policy.pluginDependencies[sourceOwner.id] || []);
-        if (!allowed.has(destination.id)) {
-          findings.push(importFinding(
-            sourceFile,
-            imported.node,
-            "VF_PLUGIN_IMPORT_POLICY",
-            `plugin '${sourceOwner.id}' imports undeclared plugin dependency '${destination.id}'`,
-          ));
-        }
-      }
     }
   }
   return findings;
@@ -1414,7 +1316,7 @@ function implementationEffectScopes(ts, sourceFiles, checker, project, policy, r
           .map(item => ({...imported, importedName: (item.propertyName || item.name).text}))
         : [...(selectedNames || new Set(["*"]))].map(name => ({...imported, importedName: name}));
       for (const dependency of imports) {
-        const destination = importDestinationOwner(ts, resolved, ownedPolicy, owner, dependency);
+        const destination = resolvedImportOwner(ts, resolved, ownedPolicy, owner, dependency);
         const name = dependency.importedName;
         const selectedExport = name && destination?.export?.split(".")[0] !== name ? name : "";
         enqueue(destinationFile, destination, selectedExport);
@@ -2411,6 +2313,8 @@ function collectQualityFacts(ts, program, checker, project, sourceFiles, request
           imported: target,
           raw_import: imported.value,
           resolved_path: resolved ? path.resolve(resolved) : "",
+          symbols: [...(imported.declaration?.importClause?.namedBindings?.elements || imported.declaration?.exportClause?.elements || [])]
+            .map(item => (item.propertyName || item.name).text),
           path: module,
           line: location.line,
           column: location.column,
@@ -2524,7 +2428,7 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
 
         findings.push(...auditRuleImportPolicy(ts, sourceFile, ruleParams));
       }
-      if (topics.has("architecture")) findings.push(...auditImportOwnership(ts, implementationFile, checker, project, policy));
+      if (topics.has("architecture")) findings.push(...auditExternalImports(ts, implementationFile, checker, project, policy));
       if (sourceFile.isDeclarationFile) continue;
       if (topics.has("purity")) findings.push(...auditTopLevelPurity(ts, sourceFile, policy, ruleParams));
       if (topics.has("completion")) findings.push(...auditCompletionAndPromiseOwnership(ts, sourceFile, checker, policy, project));

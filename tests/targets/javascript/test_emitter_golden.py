@@ -343,21 +343,21 @@ PROFILE_GOLDENS = {
     "esm-module": {
         "target": "node",
         "entry": "workflow.js",
-        "files": ["workflow.d.ts", "workflow.js", "workflow.js.map"],
+        "files": ["workflow-launches.json", "workflow.d.ts", "workflow.js", "workflow.js.map"],
         "typecheckFiles": ["node-contract-check.ts"],
         "appEntry": None,
     },
     "single-esm": {
         "target": "node",
         "entry": "index.js",
-        "files": ["index.d.ts", "index.js", "index.js.map"],
+        "files": ["index.d.ts", "index.js", "index.js.map", "workflow-launches.json"],
         "typecheckFiles": ["node-contract-check.ts"],
         "appEntry": None,
     },
     "web-app": {
         "target": "browser",
         "entry": "index.html",
-        "files": ["index.html", "index.js", "index.js.map", "workflow.d.ts"],
+        "files": ["index.html", "index.js", "index.js.map", "workflow-launches.json", "workflow.d.ts"],
         "typecheckFiles": [
             "node-contract-check.ts",
             "app.ts",

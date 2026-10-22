@@ -306,6 +306,8 @@ def run_variants(work_root: Path, variant: str, toolchain: Path, *, fixture: Any
         else:
             actual = fixture._observe(case, root, workspace, config, source, variant=variant)
         code = case.current_code if variant == 'current' and case.current_code is not None else case.code
+        if variant == 'current' and code in {'VF_IMPORT_OWNER','VF_IMPORT_BASE_LIB','VF_IMPORT_LAYER','VF_IMPORT_NODE_TO_NODE','VF_IMPORT_PACKAGE_ROOT'}:
+            code = 'RESOURCE.REFERENCE.UNDECLARED'
         if variant == 'current' and case.id in {'js.variant.base.host-date', 'js.variant.base.host-performance', 'js.variant.base.host-math-computed', 'js.variant.base.host-math-escape'}:
             code = ''  # B07: clock reads are computation, not host I/O.
         expected = {'should_accept': not code or item.severity == 'warning', 'codes': [{'code': code, 'severity': item.severity}] if code else [], 'metrics': dict(case.metrics)}

@@ -44,9 +44,9 @@ def test_selected_effect_policy_still_rejects_explicit_file_io():
 
 
 @pytest.mark.parametrize(("shared", "used", "rejected"), (
-    ("plugin", False, False), ("plugin", True, True), (None, False, True), ("node", False, True),
+    ("plugin", False, False), ("plugin", True, True), (None, False, False), ("node", False, False),
 ))
-def test_node_import_ownership_distinguishes_shared_declarations(shared, used, rejected):
+def test_node_coupling_checks_calls_while_import_permission_belongs_to_root(shared, used, rejected):
     from vibeflow.targets.python.rules.node.node_architecture import node_architecture
     body = "return Foreign().run_pure(inputs, params)" if used else "return {}"
     source = PythonSourceFile.parse("/virtual/task.py", "task",

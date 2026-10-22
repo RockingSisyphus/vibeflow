@@ -6,7 +6,7 @@ from vibeflow.core.findings import HealthFinding
 from vibeflow.targets.python.project.plugins import PluginRegistry
 from vibeflow.targets.python.project.policy import EffectivePolicy
 from vibeflow.targets.python.project.registry import NodeRegistry
-from vibeflow.tooling.application.python.project.resource_selection import PythonResources
+from vibeflow.tooling.application.python.project.resource_bindings import PythonResources
 @dataclass(frozen=True)
 class WorkspaceEnvironment:
     registry: NodeRegistry
@@ -15,6 +15,7 @@ class WorkspaceEnvironment:
     available_resources: PythonResources
     effective_policy: EffectivePolicy
     findings: tuple[HealthFinding, ...]
+    preparation: object = None
 
 
 __all__ = ["WorkspaceEnvironment"]

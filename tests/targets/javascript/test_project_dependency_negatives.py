@@ -262,12 +262,18 @@ def test_project_dependency_negative_has_precise_diagnostic(
     )
     entry = project / "entry.ts"
     checked = run_rule_check_driver({"typecheckFiles": [str(entry)], "ruleTopics": ["architecture", "imports", "purity", "completion", "module_state"], "importPolicy": {"owners": owners, "node_base_libs": case.node_base_libs or {}, "base_lib_dependencies": {"test.base": []}}}, package_root=project)
-    matching = [item for item in checked.findings if item.get("code") == case.code]
-    assert matching, [item.get("code") for item in checked.findings]
+    from tests.fixtures.support.resource_rules import javascript_references
+    findings = (*checked.findings, *javascript_references(project, {"owners":owners,"node_base_libs":case.node_base_libs or {}}))
+    expected_code = "RESOURCE.REFERENCE.UNDECLARED" if case.code in {"VF_IMPORT_OWNER","VF_IMPORT_LAYER","VF_IMPORT_NODE","VF_IMPORT_NODE_TO_NODE","VF_IMPORT_PACKAGE_ROOT"} else case.code
+    matching = [item for item in findings if item.get("code") == expected_code]
+    assert matching, [item.get("code") for item in findings]
     diagnostic = matching[0]
-    expected_file = (project / case.diagnostic_file).resolve()
-    expected_source = case.sources[case.diagnostic_file]
-    expected_line, expected_column = _line_column(expected_source, case.marker)
+    # An unowned barrel is rejected at the first undeclared edge, before traversing it.
+    diagnostic_file = "entry.ts" if case.name == "barrel" else case.diagnostic_file
+    marker = '"./barrel.ts"' if case.name == "barrel" else case.marker
+    expected_file = (project / diagnostic_file).resolve()
+    expected_source = case.sources[diagnostic_file]
+    expected_line, expected_column = _line_column(expected_source, marker)
     assert Path(str(diagnostic["file"])).resolve() == expected_file
     assert diagnostic["line"] == expected_line
     assert diagnostic["column"] == expected_column

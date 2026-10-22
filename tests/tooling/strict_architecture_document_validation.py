@@ -5,7 +5,7 @@ from copy import deepcopy
 
 import pytest
 
-from vibeflow.tooling.application.python.presentation.architecture_validation import architecture_regenerate_command, check_architecture_document
+from vibeflow.tooling.architecture.documents import architecture_regenerate_command, check_architecture_document
 from vibeflow.tooling.project.config_loader import ConfigLoadError, load_config_document, load_raw_config_document
 from vibeflow.tooling.project.document_kinds import ARCHITECTURE_DOCUMENT_HEADER
 

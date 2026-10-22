@@ -10,8 +10,9 @@ import shutil
 
 import pytest
 
+from vibeflow.core.descriptors.resource_use import ResourceUse
 from vibeflow.core.flow import GraphConfig, NodeCallSpec
-from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
+from vibeflow.targets.javascript.build.project_resources import source_import_facts
 from vibeflow.targets.javascript.quality.rules import run_javascript_rules
 from vibeflow.tooling.project.resources import prepare_workflow_catalogs
 
@@ -63,7 +64,7 @@ def _execute(project: Path, calls, relations=(), *, completed: bool = True):
         "kind": "ruleset", "id": "test.source", "calls": calls, "relations": relations,
         "entrypoints": {"static": [calls[-1]["id"]], "import": [], "run": []}}), encoding="utf-8")
     catalogs = prepare_workflow_catalogs(project / "configs/model.jsonc")
-    import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=project, allowed_external=set(), node_ids=frozenset({"example.model"}))
+    import_policy, _ = source_import_facts(resource_use=ResourceUse("test"), catalogs=catalogs, project_root=project, allowed_external=set(), node_ids=frozenset({"example.model"}))
     report = run_javascript_rules(GraphConfig(nodes=(NodeCallSpec("model", "example.model"),), rulesets=()),
                                   catalogs, project_root=project, package_root=project, target="node", import_policy=import_policy)
     if completed:
@@ -235,7 +236,7 @@ def test_real_rule_dynamic_replacement_and_empty_are_independent_calls(source_pr
     sdk_resource(source_project,"ruleset","test.source").write_text(json.dumps({"kind":"ruleset","id":"test.source",
         "calls":[{"id":"check","rule_id":"test.default"}],"entrypoints":{"static":["check"],"import":[],"run":[]}}))
     catalogs = prepare_workflow_catalogs(source_project / "configs/model.jsonc")
-    policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=source_project, allowed_external=set(), node_ids=frozenset({"example.model"}))
+    policy, _ = source_import_facts(resource_use=ResourceUse("test"), catalogs=catalogs, project_root=source_project, allowed_external=set(), node_ids=frozenset({"example.model"}))
     graph = GraphConfig((NodeCallSpec("default", "example.model"),
         NodeCallSpec("dynamic", "example.model", rulesets=({"rule_id":"test.dynamic"},)),
         NodeCallSpec("disabled", "example.model", rulesets=())), rulesets=())

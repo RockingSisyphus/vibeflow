@@ -66,7 +66,7 @@ def _forbid_execution(monkeypatch):
     from vibeflow.targets.python.project import GraphCompiler, NodeRegistry
     from vibeflow.targets.python.quality import rule_adapter
     from vibeflow.targets.python.project import resource_rules, source_closure
-    from vibeflow.tooling.presentation import resource_architecture
+    from vibeflow.tooling.architecture import resources as resource_architecture
 
     def unexpected(*_args,**_kwargs):
         raise AssertionError("a prepared presentation must not compile, bind, check or scan")

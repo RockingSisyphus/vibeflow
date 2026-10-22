@@ -12,6 +12,7 @@ import sys
 
 import pytest
 
+from vibeflow.core.descriptors.resource_use import ResourceUse
 from vibeflow.targets.javascript.build.plugin_session import JavascriptPluginSession
 from vibeflow.tooling.application.javascript.audit import JavascriptAuditRequest, audit_javascript_project
 from vibeflow.tooling.application.javascript.build import ProjectBuildRequest, build_project_aot
@@ -181,7 +182,7 @@ def test_allowed_top_level_model_passes_formal_checks_build_and_actual_execution
 
 
 def test_run_only_domain_rule_is_explicit_and_does_not_become_a_build_check(domain_project, tmp_path) -> None:
-    from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
+    from vibeflow.targets.javascript.build.project_resources import source_import_facts
     from vibeflow.targets.javascript.quality.rules import run_javascript_rules
     from vibeflow.tooling.project.resources import prepare_workflow_catalogs
 
@@ -198,7 +199,7 @@ def test_run_only_domain_rule_is_explicit_and_does_not_become_a_build_check(doma
     assert json.loads(result.stdout) == {"result": 7}
     # The public Target checker can explicitly select run; no JS run command or implicit runtime scan is introduced.
     catalogs = prepare_workflow_catalogs(project / "configs/model.jsonc")
-    policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=project, allowed_external=set())
+    policy, _ = source_import_facts(resource_use=ResourceUse("test"), catalogs=catalogs, project_root=project, allowed_external=set())
     checked = run_javascript_rules(audited.graph, catalogs, project_root=project, package_root=project, target="node", phase="run", import_policy=policy)
     _domain_diagnostic([finding.to_dict() for finding in checked.findings], source, line)
     assert any(execution.plan.entrypoint == "run" and execution.executed == ("model_definition",) for execution in checked.results["example.transform"])
@@ -494,7 +495,7 @@ def test_rule_abi_arguments_records_ast_and_native_file_io(domain_project) -> No
 def test_rule_scope_keeps_call_identity_and_caches_source_snapshots(domain_project, scope, counts) -> None:
     from vibeflow.core.flow import GraphConfig, NodeCallSpec
     from vibeflow.targets.javascript.quality.rules import run_javascript_rules
-    from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
+    from vibeflow.targets.javascript.build.project_resources import source_import_facts
     from vibeflow.tooling.project.resources import prepare_workflow_catalogs
 
     _, project = domain_project
@@ -505,7 +506,7 @@ def test_rule_scope_keeps_call_identity_and_caches_source_snapshots(domain_proje
     file = sdk_resource(project, 'node', 'example.model')
     data = json.loads(file.read_text()); data["rulesets"] = ["test.scope"]; file.write_text(json.dumps(data))
     catalogs = prepare_workflow_catalogs(project / "configs/model.jsonc")
-    policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=project, allowed_external=set(), node_ids=frozenset({"example.model"}))
+    policy, _ = source_import_facts(resource_use=ResourceUse("test"), catalogs=catalogs, project_root=project, allowed_external=set(), node_ids=frozenset({"example.model"}))
     graph = GraphConfig(nodes=(NodeCallSpec("first", "example.model"), NodeCallSpec("second", "example.model")), rulesets=())
     report = run_javascript_rules(graph, catalogs, project_root=project, package_root=project, target="node", import_policy=policy)
     results = [execution for execution in report.results["example.model"] if execution.results]

@@ -50,7 +50,7 @@ Python SDK 使用 `PipelineRuntime(..., entry="gui")`、`bundle.create_runtime(e
   "params": {
     "capability":"vibeflow.workflow",
     "operations":["call","wait"],
-    "actions":[{"operation":"call","target":"worker","entry":"main","wait":true},
+    "actions":[{"operation":"call","wait":true},
                {"operation":"wait"}]
   }
 }]
@@ -58,7 +58,7 @@ Python SDK 使用 `PipelineRuntime(..., entry="gui")`、`bundle.create_runtime(e
 
 SDK 声明也可直接选择这些 Rule，调用配置可以覆盖其规则选择。有效权限按完整调用路径保存；同类型的另一处调用不能借用授权。图级限制覆盖其负责的有效子图，节点选择空 Ruleset 不能取消图级限制。`restrict` 默认限制 `vibeflow.workflow` 和 `vibeflow.port`，也可通过 `capabilities` 参数指定其他接口。
 
-`actions` 是作者对操作、目标和等待方式的显式声明，用于图审查和展示；框架不分析任意业务代码来证明声明。调整实现、目标或等待配置时应同步更新它。动态目标可以省略，页面会保留操作说明而不虚构目标图。未提供 actions 时，规则根据明确声明的 operations 输出基本操作说明。
+`actions` 是作者对操作和等待方式的显式声明，用于图审查和展示；框架不分析任意业务代码来证明声明。目标、入口和启动方式统一在节点 `config` 中维护。调整实现或等待方式时同步更新 actions，调整目标时更新 config。Send/Receive 未声明 `expected_workflows` 时，页面保留操作说明而不虚构对端。未提供 actions 时，规则根据明确声明的 operations 输出基本操作说明。
 
 ## 接口约定
 
@@ -67,11 +67,11 @@ Node 通过 `context.capabilities["vibeflow.workflow"]` 使用接口。Python �
 | 操作 | 请求 | 结果与等待行为 |
 |---|---|---|
 | `self` | `{}`，也可省略参数 | `{id}`；属于当前 workflow 实例，进入 Nodeset / Loop 不变 |
-| `call` | `{target, entry?, inputs?, timeout?}` | 等待宿主注册确认后返回 `{id}`；不等待业务结束 |
+| `call` | `{workflow, launch, inputs?, timeout?}` | 等待宿主注册确认后返回 `{id}`；不等待业务结束 |
 | `wait` | `{id, timeout?}` | 等待真实终态，返回 `state`、`outputs`、`error` 等；可重复读取 |
 | `send` | `{id, port?, payload}` | 交给本地发送适配器后继续；不等待对端处理，无业务返回值 |
 | `receive` | `{port?, timeout?}` | 默认等待消息，返回 `{sender, port, payload}` |
-| `kill` | `{id, timeout?}` | 请求宿主停止该实例，等待真实终态；不支持时明确失败 |
+| `kill` | `{id, workflow, timeout?}` | 请求宿主停止该实例，等待真实终态；不支持时明确失败 |
 
 默认端口是 `default`，超时以秒计。取消等待只结束当前等待，不自动停止对端。JS 的等待操作使用异步 completion；Python 接入 Node 的取消信号。普通退出先完成本地待发交接，强制退出不保证尚未交接的消息。第一版只支持本机、内存中的普通 JSON；大于跨语言安全整数范围的整数须编码为字符串。
 
@@ -81,32 +81,42 @@ Node 通过 `context.capabilities["vibeflow.workflow"]` 使用接口。Python �
 
 ## 目标和宿主
 
-工作流配置可声明稳定目标别名。workflow 路径相对所属 root，`root` 缺省为当前 root：
+目标和启动方式在具体 Call 节点的 `config` 中声明，不维护顶层目标表：
 
 ```jsonc
-"workflow_targets": {
-  "worker": {
-    "root":"worker_root",
-    "workflow":"configs/worker.jsonc",
-    "entry":"main",
-    "command":["python","-m","vibeflow.coordination","run-python","--bundle","build/worker"],
-    "cwd":"../worker",
+"config": {
+  "workflow": {"root":"worker_root", "path":"configs/worker.jsonc", "entry":"main"},
+  "launch": {
+    "command":["python","-m","vibeflow.coordination","run-python","--bundle","../worker/build"],
+    "cwd":".",
     "env":{}
-  }
+  },
+  "allow_background": false
 }
 ```
 
-命令是参数数组，不经过 shell；工作目录相对服务配置文件。Windows 路径仍作为单个参数传入，JSON 中反斜杠需要转义。环境初始化、应用窗口、浏览器插件及其权限由作者负责。
+`workflow.path` 相对目标 root，`root` 省略时采用当前 workflow 的 root；`entry` 可选，传到现有命名入口选择接口。未指定时使用目标默认入口或唯一入口，多入口无默认值时必须选择。命令不必重复写入口。`launch.cwd` 相对调用 workflow 所属 root，命令是参数数组，不经过 shell。环境初始化、窗口、浏览器权限仍由作者负责。
 
-使用已安装的 wheel 时，可以通过下面的模块命令启动；解压开发包时改用 `python run.py coordination …`，启动目标的 command 也使用其实际 `run.py` 路径。作者提供的命令必须能在自己的环境找到内核，不依赖父进程临时修改的 Python 导入路径。
+Kill 节点也必须在 `config.workflow` 声明目标，并从输入取得实例 ID；同一 workflow 运行多份时只停止所选实例。实例归属不匹配会返回 `VF_WORKFLOW_MISMATCH`。Send/Receive 可在 `config.expected_workflows` 中填写上述 workflow 引用列表；它仅描述预期交互，不限制实际通信。
 
-先明确启动本机服务：
+标准节点的流程分类是 `workflow-io`。操作及配置共同生成 Architecture 关联和右键跳转；Rule action 只描述操作和等待行为，不重复声明目标、入口或启动方式。
+
+planned Call 保留设计意图供审查，启动清单只收集已实现调用。未来节点的启动配置尚未补齐时，也不会阻止收集已实现调用；其目标不会因此获得启动资格。
+
+显式启动本机通信服务：
 
 ```bash
-python -m vibeflow coordination serve --config communications.jsonc --port 8765
+python -m vibeflow coordination serve --workspace vibeflow_config.jsonc --port 8765
+# 可用 --config 限定当前 workspace 中的一份 workflow
+python -m vibeflow coordination serve --bundle build/main --port 8765
 ```
 
-`communications.jsonc` 使用相同的 `workflow_targets` 声明；也可直接使用包含它的 workflow 配置。目标别名属于这份服务配置的命名空间；多个 workflow 共用服务时，作者将它们需要的启动目标统一登记，避免同名别名指向不同程序。服务不会自动读取被启动程序的目标配置。服务监听 `127.0.0.1`，不会自动启动或托管已经接入的程序。作者选择本机可信宿主；这不是运行不可信业务代码的隔离沙箱。
+源码服务从注册 workflow 的有效节点配置准备启动声明。构建保存 `workflow-launches.json`，部署服务读取它，无需扫描源工程；Call 请求必须与已准备的 workflow/launch 声明匹配，不允许请求直接引入其他命令。Python 部署包的启动工作目录基于保存的 root，JavaScript 部署包基于产物目录；作者需随部署提供命令引用的外部产物和显式资源。服务监听 `127.0.0.1`，没有自动运行组或子进程清理。
+
+启动声明同时保存调用 workflow 的身份，服务据此区分不同 root 中相同的命令，并解析各自的工作目录。标准宿主自动登记该身份；自定义宿主创建客户端时，应通过 `workflow: {root, path}` 登记自身 workflow。
+宿主提供明确身份时，它必须与 Call 配置的目标一致；不一致会报告实际与预期路径，避免把其他 workflow 的执行结果记到该目标下。
+
+使用已安装 wheel 时采用上述模块命令，解压开发包使用 `python run.py coordination …`，启动命令也使用其实际内核路径。
 
 标准 Python 接入命令支持源码和 AOT：
 
@@ -131,14 +141,14 @@ node kernel/javascript/workflow_node.mjs build/worker/workflow.js
 
 | 请求 | 宿主职责和响应 |
 |---|---|
-| `register`：`{id?,workflow?,pid?,stop_supported}` | call 启动的宿主使用环境中的 id；独立宿主省略 id。返回 `{id,inputs,entry}`。每个运行只登记一次，旧终态 ID 不能复用。 |
+| `register`：`{id?,workflow?,pid?,stop_supported}` | call 启动的宿主使用环境中的 id；独立宿主省略 id。返回 `{id,inputs,entry,workflow}`。每个运行只登记一次，旧终态 ID 不能复用。 |
 | `control`：`{id}` | 支持停止的宿主轮询。返回 `{pending:true}`，或 `{stop:true,ended:false}`；宿主收到后取消该次运行，完成实际清理再报告终态。 |
 | `complete`：`{id,state,outputs,error}` | `state` 为 succeeded、failed 或 cancelled。输出和错误须为 JSON。宿主必须在真实执行与清理结束后报告。 |
 | `send`：`{id,sender,port,payload}` | 将消息交给指定实例邮箱；服务确认入队，不等于业务处理完成。 |
 | `receive`：`{id,port}` | 返回 `{sender,port,payload}`，无消息时返回 `{pending:true}` 后继续轮询。 |
-| `call`：`{target,entry?,inputs?}` | 返回预留 `{id}`；随后请求 `ready`，直到宿主登记。包装脚本退出不会替代登记。 |
+| `call`：`{sender,workflow,launch,inputs?}` | 客户端自动带上调用实例 `sender`。返回预留 `{id}`；随后请求 `ready`，直到宿主登记。包装脚本退出不会替代登记。 |
 | `ready` / `wait`：`{id}` | 未就绪时返回 `{pending:true}`；ready 返回身份，wait 返回真实终态及输出，可重复读取。 |
-| `kill`：`{id}` | 发出停止请求或报告不支持；继续 wait 确认真实结束。 |
+| `kill`：`{id,workflow?}` | 发出停止请求或报告不支持；指定 workflow 时校验实例归属，继续 wait 确认真实结束。 |
 | `instances`：`{}` | 返回实例状态列表，供作者诊断和自行清理。 |
 
 轮询由服务短暂等待后响应，宿主可结束当前 HTTP 等待来实现本地取消。取消等待不等于 kill。普通退出前完成本地发送队列的交接；各宿主使用相同的实例与消息地址，不共享线程或进程生命周期。

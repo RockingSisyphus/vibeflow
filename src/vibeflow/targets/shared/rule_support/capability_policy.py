@@ -32,12 +32,12 @@ def handlers():
     return {"vibeflow.capability.allow": allow, "vibeflow.capability.restrict": restrict}
 
 
-def policy_findings(graph, policies, descriptor):
+def policy_findings(graph, policies, descriptor, *, global_config=None, effective_params=None):
     """Check declarations against graph restrictions and per-call grants."""
     from vibeflow.core.graph_calls import graph_call_subjects
     from vibeflow.core.findings import HealthFinding
     findings = []
-    for subject in graph_call_subjects(graph):
+    for subject in graph_call_subjects(graph, global_config=global_config):
         for node in subject.graph.nodes:
             path = (*subject.call_path, node.id)
             constraints = policies.get(path, {}).get("capabilities", {})
@@ -58,8 +58,16 @@ def policy_findings(graph, policies, descriptor):
         for node in subject.graph.nodes:
             path = (*subject.call_path, node.id)
             actions = policies.get(path, {}).get("actions", ())
+            from vibeflow.core.workflows.references import node_workflow_actions, workflow_node_params
+            params = (effective_params or {}).get(path, workflow_node_params(node, descriptor(node.definition_id), subject))
+            try:
+                node_workflow_actions(actions, params, root=graph.root_id)
+            except ValueError as error:
+                findings.append(HealthFinding(rule_id="WORKFLOW.CONFIG.INVALID", severity="error",
+                    object_type="node", object_id="/".join(path), message=str(error),
+                    details={"call_path":list(path)}))
             calls = [action for action in actions if action.get("capability") == "vibeflow.workflow" and action.get("operation") == "call"]
-            if not calls or node.params.get("allow_background") is True or all(action.get("wait") is True for action in calls):
+            if not calls or params.get("allow_background") is True or all(action.get("wait") is True for action in calls):
                 continue
             providers = {provider.type for provider in node.provides}
             handled = any(

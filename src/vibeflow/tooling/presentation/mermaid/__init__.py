@@ -115,6 +115,11 @@ def render_mermaid_svg(
                 _raise_on_error_svg(output)
                 if enhance_labels and not html_labels:
                     _enhance_svg_labels(output)
+                from .planned import normalize_planned_svg
+                text = output.read_text(encoding="utf-8")
+                normalized = normalize_planned_svg(text)
+                if normalized != text:
+                    output.write_text(normalized, encoding="utf-8")
                 return output
             state = process_state.read_text() if process_state.exists() else "not available"
             detail = (f"Renderer supervisor returncode={completed.returncode}; process state: {state}\n"

@@ -17,7 +17,7 @@ from vibeflow.targets.python.project.registry import NodeRegistryError
 if TYPE_CHECKING:
     from vibeflow.core.flow import GraphConfig
     from vibeflow.targets.python.project.registry import NodeRegistry
-    from vibeflow.tooling.application.python.project.resource_selection import PythonResources
+    from vibeflow.tooling.application.python.project.resource_bindings import PythonResources
 
 @dataclass(frozen=True)
 class CheckedRunResult:

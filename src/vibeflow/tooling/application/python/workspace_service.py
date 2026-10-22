@@ -33,7 +33,7 @@ from vibeflow.tooling.project.config_schema import (
     ConfigSchemaError, collect_config_schema_findings,
 )
 from vibeflow.tooling.project.resources import ResourcePreparationError
-from vibeflow.tooling.application.python.project.resource_selection import PythonResources, select_python_resources
+from vibeflow.tooling.application.python.project.resource_bindings import PythonResources
 
 from vibeflow.tooling.application.python.presentation.architecture_validation import (
     _validate_registered_architecture_document,
@@ -349,14 +349,13 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
         return _workspace_error_report("PLUGIN.FACTORY.LOAD", str(exc), config_path, env.effective_policy)
     from vibeflow.targets.python.project.plugins import plugin_lifetime
     with source_paths(env.registry.source_roots), plugin_lifetime(plugin_registry, plugin_type="compiler"):
-        resources, resource_findings = select_python_resources(document.data, registry=env.registry, base_path=root.path)
+        resources = env.resources
         resources = replace(
             resources,
             base_libs=_with_effective_resource_source(resources.base_libs, root=root, source_path=config_path),
             plugins=_with_effective_resource_source(resources.plugins, root=root, source_path=config_path),
 
         )
-        preflight_findings.extend(annotate_findings(resource_findings, root=root, source_path=config_path))
         effective_policy = env.effective_policy
         env.registry.configure_rule_defaults(purity_policy=effective_policy.to_purity_policy())
         schema_findings = dedupe_findings((*collect_config_schema_findings(document.data), *preflight_findings))
@@ -374,6 +373,14 @@ def _prepare_workspace_graph(path: Path, *, workspace: WorkspaceConfig, env: Wor
             )
             graph = compilation.workflow.graph
             compiled = compilation.compiled_graph
+            if env.preparation is not None:
+                review = env.preparation.review_graph(config_path, graph)
+                errors = tuple(item for item in review.findings if item.severity == "error")
+                if errors:
+                    return HealthReport(status="FAIL", errors=errors, warnings=warnings,
+                                        effective_policy=effective_policy.to_dict())
+                from vibeflow.tooling.application.python.project.resource_bindings import bind_python_resources
+                resources = bind_python_resources(env.registry, env.preparation.resource_use(config_path))
         except GraphConfigError as exc:
             return fail_report("CONFIG.SCHEMA.PARSE", str(exc), "config", str(config_path), "schema", effective_policy=effective_policy.to_dict())
         except GraphCompileError as exc:

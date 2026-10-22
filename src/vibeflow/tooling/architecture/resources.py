@@ -7,14 +7,13 @@ from vibeflow.core.rules import compile_ruleset
 from vibeflow.tooling.presentation.node_presentation import resolve_presentation
 
 
-def _selected_resources(selections, catalogs):
+def _resource_annotations(resource_use, catalogs):
     selected = {}
-    for kind, values in (
-                         [("base_lib", selections.get("base_lib", {}).get("modules", ()))]):
-        for value in values:
-            item = {"id":value} if isinstance(value,str) else value
-            if item.get("id"):
-                selected[(kind,item["id"])] = item
+    if resource_use is not None:
+        for item in (*(resource_use.resources or ()), *resource_use.annotations):
+            selected[(item["kind"], item["id"])] = {"status": "implemented", **item.get("selection", {}), "reason": item.get("reason", "")}
+        for item in resource_use.planned:
+            selected[(item["kind"], item["id"])] = dict(item)
     for record in catalogs.plugin_records:
         if record.get("id"):
             selected[("plugin_declaration",record["id"])] = record
@@ -30,14 +29,13 @@ def _rule_plans(descriptor, catalogs):
             for phase in ("import","static","run")}
 
 
-def resource_architecture(catalogs, *, project_root, source_facts=(), selections=None,
+def resource_architecture(catalogs, *, project_root, source_facts=(), resource_use=None,
                           selected_nodes=None, findings=(), roots=None):
     root = Path(project_root).resolve()
-    selections = selections or {}
     snapshots = {str(Path(item["path"]).resolve()):item for item in source_facts}
     resources, files, edges = {}, {}, []
     selected = None if selected_nodes is None else set(selected_nodes)
-    uses = _selected_resources(selections,catalogs)
+    uses = _resource_annotations(resource_use,catalogs)
     known_roots = {key:Path(value).resolve() for key,value in (roots or {}).items()}
 
     def source_id(path):
@@ -57,6 +55,7 @@ def resource_architecture(catalogs, *, project_root, source_facts=(), selections
 
     diagnostics = [item.to_dict() if hasattr(item,"to_dict") else item for item in findings]
     for kind, descriptor in source_resources(catalogs):
+        if resource_use is not None and not resource_use.allows(kind, descriptor.id):continue
         if kind == "node" and selected is not None and descriptor.id not in selected:continue
         use=uses.get((kind,descriptor.id),{})
         source_rows = []

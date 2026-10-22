@@ -940,9 +940,12 @@ def test_workspace_node_library_dependency_is_explicit(tmp_path) -> None:
     payload["base_libs"] = ["math"]
     descriptor.write_text(json.dumps(payload))
     _select_fixture_plugins(config_path,project_root,framework_root)
+    selection = json.loads(config_path.read_text())
+    selection["base_lib"] = {"modules": ["math"]}
+    config_path.write_text(json.dumps(selection))
     referenced = validate_workspace_config_path(config_path,workspace=load_workspace_config(workspace_path))
-    assert "VF_IMPORT_LAYER" in {finding.rule_id for finding in (*missing.errors,*missing.warnings)}
-    assert "VF_IMPORT_LAYER" not in {finding.rule_id for finding in (*referenced.errors,*referenced.warnings)}
+    assert "RESOURCE.REFERENCE.UNAVAILABLE" in {finding.rule_id for finding in (*missing.errors,*missing.warnings)}
+    assert "RESOURCE.REFERENCE.UNDECLARED" not in {finding.rule_id for finding in (*referenced.errors,*referenced.warnings)}
 
 
 def test_cli_workspace_quality_reports_all_roots_with_selected_root_rules(tmp_path, capsys):

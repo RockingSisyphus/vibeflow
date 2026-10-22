@@ -576,7 +576,8 @@ def expect_build_failure(
             diagnostic = matching[0]
             location = diagnostic.get("source_location", diagnostic)
             details = diagnostic.get("details", {})
-            owner = details.get("source_owner", diagnostic.get("owner"))
+            owner = ({"id":details["resource_id"], "kind":details["resource_kind"]} if expected_code.startswith("RESOURCE.")
+                     else details.get("source_owner", diagnostic.get("owner")))
             if expected_definition_id is not None and diagnostic.get("definition_id") != expected_definition_id:
                 raise AssertionError(
                     f"{expected_code} Rule definition: expected {expected_definition_id!r}, "

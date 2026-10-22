@@ -9,8 +9,7 @@ def entry_facts(graph, compiled):
         entries[name] = {**declaration.to_dict(), "nodes": list(routes.order),
             "inputs": [item.to_dict() for item in selected.inputs],
             "outputs": [item.to_dict() for item in selected.outputs]}
-    return {"entries": entries, "default_entry": graph.default_entry,
-        "workflow_targets": {name: target.to_dict() for name, target in graph.workflow_targets.items()}}
+    return {"entries": entries, "default_entry": graph.default_entry}
 
 
 def policy_facts(policies):

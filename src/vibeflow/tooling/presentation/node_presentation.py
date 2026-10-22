@@ -14,13 +14,15 @@ from vibeflow.tooling.presentation.style import SYSTEM_STYLE_COLORS
 class EffectivePresentation:
     values: Mapping[str, str]
     sources: Mapping[str, str]
+    planned: bool = False
 
     @property
     def shape(self) -> str:
         return self.values["shape"]
 
     def to_dict(self) -> dict[str, object]:
-        return {"values": dict(self.values), "sources": dict(self.sources)}
+        return {"values": dict(self.values), "sources": dict(self.sources),
+                "modifiers": {"planned": self.planned}}
 
 
 def resolve_presentation(
@@ -34,7 +36,7 @@ def resolve_presentation(
     node: object | None = None,
     compiled: object | None = None,
 ) -> EffectivePresentation:
-    """Native → Node → status → call, with per-field provenance."""
+    """Native → operation → author → health → call; planned is a modifier."""
     identity = flow_kind or _get(descriptor, "flow_kind", "process")
     native_class = native_class or ("externalDependency" if _get(descriptor, "external", False)
                                     else "documentNode" if identity == "document" else "defaultNode")
@@ -44,6 +46,14 @@ def resolve_presentation(
     if identity == "process" and native_class not in {"loopNode", "nodesetNode"} and _parallel_call(node, compiled):
         values["shape"] = "dbl-circ"
     sources = dict.fromkeys(values, "native")
+    operations = {operation for requirement in _get(descriptor, "capabilities", ())
+                  if requirement.id == "vibeflow.workflow" for operation in requirement.operations}
+    operation = "call" if operations <= {"call", "wait"} and "call" in operations else (
+        next(iter(operations)) if len(operations) == 1 else "multiple" if operations else "")
+    from vibeflow.tooling.presentation.style import WORKFLOW_OPERATION_STYLES
+    if operation in WORKFLOW_OPERATION_STYLES:
+        values.update(WORKFLOW_OPERATION_STYLES[operation])
+        sources.update(dict.fromkeys(WORKFLOW_OPERATION_STYLES[operation], "workflow 操作 · " + operation))
 
     def apply(presentation: object, origin: str) -> None:
         if hasattr(presentation, "to_dict"):
@@ -63,7 +73,7 @@ def resolve_presentation(
         status = SYSTEM_STYLE_COLORS[status_class]
         apply({"fill": status.fill, "stroke": status.stroke, "text": status.text}, "status")
     apply(call_style, "call")
-    return EffectivePresentation(MappingProxyType(values), MappingProxyType(sources))
+    return EffectivePresentation(MappingProxyType(values), MappingProxyType(sources), status_class == "plannedNode")
 
 
 def _parallel_call(node: object | None, compiled: object | None) -> bool:

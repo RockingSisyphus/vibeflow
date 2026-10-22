@@ -105,5 +105,10 @@
         "as": "result"
       }
     ]
+  },
+  "base_lib": {
+    "modules": [
+      "sandbox.math"
+    ]
   }
 }

@@ -61,7 +61,7 @@ window.VFInspector=(()=>{
     if(facts.preview_operations?.length){
       const part=section(parent,"接口操作与等待行为");
       for(const action of facts.preview_operations){const row=element("article");row.className="contract-detail";
-        row.append(element("strong",VFModel.operationLabel(action)));table(row,Object.entries(action).map(([key,value])=>[({capability:"Capability",target:"目标别名",entry:"目标入口",wait:"等待执行结束",operation:"操作"})[key]||key,value]));part.append(row);}
+        row.append(element("strong",VFModel.operationLabel(action)));table(row,Object.entries(action).map(([key,value])=>[({capability:"Capability",workflow:"目标 workflow",expected_workflows:"预期交互 workflow",entry:"目标入口",wait:"等待执行结束",operation:"操作"})[key]||key,value]));part.append(row);}
     }
     if(nonempty(definition?.global_config?.values??definition?.global_config)){const part=section(parent,"Nodeset 全局配置声明");table(part,Object.entries(values(definition.global_config)));}
     if(nonempty(facts.metadata)||nonempty(nodeDefinition?.metadata)){const part=section(parent,"补充元数据");table(part,[["调用",facts.metadata],["业务定义",nodeDefinition?.metadata]]);}

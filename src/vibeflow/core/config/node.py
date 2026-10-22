@@ -37,7 +37,8 @@ def normalize_node_config_spec(
         raise NodeConfigError("node config defaults must be an object")
     normalized_schema = _normalize_schema(schema)
     normalized_defaults = {str(key): value for key, value in defaults.items()}
-    missing_defaults = sorted(set(normalized_schema) - set(normalized_defaults))
+    missing_defaults = sorted(key for key in set(normalized_schema) - set(normalized_defaults)
+                              if normalized_schema[key].get("required") is not True)
     extra_defaults = sorted(set(normalized_defaults) - set(normalized_schema))
     if missing_defaults:
         raise NodeConfigError(f"node config defaults missing keys: {missing_defaults}")
@@ -66,6 +67,9 @@ def merge_node_config(
             f"node config overrides contain undeclared keys: {unknown}"
         )
     merged = {**dict(spec.defaults), **normalized_overrides}
+    missing = sorted(key for key, schema in spec.schema.items() if schema.get("required") is True and key not in merged)
+    if missing:
+        raise NodeConfigError(f"node config is missing required keys: {missing}")
     for key, value in merged.items():
         merged[key] = _json_snapshot(value, object_id=key)
         _assert_schema_value(key, merged[key], spec.schema[key])

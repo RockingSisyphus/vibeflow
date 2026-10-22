@@ -17,6 +17,8 @@ class DriverSession:
         self.stack=ExitStack()
         resources=self.stack.enter_context(materialized_resources())
         self.resources=resources
+        from vibeflow.targets.javascript.resources.identity import FrameworkResources
+        self.framework_resources=FrameworkResources(resources)
         self.stderr=self.stack.enter_context(tempfile.TemporaryFile(mode="w+t",encoding="utf-8"))
         try:
             self.process=subprocess.Popen([node_command,str(resources/"toolchain_driver.mjs"),"--session"],
@@ -45,7 +47,7 @@ class DriverSession:
         if not line:
             self.stderr.seek(0)
             raise AotToolchainError("VF_PROTOCOL","JavaScript analysis driver exited: "+self.stderr.read())
-        try:return json.loads(line)
+        try:return self.framework_resources.annotate_analysis(json.loads(line))
         except ValueError as error:
             raise AotToolchainError("VF_PROTOCOL","JavaScript analysis driver returned invalid JSON") from error
 

@@ -9,7 +9,7 @@ from dataclasses import asdict, fields
 from vibeflow.core.findings import HealthFinding
 from vibeflow.targets.shared.quality_support.models import (
     SourceQualityFacts, QualityPolicy, QualityStructureConventions,
-    QualityStructureLimits, QualityStructureRoles, QualityThresholds,
+    QualityStructureLimits, QualityThresholds,
 )
 from vibeflow.core.rules.models import RuleRecord, RuleResult, plain
 
@@ -36,7 +36,6 @@ def source_quality_defaults(policy: QualityPolicy | None = None) -> dict[str, di
         "dependencies": {name: thresholds[name] for name in _DEPENDENCY_LIMITS},
         "structure": {
             **{name: thresholds[name] for name in _STRUCTURE_LIMITS}, **structure,
-            "structure_roles": plain(asdict(active.structure_roles)),
             "structure_conventions": plain(asdict(active.structure_conventions)),
         },
         "duplicates": {},
@@ -49,7 +48,6 @@ def _policy(params):
     limits = {name: plain(value) for name, value in params.items() if name in structure_names}
     if "allowed_root_code_files" in limits:
         limits["allowed_root_code_files"] = tuple(limits["allowed_root_code_files"])
-    roles = plain(params.get("structure_roles", {}))
     conventions = plain(params.get("structure_conventions", {}))
     for name in ("suggested_entry_files", "public_entry_stems", "ignored_prefix_stems", "internal_suffixes", "distance_exempt_stems"):
         if name in conventions:
@@ -57,7 +55,6 @@ def _policy(params):
     return QualityPolicy(
         thresholds=QualityThresholds(**{name: value for name, value in params.items() if name in threshold_names}),
         structure_limits=QualityStructureLimits(**limits) if limits else None,
-        structure_roles=QualityStructureRoles(**roles),
         structure_conventions=QualityStructureConventions(**conventions),
     )
 
@@ -130,8 +127,7 @@ def _structure(context, inputs, params):
              for item in inputs["import_sites"].value}
     directories, clusters, summary, findings = analyze_directory_structure(
         facts.files, graph, sites, policy.thresholds, policy.structure_conventions)
-    root_summary, root_findings = analyze_root_structure(facts.files, graph, sites, policy.structure_limits,
-        roles=QualityStructureRoles(context.facts["source_import_scopes"]) if "source_import_scopes" in context.facts else policy.structure_roles,
+    root_summary, root_findings = analyze_root_structure(facts.files, policy.structure_limits,
         conventions=policy.structure_conventions)
     summary.update(root_summary)
     return RuleResult({"directories": RuleRecord("vibeflow.directories.v1", directories),

@@ -73,7 +73,7 @@ def test_python_aot_uses_prepared_nodes_and_rejects_old_artifact_format(tmp_path
     assert runtime.trace.step_count == 1
     records = list((tmp_path / "preview" / "vibeflow-preview" / "snapshots").glob("*/record.json"))
     assert len(records) == 1
-    assert json.loads(records[0].read_text())["version"] == 3
+    assert json.loads(records[0].read_text())["version"] == 4
     metadata["format"] = "vibeflow.aot-build.v3"
     result.manifest.write_text(json.dumps(metadata))
     with pytest.raises(ValueError, match="rebuild"):

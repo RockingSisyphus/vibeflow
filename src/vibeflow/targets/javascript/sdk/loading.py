@@ -9,6 +9,7 @@ import atexit
 from vibeflow.core.descriptors.contributions import PluginContributions, ResourceDeclaration, ResourceOrigin, ResourceOwner
 from vibeflow.core.descriptors.decode import decode_resource
 from vibeflow.targets.javascript.build.plugin_session import JavascriptPluginSession
+from vibeflow.targets.javascript.resources.identity import business_source_states
 
 
 @dataclass(frozen=True)
@@ -124,8 +125,7 @@ process.stdout.write(entry);
             raise
         resources.append((descriptor, location))
     resources = tuple(resources)
-    states = {str(path):"unknown" for path in result.get("included_sources", ())}
-    states.update({str(path):"loaded" for path in result.get("loaded_sources", ())})
+    states = business_source_states(result)
     for descriptor,_ in resources:
         for implementation in getattr(descriptor,"implementations",()):
             for member in getattr(implementation,"implementation_files",()):
@@ -154,8 +154,7 @@ def discover_resources(directory, *, project_config, package_root, node_command=
     with JavascriptPluginSession(node_command=node_command) as session:
         for path, kind in candidates:
             result = session.resource_declarations(module=path.resolve(), package_root=package_root)
-            states.update({path:"unknown" for path in result.get("included_sources", ())})
-            states.update({path:"loaded" for path in result.get("loaded_sources", ())})
+            states.update(business_source_states(result))
             for item in result["resources"]:
                 try:
                     descriptor = decode_resource(item["descriptor"])

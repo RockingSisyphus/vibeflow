@@ -225,6 +225,8 @@ class _MermaidRenderer:
                 )
                 self._render_edges(lines, nodeset.graph, nested_compiled, prefix=nested_prefix, indent=f"{indent}  ")
             lines.append(f"{indent}end")
+            if node.status == STATUS_PLANNED or nodeset.status == STATUS_PLANNED:
+                lines.append(f"{indent}class {group_id} plannedNode;")
 
 
     def _render_edges(self, lines: list[str], graph: GraphConfig, compiled: CompiledGraph, *, prefix: str, indent: str) -> None:

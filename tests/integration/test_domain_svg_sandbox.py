@@ -70,7 +70,7 @@ def _assert_shape(element, shape):
     ("default", "#cceeff", "hex", "MODEL_ICON"),
     ("node", "#fff2aa", "diamond", "NODE_ICON"),
     ("call", "#ffe6ee", "circle", "CALL_ICON"),
-    ("status", "#fef08a", "diamond", "NODE_ICON"),
+    ("status", "#fff2aa", "diamond", "NODE_ICON"),
     ("planned", "#ffe6ee", "circle", "CALL_ICON"),
 ])
 def test_formal_domain_svg_preserves_effective_styles_and_native_identity(svg_project, capsys, tmp_path, level, fill, shape, icon):
@@ -106,7 +106,7 @@ def test_formal_domain_svg_preserves_effective_styles_and_native_identity(svg_pr
     model = records["model"]
     assert model["presentation"]["values"]["fill"] == fill
     assert model["presentation"]["values"]["shape"] == shape
-    assert model["presentation"]["sources"]["fill"] == ("call" if level == "planned" else "node" if level == "default" else level)
+    assert model["presentation"]["sources"]["fill"] == ("call" if level == "planned" else "node" if level in {"default","status"} else level)
     assert model["presentation"]["sources"]["icon"] == ("call" if level == "planned" else "node" if level == "status" else "node" if level == "default" else level)
     assert model["flow_kind"] == "process"
     assert "model_block" in model["tags"]

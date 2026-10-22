@@ -35,6 +35,8 @@ SYSTEM_EXIT_CALLS = frozenset(
 SYSTEM_EXIT_SCOPES = frozenset({EFFECT_SCOPE_TERMINAL, EFFECT_SCOPE_PYTHON_IO})
 TERMINAL_CALLS = frozenset({"input", "builtins.input", "print", "builtins.print"})
 TERMINAL_STREAMS = ("sys.stdin", "sys.stdout", "sys.stderr")
+ENVIRONMENT_MAPPINGS = frozenset({"os.environ", "os.environb"})
+ENVIRONMENT_CALLS = frozenset({"os.getenv", "os.getenvb", "os.putenv", "os.unsetenv"})
 PYTHON_IO_IMPORT_ROOTS = frozenset(
     (BANNED_IMPORT_ROOTS - {"importlib"})
     | {
@@ -152,6 +154,8 @@ def policy_import_violation_code(module: str, *, policy: PurityPolicy) -> str:
 def effect_import_violation_code(module: str, *, effect_scope: str,
                                  imported_names: set[str] | None = None) -> str:
     root = module.split(".", 1)[0]
+    if module == "os" and effect_scope == EFFECT_SCOPE_GLOBAL_STATE:
+        return ""
     if module == "urllib" and imported_names == {"parse"}:
         return ""
     if module == "pathlib" and imported_names and imported_names <= PURE_PATH_CLASSES:
@@ -188,6 +192,15 @@ def call_violation(
     local_receiver = local_reference or raw_root in local_names and raw_root not in aliases
     if local_receiver or source_resolved:
         return "", ""
+    if effect_scope == EFFECT_SCOPE_GLOBAL_STATE and (
+        candidate in ENVIRONMENT_CALLS or any(
+            candidate.startswith(prefix + ".") for prefix in ENVIRONMENT_MAPPINGS
+        )
+    ):
+        return "", ""
+    # Importing os for environment access does not grant its other operations.
+    if effect_scope == EFFECT_SCOPE_GLOBAL_STATE and candidate.startswith("os."):
+        return "effect_call", candidate
     if any(candidate == prefix or candidate.startswith(prefix + ".") for prefix in HARD_PROCESS_STATE_PREFIXES):
         return "effect_call", candidate
     if candidate in HARD_PROCESS_TERMINATION_CALLS:

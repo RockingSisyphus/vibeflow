@@ -15,7 +15,6 @@ from vibeflow.targets.shared.quality_support import (
     QualityPolicy,
     QualityStructureConventions,
     QualityStructureLimits,
-    QualityStructureRoles,
     QualityThresholds,
 )
 from vibeflow.targets.javascript.build.toolchain import AotToolchainError, DriverQualityResult, run_quality_facts_driver
@@ -32,13 +31,11 @@ DEFAULT_EXCLUDED_DIRS = frozenset({
 
 
 def javascript_quality_policy(*, thresholds: QualityThresholds | None = None,
-                              structure_limits: QualityStructureLimits | None = None,
-                              structure_roles: QualityStructureRoles | None = None) -> QualityPolicy:
+                              structure_limits: QualityStructureLimits | None = None) -> QualityPolicy:
     if structure_limits is not None and structure_limits.allowed_root_code_files == QualityStructureLimits().allowed_root_code_files:
         structure_limits = replace(structure_limits, allowed_root_code_files=("index.ts", "index.js", "index.tsx", "index.jsx", "index.mts", "index.mjs"))
     return QualityPolicy(
         thresholds=thresholds or QualityThresholds(), structure_limits=structure_limits,
-        structure_roles=structure_roles or QualityStructureRoles(),
         structure_conventions=QualityStructureConventions(
             code_label="JavaScript/TypeScript", package_entry="index.ts",
             suggested_entry_files=("index.ts", "index.js"), public_entry_stems=("index", "api", "types"),

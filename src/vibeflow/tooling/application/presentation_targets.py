@@ -17,35 +17,24 @@ def prepare_targets(architecture, *, config, workspace, load_own_target=None):
         identity = pending.pop()
         item = graphs[identity]
         facts = item["architecture"]
-        declarations = facts.get("workflow", {}).get("workflow_targets", {})
-        needed = {action.get("target") for policy in facts.get("call_policies", {}).values()
-            for action in policy.get("actions", ()) if action.get("capability") == "vibeflow.workflow" and action.get("target")}
-        for alias in needed:
-            declaration = declarations.get(alias)
-            if declaration is None:
+        from vibeflow.core.workflows.references import action_references
+        references = {json.dumps(ref, sort_keys=True):ref for policy in facts.get("call_policies", {}).values()
+            for action in policy.get("actions", ()) for ref in action_references(action)}
+        for reference in references.values():
+            target_id = reference["root"] + ":" + reference["path"]
+            if target_id in graphs:
                 continue
             try:
-                if workspace is None:
-                    raise ValueError("target expansion requires project root metadata")
-                root = workspace.root_by_id(declaration.get("root") or item["workflow"]["root_id"])
-                path = (root.path / declaration["workflow"]).resolve()
+                root = workspace.root_by_id(reference["root"])
+                path = (root.path / reference["path"]).resolve()
                 target = workflow_identity(path, workspace, target=root.project_target)
-                declaration["identity"] = target["id"]
-                if target["id"] in graphs:
-                    continue
-                if target["id"] in failures:
-                    raise ValueError(failures[target["id"]])
-                try:
-                    prepared = (load_own_target(path, workspace)
-                        if load_own_target is not None and root.project_target == architecture.get("project_target", "python")
-                        else _load(path, workspace))
-                except Exception as error:
-                    failures[target["id"]] = str(error)
-                    raise
-                graphs[target["id"]] = {"workflow": target, "architecture": deepcopy(prepared)}
-                pending.append(target["id"])
+                prepared = (load_own_target(path, workspace)
+                    if load_own_target is not None and root.project_target == architecture.get("project_target", "python")
+                    else _load(path, workspace))
+                graphs[target_id] = {"workflow":target, "architecture":deepcopy(prepared)}
+                pending.append(target_id)
             except Exception as error:
-                declaration["preview_error"] = str(error)
+                graphs[target_id] = {"workflow":{"id":target_id,"root_id":reference["root"],"path":reference["path"],"name":reference["path"]}, "error":str(error)}
     primary = graphs.pop(current["id"])
     return primary["architecture"], graphs
 

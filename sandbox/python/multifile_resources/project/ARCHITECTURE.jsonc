@@ -3,20 +3,12 @@
 {
   "project_target": "python",
   "workflow": {
+    "entries": {},
+    "default_entry": "",
     "source": {
       "root_id": "resource-python",
       "path": "configs/workflow.jsonc"
     },
-    "global_config": {
-      "values": {},
-      "source": {
-        "root_id": "resource-python",
-        "path": "configs/workflow.jsonc"
-      }
-    },
-    "entries": {},
-    "default_entry": "",
-    "workflow_targets": {},
     "rulesets": [
       "vibeflow.workflow"
     ],
@@ -32,6 +24,21 @@
     "entry_mode": "sync",
     "execution_lock": null,
     "contains_global_state": false,
+    "summary": {
+      "nodes": 3,
+      "nodeset_types": 0,
+      "explicit_edges": 2,
+      "data_edges": 0,
+      "reported_edges": 2,
+      "contains_global_state": false
+    },
+    "entry_nodes": [
+      "start"
+    ],
+    "terminal_nodes": [
+      "end"
+    ],
+    "god_nodes": [],
     "nodes": [
       {
         "id": "start",
@@ -62,6 +69,9 @@
             "stroke": "native",
             "text": "native",
             "shape": "native"
+          },
+          "modifiers": {
+            "planned": false
           }
         },
         "effect_scope": "unconstrained",
@@ -92,7 +102,8 @@
             }
           },
           "allow_config_override": false
-        }
+        },
+        "operations": []
       },
       {
         "id": "model",
@@ -131,6 +142,9 @@
             "text": "node",
             "shape": "node",
             "icon": "node"
+          },
+          "modifiers": {
+            "planned": false
           }
         },
         "effect_scope": "none",
@@ -167,7 +181,8 @@
             }
           },
           "allow_config_override": false
-        }
+        },
+        "operations": []
       },
       {
         "id": "end",
@@ -198,6 +213,9 @@
             "stroke": "native",
             "text": "native",
             "shape": "native"
+          },
+          "modifiers": {
+            "planned": false
           }
         },
         "effect_scope": "unconstrained",
@@ -228,7 +246,8 @@
             }
           },
           "allow_config_override": false
-        }
+        },
+        "operations": []
       }
     ],
     "edges": [
@@ -254,7 +273,14 @@
         ],
         "transfers": []
       }
-    ]
+    ],
+    "global_config": {
+      "values": {},
+      "source": {
+        "root_id": "resource-python",
+        "path": "configs/workflow.jsonc"
+      }
+    }
   },
   "nodeset_types": {},
   "node_definitions": {
@@ -327,6 +353,9 @@
           "text": "node",
           "shape": "node",
           "icon": "node"
+        },
+        "modifiers": {
+          "planned": false
         }
       },
       "config": {
@@ -379,6 +408,9 @@
           "stroke": "native",
           "text": "native",
           "shape": "native"
+        },
+        "modifiers": {
+          "planned": false
         }
       },
       "config": {
@@ -447,6 +479,392 @@
         "priority": 100
       }
     ]
+  },
+  "call_policies": {},
+  "resource_use": {
+    "workflow": "resource-python:configs/workflow.jsonc",
+    "resources": [
+      {
+        "kind": "base_lib",
+        "id": "demo.math",
+        "reason": "explicit",
+        "selection": {
+          "id": "demo.math"
+        }
+      },
+      {
+        "kind": "data_schema",
+        "id": "number",
+        "reason": "plugin:demo"
+      },
+      {
+        "kind": "node",
+        "id": "demo.model",
+        "reason": "declaration"
+      },
+      {
+        "kind": "node",
+        "id": "demo.start",
+        "reason": "declaration"
+      },
+      {
+        "kind": "node_type",
+        "id": "vibeflow.node",
+        "reason": "builtin"
+      },
+      {
+        "kind": "plugin",
+        "id": "demo.runtime",
+        "reason": "plugin:demo"
+      },
+      {
+        "kind": "plugin_declaration",
+        "id": "demo",
+        "reason": "plugin:demo"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.async_lifecycle",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.capability.allow",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.capability.restrict",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.graph.duplicates",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.graph.flow",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.graph.join",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.graph.nodeset_types",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.graph.planned",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.graph.source.dependencies",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.graph.source.duplicates",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.graph.source.files",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.graph.source.structure",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.implementation.base_lib",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.implementation.dependency_chain",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.implementation.node",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.import_side_effects",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.input_writes",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.maintainability",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.no_side_effects",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.node_architecture",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.node_interface",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.project.dependencies",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.project.layout",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.project.packages",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.project.plugin_ownership",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.project.shared_resources",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.project.structure",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.quality.dependencies",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.quality.duplicates",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.quality.files",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.quality.structure",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.root.dependencies",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.root.duplicates",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.root.files",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.root.layout",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.root.nodesets",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.root.packages",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.root.plugin_ownership",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.root.resource_duplicates",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.root.resource_independent",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.root.resource_plugins",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.root.resource_references",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.root.resource_use",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.root.resource_visibility",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.root.resources",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.root.structure",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.workflow",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.workflow.analysis",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.workflow.duplicates",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.workflow.flow",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.workflow.join",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.workflow.nodeset_types",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.workflow.planned",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
+        "id": "vibeflow.workflow.review",
+        "reason": "builtin"
+      },
+      {
+        "kind": "ruleset",
+        "id": "vibeflow.base_lib",
+        "reason": "builtin"
+      },
+      {
+        "kind": "ruleset",
+        "id": "vibeflow.data_store",
+        "reason": "builtin"
+      },
+      {
+        "kind": "ruleset",
+        "id": "vibeflow.document",
+        "reason": "builtin"
+      },
+      {
+        "kind": "ruleset",
+        "id": "vibeflow.global_state",
+        "reason": "builtin"
+      },
+      {
+        "kind": "ruleset",
+        "id": "vibeflow.io",
+        "reason": "builtin"
+      },
+      {
+        "kind": "ruleset",
+        "id": "vibeflow.plugin",
+        "reason": "builtin"
+      },
+      {
+        "kind": "ruleset",
+        "id": "vibeflow.plugin_declaration",
+        "reason": "builtin"
+      },
+      {
+        "kind": "ruleset",
+        "id": "vibeflow.process",
+        "reason": "builtin"
+      },
+      {
+        "kind": "ruleset",
+        "id": "vibeflow.project.default",
+        "reason": "builtin"
+      },
+      {
+        "kind": "ruleset",
+        "id": "vibeflow.python_io",
+        "reason": "builtin"
+      },
+      {
+        "kind": "ruleset",
+        "id": "vibeflow.quality.source",
+        "reason": "builtin"
+      },
+      {
+        "kind": "ruleset",
+        "id": "vibeflow.root.default",
+        "reason": "builtin"
+      },
+      {
+        "kind": "ruleset",
+        "id": "vibeflow.root.resource_usage",
+        "reason": "builtin"
+      },
+      {
+        "kind": "ruleset",
+        "id": "vibeflow.workflow",
+        "reason": "builtin"
+      }
+    ],
+    "planned": [],
+    "annotations": []
   },
   "implementation_graph": {
     "resources": {
@@ -822,6 +1240,9 @@
             "text": "node",
             "shape": "node",
             "icon": "node"
+          },
+          "modifiers": {
+            "planned": false
           }
         },
         "sources": [
@@ -919,6 +1340,9 @@
             "stroke": "native",
             "text": "native",
             "shape": "native"
+          },
+          "modifiers": {
+            "planned": false
           }
         },
         "sources": [
@@ -1133,6 +1557,9 @@
             "text": "native",
             "shape": "base_lib",
             "icon": "base_lib"
+          },
+          "modifiers": {
+            "planned": false
           }
         },
         "sources": [
@@ -1398,6 +1825,9 @@
             "text": "native",
             "shape": "plugin",
             "icon": "plugin"
+          },
+          "modifiers": {
+            "planned": false
           }
         },
         "sources": [
@@ -1578,6 +2008,9 @@
             "text": "native",
             "shape": "plugin_declaration",
             "icon": "plugin_declaration"
+          },
+          "modifiers": {
+            "planned": false
           }
         },
         "sources": [
@@ -1808,7 +2241,6 @@
       "effect_scope": "unconstrained"
     }
   ],
-  "call_policies": {},
   "rule_selections": [
     {
       "kind": "graph",

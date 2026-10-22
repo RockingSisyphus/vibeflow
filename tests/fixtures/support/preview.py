@@ -16,7 +16,7 @@ def preview_directory(run_dir):
 def preview_snapshot(run_dir):
     text=(preview_directory(run_dir)/"snapshot.js").read_text(encoding="utf-8")
     payload=json.loads(text[len("VibeFlowPreview.snapshot("):-3])
-    assert payload["version"]==3
+    assert payload["version"]==4
     return payload
 
 

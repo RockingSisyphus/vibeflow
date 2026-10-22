@@ -72,11 +72,13 @@ root_checks = ruleset(id="vibetrain.root", calls=[
 ], relations=[
     {"source": "$self", "target": "base/resources", "kind": "overrides", "params": {"allow_cross_root_imports": True}},
     {"source": "$self", "target": "base/packages", "kind": "overrides", "replace_rule": "vibetrain.root.packages"},
+    {"source": "$self", "target": "base/plugin_ownership", "kind": "overrides", "replace_rule": "vibetrain.root.packages"},
 ])
 project_checks = ruleset(id="vibetrain.project", calls=[
     {"id": "base", "ruleset_id": "vibeflow.project.default"},
 ], relations=[
     {"source": "$self", "target": "base/packages", "kind": "overrides", "replace_rule": "vibetrain.project.packages"},
+    {"source": "$self", "target": "base/plugin_ownership", "kind": "overrides", "replace_rule": "vibetrain.project.packages"},
 ])
 
 plugin = Plugin(id="vibetrain.framework_access", resources=[

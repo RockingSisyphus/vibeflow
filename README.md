@@ -60,7 +60,7 @@ node javascript_project/scripts/workflow_execution_probe.mjs
 python tools/verify_project.py --full
 ```
 
-当前分发版本为 `1.3.2`，构建记录见[发行说明](docs/maintainers/release.md)。当前开发源码采用 Workflow ABI `vibeflow.workflow.v10`、AOT `vibeflow.aot-build.v4` 和预览快照 v3：项目至少注册一个独立子目录 root，业务 Node 与 NodeType 分离，Plugin 贡献整包管理，project/root 治理独立配置。旧配置与 AOT 需重新迁移和构建；Host Extension 已退役，由普通节点显式管理关键生命周期。默认审核交付离线 HTML 快照，SVG 为可选对照。详见[项目治理](distribution/docs/user/project-governance.md)及[项目准备规范](docs/maintainers/project-preparation.md)。
+当前分发版本为 `1.3.6`，见[发行说明](docs/maintainers/release.md)。采用 Workflow ABI `vibeflow.workflow.v10`、AOT `vibeflow.aot-build.v4` 和预览快照 v4：项目至少注册一个独立子目录 root，业务 Node 与 NodeType 分离，Plugin 贡献整包管理，project/root 治理独立配置。旧配置与 AOT 需重新迁移和构建；Host Extension 已退役，由普通节点显式管理关键生命周期。默认审核交付离线 HTML 快照，SVG 为可选对照。详见[项目治理](distribution/docs/user/project-governance.md)及[项目准备规范](docs/maintainers/project-preparation.md)。
 
 质量检查只覆盖当前实际选择的 Rule；不证明业务正确、代码安全、算法确定性或全部无副作用。有限 Python 输入写入规则独立于效果政策，详见[产品检查边界](distribution/docs/user/product-check-boundaries.md)。
 

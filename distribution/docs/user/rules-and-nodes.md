@@ -51,6 +51,14 @@ class Add:
 
 字符串选择 Ruleset；对象通过 `rule_id` 选择单个 Rule 并提供参数。贡献一个 Rule/Ruleset 不会自动执行它；Ruleset 可通过 `workflow_default` 声明图级默认。显式图级列表替换本图默认。
 
+## Python 进程环境变量
+
+`vibeflow.global_state` Ruleset 使用 `vibeflow.no_side_effects` 的 `effect_scope="global_state"`，允许在运行时通过 `os.environ` / `os.environb` 读取、设置、删除环境键和调用其方法，也允许 `os.getenv` / `os.getenvb`、`os.putenv`、`os.unsetenv`。环境键名不受白名单限制；显式 import policy 和导入时执行检查仍生效。Node、BaseLib 和运行插件使用相同效果检查，流程类别名称本身不授予权限。
+
+Node 可显式选择 `rulesets=["vibeflow.global_state"]`。运行插件可保留 `vibeflow.plugin` 集合，并通过自定义 Ruleset 的 `overrides` 把 `base/effects` 调用的 `effect_scope` 设为 `global_state`，完整写法见下文“Ruleset 与局部覆盖”。这不需要关闭源码检查或修改 imports 调用。
+
+该范围不会自动保存或恢复原值，需在运行生命周期清理中恢复；需要排他访问时显式配置同域 `execution_lock`。它不放开替换 `os.environ` 对象、修改 `sys.path` 等导入状态，也不授予文件、网络、线程或子进程效果。`process`、`io`、`python_io`、`data_store` 默认行为保持不变。
+
 ## 四种检查对象
 
 Rule 的 `level` 指定可用信息：

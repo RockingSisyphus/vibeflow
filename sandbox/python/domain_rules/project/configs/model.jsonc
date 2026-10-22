@@ -69,5 +69,10 @@
         "export": "plugin"
       }
     }
-  ]
+  ],
+  "base_lib": {
+    "modules": [
+      "example.arithmetic"
+    ]
+  }
 }

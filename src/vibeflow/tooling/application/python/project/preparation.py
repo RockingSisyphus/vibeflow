@@ -1,6 +1,7 @@
 """Python declaration, source-fact and governance binding preparation."""
 from contextlib import contextmanager
 from pathlib import Path
+from vibeflow.targets.python.project.resource_facts import resource_import_facts
 
 
 def discover_resources(directory, *, root, workspace, node_command, syntax_cache, loading_context=None):
@@ -16,13 +17,10 @@ def normalize_resource(declaration, implementation, *, directory, root, workspac
 
 def source_analysis(workspace, root, workflows, *, node_command, syntax_cache):
     from vibeflow.tooling.application.python.project.source_files import collect_root_source_facts
-    from vibeflow.tooling.project.source_governance import root_resource_scopes
-    from vibeflow.targets.python.project.structure_sources import python_import_scopes
     facts = collect_root_source_facts(root.path, parse_cache=syntax_cache)
-    scopes = root_resource_scopes(workspace, root, workflows, facts.files)
     from vibeflow.tooling.project.source_governance import private_root_imports
     imports = _source_imports((root.path / file.path for file in facts.files), (root.path, workspace.root), syntax_cache)
-    return facts, python_import_scopes(scopes, root.path, syntax_cache), private_root_imports(workspace, root, imports)
+    return facts, private_root_imports(workspace, root, imports)
 
 
 def shared_imports(workspace, root, *, node_command, syntax_cache):

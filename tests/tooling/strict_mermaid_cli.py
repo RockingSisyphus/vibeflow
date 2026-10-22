@@ -350,7 +350,6 @@ def test_inspect_node_rejects_invalid_declarations(tmp_path, capsys, changes, re
     (_valid_node_source(run_body='        global X\n        X = 1\n        return {"demo.out": 1}'), "global_state"),
     (_valid_node_source(run_body='        setattr(self, "x", 1)\n        return {"demo.out": 1}'), "monkey_patch"),
     (_valid_node_source(run_body='        DemoNode.x = 1\n        return {"demo.out": 1}'), "monkey_patch"),
-    (_valid_node_source(run_body='        from nodes.other_node import OtherNode\n        return {"demo.out": 1}'), "node_import"),
     (_valid_node_source().replace(VALID_NODE_IMPORT, VALID_NODE_IMPORT + "CACHE = {}\n\n"), "module_global_state"),
     (_valid_node_source().replace(VALID_NODE_IMPORT, VALID_NODE_IMPORT + "if True:\n    X = 1\n\n"), "module_side_effect"),
     (_valid_node_source(run_body='        Path("x").read_text()\n        return {"demo.out": 1}'), "effect_call"),
@@ -359,21 +358,12 @@ def test_inspect_node_rejects_invalid_declarations(tmp_path, capsys, changes, re
     (_valid_node_source(run_body='        compile("1", "<x>", "eval")\n        return {"demo.out": 1}'), "banned_call"),
 ])
 def test_inspect_node_rejects_invalid_node_shapes(tmp_path, capsys, source, diagnostic) -> None:
-    additional = ()
-    if diagnostic == "node_import":
-        folder = tmp_path / "nodes"
-        folder.mkdir()
-        (folder / "__init__.py").write_text("")
-        (folder / "other_node.py").write_text('class OtherNode:\n    def run_pure(self, inputs, params):\n        return {"demo.out":1}\n')
-        declaration = node_document(type_key="demo.other",class_name="OtherNode")
-        declaration["implementations"][0]["source"]["ref"] = "nodes/other_node.py"
-        additional = (declaration,)
-    code, payload = _inspect_node_source(tmp_path, capsys, source, additional_nodes=additional)
+    code, payload = _inspect_node_source(tmp_path, capsys, source)
     if diagnostic in {"undeclared_output", "missing_output", "dynamic_output_key", "internal_loop", "resource_field", "external_attr_assignment", "external_mutation_call", "banned_call", "contract_overlap", "monkey_patch"}:
         assert code == 0, payload
         return
     assert code == 1
-    expected = "VF_IMPORT_LAYER" if diagnostic == "node_import" else "NODE.IMPORT.SIDE_EFFECT" if diagnostic in {"module_global_state", "module_side_effect"} else _default_rule_id(diagnostic)
+    expected = "NODE.IMPORT.SIDE_EFFECT" if diagnostic in {"module_global_state", "module_side_effect"} else _default_rule_id(diagnostic)
     assert any(error["code"] == expected for error in payload["health"]["errors"]), payload
 
 

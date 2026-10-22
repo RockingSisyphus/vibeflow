@@ -2,6 +2,7 @@
 from contextlib import contextmanager
 from pathlib import Path
 from uuid import uuid4
+from vibeflow.targets.javascript.build.resource_facts import resource_import_facts
 
 
 def discover_resources(directory, *, root, workspace, node_command, syntax_cache, loading_context=None):
@@ -16,17 +17,11 @@ def normalize_resource(declaration, implementation, *, directory, root, workspac
 def source_analysis(workspace, root, workflows, *, node_command, syntax_cache):
     from vibeflow.targets.javascript.build.quality_source import collect_javascript_quality_facts, _file_fact, _finding_fact
     from vibeflow.targets.shared.quality_support import SourceQualityFacts
-    from vibeflow.targets.shared.quality_support.resource_imports import implementation_import_scopes
-    from vibeflow.tooling.project.source_governance import root_resource_scopes
-    scopes = root_resource_scopes(workspace, root, workflows, ())
-    ownership = [dict(id=owner['id'], kind=owner['kind'], path=str(root.path / owner['path']),
-        export=owner['symbol'], role=owner['role']) for scope in scopes for owner in scope['owners']]
     measured = collect_javascript_quality_facts(root.path,
         package_root=root.path / root.project_config.get("javascript",{}).get("package_root","."),
-        implementation_owners=ownership, node_command=node_command)
+        node_command=node_command)
     facts = SourceQualityFacts(str(root.path), tuple(_file_fact(item) for item in measured.files),
                               tuple(_finding_fact(item) for item in measured.findings))
-    scopes = root_resource_scopes(workspace, root, workflows, facts.files)
     from vibeflow.tooling.project.source_governance import private_root_imports
     imports = []
     for file in measured.files:
@@ -34,7 +29,7 @@ def source_analysis(workspace, root, workflows, *, node_command, syntax_cache):
         for site in file["import_sites"]:
             if site.get("resolved_path"):
                 imports.append((path, Path(site["resolved_path"]), site["line"]))
-    return facts, implementation_import_scopes(scopes, measured.implementations), private_root_imports(workspace, root, imports)
+    return facts, private_root_imports(workspace, root, imports)
 
 
 def shared_imports(workspace, root, *, node_command, syntax_cache):

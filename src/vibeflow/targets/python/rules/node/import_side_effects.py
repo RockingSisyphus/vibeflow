@@ -15,9 +15,7 @@ def import_side_effects(context, inputs, params):
     sources = context.require("source_context")
     findings = []
     from vibeflow.targets.python.project.source_membership import subject_files
-    from vibeflow.targets.python.rules.node.source_ownership import ownership_findings
     files = subject_files(context)
-    findings.extend(ownership_findings(context))
     for source in files:
         if source._tree is None:
             findings.append(finding(context, "QUALITY.SYNTAX.PYTHON", source.parse_error, path=source.path))

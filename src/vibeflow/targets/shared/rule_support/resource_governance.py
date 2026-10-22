@@ -43,7 +43,7 @@ def packages(context, inputs, params):
     level = context.scope["level"]
     facts, findings = context.facts[level], []
     for package in facts.get("packages", ()):
-        base, owner = PurePath(package["path"]), PurePath(package["owner_path"])
+        owner = PurePath(package["owner_path"])
         source = PurePath(package["source"])
         if package["source_kind"] == "file" and (not source.is_relative_to(owner/"plugins")
                 or len(source.relative_to(owner/"plugins").parts) < 2):
@@ -53,15 +53,6 @@ def packages(context, inputs, params):
             if resource["kind"] == "node":
                 findings.append(_finding(context, "PLUGIN.PACKAGE.BUSINESS_NODE",
                     "Plugins contribute NodeTypes; business Nodes belong in project/root nodes/", resource["path"]))
-            for path in (resource["path"], *resource["implementation_paths"]):
-                if not PurePath(path).is_relative_to(base):
-                    findings.append(_finding(context, "PLUGIN.PACKAGE.OWNERSHIP",
-                        f"Plugin '{package['id']}' contribution is outside its package: {path}", path))
-        for path in package["source_paths"]:
-            value = PurePath(path)
-            if value.is_relative_to(package["project_path"]) and not value.is_relative_to(base) and "node_modules" not in value.parts:
-                findings.append(_finding(context, "PLUGIN.PACKAGE.IMPORT",
-                    f"Plugin '{package['id']}' imports project code outside its package: {path}", path))
     for item in facts.get("nodeset_imports", ()) if level == "root" else ():
         # The directory convention describes unselected packages too.
         if any(PurePath(item["path"]).is_relative_to(directory) for directory in facts.get("plugin_directories", ())):

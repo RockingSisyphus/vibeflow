@@ -235,5 +235,10 @@
         "as": "loop.iterations"
       }
     ]
+  },
+  "base_lib": {
+    "modules": [
+      "addition.math"
+    ]
   }
 }

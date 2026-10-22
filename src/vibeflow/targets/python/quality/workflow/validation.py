@@ -92,7 +92,7 @@ def validate_graph_health(graph, *, registry=None, plugin_registry=None,
         paths = [(*subject.call_path, node.id) for subject in graph_call_subjects(graph) for node in subject.graph.nodes]
         registry.call_capability_policies = policies_from_executions(state.rule_executions, paths)
         _append_findings(state, policy_findings(graph, registry.call_capability_policies,
-            lambda key: registry.descriptor(key) if key in registry.available() else None))
+            lambda key: registry.descriptor(key) if key in registry.available() else None, global_config=global_config))
     report = _build_health_report(graph, compiled, plugin_registry, state)
     if graph.selected_entry:
         from dataclasses import replace

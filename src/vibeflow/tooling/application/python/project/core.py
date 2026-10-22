@@ -19,17 +19,19 @@ def build_workspace_environment(workspace: WorkspaceConfig, config_path=None, *,
     preparation = preparation or ProjectPreparation(workspace, root=root, workflow=config_path)
     prepared = preparation.workflow_resources(config_path)
     governance = governance or preparation.review()
+    prepared = preparation.workflow_resources(config_path)
     registry = build_workspace_node_registry(workspace, config_path=config_path, prepared_resources=prepared)
-    from vibeflow.tooling.application.python.project.resource_selection import select_python_resources
-    available_resources, resource_findings = select_python_resources({}, registry=registry)
+    from vibeflow.tooling.application.python.project.resource_bindings import bind_python_resources, PythonResources
+    available_resources = (bind_python_resources(registry, prepared.resource_use)
+                           if prepared.resource_use is not None else PythonResources())
     return WorkspaceEnvironment(registry=registry, plugin_registry=PluginRegistry(),
         resources=available_resources, available_resources=available_resources,
-        effective_policy=default_effective_policy(), findings=(*resource_findings, *governance.findings))
+        effective_policy=default_effective_policy(), findings=governance.findings, preparation=preparation)
 
 
 def load_workspace_resources(workspace: WorkspaceConfig, config_path=None):
-    from vibeflow.tooling.application.python.project.resource_selection import select_python_resources
-    return select_python_resources({}, registry=build_workspace_node_registry(workspace, config_path=config_path))
+    environment = build_workspace_environment(workspace, config_path)
+    return environment.resources, environment.findings
 
 
 def workspace_finding(

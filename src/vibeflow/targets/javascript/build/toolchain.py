@@ -312,17 +312,16 @@ def _run_driver(
                     "VF_TOOLCHAIN_TIMEOUT",
                     "JavaScript build driver timed out",
                 ) from exc
+            try:
+                payload = json.loads(completed.stdout)
+            except json.JSONDecodeError as exc:
+                detail = completed.stderr.strip() or completed.stdout.strip()
+                raise AotToolchainError("VF_PROTOCOL", f"JavaScript build driver returned invalid JSON: {detail}") from exc
+            from vibeflow.targets.javascript.resources.identity import FrameworkResources
+            payload = FrameworkResources(resource_directory).annotate_analysis(payload)
+            return _driver_result(payload, completed.returncode)
     finally:
         request_path.unlink(missing_ok=True)
-    try:
-        payload = json.loads(completed.stdout)
-    except json.JSONDecodeError as exc:
-        detail = completed.stderr.strip() or completed.stdout.strip()
-        raise AotToolchainError(
-            "VF_PROTOCOL",
-            f"JavaScript build driver returned invalid JSON: {detail}",
-        ) from exc
-    return _driver_result(payload, completed.returncode)
 
 
 def _driver_result(payload, returncode):

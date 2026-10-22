@@ -156,5 +156,5 @@ def test_private_support_cannot_be_imported_outside_plugin_package(tmp_path):
     workspace,config=project(tmp_path,plugin_source='import borrowed\n'+PLUGIN_SOURCE)
     from vibeflow.tooling.project.preparation import ProjectPreparation
     prepare_workflow_resources(workspace,config)
-    (tmp_path / "root_rules.jsonc").write_text('{"rulesets":[{"rule_id":"vibeflow.root.packages"}]}')
+    (tmp_path / "root_rules.jsonc").write_text('{"rulesets":[{"rule_id":"vibeflow.root.plugin_ownership"}]}')
     assert any(item.rule_id == "PLUGIN.PACKAGE.IMPORT" for item in ProjectPreparation(workspace).review().findings)

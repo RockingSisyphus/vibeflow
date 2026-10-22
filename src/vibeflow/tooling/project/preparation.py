@@ -39,14 +39,35 @@ class ProjectPreparation:
         self.workflows = {}
         self.reviews = {}
         self.root_source_facts = {}
-        self.root_import_scopes = {}
         self.root_private_imports = {}
+        self._architecture_inputs = None
 
     def workflow_resources(self, path):
         path = Path(path).resolve()
         if path not in self.workflows:
             self.workflows[path] = prepare_workflow_resources(self.workspace, path, node_command=self.node_command, discovery_cache=self.declarations, syntax_caches=self.syntax_caches, binding_contexts=self.binding_contexts)
         return self.workflows[path]
+
+    def resource_use(self, workflow_path):
+        self.workflow_resources(workflow_path)
+        self.review()
+        use = self.workflow_resources(workflow_path).resource_use
+        if use is None:
+            raise ValueError("resource-use Rules did not produce an available result; inspect review findings")
+        return use
+
+    def review_graph(self, workflow_path, graph):
+        """Re-evaluate the selected Rules when compiler hooks change references."""
+        path = Path(workflow_path).resolve()
+        prepared = self.workflow_resources(path)
+        if prepared.graph is not graph:
+            self.workflows[path] = replace(prepared, graph=graph, resource_use=None)
+            self.reviews.clear()
+        review = self.review()
+        from vibeflow.tooling.project.resources.use_facts import workflow_identity
+        identity = workflow_identity(self.workspace, path)
+        return replace(review, findings=tuple(finding for finding in review.findings
+            if not finding.details.get("workflow") or finding.details["workflow"] == identity))
 
     def review(self, *, write_architecture=False):
         if write_architecture in self.reviews:
@@ -101,8 +122,10 @@ class ProjectPreparation:
                 extra.update(shared_imports=tuple(shared.values()), usage_complete=self.usage_complete)
             context = replace(context, facts={level: {**context.facts[level], **extra}})
             if root is not None and config.selections:
+                from vibeflow.tooling.project.resources.use import resource_workflows
                 context = replace(context, facts={"root": {**context.facts["root"],
-                    "source_quality": self.source_facts(root), "source_import_scopes":self.root_import_scopes[root.id],
+                    "resource_workflows": resource_workflows(self, root),
+                    "source_quality": self.source_facts(root),
                     "private_root_imports":self.root_private_imports[root.id]}})
             with governance_rule_handlers(prepared.catalogs, target_root=root or self.workspace.root,
                                           node_command=self.node_command) as handlers:
@@ -111,26 +134,35 @@ class ProjectPreparation:
             object_id=str(item.path), message=item.message, source_location={"path": str(item.path)},
             failure_layer="source", root_id=item.root_id) for item in issues)
         findings += tuple(finding for result in results for item in result.results.values() for finding in item.findings)
+        from vibeflow.tooling.project.resources.use import collect_resource_uses
+        findings += collect_resource_uses(self, results)
         architecture_path = None
         if write_architecture:
             if self.root is not None:
                 raise ValueError("a root-scoped preparation cannot overwrite the project architecture")
-            from vibeflow.tooling.presentation.project_architecture import write_project_architecture
             project_config = configs[0][1]
             purposes = project_config.rule_params.get("vibeflow.project.layout", {}).get("directories", ())
-            architecture_path = write_project_architecture(inventory, resources=resources, directory_purposes=purposes,
+            self._architecture_inputs = (inventory, dict(resources=resources, workflows=self.workflows, directory_purposes=purposes,
                 root_directory_purposes={root.id: config.rule_params.get("vibeflow.root.layout", {}).get("directories", ())
-                    for root, config in configs if root is not None})
+                    for root, config in configs if root is not None}))
+            architecture_path = self.publish_architecture()
         review = GovernanceReview(inventory, resources, tuple(results), findings, architecture_path)
         self.reviews[write_architecture] = review
         return review
 
+    def publish_architecture(self):
+        """Refresh document existence after publication using the same prepared facts."""
+        from vibeflow.tooling.architecture.project import write_project_architecture
+        if self._architecture_inputs is None:
+            return self.review(write_architecture=True).architecture_path
+        inventory, facts = self._architecture_inputs
+        return write_project_architecture(inventory, **facts)
+
     def source_facts(self, root):
         if root.id not in self.root_source_facts:
             from vibeflow.tooling.application.project_targets import preparation_adapter
-            facts,scopes,imports = preparation_adapter(root.project_target).source_analysis(self.workspace,root,self.workflows,
+            facts,imports = preparation_adapter(root.project_target).source_analysis(self.workspace,root,self.workflows,
                 node_command=self.node_command,syntax_cache=self.syntax_caches.setdefault(root.project_target,{}))
-            self.root_import_scopes[root.id] = scopes
             self.root_private_imports[root.id] = imports
             self.root_source_facts[root.id] = facts
         return self.root_source_facts[root.id]

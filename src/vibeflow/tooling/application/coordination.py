@@ -10,7 +10,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(prog="vibeflow coordination")
     commands = parser.add_subparsers(dest="command", required=True)
     serve = commands.add_parser("serve", help="serve local JSON mailboxes; hosts own cleanup")
-    serve.add_argument("--config", required=True, help="JSON/JSONC file containing workflow_targets")
+    serve.add_argument("--workspace", help="project workspace supplying node launch declarations")
+    serve.add_argument("--config", help="select one source workflow")
+    serve.add_argument("--bundle", help="load saved deployment launch declarations")
     serve.add_argument("--port", type=int, default=8765)
     run = commands.add_parser("run-python", help="connect one checked source or prepared AOT instance")
     source = run.add_mutually_exclusive_group(required=True)
@@ -41,14 +43,17 @@ def main(argv=None):
 
 
 def _serve(args):
-    from vibeflow.core.workflows.targets import parse_targets
     from vibeflow.coordination import WorkflowServer
-    from vibeflow.tooling.project.config_loader import load_raw_config_document
-    path = Path(args.config).resolve()
-    document = load_raw_config_document(path)
-    targets = {name: {**value.to_dict(), "cwd": str((path.parent / value.cwd).resolve())}
-               for name, value in parse_targets(document.data.get("workflow_targets", {})).items()}
-    with WorkflowServer(targets=targets, port=args.port) as server:
-        print(json.dumps({"url": server.url, "targets": list(targets)}, ensure_ascii=False), flush=True)
+    from vibeflow.tooling.project.workflow_launches import source_launches, bundle_launches
+    if args.bundle:
+        if args.workspace or args.config:
+            raise ValueError("serve --bundle cannot be combined with source options")
+        launches = bundle_launches(args.bundle)
+    else:
+        from vibeflow.tooling.project.workspace_loader import load_workspace_config, load_project_workspace
+        workspace = load_workspace_config(Path(args.workspace)) if args.workspace else load_project_workspace(Path(args.config or Path.cwd()))
+        launches = source_launches(workspace, config=args.config)
+    with WorkflowServer(launches=launches, port=args.port) as server:
+        print(json.dumps({"url":server.url, "launches":[item["workflow"] for item in launches]}, ensure_ascii=False), flush=True)
         Event().wait()
     return 0

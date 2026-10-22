@@ -22,7 +22,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     from vibeflow.core.models import CoreCompileRequest, ImplementationFact, ImplementationFacts, TargetFeatureSet
     from vibeflow.targets.shared.quality_support import (
         FileQuality, FunctionQuality, ImportSite, SourceQualityFacts, QualityPolicy,
-        QualityStructureLimits, QualityStructureRoles,
+        QualityStructureLimits,
         QualityThresholds,
     )
     from vibeflow.targets.shared.quality_support.implementation import (
@@ -36,7 +36,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     from vibeflow.targets.shared.quality_support.workflow_rules.planned import planned_health_events
 
     if variant == "baseline":
-        from vibeflow.targets.shared.quality_support import evaluate_source_quality
+        from vibeflow.targets.shared.quality_support import evaluate_source_quality, QualityStructureRoles
         from vibeflow.targets.shared.quality_support.implementation import (evaluate_node_implementation,
             evaluate_base_lib_implementation, evaluate_base_lib_dependency_chain)
     else:
@@ -196,7 +196,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     quiet=QualityStructureLimits(warn_root_code_files=999,max_root_code_files=1000,warn_code_dirs=999,max_code_dirs=1000,
         warn_code_files_per_dir=999,max_code_files_per_dir=1000,warn_code_dir_depth=999,max_code_dir_depth=1000,
         warn_child_code_dirs_per_dir=999,max_child_code_dirs_per_dir=1000,warn_root_level_code_files=999,max_root_level_code_files=1000,
-        enforce_role_imports=False)
+        **({"enforce_role_imports":False} if variant == "baseline" else {}))
     structure_limits=[
         ("root_files","warn_root_code_files","max_root_code_files","ROOT_TOO_MANY_CODE_FILES",lambda n:[file(f"pkg/x{i}.py") for i in range(n)]),
         ("root_dirs","warn_code_dirs","max_code_dirs","ROOT_TOO_MANY_CODE_DIRS",lambda n:[file(f"d{i}/x.py") for i in range(n)]),
@@ -223,11 +223,18 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
                      "base_libs":["b"] if source_role == "nodes" and target_role == "base_lib" and resource_id == "a" else [],
                      "dependencies":[],"plugin_id":"test" if role == "plugins" else ""}
                     for resource_id,path,role in (("a","a.py",source_role),("b","b.py",target_role))]
-            roles=QualityStructureRoles(_resource_scopes=({"id":"selected","owners":owners},))
-        policy=QualityPolicy(structure_limits=replace(quiet,enforce_role_imports=True),structure_roles=roles)
+            from tests.fixtures.support.resource_rules import check
+            for owner in owners:
+                owner["symbol"] = ""
+            findings = check(owners, source="a.py", target="b.py")
+        if variant == "baseline":
+            policy=QualityPolicy(structure_limits=replace(quiet,enforce_role_imports=True),structure_roles=roles)
+            operation=lambda policy=policy:project([file("a.py",imports=("b",),import_sites=(ImportSite("a","b","import b","a.py",1,1),)),file("b.py")],policy)
+        else:
+            operation=lambda findings=findings:findings
         emit(f"project.roles.{source_role}.{target_role}", f"声明资源导入 {source_role}→{target_role}", "project.structure",
-            lambda policy=policy:project([file("a.py",imports=("b",),import_sites=(ImportSite("a","b","import b","a.py",1,1),)),file("b.py")],policy),
-            codes(*(("QUALITY.STRUCTURE."+diagnostic,"error"),) if diagnostic else ()),evidence=structure_evidence)
+            operation, codes(*((("QUALITY.STRUCTURE."+diagnostic if variant == "baseline" else "RESOURCE.REFERENCE.UNDECLARED"),"error"),) if diagnostic else ()),
+            classification="approved_change", notes="Resource references now belong to the independent resource Rule, with the same relationship restrictions.", evidence="targets/shared/rule_support/resource_use/references.py")
     for name,threshold in [("fanout","max_directory_fanout"),("fanin","max_directory_fanin")]:
         files=([file("source/x.py",imports=("a.x","b.x")),file("a/x.py"),file("b/x.py")] if name == "fanout"
             else [file("source/x.py"),file("a/x.py",imports=("source.x",)),file("b/x.py",imports=("source.x",))])

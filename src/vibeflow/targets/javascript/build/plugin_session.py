@@ -37,7 +37,10 @@ class JavascriptPluginSession:
 
     def __enter__(self) -> JavascriptPluginSession:
         context = materialized_resources()
-        worker_path = context.__enter__() / "plugin_worker.mjs"
+        resource_directory = context.__enter__()
+        worker_path = resource_directory / "plugin_worker.mjs"
+        from vibeflow.targets.javascript.resources.identity import FrameworkResources
+        self._framework_resources = FrameworkResources(resource_directory)
         self._resource_context = context
         self._stderr = tempfile.TemporaryFile(mode="w+t", encoding="utf-8")
         try:
@@ -252,6 +255,9 @@ class JavascriptPluginSession:
                 "VF_PLUGIN_PROCESS",
                 "JavaScript plugin worker omitted its result object",
             )
+        if payload.get("command") == "declarations":
+            result = {**result, "framework_sources": self._framework_resources.imported_framework_files(
+                (*result.get("included_sources", ()), *result.get("loaded_sources", ())))}
         return result
 
 

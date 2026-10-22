@@ -19,59 +19,16 @@ from vibeflow.core.descriptors.source_bundle import implementation_sources, sour
 from vibeflow.core.flow import GraphConfig
 
 
-def base_lib_closure(
-    nodes: Mapping[str, NodeDescriptor],
-    *,
-    catalog: BaseLibCatalog,
-    target: str,
-    project_root: Path,
-) -> tuple[
-    tuple[BaseLibDescriptor, ...],
-    Mapping[str, Mapping[str, str]],
-]:
-    ordered: list[BaseLibDescriptor] = []
-    implementations: dict[str, Mapping[str, str]] = {}
-    complete: set[str] = set()
-    active: list[str] = []
-
-    def visit(resource_id: str) -> None:
-        if resource_id in complete:
-            return
-        if resource_id in active:
-            start = active.index(resource_id)
-            cycle = " -> ".join((*active[start:], resource_id))
-            raise ProjectBuildError(
-                "VF_AOT_BASE_LIB_CYCLE",
-                f"base_lib dependency cycle: {cycle}",
-            )
-        descriptor = catalog.get(resource_id)
-        if descriptor is None:
-            raise ProjectBuildError(
-                "VF_AOT_BASE_LIB_UNKNOWN",
-                f"unknown required base_lib '{resource_id}'",
-            )
-        active.append(resource_id)
-        for dependency in descriptor.dependencies:
-            visit(dependency)
-        active.pop()
-        selected = select_implementation(
-            descriptor.implementations,
-            target=target,
-            subject=f"base_lib '{descriptor.id}'",
-        )
-        _source, mapping = implementation_source(
-            selected,
-            project_root=project_root,
-            source_roots=catalog.source_roots,
-            subject=f"base_lib '{descriptor.id}'",
-        )
-        implementations[descriptor.id] = mapping
-        complete.add(resource_id)
+def bind_base_libs(identifiers, *, catalog, target, project_root):
+    """Bind an already ordered resource-use projection to a JavaScript target."""
+    ordered, implementations = [], {}
+    for identifier in identifiers:
+        descriptor = catalog.require(identifier)
+        selected = select_implementation(descriptor.implementations, target=target, subject=f"base_lib '{identifier}'")
+        _source, mapping = implementation_source(selected, project_root=project_root,
+            source_roots=catalog.source_roots, subject=f"base_lib '{identifier}'")
+        implementations[identifier] = mapping
         ordered.append(descriptor)
-
-    for descriptor in sorted(nodes.values(), key=lambda item: item.id):
-        for resource_id in descriptor.base_libs:
-            visit(resource_id)
     return tuple(ordered), implementations
 
 
@@ -172,7 +129,7 @@ def schemas_for_types(
     return schemas
 
 
-def target_neutral_import_policy(*, catalogs: DescriptorCatalogs, project_root: Path, allowed_external: set[str], node_ids: frozenset[str] | None=None, plugin_ids: frozenset[str]=frozenset(), resource_inventory=()) -> tuple[dict[str, Any], tuple[str, ...]]:
+def source_import_facts(*, resource_use, catalogs: DescriptorCatalogs, project_root: Path, allowed_external: set[str], node_ids: frozenset[str] | None=None, plugin_ids: frozenset[str]=frozenset(), resource_inventory=()) -> tuple[dict[str, Any], tuple[str, ...]]:
     """Describe a JS/TS source closure without selecting a platform.
 
     ``node_ids=None`` selects the complete registered node/base-lib catalog for
@@ -221,50 +178,14 @@ def target_neutral_import_policy(*, catalogs: DescriptorCatalogs, project_root: 
         for descriptor in catalogs.nodes
         if node_ids is None or descriptor.id in node_ids
     )
-    selected_base_lib_ids: set[str]
-    if node_ids is None:
-        selected_base_lib_ids = {
-            descriptor.id for descriptor in catalogs.base_libs
-        }
-    else:
-        selected_base_lib_ids = set()
-        visiting: list[str] = []
-
-        def visit_base_lib(resource_id: str) -> None:
-            if resource_id in selected_base_lib_ids:
-                return
-            if resource_id in visiting:
-                start = visiting.index(resource_id)
-                cycle = " -> ".join((*visiting[start:], resource_id))
-                raise ProjectBuildError(
-                    "VF_AOT_BASE_LIB_CYCLE",
-                    f"base_lib dependency cycle: {cycle}",
-                )
-            descriptor = catalogs.base_libs.get(resource_id)
-            if descriptor is None:
-                raise ProjectBuildError(
-                    "VF_AOT_BASE_LIB_UNKNOWN",
-                    f"unknown required base_lib '{resource_id}'",
-                )
-            visiting.append(resource_id)
-            for dependency in descriptor.dependencies:
-                visit_base_lib(dependency)
-            visiting.pop()
-            selected_base_lib_ids.add(resource_id)
-
-        dependent_resources = (*selected_nodes,
-
-            *(item for item in catalogs.plugins if item.id in plugin_ids),
-            *(item for kind,item in source_resources(catalogs) if kind == "plugin_declaration"))
-        for descriptor in dependent_resources:
-            for resource_id in descriptor.base_libs:
-                visit_base_lib(resource_id)
-
-    selected_base_libs = tuple(
-        descriptor
-        for descriptor in catalogs.base_libs
-        if descriptor.id in selected_base_lib_ids
-    )
+    from vibeflow.core.descriptors.resource_use import required_base_libs
+    try:
+        referenced = (tuple(item.id for item in catalogs.base_libs) if node_ids is None else
+                      required_base_libs(catalogs, node_ids=node_ids, plugin_ids=plugin_ids))
+    except ValueError as error:
+        raise ProjectBuildError("RESOURCE.DEPENDENCY.INVALID", str(error)) from error
+    selected_base_libs = tuple(catalogs.base_libs.require(identifier) for identifier in referenced
+                              if resource_use.allows("base_lib", identifier))
 
     for descriptor in selected_nodes:
         for implementation in descriptor.implementations:
@@ -345,16 +266,6 @@ def target_neutral_import_policy(*, catalogs: DescriptorCatalogs, project_root: 
 
             "resource_base_libs": {kind + ":" + item.id:list(item.base_libs)
                 for kind,item in source_resources(catalogs) if hasattr(item,"base_libs")},
-            "plugin_contributions": {record["id"]:[{"kind":kind,"id":item.id}
-                for kind,group in (("node","nodes"),("base_lib","base_libs"),("plugin","plugins"),("rule","rules"))
-                for item in getattr(catalogs,group)
-                if catalogs.origins.get((group,item.id)) and catalogs.origins[(group,item.id)].owner.plugin_id == record["id"]]
-                for record in catalogs.plugin_records if record.get("loaded")},
-            "plugin_dependencies": {
-                descriptor.id: list(descriptor.dependencies)
-                for descriptor in catalogs.plugins
-                if descriptor.id in plugin_ids
-            },
             "allowed_external_packages": sorted(allowed_external),
             "source_roots": [value for value in catalogs.source_roots if Path(value) != project_root],
         },
@@ -369,9 +280,7 @@ def driver_import_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
         "node_base_libs": "nodeBaseLibs",
         "base_lib_dependencies": "baseLibDependencies",
 
-        "plugin_dependencies": "pluginDependencies",
         "resource_base_libs": "resourceBaseLibs",
-        "plugin_contributions": "pluginContributions",
     }
     return {
         "owners": [dict(item) for item in policy.get("owners", ())],
@@ -385,10 +294,10 @@ def driver_import_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
 
 
 __all__ = [
-    "base_lib_closure",
+    "bind_base_libs",
     "driver_import_policy",
     "required_capabilities",
     "schemas_for_types",
-    "target_neutral_import_policy",
+    "source_import_facts",
     "used_schema_types",
 ]

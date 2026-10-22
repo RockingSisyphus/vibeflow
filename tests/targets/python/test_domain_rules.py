@@ -350,5 +350,5 @@ def test_module_rule_binding_uses_resolved_source_provenance(domain_project, cap
         assert finding["definition_id"] == "example.model_definition"
         assert finding["source_location"]["path"] == str(project / "plugins/code_plugin/plugin.py")
         assert finding["source_location"]["line"] > 0
-        assert finding["details"]["implementation"] == {"kind":"module","ref":"plugins.code_plugin.rules.model_definition",
+        assert finding["details"]["implementation"] == {"kind":"file","ref":str(project / "plugins/code_plugin/rules/model_definition.py"),
             "export":export,"path":str(project / "plugins/code_plugin/rules/model_definition.py")}

@@ -73,12 +73,9 @@ def parse_graph_config_data(
         root_path=actual_root_path,
         source_path=actual_source_path,
     )
-    from vibeflow.core.workflows.targets import parse_targets
-    try:
-        targets = parse_targets(config.get("workflow_targets", {}))
-    except ValueError as error:
-        raise GraphConfigError(str(error), "CONFIG.WORKFLOW_TARGET.INVALID") from error
-    return replace(graph, rulesets=_parse_rulesets(config.get("rulesets"), explicit="rulesets" in config), workflow_targets=targets)
+    if "workflow_targets" in config:
+        raise GraphConfigError("workflow_targets is removed; configure workflow and launch on Call nodes", "CONFIG.WORKFLOW_TARGET.REMOVED")
+    return replace(graph, rulesets=_parse_rulesets(config.get("rulesets"), explicit="rulesets" in config))
 
 
 def _parse_graph_body(

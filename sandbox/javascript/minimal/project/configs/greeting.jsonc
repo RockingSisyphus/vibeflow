@@ -38,5 +38,10 @@
         "export": "plugin"
       }
     }
-  ]
+  ],
+  "base_lib": {
+    "modules": [
+      "example.text"
+    ]
+  }
 }

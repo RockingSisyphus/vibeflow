@@ -8,6 +8,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from .protocol import CoordinationError, json_value
+from vibeflow.core.workflows.references import workflow_reference, launch_configuration
 
 
 class _Operation:
@@ -29,6 +30,7 @@ class WorkflowClient:
             "pid": os.getpid(), "stop_supported": stop is not None})
         self.id = registered["id"]
         self.inputs, self.entry = registered["inputs"], registered["entry"]
+        self.workflow = registered.get("workflow")
         self._outbox, self._errors = Queue(), []
         self._closed = Event()
         self._finish_lock = Lock()
@@ -115,22 +117,26 @@ class WorkflowClient:
     def receive(self, port="default", *, timeout=None, signal=None):
         return self._wait("receive", self.id, port=port, timeout=timeout, signal=signal)
 
-    def kill(self, identifier, *, timeout=None, signal=None):
-        self.request("kill", {"id": identifier})
+    def kill(self, identifier, *, workflow=None, timeout=None, signal=None):
+        request = {"id": identifier}
+        if workflow is not None:
+            request["workflow"] = workflow_reference(workflow, root=self.workflow.get("root", "") if isinstance(self.workflow, dict) else "")
+        self.request("kill", request)
         return self.wait(identifier, timeout=timeout, signal=signal)
 
-    def call(self, target, *, entry=None, inputs=None, timeout=None, signal=None):
-        launched = self.request("call", {"target": target, "entry": entry, "inputs": inputs or {}})
+    def call(self, workflow, *, launch, inputs=None, timeout=None, signal=None):
+        reference = workflow_reference(workflow, root=self.workflow.get("root", "") if isinstance(self.workflow, dict) else "")
+        launched = self.request("call", {"sender":self.id, "workflow": reference, "launch": launch_configuration(launch), "inputs": inputs or {}})
         return self._wait("ready", launched["id"], timeout=timeout, signal=signal)
 
     def operations(self):
         return {"self": _Operation(lambda request, signal: {"id": self.id}),
-            "call": _Operation(lambda request, signal: self.call(request["target"], entry=request.get("entry"),
+            "call": _Operation(lambda request, signal: self.call(request["workflow"], launch=request["launch"],
                 inputs=request.get("inputs"), timeout=request.get("timeout"), signal=signal)),
             "wait": _Operation(lambda request, signal: self.wait(request["id"], timeout=request.get("timeout"), signal=signal)),
             "send": _Operation(lambda request, signal: self.send(request["id"], request.get("port", "default"), request.get("payload"))),
             "receive": _Operation(lambda request, signal: self.receive(request.get("port", "default"), timeout=request.get("timeout"), signal=signal)),
-            "kill": _Operation(lambda request, signal: self.kill(request["id"], timeout=request.get("timeout"), signal=signal))}
+            "kill": _Operation(lambda request, signal: self.kill(request["id"], workflow=request["workflow"], timeout=request.get("timeout"), signal=signal))}
 
     def finish(self, *, state="succeeded", outputs=None, error=None):
         with self._finish_lock:

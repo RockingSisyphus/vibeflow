@@ -7,20 +7,11 @@ import json
 import os
 from pathlib import Path
 from uuid import uuid4
+from vibeflow.tooling.file_io import atomic_write
 
 
 def script_call(method, value):
     return "VibeFlowPreview." + method + "(" + json.dumps(value, ensure_ascii=False, allow_nan=False).replace("<", "\\u003c") + ");\n"
-
-
-def atomic_write(path: Path, text: str):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name("." + path.name + "." + uuid4().hex)
-    try:
-        temporary.write_text(text, encoding="utf-8")
-        os.replace(temporary, path)
-    finally:
-        temporary.unlink(missing_ok=True)
 
 
 def ensure_catalog(root):
@@ -66,7 +57,7 @@ def new_record(root, workflow, category, status):
         raise ValueError(f"unknown preview category: {category}")
     now = utc_now()
     identity = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ-") + uuid4().hex[:12]
-    result = PreviewRecord(Path(root).resolve(), dict(version=3, id=identity, category=category, status=status,
+    result = PreviewRecord(Path(root).resolve(), dict(version=4, id=identity, category=category, status=status,
         created_at=now, updated_at=now, workflow=workflow, views=[]))
     result.directory.mkdir(parents=True, exist_ok=False)
     return result
@@ -85,7 +76,7 @@ def reindex(root):
             value = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(value,dict):
                 raise ValueError("snapshot record must be an object")
-            if value.get("version") != 3:
+            if value.get("version") != 4:
                 obsolete += 1
                 continue
             if not isinstance(value, dict) or not isinstance(value.get("workflow"), dict):

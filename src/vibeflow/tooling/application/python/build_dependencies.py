@@ -11,37 +11,8 @@ from vibeflow.targets.python.project.source_closure import resolve_local_module_
 import sys
 
 
-def implementation_packages(registry, used, *, roots, framework):
-    modules, files = {}, set()
-    for key in used:
-        direct = registry.direct_bindings.get(('node', key))
-        if direct is not None:
-            modules[direct.__module__] = None
-        else:
-            path = registry.source_locations[key][0]
-            source = registry.descriptor(key).implementations[0].source
-            if source.kind in {'module', 'package'}:
-                modules[source.ref] = path
-            else:
-                files.add(path)
-    for (kind, _), value in registry.direct_bindings.items():
-        if kind in {'plugin', 'base_lib'} and hasattr(value, '__module__'):
-            modules[value.__module__] = None
-    for group in ('plugins', 'base_libs'):
-        for descriptor in getattr(registry.prepared_resources.catalogs, group):
-            if group == 'plugins' and descriptor.plugin_type != 'runtime':
-                continue
-            for implementation in descriptor.implementations:
-                source = implementation.source
-                if source.kind in {'module', 'package'}:
-                    modules.setdefault(source.ref, None)
-                elif source.kind == 'file':
-                    owner = registry.resource_roots[(group, descriptor.id)]
-                    files.add((owner.path / source.ref).resolve())
-    for record in registry.prepared_resources.records:
-        source = record['source']
-        if source['kind'] in {'module', 'package'}:
-            modules.setdefault(source['ref'], None)
+def implementation_packages(inputs, *, roots, framework):
+    modules, files = dict(inputs.modules), inputs.files
     prefixes, resources = {}, []
 
     def external(path):

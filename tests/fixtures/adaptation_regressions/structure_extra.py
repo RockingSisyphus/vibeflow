@@ -12,9 +12,9 @@ def workspace(root,*,cross_root=False):
     return root/'app'
 
 
-def workflow(app,name,definitions,plugins=()):
+def workflow(app,name,definitions,plugins=(), libraries=()):
     path=app/'configs'/(name+'.jsonc')
-    write_json(path,{'plugins':list(plugins),'rulesets':[],'pipeline':{'nodes':[{
+    write_json(path,{'plugins':list(plugins),'base_lib':{'modules':list(libraries)},'rulesets':[],'pipeline':{'nodes':[{
         'id':'leaf'+str(i),'definition_id':key,'display_name':'Leaf '+str(i),'description':'Explicit source permission.'}
         for i,key in enumerate(definitions)]}})
     return path
@@ -42,12 +42,12 @@ def library_fixture(root,*,cross_root=False,both=False,denied=False):
         write(app,'nodes/'+selection+'.py','from vibeflow.targets.python.sdk import node\nfrom base_lib.math import value\n'
             f"@node(id='audit.{selection}',node_type='vibeflow.node',contract={CONTRACT!r},rulesets=['vibeflow.process'],base_libs={libs!r})\n"
             "class Leaf:\n    def run_pure(self,inputs,params):\n        return {'result':value()}\n")
-        workflow(app,selection,('audit.'+selection,))
+        workflow(app,selection,('audit.'+selection,), libraries=['audit.library'])
     if cross_root:
         # The shared library has an actual second consumer, not a private-root escape.
         peer=root/'peer'
         write(peer,'nodes/leaf.py',(app/'nodes'/('denied.py' if denied else 'allowed.py')).read_text().replace("base_libs=[]","base_libs=['audit.library']"))
-        workflow(peer,'workflow',('audit.denied' if denied else 'audit.allowed',))
+        workflow(peer,'workflow',('audit.denied' if denied else 'audit.allowed',), libraries=['audit.library'])
     return app
 
 
@@ -72,7 +72,7 @@ def checked(root,config,kernel,identifier,*,command='validate',denied=False,suff
     errors=[x for x in findings(raw['payload']) if x.get('severity')=='error']
     actual_codes=sorted({x.get('code',x.get('rule_id')) for x in errors})
     targets=[x for x in errors if x.get('code',x.get('rule_id')) in codes]
-    exact=bool(targets) and all(x.get('source_path',x.get('source_location',{}).get('path'))==str(config.parent.parent/suffix)
+    exact=bool(targets) and all(x.get('source_location',{}).get('path')==str(config.parent.parent/suffix)
         and x.get('source_location',{}).get('line')==2 for x in targets)
     lifecycle=identifier.startswith('lifecycle')
     actual={'exit_code':raw['exit_code'],'codes':actual_codes,'target_exact':exact,'diagnostics':errors}
@@ -93,16 +93,16 @@ def observe(work:Path,kernel:Path,toolchain=None,renderer=None):
         name='shared-denied' if denied else 'shared-symbol-isolated';root=work/name;config=shared_fixture(root,denied=denied)
         for command in ('validate','quality-check'):
             rows.append(checked(root,config,kernel,name,command=command,denied=denied,suffix='nodes/shared.py',
-                codes=('VF_IMPORT_LAYER','QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT')))
+                codes=('RESOURCE.REFERENCE.UNDECLARED','RESOURCE.REFERENCE.UNDECLARED')))
         name='cross-root-denied' if denied else 'cross-root-allowed';root=work/name;app=library_fixture(root,cross_root=True,denied=denied)
         for command in ('validate','quality-check'):
             rows.append(checked(root,app/'configs'/('denied.jsonc' if denied else 'allowed.jsonc'),kernel,name,command=command,denied=denied,
-                suffix='nodes/denied.py' if denied else 'nodes/allowed.py',codes=('VF_IMPORT_LAYER','QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT')))
+                suffix='nodes/denied.py' if denied else 'nodes/allowed.py',codes=('RESOURCE.REFERENCE.UNDECLARED','RESOURCE.REFERENCE.UNDECLARED')))
     root=work/'workflow-isolation';app=library_fixture(root,both=True)
     for name in ('allowed','denied'):
-        rows.append(checked(root,app/'configs'/(name+'.jsonc'),kernel,'workflow-isolation-'+name,denied=name=='denied',suffix='nodes/'+name+'.py',codes=('VF_IMPORT_LAYER','QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT',)))
+        rows.append(checked(root,app/'configs'/(name+'.jsonc'),kernel,'workflow-isolation-'+name,denied=name=='denied',suffix='nodes/'+name+'.py',codes=('RESOURCE.REFERENCE.UNDECLARED','RESOURCE.REFERENCE.UNDECLARED',)))
     rows.append(checked(root,app/'configs/allowed.jsonc',kernel,'workflow-isolation-mixed',command='quality-check',denied=True,
-        suffix='nodes/denied.py',codes=('QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT',)))
+        suffix='nodes/denied.py',codes=('RESOURCE.REFERENCE.UNDECLARED',)))
     for denied in (False,True):
         name='lifecycle-contribution-denied' if denied else 'lifecycle-library-allowed';root=work/name;config=lifecycle_fixture(root,denied=denied)
         rows.append(checked(root,config,kernel,name,command='quality-check',denied=denied))

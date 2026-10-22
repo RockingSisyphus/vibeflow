@@ -4,25 +4,10 @@ from pathlib import Path
 _EXCLUDED = {'.git', '.venv', 'node_modules', 'runs', 'build', 'dist', '__pycache__', 'vibeflow-preview', 'vibeflow-preview.config.js'}
 
 
-def python_bundle_files(workspace, registry, config, *, out_dir, include):
+def python_bundle_files(workspace, registry, config, inputs, *, out_dir, include):
     workflow_root = workspace.root_for_path(config)
     roots = (workflow_root.path.resolve(), workspace.root.resolve())
-    shared = tuple(workspace.root / name for name in ('nodes', 'base_lib', 'plugins'))
-
-    def eligible(path):
-        owner = next((root for root in roots if path.is_relative_to(root)), None)
-        visible = path.is_relative_to(roots[0]) or any(path.is_relative_to(group) for group in shared)
-        return owner is not None and visible and not path.is_relative_to(out_dir) and not any(
-            part in _EXCLUDED for part in path.relative_to(owner).parts) and path.suffix != '.pyc'
-
-    files = {Path(config).resolve()}
-    for root in (roots[0], *shared):
-        files.update(path for path in root.rglob('*.py') if path.is_file() and eligible(path))
-    # The checked source closure includes explicitly permitted cross-root
-    # imports. Preserve their workspace-relative module paths in the bundle.
-    context = registry.source_context_snapshot
-    files.update(Path(source.path) for source in context.files
-                 if Path(source.path).is_relative_to(workspace.root))
+    files = {Path(config).resolve(), *(path for path in inputs.files if path.is_relative_to(workspace.root))}
     # Imported private libraries are not members of the workflow's visible
     # catalog. Read declarations only in its checked dependency files, without
     # activating unrelated resources from the foreign root.
@@ -38,19 +23,8 @@ def python_bundle_files(workspace, registry, config, *, out_dir, include):
                 continue
             for resource in discover_file_resources(path, namespace):
                 for implementation in getattr(resource.descriptor, "implementations", ()):
-                    for source in implementation.implementation_files:
+                    for source in getattr(implementation, "implementation_files", ()) if implementation.language == "python" else ():
                         files.add(_implementation_path(source.kind, source.ref, owner.path, roots))
-    # Explicit declaration support files may include data as well as code.
-    loaded = registry.prepared_resources
-    for group in ('nodes', 'base_libs', 'plugins'):
-        for descriptor in getattr(loaded.catalogs, group).available():
-            descriptor = getattr(loaded.catalogs, group).require(descriptor)
-            owner = registry.resource_roots.get((group, descriptor.id))
-            if owner is None:
-                continue
-            for implementation in descriptor.implementations:
-                for source in implementation.implementation_files:
-                    files.add(_implementation_path(source.kind, source.ref, owner.path, roots))
     # Packages carry adjacent resources. Root-level data and dynamic imports
     # outside the source roots are explicit --include choices.
     packages = set()
@@ -65,7 +39,9 @@ def python_bundle_files(workspace, registry, config, *, out_dir, include):
             package = package.parent
     for package in packages:
         files.update(path for path in package.rglob('*') if path.is_file() and not path.is_relative_to(out_dir)
-            and not any(part in _EXCLUDED for part in path.relative_to(package).parts) and path.suffix != '.pyc')
+            and not any(part in _EXCLUDED for part in path.relative_to(package).parts)
+            and path.suffix not in {'.py', '.pyc', '.pyo'})
+    files.update(package / '__init__.py' for package in packages)
     for entry in include:
         path = (workflow_root.path / entry).resolve()
         if not path.exists():

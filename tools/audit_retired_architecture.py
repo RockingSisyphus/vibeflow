@@ -9,6 +9,13 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 RETIRED_FILES = (
+    "core/workflows/targets.py",
+    "tooling/presentation/architecture_facts.py",
+    "tooling/presentation/project_architecture.py",
+    "tooling/presentation/resource_architecture.py",
+    "tooling/presentation/workflow_facts.py",
+    "tooling/application/python/project/resource_selection.py",
+    "targets/python/rules/node/source_ownership.py",
     "tooling/application/python/diagnostics.py",
     "tooling/application/python/project/contributions.py",
     "tooling/application/python/presentation/style.py",
@@ -62,7 +69,8 @@ MOVED_FILES = ('core/rules/builtin/__init__.py', 'core/rules/builtin/effects.py'
     'core/rules/builtin/implementation.py', 'core/rules/builtin/project_quality.py',
     'core/rules/builtin/workflow.py')
 RETIRED_PACKAGE_DIRS = ('core/rules/builtin',)
-RETIRED_SYMBOLS = frozenset({'RuntimeDispatchSite', 'RuntimeDispatchAnalysis',
+RETIRED_SYMBOLS = frozenset({'select_python_resources', 'target_neutral_import_policy', 'base_lib_closure', 'QualityStructureRoles', 'resource_import_violations',
+    'RuntimeDispatchSite', 'RuntimeDispatchAnalysis',
     'analyze_runtime_dispatch', 'analyze_source_runtime_dispatch',
     '_RuntimeDispatchAnalyzer', '_SourceDispatchAnalyzer','NodeInfo', 'NodeContract', 'RegistryBase', 'BaseLibInfo',
     'BaseLibRegistry', 'PluginInfo', 'PluginResourceRegistry', 'ConfigResources',

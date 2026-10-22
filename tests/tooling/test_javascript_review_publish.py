@@ -46,7 +46,8 @@ def _review_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # Publication tests isolate prepared governance from the mocked audit result.
     from vibeflow.tooling.project import preparation
     monkeypatch.setattr(preparation, "ProjectPreparation", lambda *a, **k: SimpleNamespace(
-        review=lambda **k: SimpleNamespace(architecture_path=tmp_path / "PROJECT_ARCHITECTURE.jsonc")))
+        review=lambda **k: SimpleNamespace(architecture_path=tmp_path / "PROJECT_ARCHITECTURE.jsonc"),
+        publish_architecture=lambda:tmp_path / "PROJECT_ARCHITECTURE.jsonc"))
     rendered_architecture = ARCHITECTURE_DOCUMENT_HEADER + json.dumps(
         {
             "project_target": "javascript",
