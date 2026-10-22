@@ -40,7 +40,7 @@ from ..base_lib.local import multiply
 class Local:
     def run_pure(self, inputs, params): return {"local":multiply(4)}
 ''')
-        data = {"pipeline":{"nodes":[
+        data = {"base_lib":{"modules":["local.math","shared.math"]},"pipeline":{"nodes":[
             {"id":"local","definition_id":"local.step","display_name":"Local","description":"Prepare private value"},
             {"id":"shared","definition_id":"shared.step","display_name":"Shared","description":"Apply shared arithmetic"}],
             "edges":[["local","shared"]],"outputs":[{"type":"result.value","cardinality":"exactly_one","display_name":"Result","as":"result"}]}}

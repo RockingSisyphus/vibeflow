@@ -1,7 +1,7 @@
 from __future__ import annotations
 from vibeflow.tooling.presentation.mermaid.style import mermaid_style, mermaid_shape
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 import tempfile
 from typing import Mapping
@@ -284,7 +284,7 @@ def _render_group_fragment(
             f'  placeholder["{_escape_label(title)}\\n'
             f'{_escape_label("recursive expansion skipped" if group.target in visited else "nodeset has no concrete pipeline")}"]\n'
         )
-        return _render_fragment(
+        return replace(_render_fragment(
             title,
             mermaid,
             temp_dir,
@@ -295,11 +295,11 @@ def _render_group_fragment(
             background=background,
             max_text_size=max_text_size,
             max_edges=max_edges,
-        )
+        ), planned=group.nodeset.status == STATUS_PLANNED)
     compiled = result.compiled_nodeset_types[group.target]
     children = _invocation_groups(group.nodeset.graph)
     if not children:
-        return _render_fragment(
+        return replace(_render_fragment(
             title,
             _graph_mermaid(
                 result,
@@ -317,7 +317,7 @@ def _render_group_fragment(
             background=background,
             max_text_size=max_text_size,
             max_edges=max_edges,
-        )
+        ), planned=group.nodeset.status == STATUS_PLANNED)
     parent = _render_fragment(
         "parent flow",
         _graph_mermaid(
@@ -362,7 +362,7 @@ def _render_group_fragment(
         review_fragment_max_width=review_fragment_max_width,
     )
     width, height = _viewbox_size(nested)
-    return SvgFragment(
+    return replace(SvgFragment(
         title,
         nested,
         width,
@@ -370,7 +370,7 @@ def _render_group_fragment(
         review_kind=group.kind,
         review_owner=owner,
         review_target=group.target,
-    )
+    ), planned=group.nodeset.status == STATUS_PLANNED)
 
 
 def _render_fragment(
@@ -528,7 +528,7 @@ def _node_presentation_fact(result, graph, node):
             presentation = record.get("presentation", {})
             values = presentation.get("values", {})
             if "shape" in values:
-                return EffectivePresentation(values, presentation.get("sources", {}))
+                return EffectivePresentation(values, presentation.get("sources", {}), presentation.get("modifiers", {}).get("planned", False))
     return None
 
 

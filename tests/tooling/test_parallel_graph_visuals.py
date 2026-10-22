@@ -5,7 +5,7 @@ import pytest
 from tests.tooling.test_presentation_cascade import Empty
 from vibeflow.core.descriptors import DescriptorCatalogs,NodeDescriptor,NodeContractDescriptor
 from vibeflow.targets.python.project import GraphCompiler,NodeRegistry
-from vibeflow.tooling.application.javascript.presentation.architecture import _javascript_graph_document
+from vibeflow.tooling.architecture.workflow import graph_document
 from vibeflow.tooling.application.javascript.presentation.diagrams import render_mermaid
 from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid
 from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_document
@@ -22,8 +22,8 @@ def test_parallel_graph_has_normal_explicit_completion_edges():
         for name,kind in (("start","boundary"),("left","work"),("right","work"),("collect","work"),("end","boundary"))],
         "edges":[["start","left"],["start","right"],["left","collect"],["right","collect"],["collect","end"]]}})
     compiled=GraphCompiler().compile(graph,registry=registry)
-    architecture={"workflow":_javascript_graph_document(graph,compiled,source={},graph_lock_scope="graph",catalogs=catalogs,health_classes={})}
-    texts=[export_mermaid(graph,compiled=compiled,registry=registry),render_mermaid(SimpleNamespace(graph=graph,compiled=compiled,catalogs=catalogs,architecture=architecture))]
+    architecture={"workflow":graph_document(graph,compiled,source={},graph_lock_scope="graph",descriptor=catalogs.nodes.get,health_classes={})}
+    texts=[export_mermaid(graph,compiled=compiled,registry=registry),render_mermaid(SimpleNamespace(graph=graph,compiled=compiled,descriptor=catalogs.nodes.get,architecture=architecture))]
     for text in texts:
         assert all(name in text for name in ("left","right","collect","end"))
         assert text.count("-->")==5
@@ -51,10 +51,10 @@ def _parallel_fixture(*, descriptor_shape="", call_shape="", external=False):
 def _presentations(graph,registry,catalogs):
     compiled=GraphCompiler().compile(graph,registry=registry)
     py=build_architecture_document(graph,compiled=compiled,registry=registry)["workflow"]
-    js=_javascript_graph_document(graph,compiled,source={},graph_lock_scope="graph",catalogs=catalogs)
+    js=graph_document(graph,compiled,source={},graph_lock_scope="graph",descriptor=catalogs.nodes.get)
     assert {n['id']:n['presentation'] for n in py['nodes']}=={n['id']:n['presentation'] for n in js['nodes']}
     texts=[export_mermaid(graph,compiled=compiled,registry=registry),
-        render_mermaid(SimpleNamespace(graph=graph,compiled=compiled,catalogs=catalogs,architecture={"workflow":js}))]
+        render_mermaid(SimpleNamespace(graph=graph,compiled=compiled,descriptor=catalogs.nodes.get,architecture={"workflow":js}))]
     return {n['id']:n['presentation'] for n in py['nodes']},texts
 
 
@@ -105,14 +105,14 @@ def test_same_endpoints_keep_each_conditional_edges_own_roles():
         replace(edge,when="route == 'both'",schedule=True,transfer=True),*graph.edges[1:]))
     compiled=GraphCompiler().compile(graph,registry=registry)
     py=build_architecture_document(graph,compiled=compiled,registry=registry)['workflow']
-    js=_javascript_graph_document(graph,compiled,source={},graph_lock_scope='root',catalogs=catalogs)
+    js=graph_document(graph,compiled,source={},graph_lock_scope='root',descriptor=catalogs.nodes.get)
     for body in (py,js):
         actual={item['when']:item['roles'] for item in body['edges'] if item['from']=='start' and item['to']=='dispatch'}
         assert actual=={"route == 'run'":['mainline','schedule'],"route == 'data'":['data_bypass','transfer'],
                         "route == 'both'":['mainline','schedule','transfer']}
 
     texts=[export_mermaid(graph,compiled=compiled,registry=registry),
-        render_mermaid(SimpleNamespace(graph=graph,compiled=compiled,catalogs=catalogs,architecture={"workflow":js}))]
+        render_mermaid(SimpleNamespace(graph=graph,compiled=compiled,descriptor=catalogs.nodes.get,architecture={"workflow":js}))]
     for text in texts:
         assert "linkStyle 0 stroke-width:4px" in text
         assert "linkStyle 1 stroke-dasharray:6 4,stroke-width:2px" in text

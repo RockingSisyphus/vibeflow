@@ -61,5 +61,6 @@ Run the complete source-repository gate with:
 python tools/verify_project.py --full
 ```
 
-Current distribution version: `1.3.2`. Workflow ABI: `vibeflow.workflow.v10`. AOT manifest: `vibeflow.aot-build.v4`. Plugin ABI: `vibeflow.plugin.v4`.
+Current distribution version: `1.3.6`. Workflow ABI: `vibeflow.workflow.v10`. AOT manifest: `vibeflow.aot-build.v4`. Plugin ABI: `vibeflow.plugin.v4`.
+This version includes preview snapshots v4, the shared architecture package and node-owned launch declarations. Planned calls remain visible for review and are excluded from service launch declarations. See the [distribution build instructions](docs/maintainers/release.md).
 Both profiles include the offline HTML viewer, workflow history, and project/root navigation. Named entries and independent workflow coordination are supported. Project/root governance checks shared-resource boundaries; Python AOT carries declared support files of permitted cross-root dependencies. Rebuild older AOT artifacts for the current ABI. See the [coordination guide](distribution/docs/user/workflow-coordination.md), [project governance](distribution/docs/user/project-governance.md), and [distribution build instructions](docs/maintainers/release.md).

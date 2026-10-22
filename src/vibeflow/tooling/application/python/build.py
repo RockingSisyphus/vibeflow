@@ -72,8 +72,10 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
                         workspace.root.resolve(): 'shared'}
         used = {call.definition_id for block in prepared.workflow.blocks for call in block.nodes
             if not(call.is_nodeset or call.is_loop or call.status == 'planned')}
+        from vibeflow.tooling.application.python.build_inputs import python_build_inputs
+        inputs = python_build_inputs(environment.registry, used, checked.resources.resource_use, native_plan)
         from vibeflow.tooling.application.python.build_dependencies import implementation_packages, copy_implementation_packages
-        dependency_roots, dependency_resources = implementation_packages(environment.registry, used,
+        dependency_roots, dependency_resources = implementation_packages(inputs,
             roots=tuple(destinations), framework=framework)
         mappings = sorted(list(destinations.items())
             + list(dependency_roots) + [(framework,'_framework/vibeflow')],key=lambda item:len(str(item[0])),reverse=True)
@@ -128,6 +130,8 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
             if selection.get('status') == 'planned':
                 continue
             descriptor = registry.prepared_resources.catalogs.plugins.require(selection['id'])
+            if not checked.resources.resource_use.allows('plugin', descriptor.id):
+                continue
             if descriptor.plugin_type != 'runtime':
                 continue
             origin = registry.prepared_resources.catalogs.origins[('plugins',descriptor.id)]
@@ -161,7 +165,7 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
         delegate_entries = {name: validate_delegate_cli_graph_contract(
             project_entry(compilation.workflow.graph, compilation.compiled_graph, name)[0], health).to_dict()
             for name in compilation.workflow.graph.entries}
-        data = dict(delegate_health=delegate_health.to_dict(), delegate_health_by_entry=delegate_entries,
+        data = dict(workflow_reference={"root":workspace.root_for_path(config).id, "path":config.relative_to(workspace.root_for_path(config).path).as_posix()}, resource_use=checked.resources.resource_use.to_dict(), delegate_health=delegate_health.to_dict(), delegate_health_by_entry=delegate_entries,
             workflow=prepared.workflow.to_dict(),graphs=encode_snapshot(prepared.graphs,relocate=relocate),
             compiled=encode_snapshot(prepared.compiled),globals=encode_snapshot(prepared.globals),overrides=encode_snapshot(prepared.overrides),
             source_roots=list(dict.fromkeys([*destinations.values(),*(destination for _,destination in dependency_roots)])),
@@ -170,7 +174,7 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
             nodes=nodes,plugins=plugins,blocks=blocks,
             config_path=relative(config),runtime_options=asdict(options),health=health.to_dict())
         from vibeflow.tooling.application.python.build_files import python_bundle_files, copy_python_framework
-        files = python_bundle_files(workspace, environment.registry, config,
+        files = python_bundle_files(workspace, environment.registry, config, inputs,
             out_dir=Path(request.out_dir).resolve(), include=request.include)
         files = tuple(sorted({*files,*(Path(graph.source_path) for graph in prepared.graphs.values() if graph.source_path)}))
         from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
@@ -184,6 +188,9 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
         preview_record = incidental_preview(publish_build_preview)
         with preview_operation(preview_record), staged_build(request.out_dir,replace=request.replace) as staging:
             copy_python_framework(staging/'_framework/vibeflow')
+            from vibeflow.tooling.project.workflow_launches import graph_launches, write_bundle_launches
+            write_bundle_launches(staging, graph_launches(compilation.workflow.graph, registry.prepared_resources.catalogs,
+                root=workspace.root_for_path(config), global_config=checked.resources.global_config), base=relative(workspace.root_for_path(config).path), workflow=data["workflow_reference"])
             copy_implementation_packages(dependency_resources,staging)
             for source in files:
                 target = staging / relative(source)

@@ -27,16 +27,16 @@ def project(path, target):
     return load_workspace_config(path / "vibeflow_config.jsonc")
 
 
-def node(target, identifier="step", *, imports="", expression="731", node_type="vibeflow.node"):
+def node(target, identifier="step", *, imports="", expression="731", node_type="vibeflow.node", support=()):
     contract = {"provides":[{"key":"answer","type":"answer","display_name":"Answer"}],
                 "output_semantics":{"answer":["Imported value"]}}
     if target == "python":
         return ('from vibeflow.targets.python.sdk import node\n' + imports + '\n'
-                f'@node(id={identifier!r},node_type={node_type!r},flow_kind="terminal",rulesets=[],contract={contract!r})\n'
+                f'@node(id={identifier!r},node_type={node_type!r},flow_kind="terminal",rulesets=[],implementation_files={list(support)!r},contract={contract!r})\n'
                 f'class Step:\n    def run_pure(self,inputs,params):return {{"answer":{expression}}}\n')
     return ('import {defineNode} from "@vibeflow/plugin";\n' + imports + '\n'
             f'export const step=defineNode({{id:{json.dumps(identifier)},node_type:{json.dumps(node_type)},'
-            f'flow_kind:"terminal",rulesets:[],contract:{json.dumps(contract)},run(){{return {{answer:{expression}}}}}}});\n')
+            f'flow_kind:"terminal",rulesets:[],implementation_files:{json.dumps(support)},contract:{json.dumps(contract)},run(){{return {{answer:{expression}}}}}}});\n')
 
 
 def workflow(path):
@@ -90,7 +90,7 @@ def test_explicit_cross_root_import_survives_source_free_deployment(tmp_path, ta
     write(source / "backend/base_lib/value.txt", "731")
     imports = ('from backend.base_lib.secret import value' if target == "python" else
                'import {value} from "../../backend/base_lib/secret.ts";')
-    write(source / ("app/nodes/step" + suffix), node(target, imports=imports, expression="value()"))
+    write(source / ("app/nodes/step" + suffix), node(target, imports=imports, expression="value()", support=["../../backend/base_lib/secret" + suffix]))
     config = source / "app/main.jsonc"
     workflow(config)
     if target == "javascript":

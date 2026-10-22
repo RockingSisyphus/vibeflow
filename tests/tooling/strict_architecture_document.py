@@ -26,7 +26,7 @@ def test_architecture_document_is_deterministic_and_keeps_planned_and_unused_bod
     assert '"format_version"' not in first
     assert '"generated"' not in first
     assert '"executable"' not in first
-    assert list(payload) == ['project_target', 'workflow', 'nodeset_types', 'node_definitions', 'node_types', 'resources', 'call_effect_scopes', 'call_policies', 'rule_selections']
+    assert set(payload) == {'resource_use', 'project_target', 'workflow', 'nodeset_types', 'node_definitions', 'node_types', 'resources', 'call_effect_scopes', 'call_policies', 'rule_selections'}
     assert payload['project_target'] == 'python'
     assert payload['workflow']['source'] == {'root_id': 'app', 'path': 'configs/main.jsonc'}
     assert payload['nodeset_types']['design.with_body']['body']['nodes'][0]['id'] == 'planned_step'

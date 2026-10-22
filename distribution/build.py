@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 from dataclasses import dataclass
 import hashlib
 import json
@@ -404,10 +405,11 @@ def _populate_distribution(output: Path, *, profile: DistributionProfile | None 
     _ensure_standard_project_dirs(output)
     _write_workspace_config(output)
     _write_python_architecture(output)
-    _write_javascript_architecture(output)
-    _write_distribution_metadata(output, profile=profile)
-    _write_kernel_manifest(output)
-    _write_preview_entry(output)
+    with _javascript_declaration_tools(output):
+        _write_javascript_architecture(output)
+        _write_distribution_metadata(output, profile=profile)
+        _write_kernel_manifest(output)
+        _write_preview_entry(output)
     _normalize_output_modes(output)
 
 
@@ -959,8 +961,9 @@ def _write_workspace_config(output: Path) -> None:
         ]}}}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def _write_javascript_architecture(output: Path) -> None:
-    """Load the fixed TS plugin using a temporary, locked declaration toolchain."""
+@contextmanager
+def _javascript_declaration_tools(output: Path):
+    """Share one locked declaration toolchain across documents and project index."""
 
     project = output / "javascript_project"
     with tempfile.TemporaryDirectory(prefix="vibeflow-declaration-tools-") as directory:
@@ -976,12 +979,12 @@ def _write_javascript_architecture(output: Path) -> None:
         link = project / "node_modules"
         link.symlink_to(tools / "node_modules", target_is_directory=True)
         try:
-            _render_javascript_architecture(output)
+            yield
         finally:
             link.unlink()
 
 
-def _render_javascript_architecture(output: Path) -> None:
+def _write_javascript_architecture(output: Path) -> None:
 
     script = """
 import os

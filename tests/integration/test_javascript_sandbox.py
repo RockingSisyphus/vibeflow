@@ -101,11 +101,11 @@ def test_typescript_sandbox_positive_projects_prepare_real_aot_plans(
 @pytest.mark.parametrize(
     ("config_name", "expected_code", "expected_line"),
     [
-        ("direct_node_import.jsonc", "VF_IMPORT_NODE_TO_NODE", 1),
-        ("undeclared_base_lib.jsonc", "VF_IMPORT_BASE_LIB", 1),
+        ("direct_node_import.jsonc", "RESOURCE.REFERENCE.UNDECLARED", 1),
+        ("undeclared_base_lib.jsonc", "RESOURCE.REFERENCE.UNAVAILABLE", 1),
         ("dynamic_import.jsonc", "VF_IMPORT_DYNAMIC", 13),
-        ("runtime_import.jsonc", "VF_IMPORT_OWNER", 1),
-        ("symlink_import.jsonc", "VF_IMPORT_NODE_TO_NODE", 1),
+        ("runtime_import.jsonc", "RESOURCE.REFERENCE.UNDECLARED", 1),
+        ("symlink_import.jsonc", "RESOURCE.REFERENCE.UNDECLARED", 1),
     ],
 )
 def test_typescript_sandbox_selected_import_rules_reject_before_aot(
@@ -126,12 +126,10 @@ def test_typescript_sandbox_selected_import_rules_reject_before_aot(
             profile="single-esm",
         ))
     finding = next(item for item in error.value.diagnostics if item["code"] == expected_code)
-    assert finding["definition_id"] == ("vibeflow.import_side_effects" if expected_code == "VF_IMPORT_DYNAMIC" else "vibeflow.node_architecture")
+    assert finding["definition_id"] == ("vibeflow.import_side_effects" if expected_code == "VF_IMPORT_DYNAMIC" else "vibeflow.root.resource_references")
     assert finding["source_location"]["path"] == str(project / "negative/nodes" / (Path(config_name).stem + ".ts"))
     assert finding["source_location"]["line"] == expected_line
-    assert finding["details"]["source_owner"]["id"] == f"sandbox.invalid.{Path(config_name).stem}"
-    if config_name == "symlink_import.jsonc":
-        assert "VF_IMPORT_OWNER" not in {item["code"] for item in error.value.diagnostics}
+    assert (finding["details"]["source_owner"]["id"] if expected_code == "VF_IMPORT_DYNAMIC" else finding["details"]["resource_id"]) == f"sandbox.invalid.{Path(config_name).stem}"
     assert not output.exists()
 
 
@@ -145,6 +143,8 @@ def test_platform_module_failures_remain_native_when_rules_are_unselected(
     config_name: str,
 ) -> None:
     workspace, project = sandbox_project
+    # This test isolates language/platform rules; ownership has separate root tests.
+    (project / "root_rules.jsonc").write_text('{"rulesets":[]}')
     request = ProjectBuildRequest(
         workspace=workspace,
         config=project / "configs/negative" / config_name,

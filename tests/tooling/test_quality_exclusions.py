@@ -52,7 +52,6 @@ def test_root_exclusions_do_not_hide_same_named_canonical_packages(
             max_child_code_dirs_per_dir=20,
             warn_root_level_code_files=10,
             max_root_level_code_files=20,
-            enforce_role_imports=False,
         )))
 
     assert {item.path for item in report.files} == {
@@ -90,7 +89,7 @@ def test_source_scan_exact_paths_exclude_files_and_directories_only_at_root(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(source, encoding="utf-8")
 
-    report = evaluate_standard_project_quality(collect_root_source_facts(tmp_path, excluded_dirs=(*DEFAULT_EXCLUDED_DIRS,"./legacy.py","./compat")), QualityPolicy(structure_limits=QualityStructureLimits(enforce_role_imports=False,warn_root_code_files=20,max_root_code_files=30)))
+    report = evaluate_standard_project_quality(collect_root_source_facts(tmp_path, excluded_dirs=(*DEFAULT_EXCLUDED_DIRS,"./legacy.py","./compat")), QualityPolicy(structure_limits=QualityStructureLimits(warn_root_code_files=20,max_root_code_files=30)))
     assert {item.path for item in report.files} == {"nested/compat/visible.py", "nested/legacy.py"}
     root_layout = report.structure_summary["root_layout"]
     assert root_layout["code_files"] == 2

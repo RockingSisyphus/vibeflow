@@ -58,7 +58,8 @@ def _compose_svg(
         )
         x += column_width + column_gap
     parts.append("</svg>")
-    return "\n".join(parts) + "\n"
+    from .planned import normalize_planned_svg
+    return normalize_planned_svg("\n".join(parts) + "\n")
 
 def _column_svg(
     column: list[SvgFragment],
@@ -81,6 +82,8 @@ def _column_svg(
         frame_y = cursor - _FRAGMENT_FRAME_PADDING
         frame_width = width + _FRAGMENT_FRAME_PADDING * 2
         frame_height = title_height + display_height + _FRAGMENT_FRAME_PADDING * 2
+        if fragment.planned:
+            parts.append('<g class="planned-panel" data-planned="true" opacity="0.6">')
         parts.append(
             f'<rect class="review-panel-frame" x="{frame_x:.3f}" y="{frame_y:.3f}" '
             f'width="{frame_width:.3f}" height="{frame_height:.3f}" rx="6"/>'
@@ -102,6 +105,8 @@ def _column_svg(
                 fragment_index=index,
             )
         )
+        if fragment.planned:
+            parts.append("</g>")
         cursor += display_height + row_gap
     return parts
 

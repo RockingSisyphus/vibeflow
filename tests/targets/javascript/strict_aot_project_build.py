@@ -4,6 +4,7 @@ from tests.fixtures.support.plugins import Resource, resource as sdk_resource, w
 
 import builtins
 import json
+import re
 import os
 import shutil
 from pathlib import Path
@@ -885,7 +886,7 @@ def test_javascript_mermaid_composes_planned_custom_and_external_styles(
 
     mermaid = render_mermaid(result)
 
-    assert "classDef plannedNode fill:#fef08a,stroke:#ca8a04,stroke-width:3px,stroke-dasharray: 6 3,color:#713f12;" in mermaid
+    assert "classDef plannedNode stroke-width:3px,stroke-dasharray:6 3,opacity:0.6;" in mermaid
     assert "class vf_planned plannedNode;" in mermaid
     assert "status: planned blocking" in mermaid
     assert "class vf_custom defaultNode;" in mermaid
@@ -913,8 +914,8 @@ def test_javascript_mermaid_composes_planned_custom_and_external_styles(
         )
         svg = output.read_text(encoding="utf-8")
         assert "plannedNode" in svg
-        assert "fill:#fef08a !important" in svg
-        assert "stroke-dasharray:6 3 !important" in svg
+        assert "opacity:0.6!important" in svg
+        assert re.search(r"stroke-dasharray:\s*6 3\s*!important", svg)
         assert "externalDependency externalBoundary" in svg
         assert "fill:#fbc8e2 !important" in svg
         assert "stroke:#b81759 !important" in svg

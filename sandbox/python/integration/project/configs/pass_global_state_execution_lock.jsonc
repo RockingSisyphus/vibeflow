@@ -52,5 +52,12 @@
         "export": "plugin"
       }
     }
-  ]
+  ],
+  "base_lib": {
+    "modules": [
+      "good_math",
+      "good_chain_a",
+      "sandbox_arithmetic"
+    ]
+  }
 }

@@ -202,7 +202,7 @@ class _ReviewRunner:
         return True
 
     def _regenerate_architecture(self) -> bool:
-        from vibeflow.tooling.application.python.presentation.architecture_validation import architecture_finding_status, check_architecture_document
+        from vibeflow.tooling.architecture.documents import architecture_finding_status, check_architecture_document
         from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_document, render_architecture_payload
 
         try:
@@ -215,7 +215,9 @@ class _ReviewRunner:
             )
             text = render_architecture_payload(payload)
             self.spec.document_path.parent.mkdir(parents=True, exist_ok=True)
-            self.spec.document_path.write_text(text, encoding="utf-8")
+            from vibeflow.tooling.file_io import atomic_write
+            atomic_write(self.spec.document_path, text)
+            self.preparation.publish_architecture()
             finding = check_architecture_document(
                 self.spec.document_path,
                 expected_payload=payload,

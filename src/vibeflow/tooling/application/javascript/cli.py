@@ -432,10 +432,13 @@ def handle_review(args: argparse.Namespace) -> int:
     assert result is not None
     architecture = render_architecture(result)
     try:
-        _atomic_write(architecture_path, architecture)
+        from vibeflow.tooling.architecture.documents import parse_architecture_text
+        from vibeflow.tooling.file_io import atomic_write
+        atomic_write(architecture_path, architecture)
+        args.preparation.publish_architecture()
         if architecture_path.read_text(encoding="utf-8") != architecture:
             raise ValueError("generated Architecture document is not canonical after publication")
-        _validate_architecture_document(architecture)
+        parse_architecture_text(architecture, project_target="javascript")
     except Exception as exc:
         return _finish_review_failure(
             payload,
@@ -592,54 +595,14 @@ def _write_or_print(text: str, output: Path | None) -> None:
         print(text, end="")
         return
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(text, encoding="utf-8")
-
-
-def _atomic_write(path: Path, text: str) -> None:
-    path = path.resolve()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(
-        mode="w",
-        encoding="utf-8",
-        prefix=f".{path.name}.",
-        suffix=".tmp",
-        dir=path.parent,
-        delete=False,
-    ) as handle:
-        handle.write(text)
-        temporary = Path(handle.name)
-    try:
-        os.replace(temporary, path)
-    finally:
-        temporary.unlink(missing_ok=True)
+    from vibeflow.tooling.file_io import atomic_write
+    atomic_write(output, text)
 
 
 class _ReviewSvgValidationError(ValueError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
-
-
-def _validate_architecture_document(architecture: str) -> None:
-    from vibeflow.tooling.project.document_kinds import (
-        ARCHITECTURE_DOCUMENT_HEADER,
-    )
-
-    if not architecture.startswith(ARCHITECTURE_DOCUMENT_HEADER):
-        raise ValueError(
-            "generated Architecture document has no VibeFlow header"
-        )
-    try:
-        payload = json.loads(architecture[len(ARCHITECTURE_DOCUMENT_HEADER) :])
-    except json.JSONDecodeError as exc:
-        raise ValueError(
-            "generated Architecture document is not valid JSONC"
-        ) from exc
-    if (
-        not isinstance(payload, Mapping)
-        or payload.get("project_target") != "javascript"
-    ):
-        raise ValueError("generated Architecture document has an invalid target")
 
 
 def _validate_review_svg_file(

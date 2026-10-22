@@ -74,12 +74,12 @@ def test_config_resources_global_config_plugins_base_lib_and_mermaid(tmp_path) -
 
 def test_planned_resources_preserve_explicit_review_metadata(tmp_path) -> None:
     from types import SimpleNamespace
-    from vibeflow.tooling.application.python.project.resource_selection import select_python_resources
+    from vibeflow.tooling.application.python.project.resource_bindings import bind_python_resources
+    from vibeflow.core.descriptors.resource_use import ResourceUse
     from vibeflow.core.descriptors import compose_contributions
     planned = {'id': 'future_runtime', 'type': 'runtime', 'status': 'planned', 'display_name': 'Future Runtime', 'description': 'Review a future runtime.'}
-    registry = SimpleNamespace(prepared_resources=SimpleNamespace(catalogs=compose_contributions(()), lifecycle_selections=(planned,)))
-    resources, findings = select_python_resources({'base_lib': {'modules': [{'id': 'future_tools', 'status': 'planned', 'display_name': 'Future Tools', 'description': 'Review a future library.'}]}}, registry=registry)
-    assert findings == ()
+    registry = SimpleNamespace(prepared_resources=SimpleNamespace(document=None, catalogs=compose_contributions(()), lifecycle_selections=(planned,)))
+    resources = bind_python_resources(registry, ResourceUse('test', planned=({'kind':'base_lib','id': 'future_tools', 'status': 'planned', 'display_name': 'Future Tools', 'description': 'Review a future library.'},)))
     assert resources.plugins[0].status == 'planned'
     assert resources.plugins[0].display_name == 'Future Runtime'
     assert resources.base_libs[0].status == 'planned'
@@ -87,11 +87,11 @@ def test_planned_resources_preserve_explicit_review_metadata(tmp_path) -> None:
 def test_planned_plugin_selection_skips_implementation_load(tmp_path) -> None:
     from types import SimpleNamespace
     from vibeflow.core.descriptors import compose_contributions
-    from vibeflow.tooling.application.python.project.resource_selection import select_python_resources
+    from vibeflow.tooling.application.python.project.resource_bindings import bind_python_resources
+    from vibeflow.core.descriptors.resource_use import ResourceUse
     selection = {'id': 'future_runtime', 'type': 'runtime', 'status': 'planned', 'config': {'mode': 'review'}, 'display_name': 'Future Policy', 'description': 'Planned policy plugin.'}
-    registry = SimpleNamespace(prepared_resources=SimpleNamespace(catalogs=compose_contributions(()), lifecycle_selections=(selection,)))
-    resources, findings = select_python_resources({}, registry=registry)
-    assert findings == ()
+    registry = SimpleNamespace(prepared_resources=SimpleNamespace(document=None, catalogs=compose_contributions(()), lifecycle_selections=(selection,)))
+    resources = bind_python_resources(registry, ResourceUse('test'))
     assert resources.plugins[0].descriptor is None
     assert resources.plugins[0].to_dict()['config'] == {'mode': 'review'}
 

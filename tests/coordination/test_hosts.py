@@ -25,7 +25,7 @@ class Boundary:
     def run_pure(self,inputs,params):return {}
 @node(node_type='vibeflow.node', id="peer.work",rulesets=["vibeflow.process"],
       capabilities=[{"id":"vibeflow.workflow","operations":["self","send","receive"]}],
-      contract={"provides":[{"key":"out","type":"number","display_name":"Result"}],"output_semantics":{"out":["Tripled message"]}})
+      contract={"params_schema":{"workflow":{"type":"object"},"launch":{"type":"object"}},"params_defaults":{"workflow":{},"launch":{}},"provides":[{"key":"out","type":"number","display_name":"Result"}],"output_semantics":{"out":["Tripled message"]}})
 class Work:
     def run_pure(self,inputs,params,context):
         api=context.capabilities["vibeflow.workflow"]
@@ -50,7 +50,7 @@ class Work:
     return workspace, config
 
 
-def node_module(root, *, caller=False):
+def node_module(root, *, caller=False, peer=None):
     implementation = '''
 export function boundary(){return {};}
 export async function work(inputs,params,context){
@@ -65,7 +65,7 @@ export async function work(inputs,params,context){
     if caller:
         operations += ["call", "wait"]
         implementation = implementation.replace('const message=await api.receive({port:"request"});', '''
-  const peer=await api.call({target:"peer"});
+  const peer=await api.call({workflow:params.workflow,launch:params.launch});
   api.send({id:peer.id,port:"request",payload:{value:7}});
   const message=await api.receive({port:"reply"});
   const ended=await api.wait({id:peer.id});
@@ -78,7 +78,7 @@ export async function work(inputs,params,context){
             {"id": key, "definition_id": key, "is_terminal": key != "work", "flow_kind": "process" if key == "work" else "terminal",
              "implementation": {"kind": "file", "ref": "./nodes.mjs", "export": "work" if key == "work" else "boundary"},
              **({"completion": "suspend", "provides": [{"key": "out", "type": "number"}],
-                 "capabilities": [{"id": "vibeflow.workflow", "operations": operations}]} if key == "work" else {})}
+                 "capabilities": [{"id": "vibeflow.workflow", "operations": operations}], "params":peer or {}} if key == "work" else {})}
             for key in ("start", "work", "end")],
         "routes": [{"source": "start", "target": "work"}, {"source": "work", "target": "end"}],
         "outputs": [{"type": "number", "as": "result", "cardinality": "exactly_one"}]})
@@ -102,12 +102,14 @@ def test_instances_exchange_messages_and_kill_confirms_actual_workflow_end(tmp_p
             command += ["--config", str(config), "--workspace", str(workspace.path)]
     else:
         command = ["node", str(resources / "coordination" / "workflow_node.mjs"), str(node_module(tmp_path))]
-    with WorkflowServer(targets={"peer": {"command": command, "cwd": str(tmp_path)}}) as server:
+    reference={"root":workspace.root_for_path(config).id if target.startswith("python") else "peer","path":"workflow.jsonc"}
+    launch={"command":command,"cwd":str(tmp_path)}
+    with WorkflowServer(launches=[{"workflow":reference,"launch":launch}]) as server:
         caller = WorkflowClient(server.url)
         instances = []
         try:
             for value in (7, 11):
-                identity = caller.call("peer", timeout=15)["id"]
+                identity = caller.call(reference, launch=launch, timeout=15)["id"]
                 instances.append(identity)
                 caller.send(identity, "request", {"value": value})
             caller.flush()
@@ -118,9 +120,9 @@ def test_instances_exchange_messages_and_kill_confirms_actual_workflow_end(tmp_p
                 result = caller.wait(identity, timeout=15)
                 assert result["state"] == "succeeded", result
                 assert result["outputs"]["result"] in (21, 33)
-            waiting = caller.call("peer", timeout=15)["id"]
+            waiting = caller.call(reference, launch=launch, timeout=15)["id"]
             instances.append(waiting)
-            stopped = caller.kill(waiting, timeout=15)
+            stopped = caller.kill(waiting,workflow=reference, timeout=15)
             assert stopped["state"] == "cancelled", stopped
         finally:
             for identity in instances:
@@ -136,17 +138,18 @@ def test_ordinary_workflow_node_calls_other_target_sends_receives_and_waits(tmp_
     caller_root, peer_root = tmp_path / "caller", tmp_path / "peer"
     caller_root.mkdir()
     peer_root.mkdir()
-    def python_command(root, *, caller=False, aot=False):
+    def python_command(root, *, caller=False, aot=False, peer=None):
         workspace, config = python_project(root)
         if caller:
             plugin = root / "nodes/steps.py"
             source = plugin.read_text().replace('["self","send","receive"]', '["self","send","receive","call","wait"]')
             source = source.replace('        message=api["receive"]({"port":"request"})',
-                '        peer=api["call"]({"target":"peer"})\n        api["send"]({"id":peer["id"],"port":"request","payload":{"value":7}})\n        message=api["receive"]({"port":"reply"})\n        api["wait"]({"id":peer["id"]})')
+                '        peer=api["call"]({"workflow":params["workflow"],"launch":params["launch"]})\n        api["send"]({"id":peer["id"],"port":"request","payload":{"value":7}})\n        message=api["receive"]({"port":"reply"})\n        api["wait"]({"id":peer["id"]})')
             source = source.replace('        api["send"]({"id":message["sender"],"port":"reply","payload":{"value":value,"self":api["self"]({})["id"]}})\n', '')
             plugin.write_text(source)
             declaration = json.loads(config.read_text())
             declaration["pipeline"]["nodes"][1]["rulesets"][1]["params"]["operations"] += ["call", "wait"]
+            declaration["pipeline"]["nodes"][1]["config"] = peer
             config.write_text(json.dumps(declaration))
         command = [sys.executable, "-B", "-m", "vibeflow.coordination", "run-python",
             "--run-root", str(root / "runs"), "--preview-root", str(root / "preview")]
@@ -156,15 +159,18 @@ def test_ordinary_workflow_node_calls_other_target_sends_receives_and_waits(tmp_
             return command + ["--bundle", str(built.out_dir)]
         return command + ["--workspace", str(workspace.path), "--config", str(config)]
     if caller_target == "node":
-        commands = {"caller": ["node", str(resources / "coordination" / "workflow_node.mjs"), str(node_module(caller_root, caller=True))],
-                    "peer": python_command(peer_root, aot=True)}
+        peer_command=python_command(peer_root,aot=True)
     else:
-        commands = {"caller": python_command(caller_root, caller=True, aot=caller_target.endswith("aot")),
-                    "peer": ["node", str(resources / "coordination" / "workflow_node.mjs"), str(node_module(peer_root))]}
-    with WorkflowServer(targets={key: {"command": command, "cwd": str(tmp_path)} for key, command in commands.items()}) as server:
+        peer_command=["node",str(resources/"coordination/workflow_node.mjs"),str(node_module(peer_root))]
+    peer={"workflow":{"root":"peer","path":"workflow.jsonc"},"launch":{"command":peer_command,"cwd":str(tmp_path)}}
+    caller_command=(["node",str(resources/"coordination/workflow_node.mjs"),str(node_module(caller_root,caller=True,peer=peer))]
+        if caller_target=="node" else python_command(caller_root,caller=True,aot=caller_target.endswith("aot"),peer=peer))
+    reference={"root":"caller","path":"workflow.jsonc"}
+    launch={"command":caller_command,"cwd":str(tmp_path)}
+    with WorkflowServer(launches=[peer,{"workflow":reference,"launch":launch}]) as server:
         client = WorkflowClient(server.url)
         try:
-            identity = client.call("caller", timeout=20)["id"]
+            identity = client.call(reference,launch=launch,timeout=20)["id"]
             result = client.wait(identity, timeout=30)
             assert result["state"] == "succeeded", result
             assert result["outputs"] == {"result": 63}
@@ -181,12 +187,14 @@ def test_launcher_and_caller_exit_do_not_end_the_registered_workflow(tmp_path):
     command = ["node", str(resources / "coordination" / "workflow_node.mjs"), str(node_module(tmp_path))]
     wrapper = tmp_path / "launch.py"
     wrapper.write_text("import subprocess\nsubprocess.Popen(" + repr(command) + ")\n")
-    with WorkflowServer(targets={"peer": {"command": [sys.executable, str(wrapper)], "cwd": str(tmp_path)}}) as server:
+    reference={"root":"peer","path":"workflow.jsonc"}
+    launch={"command":[sys.executable,str(wrapper)],"cwd":str(tmp_path)}
+    with WorkflowServer(launches=[{"workflow":reference,"launch":launch}]) as server:
         caller = WorkflowClient(server.url)
         observer = WorkflowClient(server.url)
         identity = None
         try:
-            identity = caller.call("peer", timeout=15)["id"]
+            identity = caller.call(reference, launch=launch, timeout=15)["id"]
             caller.finish()
             sleep(.1)
             assert observer.request("status", {"id": identity})["state"] == "running"
@@ -195,6 +203,6 @@ def test_launcher_and_caller_exit_do_not_end_the_registered_workflow(tmp_path):
             assert observer.wait(identity, timeout=10)["state"] == "succeeded"
         finally:
             if identity and observer.request("status", {"id": identity})["state"] not in {"succeeded", "failed", "cancelled"}:
-                observer.kill(identity, timeout=10)
+                observer.kill(identity,workflow=reference, timeout=10)
             observer.finish()
             caller.finish()

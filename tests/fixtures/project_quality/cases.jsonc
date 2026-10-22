@@ -93,7 +93,7 @@
     {
       "name": "base_lib_escape",
       "module_source": "from nodes.some_node import SomeNode\n\n\ndef helper():\n    return 1\n",
-      "expected_rule_id": "VF_IMPORT_LAYER"
+      "expected_rule_id": "RESOURCE.REFERENCE.UNDECLARED"
     }
   ],
   "health_cases": [

@@ -47,7 +47,7 @@ def observe(work:Path,kernel:Path,toolchain:Path|None,renderer:Path|None)->list[
             identifier=f'js.A05.scope.{variant}.{"registered" if registered else "unregistered"}'
             root=project(work/identifier,toolchain);fixture(root,variant,registered)
             actual=cli_summary(run_cli(root,cli_args(root,'quality-check'),kernel,name='quality',toolchain=toolchain))
-            target='QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT'
+            target='RESOURCE.REFERENCE.UNDECLARED'
             findings=[item for item in actual['diagnostics'] if item.get('code',item.get('rule_id'))==target]
             actual['target_findings']=findings
             accepted=registered or variant in {'method_unused','constructor_unused'}

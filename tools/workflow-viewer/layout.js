@@ -10,14 +10,20 @@ window.VFLayout={async body(context,key,prefix="",ancestors=[],override=null,ent
   const values=await Promise.all(facts.map(async original=>{
     const localPath=[...localPrefix,original.id];
     const options=VFModel.childOptions(original,body,localPath,data.bodies);
-    const facts={...original,preview_operations:architecture.call_policies?.[JSON.stringify(localPath)]?.actions||[],preview_expandable:options.some(o=>!o.error)};
+    const actions=architecture.call_policies?.[JSON.stringify(localPath)]?.actions||original.operations||[];
+    const operations=actions.map(action=>{
+      if(action.operation!=="call"||!action.workflow)return action;
+      const {entry}=VFModel.workflowTarget(action.workflow,data.workflow_graphs,true);
+      return entry?{...action,workflow:{...action.workflow,entry}}:action;
+    });
+    const facts={...original,preview_operations:operations,preview_expandable:options.some(o=>!o.error)};
     const segment=encodeURIComponent(facts.id),path=entity==="resource"?facts.id:prefix?prefix+"/"+segment:segment,card=VFShapes.measure(facts,architecture);
     facts.preview_presentation=card.presentation;
     const item={id:facts.id,path,localPath,body,architecture,options,facts,card,width:card.width,height:card.height};
-    const selected=options.find(o=>o.key===state.targets?.get(path))||options.find(o=>!o.error),child=selected?.key;
+    const selected=options.find(o=>!o.error),child=selected?.key;
     if(state.expanded.has(path)&&child&&!selected.error&&data.bodies[child]?.facts.nodes?.length){
-      const childPrefix=selected.workflow?path+"/@workflow/"+encodeURIComponent(child):path;
-      item.inner=await VFLayout.body(context,child,childPrefix,ancestors.concat(key),null,"call",selected.workflow?[]:localPath);
+      const childPrefix=path;
+      item.inner=await VFLayout.body(context,child,childPrefix,ancestors.concat(key),null,"call",localPath);
       item.width=Math.max(360,item.inner.width+40);
       item.header=VFShapes.groupHeader(facts,architecture,item.width);
       item.height=item.header.height+item.inner.height+40;

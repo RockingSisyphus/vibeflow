@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from vibeflow.core.descriptors.resource_use import ResourceUse
 from vibeflow.targets.shared.quality_support import SourceQualityFacts, QualityPolicy, QualityThresholds
 from tests.fixtures.support.project_rules import evaluate_standard_project_quality
 from vibeflow.targets.shared.quality_support.implementation import analyze_call_graph
@@ -124,12 +125,12 @@ def _registered_rule_report(project: Path, *, policy_data=None, **_):
     """Exercise selected formal implementation rules without a workflow."""
     from vibeflow.core.flow import GraphConfig
     from vibeflow.targets.javascript.quality.rules import run_javascript_rules
-    from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
+    from vibeflow.targets.javascript.build.project_resources import source_import_facts
     from vibeflow.tooling.project.resources import prepare_workflow_catalogs
     if policy_data is not None:
         _configure_rule_policy(project, policy_data)
     catalogs = prepare_workflow_catalogs(project / "configs/greeting.jsonc")
-    import_policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=project, allowed_external=set())
+    import_policy, _ = source_import_facts(resource_use=ResourceUse("test"), catalogs=catalogs, project_root=project, allowed_external=set())
     return run_javascript_rules(GraphConfig(nodes=(), rulesets=()), catalogs, project_root=project,
                                 package_root=project, import_policy=import_policy, include_registered=True)
 
@@ -945,6 +946,7 @@ def test_registered_base_lib_optional_limits_reach_javascript_quality(
 
 def test_structure_roles_use_descriptor_ownership_not_directory_name(tmp_path: Path, capsys) -> None:
     workspace, project, config = _project_case(tmp_path)
+    (project / "root_rules.jsonc").write_text('{"rulesets":["vibeflow.root.resource_usage"]}')
     helper = project / "nodes/helper.ts"
     helper.write_text("export const value = 1;\n", encoding="utf-8")
     ordinary = project / "nodes/ordinary.ts"
@@ -959,9 +961,9 @@ def test_structure_roles_use_descriptor_ownership_not_directory_name(tmp_path: P
     assert code == 1
     structural = [item for item in _formal_findings(checked,"error")]
     structural = [item for item in structural
-                  if item["rule_id"] == "VF_IMPORT_OWNER"]
+                  if item["rule_id"] == "RESOURCE.REFERENCE.UNDECLARED"]
     assert structural, json.dumps(checked)
-    assert all(item["object_id"] == "example.greet" for item in structural)
+    assert all(item["details"]["resource_id"] == "example.greet" for item in structural)
     assert structural[0]["source_location"]["line"] == 1
 
 

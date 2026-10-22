@@ -170,5 +170,10 @@
         "export": "plugin"
       }
     }
-  ]
+  ],
+  "base_lib": {
+    "modules": [
+      "workflow.add"
+    ]
+  }
 }

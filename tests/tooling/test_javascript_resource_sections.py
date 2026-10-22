@@ -130,10 +130,10 @@ def test_javascript_call_health_distinguishes_repeated_node_ids_in_nested_graphs
     workflow_finding = {'object_type': 'node', 'object_id': 'same', 'severity': 'warning', 'details': {'call_paths': [['parent']]}}
     assert node_health_classes(graph, (workflow_finding,)) == statuses
 
-@pytest.mark.parametrize('status,override,expected,origin', [('implemented', '', '#fef3c7', 'status'), ('implemented', '#ffeebb', '#ffeebb', 'call'), ('planned', '', '#fef08a', 'status')])
+@pytest.mark.parametrize('status,override,expected,origin', [('implemented', '', '#fef3c7', 'status'), ('implemented', '#ffeebb', '#ffeebb', 'call'), ('planned', '', '#ECECFF', 'native')])
 def test_javascript_actual_call_architecture_and_mermaid_share_health_style(status, override, expected, origin):
     from vibeflow.core.flow import NodeStyle
-    from vibeflow.tooling.application.javascript.presentation.architecture import _javascript_node_document
+    from vibeflow.tooling.architecture.workflow import graph_document
     from vibeflow.tooling.application.javascript.presentation.status import node_health_classes
     result = _result()
     call = NodeCallSpec('call', 'demo.work', status=status, style=NodeStyle(fill=override))
@@ -142,7 +142,7 @@ def test_javascript_actual_call_architecture_and_mermaid_share_health_style(stat
     descriptor.tags, descriptor.metadata = ((), {})
     result.graph, result.compiled = (graph, _compiled(graph))
     finding = {'object_type': 'node', 'object_id': 'demo.work', 'severity': 'warning', 'details': {'definition_id': 'demo.work', 'call_paths': [['call']]}}
-    record = _javascript_node_document(graph, result.compiled, call, source={'path': 'workflow.jsonc'}, graph_lock_scope='root', catalogs=result.catalogs, health_classes=node_health_classes(graph, (finding,)))
+    record = next(row for row in graph_document(graph, result.compiled, source={'path': 'workflow.jsonc'}, graph_lock_scope='root', descriptor=result.catalogs.nodes.get, health_classes=node_health_classes(graph, (finding,)))['nodes'] if row['id'] == call.id)
     result.architecture['workflow'] = {'nodes': [record]}
     assert record['presentation']['values']['fill'] == expected
     assert record['presentation']['sources']['fill'] == origin

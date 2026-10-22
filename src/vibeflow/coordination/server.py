@@ -8,11 +8,15 @@ from threading import Condition, Thread
 from time import monotonic
 
 from .protocol import CoordinationError, TERMINAL, instance_id, json_value
+from vibeflow.core.workflows.references import workflow_reference, launch_configuration
 
 
 class WorkflowServer:
-    def __init__(self, *, targets=None, port=0):
-        self.targets = dict(targets or {})
+    def __init__(self, *, launches=(), port=0):
+        self.launches = tuple({"workflow": workflow_reference(item["workflow"]),
+            "launch": launch_configuration(item["launch"]), "base":item.get("base", "."),
+            "caller":workflow_reference(item["caller"]) if item.get("caller") else None}
+            for item in launches)
         self.instances = {}
         self.changed = Condition()
         owner = self
@@ -104,10 +108,19 @@ class WorkflowServer:
                     raise CoordinationError("VF_INSTANCE_EXISTS", item["id"])
                 if item["state"] in TERMINAL:
                     raise CoordinationError("VF_INSTANCE_ENDED", item["id"])
+                expected, actual = item.get("workflow"), request.get("workflow")
+                if isinstance(actual, dict):
+                    actual = workflow_reference(actual, root=expected["root"] if isinstance(expected, dict) else "")
+                if isinstance(expected, dict) and isinstance(actual, dict):
+                    if any(actual.get(key) != expected.get(key) for key in ("root", "path")):
+                        message = f"configured workflow {expected['root']}:{expected['path']} does not match registered workflow {actual['root']}:{actual['path']}"
+                        item.update(state="failed",error=message)
+                        self.changed.notify_all()
+                        raise CoordinationError("VF_WORKFLOW_MISMATCH", message)
                 item.update(registered=True, state="running", pid=request.get("pid"),
-                    workflow=request.get("workflow"), stop_supported=bool(request.get("stop_supported")))
+                    workflow=item.get("workflow") or actual, stop_supported=bool(request.get("stop_supported")))
                 self.changed.notify_all()
-                return {"id": item["id"], "inputs": item.get("inputs", {}), "entry": item.get("entry")}
+                return {"id": item["id"], "inputs": item.get("inputs", {}), "entry": item.get("entry"), "workflow":item.get("workflow")}
             item = self._instance(request.get("id"))
             if operation == "status":
                 return self._status(item)
@@ -129,6 +142,11 @@ class WorkflowServer:
                 self.changed.notify_all()
                 return {"accepted": True}
             if operation == "kill":
+                if request.get("workflow") is not None:
+                    expected = workflow_reference(request["workflow"])
+                    actual = item.get("workflow")
+                    if not isinstance(actual, dict) or any(expected.get(key) != actual.get(key) for key in ("root", "path")):
+                        raise CoordinationError("VF_WORKFLOW_MISMATCH", "instance does not belong to the configured workflow")
                 if item["state"] not in TERMINAL:
                     if not item["stop_supported"]:
                         raise CoordinationError("VF_STOP_UNSUPPORTED", item["id"])
@@ -160,19 +178,27 @@ class WorkflowServer:
             raise ValueError("unknown coordination operation: " + operation)
 
     def _launch(self, request):
-        target = self.targets.get(request.get("target"))
-        if target is None:
-            raise CoordinationError("VF_TARGET_UNKNOWN", str(request.get("target")))
-        command = target.get("command")
-        if not isinstance(command, list) or not command or any(not isinstance(arg, str) for arg in command):
-            raise ValueError("target.command must be a non-empty array of arguments")
+        reference = workflow_reference(request.get("workflow"))
+        launch = launch_configuration(request.get("launch"))
+        with self.changed:
+            sender = self._instance(request["sender"]).get("workflow") if request.get("sender") else None
+            matches = [item for item in self.launches if item["workflow"] == reference and item["launch"] == launch
+                and (item["caller"] is None or isinstance(sender, dict)
+                    and all(item["caller"].get(key) == sender.get(key) for key in ("root", "path")))]
+        if not matches:
+            raise CoordinationError("VF_LAUNCH_UNDECLARED", "Call must match a configured node workflow and launch")
+        if len({item["base"] for item in matches}) != 1:
+            raise CoordinationError("VF_LAUNCH_AMBIGUOUS", "launch declarations have different declaring roots")
+        declaration = matches[0]
+        from pathlib import Path
+        command = launch["command"]
         with self.changed:
             item = self._reserve(inputs=json_value(request.get("inputs", {})),
-                entry=request.get("entry") if request.get("entry") is not None else target.get("entry") or None)
-        environment = {**os.environ, **target.get("env", {}), "VIBEFLOW_COORDINATION_URL": self.url,
+                entry=reference.get("entry"), workflow=reference)
+        environment = {**os.environ, **launch["env"], "VIBEFLOW_COORDINATION_URL": self.url,
                        "VIBEFLOW_INSTANCE_ID": item["id"]}
         try:
-            process = subprocess.Popen(command, cwd=target.get("cwd"), env=environment,
+            process = subprocess.Popen(command, cwd=Path(declaration["base"]) / launch["cwd"], env=environment,
                 start_new_session=os.name == "posix", close_fds=True,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0)
         except Exception as error:
@@ -185,7 +211,7 @@ class WorkflowServer:
             code = process.wait()
             with self.changed:
                 if code and not item["registered"]:
-                    item.update(state="failed", error=f"launcher exited with code {code}")
+                    item.update(state="failed", error=item.get("error") or f"launcher exited with code {code}")
                     self.changed.notify_all()
         Thread(target=reap_launcher, daemon=True, name="vibeflow-launcher-reaper").start()
         return {"id": item["id"]}

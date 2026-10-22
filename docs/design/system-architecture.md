@@ -16,7 +16,7 @@ Tooling → targets/python ──────┐
 - **Python Target**：Python 插件 SDK、按 workflow 装配的内部 NodeRegistry、直接与延迟绑定、源码服务、Rule handler、BindingPlan、Runtime 与目录 AOT。
 - **JavaScript Target**：JS/TS 插件 SDK、worker 中的声明与函数绑定、源码服务、Rule ABI、BindingPlan、AOT emitter 与工具链协议。
 - **Coordination**：本机协议、客户端、邮箱、启动握手和实例状态；不解释业务图，不建立运行组，也不托管子进程清理。Target 宿主适配接入各自执行器，命令与配置编排留在 Tooling。
-- **Tooling**：workspace 与 workflow 文件、选中插件装配、CLI、架构展示和 Target-specific Application 编排。
+- **Tooling**：workspace 与 workflow 文件、选中插件装配、CLI、架构展示和 Target-specific Application 编排。独立 `tooling/architecture` 从准备事实统一组装 workflow、Nodeset、资源关系和项目索引，不承担源码发现、规则执行、编译或启动。
 
 Core 接收可移植声明、源码定位与事实；Target 持有 callable、worker 对象及工具链配置。依赖沿图中方向流动，内部 NodeRegistry 为 Python 实现绑定服务；业务 Node 与独立 BaseLib 从标准目录发现，Plugin 整包贡献类型、规则及私有支持资源。
 

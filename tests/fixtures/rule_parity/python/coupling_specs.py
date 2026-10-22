@@ -16,8 +16,6 @@ def _case(name, title, source, code=None, **options):
 def case_specs():
     method = 'class DemoNode:\n    def run_pure(self, inputs, params):\n        return {"demo.out": 1}\n'
     return [
-        _case("import_registered_node", "Import an actual registered Node from a neutral implementation directory",
-            'from implementations.other import OtherNode\n' + method, "NODE.METADATA.NODE_IMPORT", other_node_ref="implementations/other.py"),
         _case("direct_registered_node", "Directly invoke another actual registered Node",
             OTHER + 'class DemoNode:\n    def run_pure(self, inputs, params):\n        OtherNode().run_pure({}, {})\n        return {"demo.out": 1}\n', "NODE.METADATA.NODE_DIRECT_CALL"),
         _case("private_registered_node", "Read a private member of another actual registered Node",

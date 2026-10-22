@@ -35,6 +35,45 @@ def test_installer_discovers_entry_asset_references_and_preserves_configuration(
     assert config.read_text()=='window.VibeFlowViewerConfig={dataRoot:"custom/"};'
 
 
+def test_project_directory_projects_architecture_for_registered_roots(tmp_path):
+    from vibeflow.tooling.presentation.preview.exporter import publish_project
+    from vibeflow.tooling.project.workspace_loader import load_workspace_config
+    roots = []
+    for name in ("app", "peer", "empty"):
+        root = tmp_path / name
+        (root / "configs").mkdir(parents=True)
+        (root / "vibeflow_project.jsonc").write_text(json.dumps({"project_target":"python",
+            "architecture":{"documents":[{"workflow":"configs/deleted.jsonc", "document":"ARCHITECTURE.jsonc"}]}}))
+        (root / "configs/deleted.jsonc").write_text('{"pipeline":{"nodes":[]}}')
+        roots.append({"id":name,"path":name})
+        if name != "empty":
+            (root / "configs/main.jsonc").write_text('{"pipeline":{"nodes":[]}}')
+            (root / "outside.jsonc").write_text('{"pipeline":{"nodes":[]}}')
+    (tmp_path / "app/configs/broken.jsonc").write_text('{"pipeline":')
+    workspace_file = tmp_path / "vibeflow_config.jsonc"
+    workspace_file.write_text(json.dumps({"roots":roots}))
+    workspace = load_workspace_config(workspace_file)
+    for name in ("app", "peer", "empty"):
+        (tmp_path / name / "configs/deleted.jsonc").unlink()
+    from vibeflow.tooling.project.preparation import ProjectPreparation
+    ProjectPreparation(workspace).review(write_architecture=True)
+    publish_project(tmp_path, workspace)
+    script = (tmp_path / "vibeflow-preview/project.js").read_text()
+    catalog = json.loads(script[len("VibeFlowPreview.project("):-3])
+    assert {root["id"]:[w["path"] for w in root["workflows"]] for root in catalog["roots"]} == {
+        "app":["configs/broken.jsonc", "configs/deleted.jsonc", "configs/main.jsonc", "outside.jsonc"], "peer":["configs/deleted.jsonc", "configs/main.jsonc", "outside.jsonc"], "empty":["configs/deleted.jsonc"]}
+    assert not catalog["inventory_complete"]
+    (tmp_path / "app/configs/main.jsonc").unlink()
+    (tmp_path / "app/vibeflow_project.jsonc").write_text('{"project_target":"python"}')
+    workspace_file.write_text(json.dumps({"roots":roots[:1]}))
+    ProjectPreparation(load_workspace_config(workspace_file)).review(write_architecture=True)
+    publish_project(tmp_path, load_workspace_config(workspace_file))
+    script = (tmp_path / "vibeflow-preview/project.js").read_text()
+    catalog = json.loads(script[len("VibeFlowPreview.project("):-3])
+    assert [root["id"] for root in catalog["roots"]] == ["app"]
+    assert [w["path"] for w in catalog["roots"][0]["workflows"]] == ["configs/broken.jsonc", "outside.jsonc"]
+
+
 def test_concurrent_catalog_updates_and_reindex(tmp_path):
     install_page(tmp_path)
     def publish(index):
@@ -194,7 +233,7 @@ def test_data_snapshot_has_no_render_dependency_and_separates_installer(tmp_path
     record=publish_preview(root=tmp_path,workflow={"id":"r:main"},category="review",status="passed",
         architecture={"workflow":{"nodes":[],"edges":[]}})
     payload=json.loads((record.directory/"snapshot.js").read_text()[len("VibeFlowPreview.snapshot("):-3])
-    assert payload["version"]==3 and "bodies" not in payload
+    assert payload["version"]==4 and "bodies" not in payload
     assert payload["artifacts"]=={} and not (tmp_path/"vibeflow-preview.html").exists()
     assert not list(record.directory.glob("*.svg"))
     install_page(tmp_path)
@@ -281,7 +320,7 @@ def test_real_offline_shapes_nested_browser_and_history(tmp_path):
     assert second.metadata["workflow"]["target"] == "javascript"
     # Read the actual producer protocol, not a second rendering implementation.
     payload = json.loads((first.directory/"snapshot.js").read_text()[len("VibeFlowPreview.snapshot("):-3])
-    assert payload["version"] == 3 and "bodies" not in payload
+    assert payload["version"] == 4 and "bodies" not in payload
     assert payload["architecture"] == prepared.architecture()
     assert not list(first.directory.glob("*.svg"))
     from vibeflow.tooling.presentation.preview.exporter import attach_svg
@@ -396,7 +435,7 @@ def test_default_python_commands_and_explicit_svg_failure(tmp_path, monkeypatch,
         assert main(["run",*common,"--run-root",str(tmp_path/"runs"),"--run-id","actual"] )==0;capsys.readouterr()
     records=[json.loads(f.read_text()) for f in (project.parent/"vibeflow-preview/snapshots").glob("*/record.json")]
     assert {(r["category"],r["status"]) for r in records}=={("review","passed"),("build","succeeded"),("run","succeeded")}
-    assert all(r["version"]==3 for r in records)
+    assert all(r["version"]==4 for r in records)
     assert not list((project.parent/"vibeflow-preview/snapshots").rglob("*.svg"))
     assert main(["review",*common,"--with-svg"])==1;capsys.readouterr()
     failed=[json.loads(f.read_text()) for f in (project.parent/"vibeflow-preview/snapshots").glob("*/record.json") if json.loads(f.read_text())["status"]=="failed"]
@@ -485,6 +524,9 @@ def test_real_resource_cards_express_all_declared_shapes(tmp_path):
     loaded = load_workspace_graph_for_export(config,workspace=workspace,validate_health=False,_include_presentation=True)
     assert loaded[4] is None
     record = python_preview(loaded[-1],config=config,workspace=workspace)
+    snapshot = json.loads((record.directory / "snapshot.js").read_text()[len("VibeFlowPreview.snapshot("):-3])
+    for library in libraries:
+        assert snapshot["architecture"]["implementation_graph"]["resources"]["base_lib:" + library]["owner"]["kind"] == "root"
     browser = Path(__file__).resolve().parents[1] / "fixtures/preview/resource-shapes.cjs"
     result = subprocess.run(["node",str(browser),str(_find_mmdc().resolve()),str(record.root/"vibeflow-preview.html"),json.dumps(sorted(NODE_SHAPES))],
         capture_output=True,text=True,timeout=90)

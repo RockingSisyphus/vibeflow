@@ -309,7 +309,6 @@ INVALID_CASES = [
     {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "SqliteNode", "type": "bad.sqlite", "expect": "NODE.EFFECT.IMPORT_FORBIDDEN"},
     {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "EvalNode", "type": "bad.eval", "allowed": True, "retired_expect": "NODE.PURITY.BANNED_CALL"},
     {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "DynamicImportNode", "type": "bad.dynamic_import", "allowed": True, "retired_expect": "NODE.PURITY.BANNED_IMPORT"},
-    {"kind": "inspect_node", "module": "illegal_nodes/coupling_cases.py", "class": "NodeImportNode", "type": "bad.node_import", "expect": "NODE_IMPORT"},
     {"kind": "inspect_node", "module": "illegal_nodes/coupling_cases.py", "class": "DirectNodeCallNode", "type": "bad.node_call", "expect": "NODE_DIRECT_CALL"},
     {"kind": "inspect_node", "module": "illegal_nodes/coupling_cases.py", "class": "NodeInternalReadNode", "type": "bad.node_internal", "expect": "NODE_INTERNAL_READ"},
     {"kind": "inspect_node", "module": "illegal_nodes/contract_io_cases.py", "class": "DynamicOutputKeyNode", "type": "bad.dynamic_output", "allowed": True, "retired_expect": "NODE.PURITY.DYNAMIC_OUTPUT_KEY"},
@@ -328,7 +327,7 @@ INVALID_CASES = [
     {"kind": "health_node", "module": "illegal_nodes/deep_dependency_node.py", "class": "DeepBaseLibNode", "type": "bad.deep_base_lib", "expect": "NODE.MAINTAINABILITY.DEPENDENCY_CHAIN_TOO_DEEP"},
     {"kind": "base_lib", "expect": "BASE_LIB.SIDE_EFFECT_CALL"},
     {"kind": "base_lib", "expect": "BASE_LIB.GLOBAL_STATE"},
-    {"kind": "base_lib", "expect": "VF_IMPORT_LAYER"},
+    {"kind": "base_lib", "expect": "RESOURCE.REFERENCE.UNDECLARED"},
     {"kind": "base_lib", "expect": "BASE_LIB.BANNED_IMPORT"},
     {"kind": "base_lib_chain", "expect_length_gt": 4},
     {"kind": "config", "config": "fail_schema_bad_edge.jsonc", "expect": "CONFIG.SCHEMA.EDGE_PAIR"},
@@ -1190,7 +1189,10 @@ def _run_global_state_forbidden_effect_audit() -> CaseResult:
     for category, type_key in cases.items():
         findings = _node_source_report(type_key, policy=policy)
         errors = [finding.rule_id for finding in findings if finding.severity == "error"]
-        if category in {"eval", "dynamic_import", "ffi", "cffi"}:
+        if category == "environment":
+            if errors:
+                raise AssertionError(f"global-state environment access was rejected: {errors}")
+        elif category in {"eval", "dynamic_import", "ffi", "cffi"}:
             if errors:
                 raise AssertionError(f"retired security restriction still rejects {category}: {errors}")
         elif not set(errors) & accepted:
@@ -2188,6 +2190,17 @@ def _bad_base_lib_report():
                 "source_owners":owners, "purity_policy":policy}, subject={"kind":"base_lib", "id":descriptor.id,
                 "descriptor":descriptor.to_dict()}, phase=phase, target="python"), handlers=handlers)
             findings.extend(item.to_dict() for item in result.findings)
+    from vibeflow.targets.shared.rule_support.resource_use.references import references
+    from vibeflow.core.rules import RuleRecord
+    from vibeflow.core.descriptors.resource_use import ResourceUse, RESOURCE_USE_TYPE
+    workflow = {"workflow":"sandbox:bad_libraries", "path":str(PROJECT_DIR),
+        "resources":[], "entry_resources":[("base_lib", item.id) for item in declarations],
+        "owners":owners, "imports":[{"path":item.path,"target":item.resolved_path,
+            "line":item.line,"symbols":(item.symbol,)} for item in sources.imports if item.resolved_path]}
+    checked = references(RuleContext(scope={"level":"root","id":"sandbox"},subject={"id":"sandbox"},
+        facts={"root":{"resource_workflows":[workflow]}}),
+        {"use":RuleRecord(RESOURCE_USE_TYPE,{"workflows":{workflow["workflow"]:ResourceUse(workflow["workflow"]).to_dict()}})}, {})
+    findings.extend(item.to_dict() for item in checked.findings)
     local = {source.path:source.module for source in files}
     graph = {source.module:tuple(local[item.resolved_path] for item in sources.imports
         if item.path == source.path and item.resolved_path in local) for source in files}

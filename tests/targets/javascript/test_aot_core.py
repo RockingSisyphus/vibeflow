@@ -62,7 +62,8 @@ def _build_with_selected_source_rules(request: BuildRequest):
         "ruleTopics": ["imports", "architecture", "purity", "completion", "module_state", "host_io"],
         "importPolicy": policy,
     }, package_root=request.package_root, node_command=request.node_command)
-    errors = tuple(item for item in checked.findings if item.get("severity", "error") == "error")
+    from tests.fixtures.support.resource_rules import javascript_references
+    errors = tuple(item for item in (*checked.findings, *javascript_references(request.project_root, policy)) if item.get("severity", "error") == "error")
     if errors:
         raise AotBuildError(str(errors[0]["code"]), str(errors[0]["message"]), diagnostics=errors)
     return build_aot(request)
@@ -1679,9 +1680,7 @@ def test_real_typescript_rejects_unowned_barrel_and_cross_node_imports(
         diagnostic.get("code") for diagnostic in caught.value.diagnostics
     }
     assert (
-        "VF_IMPORT_NODE_TO_NODE"
-        if register_barrel
-        else "VF_IMPORT_OWNER"
+        "RESOURCE.REFERENCE.UNDECLARED"
     ) in codes
 
 

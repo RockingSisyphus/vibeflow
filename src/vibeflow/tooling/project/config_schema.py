@@ -44,11 +44,7 @@ def collect_config_schema_findings(config: Mapping[str, Any]) -> tuple[HealthFin
         return tuple(findings)
     _validate_pipeline(pipeline, "pipeline", findings)
     if "workflow_targets" in config:
-        from vibeflow.core.workflows.targets import parse_targets
-        try:
-            parse_targets(config["workflow_targets"])
-        except ValueError as error:
-            findings.append(_error("CONFIG.WORKFLOW_TARGET.INVALID", str(error), "workflow_targets"))
+        findings.append(_error("CONFIG.WORKFLOW_TARGET.REMOVED", "workflow_targets is removed; configure workflow and launch on Call nodes", "workflow_targets"))
     if "nodeset_types" in config:
         if config.get("__vibeflow_expanded_nodesets__") is True:
             _validate_nodesets(config["nodeset_types"], findings)

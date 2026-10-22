@@ -19,7 +19,7 @@ window.VFViews=({getData,getMode,getCurrent,getEntry=()=>"",getVisible,getEdgeFa
     group.append(path,node("path",{d,class:"edge-hit","data-edge-id":edgeId,"data-edge-kind":info.kind}));
     const hint=node("title",[info.label,info.facts.when?"条件："+info.facts.when:"",...info.lines].filter(Boolean).join("\n"));path.append(hint);
   }
-  function drawBody(layout,offsetX=0,offsetY=0) {
+  function drawBody(layout,offsetX=0,offsetY=0,plannedAncestor=false) {
     const group=node("svg",{width:layout.width,height:layout.height,viewBox:`0 0 ${layout.width} ${layout.height}`});
     const markers=arrows(group);
     const items=new Map(layout.values.map(v=>[v.id,v]));
@@ -38,18 +38,20 @@ window.VFViews=({getData,getMode,getCurrent,getEntry=()=>"",getVisible,getEdgeFa
     });
     for(const item of layout.values){
       const attributes={transform:`translate(${item.x},${item.y})`};attributes[layout.entity==="resource"?"data-resource-id":"data-call-path"]=item.path;
+      const planned=item.card.planned;
+      if(planned){attributes["data-planned"]="true";if(!plannedAncestor)attributes.opacity="0.6";}
       const g=node("g",attributes);getVisible().set(item.path,{...item,x:item.x+offsetX,y:item.y+offsetY});
       if(item.inner){
         const values=item.card.values;
-        g.append(node("rect",{width:item.width,height:item.height,class:"call-boundary",style:`fill:${values.fill||"#ece7d8"};stroke:${values.stroke||"#56534a"}`}));
+        g.append(node("rect",{width:item.width,height:item.height,class:"call-boundary"+(planned?" planned-outline":""),style:`fill:${values.fill||"#ece7d8"};stroke:${values.stroke||"#56534a"}`}));
         const header=node("g",{class:"group-header"});
         header.append(node("rect",{width:item.width,height:item.header.height,fill:values.fill||"#f3efe3"}));
         for(const row of item.header.rows)header.append(node("text",{x:20,y:row.y,class:"card-"+row.kind,fill:values.text||"#24231f"},row.text));
         header.append(node("path",{d:`M0 ${item.header.height} H${item.width}`,stroke:values.stroke||"#56534a"}));
         g.append(header);
         const x=(item.width-item.inner.width)/2,y=item.header.height+20;
-        const inside=drawBody(item.inner,offsetX+item.x+x,offsetY+item.y+y);inside.setAttribute("transform",`translate(${x},${y})`);g.append(inside);}
-      else g.append(VFShapes.draw(item.card,item.facts));
+        const inside=drawBody(item.inner,offsetX+item.x+x,offsetY+item.y+y,plannedAncestor||planned);inside.setAttribute("transform",`translate(${x},${y})`);g.append(inside);}
+      else {const card=VFShapes.draw(item.card,item.facts);if(planned)card.querySelector(".card-outline").classList.add("planned-outline");g.append(card);}
       group.append(g);
     }
     return group;

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 from vibeflow.core.descriptors import DescriptorCatalogs, NodeContractDescriptor, NodeDescriptor
 from vibeflow.targets.python.project import GraphCompiler, NodeRegistry
-from vibeflow.tooling.application.javascript.presentation.architecture import _javascript_graph_document
+from vibeflow.tooling.architecture.workflow import graph_document
 from vibeflow.tooling.application.javascript.presentation.diagrams import render_mermaid
 from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_document
 from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid
@@ -39,12 +39,13 @@ def test_external_composite_loop_and_planned_styles_match_canonical_facts():
     compiled = GraphCompiler().compile(graph, registry=registry)
     document = build_architecture_document(graph, compiled=compiled, registry=registry)
     python = document["workflow"]
-    javascript = _javascript_graph_document(graph, compiled, source={}, graph_lock_scope="graph", catalogs=catalogs)
+    javascript = graph_document(graph, compiled, source={}, graph_lock_scope="graph", descriptor=catalogs.nodes.get)
     python_nodes = {item["id"]: item["presentation"] for item in python["nodes"]}
     javascript_nodes = {item["id"]: item["presentation"] for item in javascript["nodes"]}
     assert python_nodes == javascript_nodes
     assert python_nodes["loop"]["values"]["shape"] == "trap-b"
-    assert python_nodes["future"]["sources"]["fill"] == "status"
+    assert python_nodes["future"]["sources"]["fill"] == "native"
+    assert python_nodes["future"]["modifiers"]["planned"] is True
     assert python_nodes["external"]["values"]["fill"] != python_nodes["block"]["values"]["fill"]
     assert python["rulesets"] == javascript["rulesets"] == []
     assert document["nodeset_types"]["body"]["effect_scope"] == "unconstrained"

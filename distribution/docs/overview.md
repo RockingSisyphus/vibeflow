@@ -38,4 +38,4 @@ VibeFlow 检查工程结构、源码健康度与所选领域约束。项目测�
 
 两个 profile 使用同一 Core、quality policy、项目模板和 Workflow ABI `vibeflow.workflow.v10`。profile 只改变开发协议、提示词和随包文档选择。
 
-当前项目采用独立 root、NodeType/业务 Node 分层及四级规则治理。旧配置与 AOT 需重新迁移和构建；旧预览不兼容，重新生成 v3 快照。详见[项目治理](user/project-governance.md)与[迁移说明](user/rule-system-migration.md)。
+当前项目采用独立 root、NodeType/业务 Node 分层及四级规则治理。旧配置与 AOT 需重新迁移和构建；旧预览不兼容，重新生成 v4 快照。详见[项目治理](user/project-governance.md)与[迁移说明](user/rule-system-migration.md)。

@@ -16,6 +16,8 @@ def lifecycle_registry(registry, *, workflow_id, config_path, plugin_types=("com
             if selection.get("status") == "planned":
                 continue
             descriptor = loaded.catalogs.plugins.require(selection["id"])
+            if loaded.resource_use is not None and not loaded.resource_use.allows("plugin", descriptor.id):
+                continue
             if descriptor.plugin_type not in plugin_types:
                 continue
             factory = registry.direct_bindings.get(("plugin", descriptor.id))

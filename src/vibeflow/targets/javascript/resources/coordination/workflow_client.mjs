@@ -22,7 +22,7 @@ export class WorkflowClient {
   static async open(url, {id=null, workflow=null, onStop=null}={}) {
     const client = new WorkflowClient(url);
     const registered = await client.request("register", {id, workflow, stop_supported:Boolean(onStop)});
-    client.id=registered.id;client.inputs=registered.inputs;client.entry=registered.entry;
+    client.id=registered.id;client.inputs=registered.inputs;client.entry=registered.entry;client.workflow=registered.workflow;
     if(onStop)client.watching=client.watch(onStop);
     return client;
   }
@@ -63,17 +63,18 @@ export class WorkflowClient {
       if(!result.pending)return result;
     }
   }
-  async call(target, {entry=null,inputs={},timeout,signal}={}) {
-    const launched=await this.request("call",{target,entry,inputs},signal);
+  async call(workflow, {launch,inputs={},timeout,signal}={}) {
+    workflow={...workflow,root:workflow?.root||this.workflow?.root||""};
+    const launched=await this.request("call",{sender:this.id,workflow,launch,inputs},signal);
     return this.poll("ready",launched.id,{timeout,signal});
   }
   wait(id, options={}) {return this.poll("wait",id,options);}
   receive(port="default", options={}) {return this.poll("receive",this.id,{...options,port});}
-  async kill(id, options={}) {await this.request("kill",{id},options.signal);return this.wait(id,options);}
+  async kill(id, options={}) {await this.request("kill",{id,...(options.workflow?{workflow:{...options.workflow,root:options.workflow.root||this.workflow?.root||""}}:{})},options.signal);return this.wait(id,options);}
   operations() {
     return {
       self:()=>({id:this.id}),
-      call:(request,context={})=>this.call(request.target,{...request,signal:context.signal}),
+      call:(request,context={})=>this.call(request.workflow,{...request,signal:context.signal}),
       wait:(request,context={})=>this.wait(request.id,{...request,signal:context.signal}),
       send:request=>{this.send(request.id,request.port||"default",request.payload);return null;},
       receive:(request,context={})=>this.receive(request.port||"default",{...request,signal:context.signal}),

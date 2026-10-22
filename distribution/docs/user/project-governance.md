@@ -55,7 +55,7 @@ root ID 的 `@` 前缀保留给项目作用域引用。共享资源的文档路�
 
 ## Plugin 的默认整包规则
 
-默认 `vibeflow.project.packages` / `vibeflow.root.packages` 要求文件 Plugin 放在 `plugins/<包名>/` 下，入口及其贡献的 NodeType、Rule、Ruleset、私有库、生命周期实现和支持代码均在包内。Python 使用包内相对导入，JavaScript 使用相对模块引用。标准库、第三方依赖及公开 SDK 无需复制进包。
+默认 `vibeflow.project.packages` / `vibeflow.root.packages` 要求文件 Plugin 放在 `plugins/<包名>/` 下。独立的 `vibeflow.project.plugin_ownership` / `vibeflow.root.plugin_ownership` 检查入口、贡献声明、实现、支持文件和导入的项目自有代码均在该包内；检查使用规范化后的实际路径，因此相对路径和符号链接不会绕过归属。Python 使用包内相对导入，JavaScript 使用相对模块引用。标准库、第三方依赖及公开 SDK 无需复制进包。
 
 默认规则要求业务 Node 只引用 Plugin 的类型 ID，不加入 Plugin。关闭或替换 packages 规则后，Plugin 可以贡献业务 Node，并应用相同的 NodeType 解析。移除 Plugin 选择会移除它的全部贡献；业务文件保留，并报告所需 NodeType 缺失。不能单独选择 Plugin 内部贡献，也不能借用另一个 root 的私有文件来拼装包。
 
@@ -72,9 +72,29 @@ workflow 通过 `plugins` 显式选择资源：
 
 省略 `scope` 时为当前 root；项目治理配置中的默认作用域为项目。治理配置加载的 Plugin 不会自动激活到 workflow。root 私有声明只进入所属 root 的绑定集合；默认 root.resources 拒绝导入其他 root 的私有源码，默认 project.dependencies 禁止项目共享目录（`nodes`、`base_lib`、`plugins`）反向依赖任何 root 的私有代码。因此 `app → 共享库 → backend 私有库` 同样会被报告。跨 root 的独立程序调用使用 workflow 协同接口。
 
-需要有意共享源码时，可以在 root_rules.jsonc 的 `rule_params` 中设置 `"vibeflow.root.resources": {"allow_cross_root_imports": true}`，也可以显式替换本层规则选择。该设置放开该 root 的源码、Nodeset、实现附属文件和 `--include` 跨 root 依赖。共享目录的反向依赖单独在 project_rules.jsonc 中配置 `"vibeflow.project.dependencies": {"allow_cross_root_imports": true}`。跨 Target 子图和 Plugin 私有子图仍分别受 root.nodesets、root.packages 规则控制；需要时显式替换对应规则选择。获准导入的源码依赖进入 AOT 构建闭包；Python 还携带这些依赖资源声明的 `implementation_files`，产物可脱离原项目运行。这不会把其他 root 的全部声明自动激活到当前 workflow。
+需要有意共享源码时，可以在 root_rules.jsonc 的 `rule_params` 中设置 `"vibeflow.root.resources": {"allow_cross_root_imports": true}`，也可以显式替换本层规则选择。该设置放开该 root 的源码、Nodeset、实现附属文件和 `--include` 跨 root 依赖。共享目录的反向依赖单独在 project_rules.jsonc 中配置 `"vibeflow.project.dependencies": {"allow_cross_root_imports": true}`。跨 Target 子图和 Plugin 私有子图仍分别受 root.nodesets、root.packages 规则控制；需要时显式替换对应规则选择。获准导入的源码依赖进入 AOT 构建闭包；Python 还携带这些依赖资源声明的 `implementation_files`，产物可脱离原项目运行。这不会把其他 root 的全部声明自动激活到当前 workflow，也不替代资源引用 Rule：引用代码仍须属于已声明的资源或 `implementation_files`，或由自定义引用 Rule 明确允许。
 
 项目共享的独立 Node/BaseLib 由默认规则检查是否至少被两个不同 root 的现存 workflow 实际引用；Plugin 按整包采用情况统计，包内资源不单独计算。专门提供项目/root 治理规则的 Plugin 按其治理用途判断。planned 调用对真实资源的引用可计入；没有真实资源的占位不计入。任何损坏的 workflow 都会明确报告分析不完整。
+
+## workflow 的资源使用
+
+独立 BaseLib 必须在 workflow 的 `base_lib.modules` 中显式声明；当前 root 和项目共享库采用相同写法。省略 `base_lib`、`{}` 或 `{"modules":[]}` 都不会启用独立库。假设 Node 声明依赖 `d`，而 `d` 又声明依赖 `e`，workflow 必须同时列出两者：
+
+```jsonc
+{"base_lib":{"modules":["d","e"]}}
+```
+
+Node 的 `base_libs` 与 BaseLib 的 `dependencies` 描述源码资源关系；workflow 的选择决定本次是否允许使用。配置和实际源码引用都会检查。一个 workflow 的声明不会授权另一个 workflow。
+
+选择 Plugin `a` 后，它贡献的资源整体可用。若 `f` 属于 `a`，只在 `plugins` 中选择 `a`，不能再把 `f` 填入 `base_lib.modules`。独立引入规则、Plugin 整包引入规则和重复声明规则分别负责这些判断。禁用或 planned 的 Plugin 不提供实现。可用集合不会自动执行 Node，也不会强制为不使用的平台加载所有实现。
+
+默认 root Ruleset 包含 `resource_visibility`、`resource_independent`、`resource_plugins`、`resource_duplicates`、`resource_use` 和 `resource_references` 六个调用（Rule ID 均带 `vibeflow.root.` 前缀）。前三者提供集合，`resource_use` 显式组合成 `vibeflow.resource_use.v1` Record，引用规则只检查该结果及资源关系。替换 `resource_independent` 的输出即可改变独立库引入方式，无须修改 Python、JavaScript、AOT 或展示代码。
+
+自定义 Ruleset 可包含 `RuleCall("defaults", ruleset_id="vibeflow.root.default")`，再通过 `RuleRelation("$self", "defaults/resource_independent", "overrides", replace_rule="your.rule")` 替换引入规则。替代 Rule 的输出端口 `resources` 类型必须为 `vibeflow.resource_set.v1`，值为 `{"workflows": {"root-id:configs/main.jsonc": [{"kind":"base_lib","id":"d","reason":"custom"}]}}`。完整可执行样例见仓库 `tests/tooling/test_resource_use.py`。
+
+显式取消相关规则后，统一结果层记录无约束；执行失败、依赖不可用或错误输出会报告错误，不会转入无约束或旧选择器。多个最终 Record 给出冲突结果也会报错。预览仍隐藏 Plugin 贡献部分，该显示过滤不参与权限判断。
+
+迁移现有项目时，补齐独立库及其间接依赖的 workflow 声明，删除 Plugin 库的重复声明，将 Plugin 自有代码移入对应包目录。旧 `structure_roles` / `enforce_role_imports` 配置已删除，资源引用检查由独立 Rule 负责。
 
 ## 四级规则
 

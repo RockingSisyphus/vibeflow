@@ -72,7 +72,6 @@ class QualityStructureLimits:
     warn_root_level_code_files: int = 1
     max_root_level_code_files: int = 2
     allowed_root_code_files: tuple[str, ...] = ("__init__.py", "registry.py")
-    enforce_role_imports: bool = True
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -90,15 +89,7 @@ class QualityStructureLimits:
             "warn_root_level_code_files": self.warn_root_level_code_files,
             "max_root_level_code_files": self.max_root_level_code_files,
             "allowed_root_code_files": list(self.allowed_root_code_files),
-            "enforce_role_imports": self.enforce_role_imports,
         }
-
-
-@dataclass(frozen=True)
-class QualityStructureRoles:
-    """Target-supplied ownership for each selected workflow's declarations."""
-
-    _resource_scopes: tuple[Mapping[str, object], ...] = field(default=(), repr=False)
 
 
 @dataclass(frozen=True)
@@ -302,7 +293,6 @@ class QualityPolicy:
 
     thresholds: QualityThresholds = field(default_factory=QualityThresholds)
     structure_limits: QualityStructureLimits | None = None
-    structure_roles: QualityStructureRoles = field(default_factory=QualityStructureRoles)
     structure_conventions: QualityStructureConventions = field(default_factory=QualityStructureConventions)
 
 
@@ -471,7 +461,6 @@ __all__ = [
     "QualityPolicy",
     "QualityReport",
     "QualityStructureLimits",
-    "QualityStructureRoles",
     "QualityThresholds",
     "SourceQualityReport",
 ]

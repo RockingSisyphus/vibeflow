@@ -266,6 +266,9 @@ def _project(root: Path, variant: str, toolchain: Path, case: Case) -> tuple[Pat
                 declaration["rulesets"] = ["vibeflow." + declaration["kind"]]
         update_resources(root, values)
         config["plugins"] = [{"source": {"kind":"file", "ref":"plugins/code_plugin/plugin.ts", "export":"plugin"}}]
+        config["base_lib"] = {"modules":[item["id"] for item in values if item["kind"] == "base_lib"
+            and not (case.id == "js.node.undeclared-base" and not case.declare_base)]}
+        _write_json(root / "root_rules.jsonc", {"rulesets":["vibeflow.root.resource_usage"]})
     config_path = root / 'workflow.jsonc'
     _write_json(config_path, config)
     return workspace, config_path, root / selected_file
@@ -389,7 +392,9 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
         workspace, config, source = _project(root, variant, toolchain, case)
         actual = _observe(case, root, workspace, config, source, variant=variant)
         code = case.current_code if variant == 'current' and case.current_code is not None else case.code
-        if variant=='current' and case.id=='js.node.package-root':code='VF_IMPORT_OWNER'
+        if variant == 'current' and code == 'VF_PLUGIN_IMPORT_POLICY': code = 'PLUGIN.PACKAGE.IMPORT'
+        if variant == 'current' and code in {'VF_IMPORT_OWNER','VF_IMPORT_BASE_LIB','VF_IMPORT_LAYER','VF_IMPORT_NODE_TO_NODE','VF_IMPORT_PACKAGE_ROOT'}:
+            code = 'RESOURCE.REFERENCE.UNAVAILABLE' if case.id == 'js.node.undeclared-base' else 'RESOURCE.REFERENCE.UNDECLARED'
         if variant == 'current' and case.id in {'js.node.recursive-helper', 'js.base.nondeterministic', 'js.node.dynamic-code'}:
             code = ''  # B04/B06/B07: preserve the baseline, retire current default inference.
         severity = 'warning' if case.id == 'js.quality.function-duplicate' else 'error'

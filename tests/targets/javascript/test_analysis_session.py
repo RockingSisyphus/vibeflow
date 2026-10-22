@@ -65,10 +65,9 @@ def test_program_sharing_does_not_share_base_lib_permissions(package):
         {"path":str(helper),"kind":"base_lib","id":"test.helper","export":"value"}]
     with DriverScope():
         for libraries in ([],["test.helper"],[]):
-            result=run_rule_check_driver({"typecheckFiles":[str(source)],"ruleTopics":["architecture"],
-                "ruleSubjectKind":"node","ruleSubjectId":"test.node",
-                "importPolicy":{"owners":owners,"nodeBaseLibs":{"test.node":libraries}}},package_root=package)
-            denied=any(item["code"]=="VF_IMPORT_BASE_LIB" for item in result.findings)
+            from tests.fixtures.support.resource_rules import javascript_references
+            findings=javascript_references(package,{"owners":owners,"nodeBaseLibs":{"test.node":libraries}})
+            denied=any(item["code"]=="RESOURCE.REFERENCE.UNDECLARED" for item in findings)
             assert denied==(not libraries)
 
 
@@ -122,3 +121,14 @@ def test_driver_scope_releases_its_owned_process_on_root_error(package):
     assert process.poll() is not None
     assert process.stdin.closed and process.stdout.closed and driver.stderr.closed
     assert scope.drivers=={} and scope.rule_sessions=={}
+
+
+def test_source_sdk_identity_does_not_hide_raw_imports(package):
+    from vibeflow.targets.javascript.resources.identity import business_import_sites
+    source = package / "plugin.ts"
+    source.write_text('import {definePlugin} from "@vibeflow/plugin";export const plugin=definePlugin({id:"example",resources:[]});')
+    facts = run_quality_facts_driver({"qualityRoot":str(package),"qualityFiles":[str(source)]},package_root=package)
+    sdk = next(site for file in facts.files for site in file["import_sites"] if site["raw_import"] == "@vibeflow/plugin")
+    assert sdk["framework_resource"] == "javascript/sdk.d.ts"
+    assert Path(sdk["resolved_path"]).is_file()
+    assert not list(business_import_sites(facts.files))

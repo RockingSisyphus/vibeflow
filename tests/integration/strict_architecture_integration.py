@@ -128,7 +128,8 @@ def test_architecture_cli_stdout_contains_canonical_document(tmp_path, capsys) -
 
     assert code == 0
     assert output.startswith(ARCHITECTURE_DOCUMENT_HEADER + "{")
-    assert list(json.loads(output.removeprefix(ARCHITECTURE_DOCUMENT_HEADER))) == [
+    assert set(json.loads(output.removeprefix(ARCHITECTURE_DOCUMENT_HEADER))) == {
+        "resource_use",
         "project_target",
         "workflow",
         "nodeset_types",
@@ -139,7 +140,7 @@ def test_architecture_cli_stdout_contains_canonical_document(tmp_path, capsys) -
         "call_effect_scopes",
         "call_policies",
         "rule_selections",
-    ]
+    }
     graph = json.loads(output.removeprefix(ARCHITECTURE_DOCUMENT_HEADER))["implementation_graph"]
     assert set(graph) == {"resources", "files", "relations"}
     assert "node:test.seed" in graph["resources"]
@@ -440,7 +441,8 @@ def test_workspace_run_writes_canonical_architecture_artifact(tmp_path) -> None:
     assert artifact_path.is_file()
     assert artifact.startswith(ARCHITECTURE_DOCUMENT_HEADER + "{")
     assert artifact == document_path.read_text(encoding="utf-8")
-    assert list(load_raw_config_document(artifact_path).data) == [
+    assert set(load_raw_config_document(artifact_path).data) == {
+        "resource_use",
         "project_target",
         "workflow",
         "nodeset_types",
@@ -451,4 +453,4 @@ def test_workspace_run_writes_canonical_architecture_artifact(tmp_path) -> None:
         "call_effect_scopes",
         "call_policies",
         "rule_selections",
-    ]
+    }

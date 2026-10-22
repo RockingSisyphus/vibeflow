@@ -132,5 +132,10 @@
         "export": "plugin"
       }
     }
-  ]
+  ],
+  "base_lib": {
+    "modules": [
+      "sandbox.math"
+    ]
+  }
 }

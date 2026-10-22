@@ -1,11 +1,9 @@
 """Install the standalone browser tool; never write workflow snapshots here."""
 from pathlib import Path
 from importlib.resources import files
-from uuid import uuid4
-import os
 import re
 from urllib.parse import urlsplit
-from .preview.catalog import atomic_write
+from vibeflow.tooling.file_io import atomic_write
 
 
 def viewer_assets():
@@ -25,12 +23,7 @@ def install_page(root):
         data=item.read_bytes()
         if target.exists() and target.read_bytes()==data:
             continue
-        temporary=target.with_name("."+target.name+"."+uuid4().hex)
-        try:
-            temporary.write_bytes(data)
-            os.replace(temporary,target)
-        finally:
-            temporary.unlink(missing_ok=True)
+        atomic_write(target, data)
     html=assets.joinpath("index.html").read_text(encoding="utf-8")
     def reference(match):
         attribute,quote,url=match.groups()

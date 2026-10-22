@@ -114,3 +114,7 @@ RETIRED["javascript"] |= frozenset({"js.plugin.undeclared-dependency"})
 # Current source selection and four-level governance have separate live cases.
 RETIRED["core"] = frozenset("core.selection.vibeflow.quality.project." + phase
                             for phase in ("import", "static", "run"))
+
+# Node-local import permission was deleted; resource Rule coverage lives in
+# tests/core/test_resource_structure_imports.py and tests/tooling/test_resource_use.py.
+RETIRED["python"] |= frozenset({"python.coupling.import_registered_node"})

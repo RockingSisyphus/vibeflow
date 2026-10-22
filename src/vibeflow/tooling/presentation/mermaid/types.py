@@ -8,21 +8,22 @@ DETAIL_PANEL_COLUMN_GAP = 56.0
 DETAIL_PANEL_ROW_GAP = 36.0
 DETAIL_PANEL_TITLE_HEIGHT = 40.0
 FRAGMENT_FRAME_PADDING = 10.0
+_PLANNED_FRAME_STYLE = ".planned-panel>.review-panel-frame{stroke-dasharray:6 3}"
 REVIEW_COLUMNS_STYLE = (
     "<style>.review-title{font-family:Arial,sans-serif;font-size:22px;font-weight:800;fill:#0f172a}"
     ".review-panel-frame{fill:#ffffff;fill-opacity:.94;stroke:#334155;stroke-width:2}"
-    ".review-title-bar{fill:#dbeafe;stroke:#334155;stroke-width:2}</style>"
+    ".review-title-bar{fill:#dbeafe;stroke:#334155;stroke-width:2}" + _PLANNED_FRAME_STYLE + "</style>"
 )
 DETAIL_PANEL_STYLE = (
     "<style>.review-title{font-family:Arial,sans-serif;font-size:20px;font-weight:800;fill:#0f172a}"
     ".review-panel-frame{fill:#ffffff;fill-opacity:.94;stroke:#475569;stroke-width:2}"
     ".review-title-bar{fill:#e0f2fe;stroke:#475569;stroke-width:2}"
-    ".review-panel-guide{stroke:#64748b;stroke-width:1.5;stroke-dasharray:6 4;fill:none}</style>"
+    ".review-panel-guide{stroke:#64748b;stroke-width:1.5;stroke-dasharray:6 4;fill:none}" + _PLANNED_FRAME_STYLE + "</style>"
 )
 PLACEHOLDER_STYLE = (
     "<style>.placeholder-title{font-family:Arial,sans-serif;font-size:16px;font-weight:700;fill:#111827}"
     ".placeholder-text{font-family:Arial,sans-serif;font-size:14px;fill:#4b5563}"
-    ".placeholder-box{fill:#f9fafb;stroke:#d1d5db;stroke-width:1}</style>"
+    ".placeholder-box{fill:#f9fafb;stroke:#d1d5db;stroke-width:1}" + _PLANNED_FRAME_STYLE + "</style>"
 )
 
 
@@ -35,3 +36,4 @@ class SvgFragment:
     review_kind: str = "fragment"
     review_owner: str = ""
     review_target: str = ""
+    planned: bool = False

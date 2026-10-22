@@ -46,27 +46,28 @@ def build_architecture_facts(prepared) -> dict[str, object]:
     graph, actual_compiled = prepared.graph, prepared.compiled
     registry, resources = prepared.registry, prepared.resources
     roots = _root_paths(graph)
-    payload = {
-        "project_target": "python",
-        "workflow": _workflow_document(graph, actual_compiled, registry=registry, resources=resources, prepared=prepared),
-        "nodeset_types": _nodeset_types_document(graph, registry=registry, prepared=prepared),
-        "node_definitions": _node_definitions_document(graph, registry=registry, roots=roots),
-        "node_types": registry.prepared_resources.catalogs.node_types.to_dict() if getattr(registry, "prepared_resources", None) else {},
-        "resources": _resources_document(graph, resources, roots=roots),
-    }
+    from vibeflow.tooling.architecture.workflow import ArchitectureInputs, build_workflow_architecture
+    payload = build_workflow_architecture(ArchitectureInputs(
+        graph=graph, compiled=actual_compiled, target="python",
+        descriptor=lambda key: registry_descriptor(registry, key),
+        compile_graph=prepared.graph_for,
+        node_definitions=_node_definitions_document(graph, registry=registry, roots=roots),
+        node_types=registry.prepared_resources.catalogs.node_types.to_dict() if getattr(registry, "prepared_resources", None) else {},
+        resources=_resources_document(graph, resources, roots=roots),
+        global_config=resources_payload(resources).get("global_config", {}),
+        policies=getattr(registry, "call_capability_policies", {}),
+        extras={"resource_use": resources.resource_use.to_dict() if getattr(resources, "resource_use", None) else None}))
     if getattr(registry, "prepared_resources", None) is not None and prepared.source_config_available:
-        from vibeflow.tooling.presentation.resource_architecture import resource_architecture
+        from vibeflow.tooling.architecture.resources import resource_architecture
         sources = prepared.source_context
         catalogs = registry.prepared_resources.catalogs
         payload["implementation_graph"] = resource_architecture(catalogs,project_root=graph.root_path,
-            source_facts=prepared.implementation_sources,selections=getattr(resources, "selection_facts", resources if isinstance(resources, Mapping) else {}),
+            source_facts=prepared.implementation_sources,resource_use=getattr(resources, "resource_use", None),
             selected_nodes={item.definition_id for item in sources.nodes},
             findings=getattr(registry,"review_findings",()),
             roots={str(root_id):str(path) for path,root_id in registry.source_root_ids.items()})
     from vibeflow.core.rules.planning import selection_report
     payload["call_effect_scopes"] = [{"call_path":list(path), "effect_scope":scope} for path,scope in sorted(getattr(registry,"call_effect_scopes",{}).items())]
-    from vibeflow.tooling.presentation.workflow_facts import policy_facts
-    payload["call_policies"] = policy_facts(getattr(registry, "call_capability_policies", {}))
     catalogs = getattr(getattr(registry, "prepared_resources", None), "catalogs", None)
     if catalogs is not None:
         payload["rule_selections"] = selection_report(graph, catalogs)
@@ -87,293 +88,7 @@ def render_architecture_document(
     return render_architecture_payload(payload)
 
 
-from vibeflow.tooling.presentation.architecture_facts import render_architecture_payload
-
-
-def _workflow_document(
-    graph: GraphConfig,
-    compiled: CompiledGraph,
-    *,
-    registry: object | None,
-    resources: object | None,
-    prepared=None,
-) -> dict[str, object]:
-    source = source_reference(graph.root_id, graph.root_path, graph.source_path)
-    global_config = resources_payload(resources).get("global_config", {})
-    return {
-        "source": source,
-        "global_config": _config_declaration(global_config, source=source),
-        **_graph_body_document(
-            graph,
-            compiled,
-            registry=registry,
-            graph_lock_scope="root",
-            prepared=prepared,
-        ),
-    }
-
-
-def _nodeset_types_document(graph: GraphConfig, *, registry: object | None, prepared=None) -> dict[str, object]:
-    reachable = reachable_nodeset_types(graph)
-    documents: dict[str, object] = {}
-    for type_key, nodeset in sorted(graph.nodeset_types.items()):
-        source = source_reference(nodeset.root_id, nodeset.root_path, nodeset.source_path)
-        body = None
-        if nodeset.graph.nodes:
-            compiled = compile_for_render(nodeset.graph, None, registry, prepared=prepared)
-            body = _graph_body_document(
-                nodeset.graph,
-                compiled,
-                registry=registry,
-                graph_lock_scope="block",
-                prepared=prepared,
-            )
-        documents[type_key] = {
-            "type_key": nodeset.type_key,
-            "expand": nodeset.expand,
-            "source": source,
-            "display_name": nodeset.display_name,
-            "description": nodeset.description,
-            "status": nodeset.status,
-            "planned_behavior": nodeset.planned_behavior.to_dict() if nodeset.status == STATUS_PLANNED else None,
-            "flow_kind": nodeset.flow_kind,
-            "effect_scope": "unavailable" if nodeset.status == STATUS_PLANNED else "unconstrained",
-            "rulesets": selection_data(nodeset.graph.rulesets),
-            "reachable_from_workflow": type_key in reachable,
-            "requires": requirements_to_dicts(nodeset.requires),
-            "provides": providers_to_dicts(nodeset.provides),
-            "global_config": _config_declaration(nodeset.global_config, source=source),
-            "body": body,
-        }
-    return documents
-
-
-def _graph_body_document(
-    graph: GraphConfig,
-    compiled: CompiledGraph,
-    *,
-    registry: object | None,
-    graph_lock_scope: str,
-    prepared=None,
-) -> dict[str, object]:
-    contains_global_state = _graph_contains_global_state(
-        graph,
-        compiled,
-        registry=registry,
-        prepared=prepared,
-    )
-    from vibeflow.tooling.presentation.workflow_facts import entry_facts
-    return {
-        **entry_facts(graph, compiled),
-        "rulesets": selection_data(graph.rulesets),
-        "inputs": providers_to_dicts(graph.inputs),
-        "outputs": requirements_to_dicts(graph.outputs),
-        "max_steps": graph.max_steps,
-        "entry_mode": graph.entry_mode,
-        "execution_lock": (
-            _execution_lock_payload(
-                graph.execution_lock,
-                scope=graph_lock_scope,
-            )
-            if graph.execution_lock is not None
-            else None
-        ),
-        "contains_global_state": contains_global_state,
-        "nodes": [
-            _node_document(
-                graph,
-                compiled,
-                node,
-                registry=registry,
-                graph_lock_scope=graph_lock_scope,
-                prepared=prepared,
-            )
-            for node in graph.nodes
-        ],
-        "edges": [_edge_document(graph, compiled, edge) for edge in compiled.effective_edges],
-    }
-
-
-def _node_document(
-    graph: GraphConfig,
-    compiled: CompiledGraph,
-    node: NodeCallSpec,
-    *,
-    registry: object | None,
-    graph_lock_scope: str,
-    prepared=None,
-) -> dict[str, object]:
-    source = source_reference(graph.root_id, graph.root_path, graph.source_path)
-    invocation = invocation_for_node(graph, node)
-    target = invocation.nodeset if invocation is not None else None
-    descriptor = registry_descriptor(registry, node.definition_id)
-    selected_rulesets = selection_data(target.graph.rulesets) if target is not None else selection_data(node.rulesets if node.rulesets is not None else registry.rulesets(node.definition_id)) if descriptor is not None else []
-    planned = node.status == STATUS_PLANNED or getattr(target, "status", "") == STATUS_PLANNED
-    invokes = None
-    if invocation is not None:
-        invokes = {
-            "kind": invocation.kind,
-            "target": invocation.target,
-            "target_status": invocation.nodeset.status,
-        }
-    contains_global_state = (
-        node.status != STATUS_PLANNED
-        and node_flow_kind(node, compiled) == FLOW_KIND_GLOBAL_STATE
-    )
-    if (
-        not planned
-        and invocation is not None
-        and invocation.nodeset.status != STATUS_PLANNED
-    ):
-        try:
-            child_compiled = compile_for_render(
-                invocation.nodeset.graph,
-                None,
-                registry,
-                prepared=prepared,
-            )
-        except Exception:
-            child_compiled = None
-        if child_compiled is not None:
-            contains_global_state = _graph_contains_global_state(
-                invocation.nodeset.graph,
-                child_compiled,
-                registry=registry,
-                visiting=(invocation.target,),
-                prepared=prepared,
-            )
-    return {
-        "id": node.id,
-        "definition_id": node.definition_id,
-        "source": source,
-        "role": node_review_metadata(graph, node, registry),
-        "flow_kind": node_flow_kind(node, compiled),
-        "rulesets": selected_rulesets,
-        "selected_rulesets": selected_rulesets,
-        "tags": list(descriptor.tags) if descriptor is not None else [],
-        "metadata": dict(descriptor.metadata) if descriptor is not None else {},
-        "presentation": resolve_presentation(registry_descriptor(registry, node.definition_id), flow_kind=node_flow_kind(node, compiled), native_class=("loopNode" if node.definition_id in LOOP_DEFINITION_IDS else "nodesetNode") if invocation is not None else "", status_class="plannedNode" if planned else "", call_style=node.style, node=node, compiled=compiled).to_dict(),
-        "effect_scope": node_review_effect_scope(graph, node, registry, compiled=compiled),
-
-        "execution_lock": (
-            _execution_lock_payload(
-                node.execution_lock,
-                scope="block" if invocation is not None else "node",
-            )
-            if node.execution_lock is not None
-            else None
-        ),
-        "effective_execution_lock": _effective_execution_lock(
-            graph,
-            node,
-            invocation=invocation,
-            graph_lock_scope=graph_lock_scope,
-        ),
-        "contains_global_state": contains_global_state,
-        "status": node.status,
-        "planned_behavior": effective_planned_behavior(node, target).to_dict() if planned else None,
-        "requires": requirements_to_dicts(node.requires),
-        "provides": providers_to_dicts(node.provides),
-        "contract_source": _contract_source(graph, node),
-        "join_policy": node.join_policy,
-        "loop": node.loop.to_dict() or None,
-        "invokes": invokes,
-        "config": {
-            "call": _config_declaration(node.params, source=source),
-            "node_configs": _config_declaration(node.node_config_overrides, source=source),
-            "allow_config_override": node.allow_config_override,
-        },
-    }
-
-
-def _contract_source(graph: GraphConfig, node: NodeCallSpec) -> str:
-    if node.status == STATUS_PLANNED:
-        return "planned_config"
-    if node.definition_id in LOOP_DEFINITION_IDS:
-        return "system_config"
-    if invocation_for_node(graph, node) is not None:
-        return "nodeset"
-    return "node_definition"
-
-
-def _execution_lock_payload(lock: object, *, scope: str) -> dict[str, str]:
-    return {"key": str(getattr(lock, "key", "")), "scope": scope}
-
-
-def _effective_execution_lock(
-    graph: GraphConfig,
-    node: NodeCallSpec,
-    *,
-    invocation: object | None,
-    graph_lock_scope: str,
-) -> dict[str, object] | None:
-    if node.execution_lock is not None:
-        return {
-            **_execution_lock_payload(
-                node.execution_lock,
-                scope="block" if invocation is not None else "node",
-            ),
-            "inherited": False,
-        }
-    if graph.execution_lock is not None:
-        return {
-            **_execution_lock_payload(
-                graph.execution_lock,
-                scope=graph_lock_scope,
-            ),
-            "inherited": True,
-        }
-    return None
-
-
-def _graph_contains_global_state(
-    graph: GraphConfig,
-    compiled: CompiledGraph,
-    *,
-    registry: object | None,
-    visiting: tuple[str, ...] = (),
-    prepared=None,
-) -> bool:
-    if compiled.contains_global_state:
-        return True
-    for node in graph.nodes:
-        if node.status == STATUS_PLANNED:
-            continue
-        if node_flow_kind(node, compiled) == FLOW_KIND_GLOBAL_STATE:
-            return True
-        invocation = invocation_for_node(graph, node)
-        if invocation is None or invocation.nodeset.status == STATUS_PLANNED:
-            continue
-        if invocation.target in visiting:
-            continue
-        try:
-            child_compiled = compile_for_render(
-                invocation.nodeset.graph,
-                None,
-                registry,
-                prepared=prepared,
-            )
-        except Exception:
-            continue
-        if _graph_contains_global_state(
-            invocation.nodeset.graph,
-            child_compiled,
-            registry=registry,
-            visiting=(*visiting, invocation.target),
-            prepared=prepared,
-        ):
-            return True
-    return False
-
-
-def _edge_document(graph: GraphConfig, compiled: CompiledGraph, edge: object) -> dict[str, object]:
-    return {
-        "from": str(getattr(edge, "source", "")),
-        "to": str(getattr(edge, "target", "")),
-        "when": str(getattr(edge, "when", "")),
-        "roles": list(edge_roles(compiled, edge)),
-        "transfers": [_snapshot(item) for item in edge_transfers(graph, edge)],
-    }
+from vibeflow.tooling.architecture.documents import render_architecture_payload
 
 
 def _node_definitions_document(

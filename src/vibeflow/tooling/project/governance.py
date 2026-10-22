@@ -57,7 +57,7 @@ def governance_context(inventory, *, root=None, resources=()):
         facts["workflows"] = tuple({"path": item.path.relative_to(root.path).as_posix(), "declaration": item.data}
                                     for item in inventory.for_root(root.id))
     return RuleContext(facts={level: facts}, subject={"kind": level, "id": facts["id"]},
-                       scope={"level": level}, target="project")
+                       scope={"level": level, "id": facts["id"]}, target="project")
 
 
 def execute_governance(config, context, *, catalogs, handlers):
@@ -69,5 +69,5 @@ def execute_governance(config, context, *, catalogs, handlers):
             raise ValueError(f"{config.path}: unknown Rule '{identifier}' in rule_params")
         rule = rules[identifier]
         rules[identifier] = replace(rule, params_defaults={**rule.params_defaults, **parameters})
-    return tuple(execute_rule_plan(compile_ruleset(reference, rules=rules, rulesets=catalogs.rulesets),
-                                   context, handlers=handlers) for reference in config.selections)
+    return tuple(replace(execute_rule_plan(compile_ruleset(reference, rules=rules, rulesets=catalogs.rulesets),
+                                   context, handlers=handlers), scope=context.scope) for reference in config.selections)

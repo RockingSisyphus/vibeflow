@@ -10,10 +10,13 @@ def run_python(args):
     if args.bundle:
         from vibeflow.tooling.application.python.bundle import load_bundle
         bundle = load_bundle(args.bundle)
-        workflow = bundle.workflow.workflow_id
+        workflow = bundle.data["workflow_reference"]
     else:
         bundle = None
-        workflow = str(Path(args.config).resolve())
+        from vibeflow.tooling.project.workspace_loader import load_workspace_config, load_project_workspace
+        workspace = load_workspace_config(Path(args.workspace)) if args.workspace else load_project_workspace(Path(args.config))
+        root = workspace.root_for_path(Path(args.config))
+        workflow = {"root":root.id, "path":Path(args.config).resolve().relative_to(root.path).as_posix()}
 
     def execute(client):
         options = dict(initial={**initial, **client.inputs},

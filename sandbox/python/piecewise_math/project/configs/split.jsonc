@@ -160,5 +160,10 @@
         "cardinality": "exactly_one"
       }
     ]
+  },
+  "base_lib": {
+    "modules": [
+      "piecewise.math"
+    ]
   }
 }

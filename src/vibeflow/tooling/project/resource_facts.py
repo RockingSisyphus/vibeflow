@@ -13,12 +13,12 @@ def implementation_paths(descriptor):
 
 def package_facts(contribution, *, owner, package_path, source_kind, source_paths, project_path, owner_scope):
     resources = tuple({"id": entry.descriptor.id, "kind": resource_kind(entry.descriptor),
-        "path": str(entry.origin.path), "implementation_paths": implementation_paths(entry.descriptor)}
+        "path": str(Path(entry.origin.path).resolve()), "implementation_paths": implementation_paths(entry.descriptor)}
         for entry in contribution.resources)
-    return {"id": contribution.id, "path": str(package_path), "source": contribution.source,
+    return {"id": contribution.id, "path": str(Path(package_path).resolve()), "source": contribution.source,
         "source_kind": source_kind, "scope": owner_scope, "owner_path": str(owner.path), "owner_id": owner.id,
         "project_path": str(project_path), "resources": resources,
-        "source_paths": tuple(str(path) for path in source_paths
+        "source_paths": tuple(str(Path(path).resolve()) for path in source_paths
             if not (Path(path).name == "__init__.py" and Path(path).is_file() and not Path(path).read_text().strip()))}
 
 

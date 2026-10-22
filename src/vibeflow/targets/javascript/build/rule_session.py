@@ -460,7 +460,7 @@ def run_javascript_rules(
                                 {path: tuple(records) for path, records in call_records.items()}, source_scopes, tuple(choices))
 
 
-def run_javascript_workflow_rules(graph: Any, catalogs: Any, *, compiled_by_path: Mapping[tuple[str, ...], Any], node_report: JavascriptRuleReport, project_root: Path, package_root: Path, target: str = "javascript", node_command: str = "node", evaluate_sources: bool = True, rule_defaults: Mapping[str, Mapping[str, Any]] | None = None, quality_policy: QualityPolicy | None = None, phase: str = "static", compiled_nodeset_types: Mapping[str, Any] | None = None) -> JavascriptRuleReport:
+def run_javascript_workflow_rules(graph: Any, catalogs: Any, *, compiled_by_path: Mapping[tuple[str, ...], Any], node_report: JavascriptRuleReport, project_root: Path, package_root: Path, target: str = "javascript", node_command: str = "node", evaluate_sources: bool = True, rule_defaults: Mapping[str, Mapping[str, Any]] | None = None, quality_policy: QualityPolicy | None = None, phase: str = "static", compiled_nodeset_types: Mapping[str, Any] | None = None, global_config=None, effective_params=None) -> JavascriptRuleReport:
     """Execute Core's range plan; native compilation remains independent."""
     results, findings = dict(node_report.results), list(node_report.findings)
     from vibeflow.core.rules.planning import graph_rule_selections
@@ -534,7 +534,7 @@ def run_javascript_workflow_rules(graph: Any, catalogs: Any, *, compiled_by_path
         from vibeflow.core.graph_calls import graph_call_subjects
         paths = [(*subject.call_path, node.id) for subject in graph_call_subjects(graph) for node in subject.graph.nodes]
         policies = policies_from_executions((item for values in results.values() for item in values), paths)
-        findings.extend(policy_findings(graph, policies, catalogs.nodes.get))
+        findings.extend(policy_findings(graph, policies, catalogs.nodes.get, global_config=global_config, effective_params=effective_params))
     return JavascriptRuleReport(results, tuple(findings), node_report.policies, node_report.facts,
         node_report.call_effect_scopes, node_report.call_effect_policies, node_report.source_scopes, choices)
 

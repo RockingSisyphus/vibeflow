@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from dataclasses import replace
 from pathlib import PurePosixPath
 from typing import Mapping, Sequence
 
 from .structure_distance import directory_for_path
-from .models import FileQuality, QualityFinding, QualityStructureConventions, QualityStructureLimits, QualityStructureRoles
-from .resource_imports import resource_import_violations
+from .models import FileQuality, QualityFinding, QualityStructureConventions, QualityStructureLimits
 
 
 _ROOT_DIR = "(root)"
@@ -15,11 +13,8 @@ _ROOT_DIR = "(root)"
 
 def analyze_root_structure(
     files: Sequence[FileQuality],
-    dependency_graph: Mapping[str, Sequence[str]],
-    import_sites_by_edge: Mapping[tuple[str, str], Sequence[Mapping[str, object]]],
     limits: QualityStructureLimits | None,
     *,
-    roles: QualityStructureRoles | None = None,
     conventions: QualityStructureConventions | None = None,
 ) -> tuple[dict[str, object], tuple[QualityFinding, ...]]:
     if limits is None or not limits.enabled:
@@ -33,8 +28,6 @@ def analyze_root_structure(
         *_child_directory_findings(stats, limits),
         *_root_level_file_findings(stats, limits, conventions),
     ]
-    if limits.enforce_role_imports:
-        findings.extend(_resource_import_findings(files, dependency_graph, import_sites_by_edge, roles or QualityStructureRoles()))
     return _summary(stats, limits), tuple(findings)
 
 
@@ -187,48 +180,6 @@ def _root_level_file_findings(stats: Mapping[str, object], limits: QualityStruct
     return [finding] if finding else []
 
 
-def _resource_import_findings(
-    files: Sequence[FileQuality],
-    dependency_graph: Mapping[str, Sequence[str]],
-    import_sites_by_edge: Mapping[tuple[str, str], Sequence[Mapping[str, object]]],
-    roles: QualityStructureRoles,
-) -> list[QualityFinding]:
-    files_by_module = {file.module: file for file in files}
-    findings: list[QualityFinding] = []
-    for source, targets in sorted(dependency_graph.items()):
-        source_file = files_by_module.get(source)
-        if source_file is None:
-            continue
-        for target in sorted(targets):
-            target_file = files_by_module.get(target)
-            if target_file is None:
-                continue
-            for code, owner, sites, scope in resource_import_violations(
-                source_file.path, target_file.path,
-                import_sites_by_edge.get((source, target), ()), roles._resource_scopes,
-            ):
-                finding = _import_finding(code, source, target,
-                    f"{owner['kind']} '{owner['id']}' imports code outside its declared implementation and libraries",
-                    {(source, target): sites})
-                findings.append(replace(finding, details={**finding.details,
-                    "resource_id": owner["id"], "resource_kind": owner["kind"], "workflow_scope": scope}))
-    return findings
-
-
-def _import_finding(rule_id: str, source: str, target: str, message: str, import_sites_by_edge) -> QualityFinding:
-    sites = tuple(import_sites_by_edge.get((source, target), ()))
-    return QualityFinding(
-        rule_id=rule_id,
-        severity="error",
-        object_type="module_dependency",
-        object_id=f"{source} -> {target}",
-        source_location=_first_site_location(sites),
-        message=f"{message}: {source} -> {target}",
-        suggested_fix_type="clarify_structure",
-        details={"source": source, "target": target, "import_sites": sites},
-    )
-
-
 def _threshold_finding(
     rule_id: str,
     object_type: str,
@@ -290,13 +241,6 @@ def _directory(path: PurePosixPath) -> str:
 
 def _first_path(paths: Sequence[str]) -> str:
     return str(paths[0]) if paths else ""
-
-
-def _first_site_location(sites: Sequence[Mapping[str, object]]) -> Mapping[str, object]:
-    if not sites:
-        return {}
-    site = sites[0]
-    return {"path": site.get("path", ""), "line": site.get("line", 1), "column": site.get("column", 1)}
 
 
 __all__ = ["analyze_root_structure"]

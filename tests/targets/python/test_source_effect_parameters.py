@@ -119,6 +119,7 @@ def test_source_effects_follow_real_helper_bodies_without_importing_node_contrac
     ("from http import client\nreturn 1", {"python_io"}),
     ("import sys\nreturn sys.stdout", {"terminal", "python_io"}),
     ("import sys\nsys.path = []\nreturn 1", set()),
+    ('import os\nreturn os.getenv("KEY")', {"python_io", "global_state"}),
 ])
 def test_shared_effect_traversal_covers_named_imports_and_process_state(scope, body, allowed):
     for kind in ("python_source", "node", "base_lib", "plugin"):
@@ -181,6 +182,56 @@ def test_shared_hard_process_state_assignment_tracks_canonical_aliases(scope, bo
         result = no_side_effects(_context(kind, body), {}, {"effect_scope":scope})
         assert result.state == "completed" and result.findings, (kind, scope, body, result)
         assert all(item.source_location["path"] == "/virtual/example.py" for item in result.findings)
+
+
+@pytest.mark.parametrize("kind", ["python_source", "node", "base_lib", "plugin"])
+@pytest.mark.parametrize("scope", ["none", "terminal", "python_io", "global_state", "trusted"])
+@pytest.mark.parametrize("body", [
+    'import os\nprevious = os.environ.get("TRITON_CACHE_DIR")\nos.environ["TRITON_CACHE_DIR"] = "cache"\n'
+    'if previous is None:\n    os.environ.pop("TRITON_CACHE_DIR", None)\n'
+    'else:\n    os.environ["TRITON_CACHE_DIR"] = previous',
+    'from os import environ as environment\nenv = environment\nenv["OTHER_KEY"] = "value"\ndel env["OTHER_KEY"]',
+    'import os as process\nread = process.environ.get\nremove = process.environ.pop\n'
+    'previous = read("OTHER_KEY")\nremove("OTHER_KEY", None)',
+])
+def test_environment_effects_belong_to_global_state(kind, scope, body):
+    result = no_side_effects(_context(kind, body + "\nreturn {}"), {}, {"effect_scope":scope})
+    assert result.state == "completed"
+    assert bool(result.findings) == (scope != "global_state"), (kind, scope, result.findings)
+
+
+@pytest.mark.parametrize("kind", ["python_source", "node", "base_lib", "plugin"])
+@pytest.mark.parametrize("body", [
+    'from os import getenv as read\nprevious = read("OTHER_KEY")',
+    'import os\nos.environb[b"KEY"] = b"value"\nos.environb.pop(b"KEY", None)',
+    'import os\nos.putenv("KEY", "value")\nos.unsetenv("KEY")\nos.getenvb(b"KEY")',
+])
+def test_global_state_supports_python_environment_apis(kind, body):
+    result = no_side_effects(_context(kind, body + "\nreturn {}"), {}, {"effect_scope":"global_state"})
+    assert result.findings == (), (kind, result.findings)
+
+
+@pytest.mark.parametrize("body", [
+    'import os\nos.system("true")',
+    'import os\nos.remove("never-removed")',
+    'import os\nos.mkdir("never-created")',
+    'import os\nos._exit(0)',
+    'import sys\nsys.path.append("other")',
+    'import os\nos.environ = {}',
+    'import os\nopen("never-created", "w")',
+    'import socket\nsocket.socket()',
+    'import threading\nthreading.Thread()',
+])
+def test_global_state_environment_grant_does_not_allow_other_effects(body):
+    for kind in ("python_source", "node", "base_lib", "plugin"):
+        result = no_side_effects(_context(kind, body + "\nreturn {}"), {}, {"effect_scope":"global_state"})
+        assert result.findings, (kind, body, result.findings)
+
+
+def test_global_state_environment_access_still_obeys_explicit_import_policy():
+    result = no_side_effects(_context("node", 'import os\nos.environ.get("KEY")\nreturn {}'), {},
+        {"effect_scope":"global_state", "policy":{"imports":{"banned_roots":["os"]}}})
+    assert {item.code for item in result.findings} == {"NODE.PURITY.BANNED_IMPORT"}
 
 
 @pytest.mark.parametrize("scope", ["none", "terminal", "python_io", "global_state", "trusted"])

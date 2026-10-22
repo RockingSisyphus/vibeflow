@@ -9,6 +9,10 @@ Python 的 plan、block、compiled 三种入口共用同一图调度器；JavaSc
 
 `global_state` 表示调用会影响进程内共享状态；它不会自动建立所有根图共用的全局串行队列。需要排他访问的工作应明确声明 `execution_lock`，并使用同一业务域的锁键。父作用域持锁时，子作用域不能换用不兼容的键；发生异常或取消也要先等真实执行和清理结束，再释放租约。
 
+Python 的 `vibeflow.global_state` Ruleset 通过 `vibeflow.no_side_effects` 的 `effect_scope="global_state"` 允许运行时读取、修改和恢复环境变量：`os.environ` / `os.environb` 的键访问及方法，以及 `os.getenv` / `os.getenvb`、`os.putenv`、`os.unsetenv`。不限制环境键名；不会自动保存或恢复原值，生命周期实现仍须负责恢复。普通 Node、BaseLib、继承/helper 与运行插件共用该效果检查；插件须显式将其 effects 调用参数设为 `global_state`，流程类别名称本身不授予权限。显式 import policy 仍然生效，导入时执行检查保持不变。
+
+该授权不包含替换 `os.environ` 对象、修改 `sys.path` 等导入状态，或文件、网络、子进程和线程操作；`process`、`io`、`python_io`、`data_store` 的默认规则不因此放开环境变量操作。
+
 旧 `async`、`detached`、`result_key` 调度字段已撤销，隐藏目标必须改成普通节点与显式连接。工作流执行探针用于核对图、契约、分支和清理行为；它通过不等于证明业务结果正确性，业务断言仍需由项目提供。
 
 ## 命名入口与运行范围

@@ -206,6 +206,10 @@ def _node_params_type(
     members: list[str] = []
     for key in keys:
         schema = params_schema.get(key)
+        if isinstance(schema, Mapping) and isinstance(schema.get("required"), bool):
+            # A parameter's presence flag is metadata; JSON Schema's object
+            # required field is a list of property names, including nested ones.
+            schema = {name:value for name,value in schema.items() if name != "required"}
         value_type = (
             schema_to_typescript(schema)
             if isinstance(schema, Mapping)

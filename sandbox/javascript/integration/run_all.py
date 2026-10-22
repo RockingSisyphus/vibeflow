@@ -216,6 +216,8 @@ def _manifest_case(cache: BuildCache, *, key: str, profile: str) -> dict[str, An
         "workflow.d.ts" if profile == "esm-module" else "index.d.ts",
         "workflow.js.map" if profile == "esm-module" else "index.js.map",
         "vibeflow-build.json",
+        "resource-use.json",
+        "workflow-launches.json",
     }
     assert_equal(set(result.files), expected, label=f"{profile} files")
     return {
@@ -359,6 +361,8 @@ def _web_profile_case(cache: BuildCache) -> dict[str, Any]:
             "index.js.map",
             "workflow.d.ts",
             "vibeflow-build.json",
+            "resource-use.json",
+            "workflow-launches.json",
         },
         label="web-app files",
     )
@@ -385,7 +389,7 @@ def _atomic_failure_case(cache: BuildCache) -> dict[str, Any]:
         )
     except (AotBuildError, ProjectBuildError) as exc:
         codes = diagnostic_codes(exc)
-        assert "VF_IMPORT_NODE_TO_NODE" in codes, sorted(codes)
+        assert "RESOURCE.REFERENCE.UNDECLARED" in codes, sorted(codes)
     else:
         raise AssertionError("invalid replacement build unexpectedly succeeded")
     after = {
@@ -431,25 +435,25 @@ def _browser_platform_rejection_case(cache: BuildCache) -> dict[str, Any]:
 
 def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
     expected = {
-        "direct_node_import": "VF_IMPORT_NODE_TO_NODE",
-        "undeclared_base_lib": "VF_IMPORT_BASE_LIB",
+        "direct_node_import": "RESOURCE.REFERENCE.UNDECLARED",
+        "undeclared_base_lib": "RESOURCE.REFERENCE.UNAVAILABLE",
         "dynamic_import": "VF_IMPORT_DYNAMIC",
-        "runtime_import": "VF_IMPORT_OWNER",
+        "runtime_import": "RESOURCE.REFERENCE.UNDECLARED",
         "immediate_async": "VF_COMPLETION_IMMEDIATE_PROMISE",
         "suspend_sync": "VF_COMPLETION_SUSPEND_NON_PROMISE",
         "unowned_promise": "VF_PROMISE_UNOWNED",
         "suspend_in_sync": "VF_ENTRY_MODE_SUSPEND_IN_SYNC",
         "task_in_sync": "VF_ENTRY_MODE_SUSPEND_IN_SYNC",
-        "barrel_import": "VF_IMPORT_NODE_TO_NODE",
-        "alias_import": "VF_IMPORT_NODE_TO_NODE",
-        "symlink_import": "VF_IMPORT_NODE_TO_NODE",
-        "base_lib_reverse": "VF_IMPORT_LAYER",
+        "barrel_import": "RESOURCE.REFERENCE.UNDECLARED",
+        "alias_import": "RESOURCE.REFERENCE.UNDECLARED",
+        "symlink_import": "RESOURCE.REFERENCE.UNDECLARED",
+        "base_lib_reverse": "RESOURCE.REFERENCE.UNDECLARED",
         "undeclared_external": "VF_IMPORT_EXTERNAL",
-        "package_root_escape": "VF_IMPORT_OWNER",
+        "package_root_escape": "RESOURCE.REFERENCE.UNDECLARED",
         # The helper itself is outside the declared Node/base_lib ownership
         # closure, so VibeFlow rejects that architectural violation before
         # esbuild reaches the platform-specific node:fs import.
-        "indirect_node_builtin": "VF_IMPORT_OWNER",
+        "indirect_node_builtin": "RESOURCE.REFERENCE.UNDECLARED",
         "module_promise": "VF_IMPORT_SIDE_EFFECT",
         "discarded_promise": "VF_PROMISE_UNOWNED",
         "long_lived_listener": "VF_NODE_RESOURCE_UNOWNED",
@@ -459,8 +463,8 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
         "barrel_import": (
             "sandbox.invalid.barrel_import",
             "node",
-            "negative/barrels/math.ts",
-            '"../../nodes/math.ts"',
+            "negative/nodes/barrel_import.ts",
+            '"../barrels/math.ts"',
         ),
         "alias_import": (
             "sandbox.invalid.alias_import",
@@ -544,6 +548,7 @@ def _negative_cases(cache: BuildCache) -> list[tuple[str, Any]]:
                     ),
                     expected_code=code,
                     expected_definition_id=(
+                        "vibeflow.root.resource_references" if code.startswith("RESOURCE.") else
                         "vibeflow.async_lifecycle"
                         if name in {"discarded_promise", "long_lived_listener"}
                         else "vibeflow.node_architecture"

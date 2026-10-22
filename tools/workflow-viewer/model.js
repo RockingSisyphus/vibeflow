@@ -1,39 +1,49 @@
 /* Protocol and graph projection. Architecture facts are the only semantic input. */
 "use strict";
 window.VFModel = (()=>{
-  function bodies(architecture,graphs={},workflow={}) {
+  function bodies(architecture,workflow={}) {
     const result={};
-    function register(architecture,identity,namespace=""){
-      const key=namespace+"workflow",body={key,namespace,architecture,identity,kind:"workflow",facts:architecture.workflow||{nodes:[],edges:[]},direction:"DOWN"};
-      result[key]=body;if(identity?.id)result["@workflow:"+identity.id]=body;
-      for(const [name,entry] of Object.entries(body.facts.entries||{})){
-        const active=new Set(entry.nodes||[]),nodes=Array.isArray(body.facts.nodes)?body.facts.nodes:Object.values(body.facts.nodes||{});
-        const entryKey=namespace+"entry:"+encodeURIComponent(name);
-        result[entryKey]={...body,key:entryKey,facts:{...body.facts,selected_entry:name,nodes:nodes.filter(n=>active.has(n.id)),
-          edges:(body.facts.edges||[]).filter(e=>active.has(e.from)&&active.has(e.to)),inputs:entry.inputs,outputs:entry.outputs}};
-      }
-      for(const [name,definition] of Object.entries(architecture.nodeset_types||{}))if(definition.body){
-        const childKey=namespace+"nodeset:"+name;
-        result[childKey]={key:childKey,namespace,architecture,identity,kind:"nodeset",facts:definition.body,direction:"DOWN"};
-      }
+    const key="workflow",body={key,architecture,identity:workflow,kind:"workflow",facts:architecture.workflow||{nodes:[],edges:[]},direction:"DOWN"};
+    result[key]=body;
+    for(const [name,entry] of Object.entries(body.facts.entries||{})){
+      const active=new Set(entry.nodes||[]),nodes=Array.isArray(body.facts.nodes)?body.facts.nodes:Object.values(body.facts.nodes||{});
+      const entryKey="entry:"+encodeURIComponent(name);
+      result[entryKey]={...body,key:entryKey,facts:{...body.facts,selected_entry:name,nodes:nodes.filter(n=>active.has(n.id)),
+        edges:(body.facts.edges||[]).filter(e=>active.has(e.from)&&active.has(e.to)),inputs:entry.inputs,outputs:entry.outputs}};
     }
-    register(architecture,workflow);
-    for(const [id,item] of Object.entries(graphs))register(item.architecture,item.workflow,"workflow:"+id+":");
+    for(const [name,definition] of Object.entries(architecture.nodeset_types||{}))if(definition.body){
+      const childKey="nodeset:"+name;
+      result[childKey]={key:childKey,architecture,identity:workflow,kind:"nodeset",facts:definition.body,direction:"DOWN"};
+    }
     const resources=architecture.implementation_graph||{};
     result.resources={facts:{nodes:Object.entries(resources.resources||{}).map(([id,facts])=>({...facts,resource_id:facts.id,id})),
       edges:(resources.relations||[]).filter(e=>resources.resources?.[e.from]&&resources.resources?.[e.to])},direction:"RIGHT"};
     return result;
   }
   function childOptions(facts,body,localPath,all){
-    if(facts.invokes){const key=body.namespace+"nodeset:"+facts.invokes.target,nodes=all[key]?.facts.nodes,available=nodes&&(Array.isArray(nodes)?nodes.length:Object.keys(nodes).length);return [{key,label:facts.invokes.target,workflow:false,error:available?"":"内部定义不可用"}];}
-    const declarations=body.architecture?.workflow?.workflow_targets||{},actions=body.architecture?.call_policies?.[JSON.stringify(localPath)]?.actions||[];
-    return actions.filter(a=>a.capability==="vibeflow.workflow"&&a.target).map(action=>{
-      const target=declarations[action.target],root=target&&all["@workflow:"+target.identity],entry=action.entry||target?.entry||root?.facts.default_entry||(Object.keys(root?.facts.entries||{}).length===1?Object.keys(root.facts.entries)[0]:null);
-      const key=entry&&root?root.namespace+"entry:"+encodeURIComponent(entry):root?.key;
-      return {key,label:action.target+(entry?" / "+entry:" / 全部入口"),workflow:true,
-        error:target?.preview_error||(!target?"未声明目标 workflow":!all[key]?"本次未准备此目标或入口的事实":"")};
-    });
+    if(facts.invokes){const key="nodeset:"+facts.invokes.target,nodes=all[key]?.facts.nodes,available=nodes&&(Array.isArray(nodes)?nodes.length:Object.keys(nodes).length);return [{key,label:facts.invokes.target,error:available?"":"内部定义不可用"}];}
+    return [];
   }
+  function workflowTarget(ref,graphs={},selectDefault=false){
+    const id=ref.root+":"+ref.path,target=graphs[id]?.architecture?.workflow,names=Object.keys(target?.entries||{});
+    const entry=ref.entry||(selectDefault?(target?.default_entry||(names.length===1?names[0]:"")):"");
+    return {id,entry,error:graphs[id]?.error||(selectDefault&&names.length>1&&!entry?"多入口且无默认值；请配置 workflow.entry":"")};
+  }
+  function workflowOptions(facts,architecture,localPath,graphs={}){
+    const actions=architecture.call_policies?.[JSON.stringify(localPath)]?.actions||facts.operations||[];
+    const result=new Map();
+    for(const action of actions){
+      if(action.capability!=="vibeflow.workflow")continue;
+      const refs=action.workflow?[action.workflow]:action.expected_workflows||[];
+      for(const ref of refs){
+        const {id,entry,error}=workflowTarget(ref,graphs,action.operation==="call"),key=id+"|"+entry;
+        result.set(key,{id,entry,workflow:ref,
+          label:id+(entry?" · 入口 "+entry:"")+(action.expected_workflows?" · 预期交互":""),error});
+      }
+    }
+    return [...result.values()];
+  }
+
   function resourceView(body,kinds){
     const selected=new Set(kinds),resources=body.facts.nodes;
     const packages=new Set(resources.filter(r=>r.kind==="plugin_declaration").map(r=>r.resource_id));
@@ -42,6 +52,7 @@ window.VFModel = (()=>{
     return {...body,facts:{nodes,edges:body.facts.edges.filter(e=>ids.has(e.from)&&ids.has(e.to))}};
   }
   function operationLabel(action){
+    if(action.planned&&action.operation==="call")return "计划启动 workflow";
     if(action.operation==="call")return action.wait===true?"启动 workflow · 等待结束":"启动 workflow · 不等待结束";
     return ({self:"本实例身份",wait:"等待实例结束",send:"发送消息 · 不等待处理",receive:"接收消息 · 等待",kill:"停止实例 · 确认终态"})[action.operation]||action.operation;
   }
@@ -97,5 +108,5 @@ window.VFModel = (()=>{
       script.onerror=()=>finish(()=>reject(new Error("无法加载 "+url)));document.head.append(script);
     });
   }
-  return {bodies,childOptions,resourceView,operationLabel,nodeInfo,edgeInfo,graphEdges,edgeLabel,loadScript};
+  return {bodies,childOptions,workflowTarget,workflowOptions,resourceView,operationLabel,nodeInfo,edgeInfo,graphEdges,edgeLabel,loadScript};
 })();

@@ -6,19 +6,20 @@ import pytest
 
 from tests.fixtures.support.plugins import resource
 from tests.targets.javascript.test_domain_rules import domain_project
+from vibeflow.core.descriptors.resource_use import ResourceUse
 from vibeflow.core.flow import GraphConfig, NodeCallSpec
 from vibeflow.core.rules import RuleContext
 from vibeflow.targets.javascript.build.driver_session import DriverScope
 from vibeflow.targets.javascript.build.analysis_service import JavascriptAnalysis
 from vibeflow.targets.javascript.rules.plugin import javascript_rule_bindings
-from vibeflow.targets.javascript.build.project_resources import target_neutral_import_policy
+from vibeflow.targets.javascript.build.project_resources import source_import_facts
 from vibeflow.targets.javascript.quality.rules import run_javascript_rules
 from vibeflow.tooling.project.resources import prepare_workflow_catalogs
 
 
 def _review(project):
     catalogs = prepare_workflow_catalogs(project / "configs/model.jsonc")
-    policy, _ = target_neutral_import_policy(catalogs=catalogs, project_root=project,
+    policy, _ = source_import_facts(resource_use=ResourceUse("test"), catalogs=catalogs, project_root=project,
                                              allowed_external=set(), node_ids=frozenset({"example.transform"}))
     return run_javascript_rules(GraphConfig(nodes=(NodeCallSpec("transform", "example.transform"),), rulesets=()),
                                 catalogs, project_root=project, package_root=project, target="node", import_policy=policy)

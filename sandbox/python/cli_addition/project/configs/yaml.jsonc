@@ -116,5 +116,10 @@
         "as": "cli.exit_code"
       }
     ]
+  },
+  "base_lib": {
+    "modules": [
+      "addition.math"
+    ]
   }
 }

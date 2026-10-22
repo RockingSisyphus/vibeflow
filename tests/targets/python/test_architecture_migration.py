@@ -36,6 +36,8 @@ def _project(root, library_path, library_text, *, node_text=None, support=None,
     selection = write_plugin(root, declarations, target="python", plugin_id="migration")
     write("main.jsonc", json.dumps({"plugins":[selection], "rulesets":[],
         "pipeline":{"nodes":[{"id":"leaf","definition_id":"test.leaf","display_name":"Leaf","description":"Exercise canonical ownership"}]}}))
+    if not dependency:
+        write("root_rules.jsonc", json.dumps({"rulesets":["vibeflow.root.default"]}))
     path = root / "main.jsonc"
     return validate_workspace_config_path(path, workspace=load_project_workspace(path))
 
@@ -59,7 +61,7 @@ def test_declared_library_support_membership_is_independent_of_directory_name(tm
 
 def test_actual_undeclared_library_is_rejected_without_old_policy_allowlist(tmp_path):
     report = _project(tmp_path, "ordinary/math.py", 'def add(left,right): return left+right\n', dependency=False)
-    assert "VF_IMPORT_LAYER" in {item.code for item in report.errors}
+    assert "RESOURCE.REFERENCE.UNAVAILABLE" in {item.code for item in report.errors}
 
 
 def test_callers_selected_effect_rule_checks_transitive_helpers_even_with_unchecked_library(tmp_path):

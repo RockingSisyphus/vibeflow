@@ -111,7 +111,7 @@ def test_architecture_uses_checked_resource_selections_after_config_changes(tmp_
     assert loaded[4] is None
     prepared=loaded[-1];facts=build_architecture_facts(prepared)
     assert facts["implementation_graph"]["resources"]["base_lib:layout.helper"]["effective_presentation"]["values"]["fill"] == "#abcdef"
-    with pytest.raises(TypeError):prepared.resources.selection_facts["base_lib"]["modules"][0]["style"]["fill"]="#000000"
+    with pytest.raises(TypeError):prepared.resources.resource_use.annotations[0]["selection"]["style"]["fill"]="#000000"
     monkeypatch.setattr(config_loader,"load_raw_config_document",lambda *a,**k:pytest.fail("facts reread source configuration"))
     config.write_text('{"base_lib":{"modules":[]}}')
     assert build_architecture_facts(prepared) == facts

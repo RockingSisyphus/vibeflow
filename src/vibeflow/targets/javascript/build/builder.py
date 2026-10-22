@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
@@ -52,7 +54,10 @@ class BuildRequest:
     app_entry: str | Path | None = None
     node_command: str = "node"
     plugin_manifest: Mapping[str, Any] = field(default_factory=dict)
+    resource_use: Mapping[str, Any] | None = None
     audit_sources: tuple[str, ...] = ()
+    workflow_launches: tuple = ()
+    workflow_reference: Mapping | None = None
 
 
 from vibeflow.targets.shared.aot import BuildResult, staged_build, write_manifest
@@ -184,6 +189,11 @@ def build_aot(request: BuildRequest) -> BuildResult:
                 profile=profile,
                 entry_name=entry_name,
             )
+            if request.resource_use is not None:
+                (staging / "resource-use.json").write_text(json.dumps(dict(request.resource_use)), encoding="utf-8")
+            from vibeflow.core.workflows.references import launch_document
+            (staging / "workflow-launches.json").write_text(
+                json.dumps(launch_document(request.workflow_launches, workflow=request.workflow_reference), ensure_ascii=False, indent=2)+"\n", encoding="utf-8")
             manifest_payload = _manifest(
                 workflow,
                 emitted=emitted,

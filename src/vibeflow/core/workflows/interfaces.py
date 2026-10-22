@@ -59,14 +59,19 @@ def port_capability_descriptor(
 WORKFLOW_CAPABILITY_ID = "vibeflow.workflow"
 _ID = {"type": "string", "minLength": 1}
 _TIMEOUT = {"type": "number", "minimum": 0}
+WORKFLOW_REFERENCE_SCHEMA = {"type":"object", "required":["path"],
+    "properties":{"root":{"type":"string"}, "path":_ID, "entry":_ID}, "additionalProperties":False}
+WORKFLOW_LAUNCH_SCHEMA = {"type":"object", "required":["command"],
+    "properties":{"command":{"type":"array","items":{"type":"string"},"minItems":1},
+        "cwd":{"type":"string"}, "env":{"type":"object","additionalProperties":{"type":"string"}}}, "additionalProperties":False}
 _REQUESTS = {
     "self": ({}, []),
-    "call": ({"target": _ID, "entry": {"type": ["string", "null"]},
-              "inputs": {"type": "object"}, "timeout": _TIMEOUT}, ["target"]),
+    "call": ({"workflow": WORKFLOW_REFERENCE_SCHEMA, "launch":WORKFLOW_LAUNCH_SCHEMA,
+              "inputs": {"type": "object"}, "timeout": _TIMEOUT}, ["workflow", "launch"]),
     "wait": ({"id": _ID, "timeout": _TIMEOUT}, ["id"]),
     "send": ({"id": _ID, "port": _ID, "payload": {}}, ["id", "payload"]),
     "receive": ({"port": _ID, "timeout": _TIMEOUT}, []),
-    "kill": ({"id": _ID, "timeout": _TIMEOUT}, ["id"]),
+    "kill": ({"id": _ID, "workflow":WORKFLOW_REFERENCE_SCHEMA, "timeout": _TIMEOUT}, ["id", "workflow"]),
 }
 WORKFLOW_SCHEMA_TYPES = {
     f"vibeflow.workflow.{name}.request": {"type": "object", "properties": fields,
@@ -77,7 +82,7 @@ _IDENTITY = {"type": "object", "properties": {"id": _ID}, "required": ["id"], "a
 _STATUS = {"type": "object", "properties": {"id": _ID,
     "state": {"enum": ["starting", "running", "stopping", "succeeded", "failed", "cancelled"]},
     "outputs": {}, "error": {}, "pid": {"type": ["number", "null"]},
-    "workflow": {"type": ["string", "null"]}, "entry": {"type": ["string", "null"]}},
+    "workflow": {"type": ["object", "string", "null"]}, "entry": {"type": ["string", "null"]}},
     "required": ["id", "state"], "additionalProperties": False}
 WORKFLOW_SCHEMA_TYPES.update({
     "vibeflow.workflow.self.result": _IDENTITY,

@@ -49,7 +49,7 @@ def handle_export_graph(args, *, export_kind: str) -> int:
 
 
 def _export_architecture(args, *, graph, compiled, registry, resources, prepared=None) -> int:
-    from vibeflow.tooling.application.python.presentation.architecture_validation import architecture_finding_status, check_architecture_document
+    from vibeflow.tooling.architecture.documents import architecture_finding_status, check_architecture_document
     from vibeflow.tooling.application.python.reports import fail_report
     from vibeflow.targets.python.project.compiler import GraphCompileError
     from vibeflow.core.findings import HealthFinding, HealthReport
@@ -99,7 +99,8 @@ def _export_architecture(args, *, graph, compiled, registry, resources, prepared
     if output_value:
         output_path = Path(output_value)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(text, encoding="utf-8")
+        from vibeflow.tooling.file_io import atomic_write
+        atomic_write(output_path, text)
     else:
         print(text, end="")
     return 0

@@ -231,7 +231,6 @@ class GraphConfig:
     entries: dict[str, EntrySpec] = field(default_factory=dict)
     default_entry: str = ""
     selected_entry: str = ""
-    workflow_targets: dict = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         from vibeflow.core.rules.selection.models import selection_refs

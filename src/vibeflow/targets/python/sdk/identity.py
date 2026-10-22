@@ -1,4 +1,4 @@
-"""Resolve SDK source assertions to the actual, already loaded Python object."""
+"""Resolve Python implementation identity and lazy source paths without ownership policy."""
 
 from dataclasses import replace
 from importlib.machinery import PathFinder
@@ -65,7 +65,16 @@ def _loaded_export(path, symbol, *, module_name=""):
 def normalize_resource(entry, value, *, root, source_roots=()):
     """Validate one loaded implementation for either ownership category."""
     if value is None:
-        return entry
+        # Resolve lazy locators without executing the implementation. Ownership is
+        # a Rule decision over these facts, never a loader restriction.
+        def canonical(source):
+            return SourceLocator("file", str(_source_path(source, Path(root), source_roots)), source.export)
+        implementations = tuple(replace(item, source=canonical(item.source),
+            **({"implementation_files": tuple(canonical(source) for source in item.implementation_files)}
+               if hasattr(item, "implementation_files") else {}))
+            if item.language == "python" else item
+            for item in getattr(entry.descriptor, "implementations", ()))
+        return replace(entry, descriptor=replace(entry.descriptor, implementations=implementations)) if implementations else entry
     descriptor = entry.descriptor
     filename = inspect.getsourcefile(value)
     symbol = getattr(value, "__qualname__", "")

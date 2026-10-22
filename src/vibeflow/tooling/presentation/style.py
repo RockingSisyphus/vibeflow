@@ -19,8 +19,17 @@ SYSTEM_STYLE_COLORS: Mapping[str, StyleColors] = {
     "documentNode": StyleColors(fill="#f0fdf4", stroke="#16a34a", text="#14532d"),
     "nodesetNode": StyleColors(fill="#ede9fe", stroke="#7c3aed", text="#3b0764"),
     "loopNode": StyleColors(fill="#f0fdfa", stroke="#0f766e", text="#134e4a"),
-    "plannedNode": StyleColors(fill="#fef08a", stroke="#ca8a04", text="#713f12"),
     "baseLibResource": StyleColors(fill="#ecfdf5", stroke="#059669", text="#064e3b"),
     "pluginResource": StyleColors(fill="#eff6ff", stroke="#2563eb", text="#1e3a8a"),
     "plannedResource": StyleColors(fill="#fef08a", stroke="#ca8a04", text="#713f12"),
+}
+
+WORKFLOW_OPERATION_STYLES = {
+    "call": {"shape": "fr-rect", "fill": "#fef3c7", "stroke": "#b7791f", "text": "#713f12"},
+    "kill": {"shape": "rounded", "fill": "#ffe4e6", "stroke": "#be123c", "text": "#881337"},
+    "receive": {"shape": "lean-l", "fill": "#1e3a8a", "stroke": "#172554", "text": "#ffffff"},
+    "send": {"shape": "lean-r", "fill": "#e0f2fe", "stroke": "#0284c7", "text": "#0c4a6e"},
+    "wait": {"shape": "hex", "fill": "#e2e8f0", "stroke": "#475569", "text": "#1e293b"},
+    "self": {"shape": "circle", "fill": "#e2e8f0", "stroke": "#475569", "text": "#1e293b"},
+    "multiple": {"shape": "doc", "fill": "#ccfbf1", "stroke": "#0f766e", "text": "#134e4a"},
 }

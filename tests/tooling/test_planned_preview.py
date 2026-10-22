@@ -82,3 +82,41 @@ def test_planned_calls_in_real_offline_browser(tmp_path):
     assert result.returncode == 0, result.stdout + result.stderr
     report = json.loads(result.stdout)
     assert report["targets"] == 2 and not report["page_errors"] and not report["network_requests"]
+
+
+@pytest.mark.parametrize("target", ["python","javascript"])
+def test_formal_svg_dims_whole_objects_once_in_nested_planned_nodesets(tmp_path, capsys, target):
+    from vibeflow.tooling.presentation.mermaid import is_mermaid_svg_renderer_available, _find_mmdc
+    from vibeflow.tooling.application.cli import main
+    if not is_mermaid_svg_renderer_available():
+        pytest.skip("locked renderer supplied by full gate")
+    if target == "python":
+        from tests.targets.python.test_code_plugins import project
+        source='from vibeflow.targets.python.sdk import node\n@node(id="fixture.leaf",node_type="vibeflow.node",contract={},rulesets=[])\nclass Leaf:\n    def run_pure(self,inputs,params):return {}\n'
+    else:
+        from tests.targets.javascript.test_code_plugins import project
+        source='import {defineNode} from "@vibeflow/plugin";\nexport const leaf=defineNode({id:"fixture.leaf",node_type:"vibeflow.node",contract:{},rulesets:[],run(){return {};}});\n'
+    workspace, config = project(tmp_path/"project", source)
+    child={"id":"leaf","definition_id":"fixture.leaf","display_name":"Future leaf","description":"Preserve authored colors",
+        "status":"planned","flow_kind":"process","requires":[],"provides":[],"style":{"fill":"#ffbbaa","stroke":"#123456","text":"#234567"}}
+    inner={"id":"inner","definition_id":"draft.inner","display_name":"Inner","description":"Nested planned Nodeset"}
+    def definition(name,nodes):
+        return {"type_key":name,"display_name":name,"description":"Planned subtree","status":"planned","planned_behavior":"transparent",
+            "requires":[],"provides":[],"rulesets":[],"pipeline":{"nodes":nodes}}
+    data=json.loads(config.read_text());data["rulesets"]=[]
+    (config.parent/"inner.jsonc").write_text(json.dumps(definition("draft.inner",[child])))
+    outer=definition("draft.outer",[inner]);outer["nodeset_imports"]=["inner.jsonc"]
+    (config.parent/"outer.jsonc").write_text(json.dumps(outer))
+    data["nodeset_imports"]=["outer.jsonc"]
+    data["pipeline"]={"nodes":[{"id":"outer","definition_id":"draft.outer","display_name":"Outer","description":"Planned container"}]}
+    config.write_text(json.dumps(data))
+    root_config=config.parent/"vibeflow_project.jsonc"
+    metadata=json.loads(root_config.read_text());metadata["architecture"]={"documents":[{"workflow":"workflow.jsonc","document":"ARCHITECTURE.jsonc"}]}
+    root_config.write_text(json.dumps(metadata))
+    workspace_path=tmp_path/"vibeflow_config.jsonc"
+    workspace_path.write_text(json.dumps({"roots":[{"id":"project","path":"project"}]}))
+    output=tmp_path/"planned.svg"
+    assert main(["review","--workspace",str(workspace_path),"--config",str(config),"--output",str(output)])==0, capsys.readouterr().out
+    script=Path(__file__).resolve().parents[1]/"fixtures/preview/planned-svg.cjs"
+    result=subprocess.run(["node",str(script),str(_find_mmdc().resolve()),str(output)],capture_output=True,text=True,timeout=30)
+    assert result.returncode==0,result.stdout+result.stderr

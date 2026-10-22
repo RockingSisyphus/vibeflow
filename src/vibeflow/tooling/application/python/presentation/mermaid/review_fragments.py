@@ -3,7 +3,7 @@ from vibeflow.tooling.presentation.mermaid.style import mermaid_style, mermaid_s
 
 import re
 import xml.sax.saxutils
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Mapping
 
@@ -87,18 +87,18 @@ def _render_nodeset_detail_fragment(
     prepared=None,
 ) -> SvgFragment:
     if nodeset.type_key in visited_nodesets:
-        return _placeholder_fragment(
+        return replace(_placeholder_fragment(
             title,
             f"recursive nodeset expansion skipped: {nodeset.type_key}",
             background=background,
-        )
+        ), planned=nodeset.status == STATUS_PLANNED)
     if not nodeset.graph.nodes:
-        return _placeholder_fragment(title, "nodeset has no concrete pipeline", background=background)
+        return replace(_placeholder_fragment(title, "nodeset has no concrete pipeline", background=background), planned=nodeset.status == STATUS_PLANNED)
 
     compiled = compile_for_render(nodeset.graph, None, registry, prepared=prepared)
     child_groups = _direct_nodeset_call_groups(nodeset.graph)
     if not child_groups:
-        return _render_fragment(
+        return replace(_render_fragment(
             title,
             _nodeset_mermaid(
                 nodeset.graph,
@@ -114,7 +114,7 @@ def _render_nodeset_detail_fragment(
             background=background,
             max_text_size=max_text_size,
             max_edges=max_edges,
-        )
+        ), planned=nodeset.status == STATUS_PLANNED)
 
     parent_fragment = _render_fragment(
         "parent flow",
@@ -158,7 +158,7 @@ def _render_nodeset_detail_fragment(
         review_fragment_max_width=review_fragment_max_width,
     )
     width, height = _viewbox_size(svg_text)
-    return SvgFragment(title=title, svg_text=svg_text, width=width, height=height)
+    return replace(SvgFragment(title=title, svg_text=svg_text, width=width, height=height), planned=nodeset.status == STATUS_PLANNED)
 
 
 def _direct_nodeset_call_groups(graph: GraphConfig) -> tuple[_NodesetInvocationGroup, ...]:

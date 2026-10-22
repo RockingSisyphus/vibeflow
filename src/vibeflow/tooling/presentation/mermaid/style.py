@@ -19,6 +19,7 @@ def mermaid_style(presentation):
 
 SYSTEM_MODIFIER_STYLES: Mapping[str, str] = {
     "externalBoundary": "stroke-width:7px,vector-effect:non-scaling-stroke",
+    "plannedNode": "stroke-width:3px,stroke-dasharray:6 3,opacity:0.6",
 }
 
 MERMAID_MAIN_CLASS_ORDER = (
@@ -49,7 +50,7 @@ def mermaid_class_def(class_name: str) -> str:
         return f"classDef {class_name} {modifier};"
     style = SYSTEM_STYLE_COLORS[class_name]
     fields = [f"fill:{style.fill}", f"stroke:{style.stroke}"]
-    if class_name in {"plannedNode", "plannedResource"}:
+    if class_name == "plannedResource":
         fields.append("stroke-width:3px,stroke-dasharray: 6 3")
     fields.append(f"color:{style.text}")
     return f"classDef {class_name} {','.join(fields)};"

@@ -15,7 +15,6 @@ from vibeflow.targets.shared.quality_support.models import (
     QualityReport,
     QualityStructureLimits,
     QualityStructureConventions,
-    QualityStructureRoles,
     QualityThresholds,
     SourceQualityReport,
 )
@@ -44,7 +43,6 @@ __all__ = [
     "QualityReport",
     "QualityStructureLimits",
     "QualityStructureConventions",
-    "QualityStructureRoles",
     "QualityThresholds",
     "SourceQualityReport",
     "WorkflowHealthReport",

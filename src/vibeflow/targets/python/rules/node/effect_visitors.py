@@ -11,6 +11,7 @@ from vibeflow.targets.python.quality.source_analysis.ast_facts import (
 )
 from vibeflow.core.constants import EFFECT_SCOPE_GLOBAL_STATE, EFFECT_SCOPE_NONE
 from vibeflow.targets.python.rules.node.effect_policy import (
+    ENVIRONMENT_MAPPINGS,
     ambient_assignment_is_forbidden,
     call_violation,
     from_import_effect_is_forbidden,
@@ -513,6 +514,9 @@ class _EffectVisitor(_PurityImportVisitor):
             self._check_ambient_assignment(target.value, node)
             return
         names = self._ambient_targets(target)
+        if (self.effect_scope == EFFECT_SCOPE_GLOBAL_STATE and isinstance(target, ast.Subscript)
+                and names and all(name in ENVIRONMENT_MAPPINGS for name in names)):
+            return
         forbidden = next((name for name in names if ambient_assignment_is_forbidden(name)), "")
         if forbidden:
             self._add("effect_call", f"must not mutate forbidden process state: {forbidden}", node, suggested_fix_type="configure_effect_rules")

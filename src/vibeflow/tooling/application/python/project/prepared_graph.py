@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from vibeflow.core.findings import HealthReport
 from vibeflow.core.models import CoreCompilation
-from vibeflow.tooling.application.python.project.resource_selection import PythonResources
+from vibeflow.tooling.application.python.project.resource_bindings import PythonResources
 
 
 @dataclass

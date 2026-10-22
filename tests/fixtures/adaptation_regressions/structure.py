@@ -34,7 +34,7 @@ def fixture(root,kind='node',*,registered=True,conventional=False):
     write(root,'nodes/leaf.py','from vibeflow.targets.python.sdk import node\n'+imports+
         f"@node(id='audit.leaf',node_type='vibeflow.node',contract={CONTRACT!r},rulesets=['vibeflow.process']"+support+libraries+")\n"
         "class Leaf:\n    def run_pure(self,inputs,params):\n        return {'result':"+body+"}\n")
-    write_json(root/'configs/workflow.jsonc',{'rulesets':[],'pipeline':{'nodes':[{
+    write_json(root/'configs/workflow.jsonc',{'rulesets':[],'base_lib':{'modules':['audit.library'] if kind=='base_lib' else []},'pipeline':{'nodes':[{
         'id':'leaf','definition_id':'audit.leaf','display_name':'Leaf','description':'Review the independent SDK definition.'}]}})
 
 
@@ -63,7 +63,7 @@ def observe(work:Path,kernel:Path,toolchain=None,renderer=None):
             expected={'exit_code':0 if registered else 1};failures=[]
             if raw['exit_code']!=expected['exit_code']:failures.append(f"unexpected exit {raw['exit_code']}: {codes}")
             if registered and codes:failures.append('declared support was rejected: '+repr(codes))
-            if not registered and not set(codes)&{'VF_IMPORT_OWNER','VF_IMPORT_LAYER','QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT','QUALITY.STRUCTURE.BASE_LIB_UPWARD_IMPORT'}:
+            if not registered and not set(codes)&{'RESOURCE.REFERENCE.UNDECLARED','RESOURCE.REFERENCE.UNDECLARED','RESOURCE.REFERENCE.UNDECLARED','RESOURCE.REFERENCE.UNDECLARED'}:
                 failures.append('missing explicit ownership diagnostic')
             rows.append(row('A05.python.'+identifier+'.'+command,'A05','Independent SDK source ownership: '+identifier,
                 expected,{'exit_code':raw['exit_code'],'codes':codes,'diagnostics':errors},failures,root))

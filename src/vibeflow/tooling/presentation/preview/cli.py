@@ -22,6 +22,8 @@ def main(argv=None):
         root = args.preview_root or workspace.root
         install_page(root.resolve())
         if workspace is not None:
+            from vibeflow.tooling.project.preparation import ProjectPreparation
+            ProjectPreparation(workspace).review(write_architecture=True)
             from .exporter import publish_project
             publish_project(root, workspace)
         if args.reindex:

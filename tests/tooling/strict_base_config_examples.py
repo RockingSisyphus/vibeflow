@@ -71,9 +71,6 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
         (base_dir / "bad.py").write_text(str(case["module_source"]), encoding="utf-8")
         from tests.fixtures.support.plugins import write_plugin
         from vibeflow.tooling.project.workspace_loader import load_project_workspace
-        from vibeflow.tooling.application.python.project.declarations import declared_python_registry
-        from vibeflow.tooling.application.python.project.resource_selection import select_python_resources
-        from vibeflow.targets.python.project.resource_rules import review_python_resource
         (base_dir / "__init__.py").write_text("")
         nodes = base_dir.parent / "nodes"
         nodes.mkdir()
@@ -89,9 +86,9 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
         data = {"plugins":[selection],"rulesets":[],"base_lib":{"modules":["bad"]},"pipeline":{"nodes":[_node_call("node","demo.other","Declaration for ownership checks.")]}}
         config.write_text(json.dumps(data))
         workspace = load_project_workspace(config)
-        registry = declared_python_registry(workspace,config)
-        resources,_ = select_python_resources(data,registry=registry)
-        findings = review_python_resource(resources.base_libs[0],base_path=base_dir.parent,registry=registry,phase="import")
+        from vibeflow.tooling.project.preparation import ProjectPreparation
+        (base_dir.parent / "root_rules.jsonc").write_text('{"rulesets":["vibeflow.root.resource_usage"]}')
+        findings = ProjectPreparation(workspace, root=workspace.root_for_path(config), workflow=config).review().findings
         rule_ids = {finding.rule_id for finding in findings}
         expected_rule = str(case["expected_rule_id"])
         assert expected_rule in rule_ids
@@ -158,7 +155,7 @@ def test_failure_examples_manifest_covers_absolute_guardrails(tmp_path, capsys) 
         "NODE.IMPORT.SIDE_EFFECT",
         "CONFIG.LOOPS.REMOVED",
         "CONFIG.BOUNDARY.REMOVED",
-        "VF_IMPORT_LAYER",
+        "RESOURCE.REFERENCE.UNDECLARED",
         "GRAPH.CYCLE.FORBIDDEN",
         "GRAPH.EDGE.DUPLICATE",
         "GRAPH.SMELL.CONFUSING_NODE_NAME",

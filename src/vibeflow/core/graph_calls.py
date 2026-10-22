@@ -20,7 +20,7 @@ class GraphCallSubject:
     available_nodeset_types: object = field(default_factory=dict)
 
 
-def graph_call_subjects(graph, *, global_config=None, node_config_overrides=None, include_planned=False):
+def graph_call_subjects(graph, *, global_config=None, node_config_overrides=None, include_planned=False, include_planned_calls=False):
     found = [GraphCallSubject("pipeline", graph, global_config=normalize_config_scope(global_config),
         overrides=node_config_overrides or {}, available_nodeset_types=graph.nodeset_types)]
 
@@ -29,7 +29,7 @@ def graph_call_subjects(graph, *, global_config=None, node_config_overrides=None
         config = normalize_config_scope(config)
         overrides = overrides or {}
         for node in current.nodes:
-            if node.status == STATUS_PLANNED:
+            if node.status == STATUS_PLANNED and not include_planned_calls:
                 continue
             key = node.loop.body if node.definition_id in LOOP_DEFINITION_IDS else node.definition_id
             if key in definitions and key not in active:

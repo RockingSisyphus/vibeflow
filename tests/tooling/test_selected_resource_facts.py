@@ -1,7 +1,7 @@
 """Architecture retains selected project source facts independently of SVG."""
 from vibeflow.core.descriptors import ContributionBuilder, ResourceOrigin, ResourceOwner, compose_contributions
 from vibeflow.core.descriptors.decode import decode_resource
-from vibeflow.tooling.presentation.resource_architecture import resource_architecture
+from vibeflow.tooling.architecture.resources import resource_architecture
 
 
 def _catalogs(definitions):

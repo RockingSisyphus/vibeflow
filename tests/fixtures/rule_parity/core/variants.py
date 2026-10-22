@@ -19,12 +19,12 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             kw.update(classification="approved_change",notes="Retired concurrency declarations require explicit task targets, including planned and nested calls.")
         support.append(rows,name,title,family,operation,expected,**kw)
     codes = support.expectation
-    from vibeflow.targets.shared.quality_support import FileQuality, FunctionQuality, ImportSite, SourceQualityFacts, QualityPolicy, QualityStructureLimits, QualityStructureRoles, QualityThresholds
+    from vibeflow.targets.shared.quality_support import FileQuality, FunctionQuality, ImportSite, SourceQualityFacts, QualityPolicy, QualityStructureLimits, QualityThresholds
     from vibeflow.targets.shared.quality_support.models import QualityStructureConventions
     from vibeflow.targets.shared.quality_support.implementation import CallChain, ImplementationLimits, ImplementationMetrics, analyze_call_graph
 
     if variant == "baseline":
-        from vibeflow.targets.shared.quality_support import evaluate_source_quality
+        from vibeflow.targets.shared.quality_support import evaluate_source_quality, QualityStructureRoles
         from vibeflow.targets.shared.quality_support.implementation import (evaluate_node_implementation,
             evaluate_base_lib_implementation, evaluate_base_lib_dependency_chain)
     else:
@@ -37,7 +37,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
     def project(files, policy=None):
         return evaluate_source_quality(SourceQualityFacts(str(work_root), tuple(files)), policy)
     limits = QualityStructureLimits()
-    quiet = replace(limits, **{name: 10000 for name in limits.__dataclass_fields__ if name.startswith(("warn_", "max_"))}, enforce_role_imports=False)
+    quiet = replace(limits, **{name: 10000 for name in limits.__dataclass_fields__ if name.startswith(("warn_", "max_"))}, **({"enforce_role_imports":False} if variant == "baseline" else {}))
     root_subjects = (
         ("root_files", "warn_root_code_files", "max_root_code_files", "ROOT_TOO_MANY_CODE_FILES", lambda n: [file(f"d{i // 8}/f{i}.py") for i in range(n)]),
         ("root_dirs", "warn_code_dirs", "max_code_dirs", "ROOT_TOO_MANY_CODE_DIRS", lambda n: [file(f"d{i}/file.py") for i in range(n)]),
@@ -114,10 +114,13 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
                 "prefix_exact":{"base_lib_paths":("base_lib",)}}
             roles = QualityStructureRoles(**historical_options.get(name, {}))
         else:
-            roles = QualityStructureRoles(_resource_scopes=({"id":"selected","owners":owners},) if declared else ())
+            from tests.fixtures.support.resource_rules import check
+            for owner in owners:
+                owner["symbol"] = ""
+            findings = check(owners if declared else (), source=source_path, target=target_path)
         changed = name.startswith("inferred_")
         emit("roles." + name, "源码身份只来自真实声明 " + name, "project.structure.variants",
-            lambda files=files, roles=roles: project(files, QualityPolicy(structure_limits=replace(quiet, enforce_role_imports=True), structure_roles=roles)),
+            (lambda files=files, roles=roles: project(files, QualityPolicy(structure_limits=replace(quiet, enforce_role_imports=True), structure_roles=roles))) if variant == "baseline" else (lambda findings=findings:findings),
             codes(*(("QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT","error"),) if variant == "baseline" and changed else ()),
             classification="approved_change" if changed else "preserved",
             notes="目录名不再赋予未声明源码Node或BaseLib身份；真实资源依赖仍由明确归属检查。",

@@ -10,6 +10,8 @@ RESOURCE_DIRECTORIES = {"node": "nodes", "base_lib": "base_lib",
 
 
 def governance_resources(source_rules=()):
+    from vibeflow.targets.shared.rule_support.resource_use import declarations
+    use_rules, use_calls, use_relations = declarations()
     rules = (
         RuleDescriptor("vibeflow.project.layout", level="project",
             params_schema={"directories": {"type": "array"}}, params_defaults={"directories": []}),
@@ -33,15 +35,17 @@ def governance_resources(source_rules=()):
                           for rule in source_rules if rule.id.startswith("vibeflow.quality."))
     quality_calls = tuple(RuleCall(rule.id.rsplit(".", 1)[1], rule_id=rule.id) for rule in quality)
     rulesets = (
+        RulesetDescriptor("vibeflow.root.resource_usage", calls=use_calls, relations=use_relations),
         RulesetDescriptor("vibeflow.project.default", calls=(
+            RuleCall("plugin_ownership", rule_id="vibeflow.project.plugin_ownership"),
             RuleCall("layout", rule_id=rules[0].id), RuleCall("shared", rule_id=rules[1].id),
             *(RuleCall(name, rule_id="vibeflow.project." + name) for name in ("structure", "packages", "dependencies")))),
         RulesetDescriptor("vibeflow.root.default", calls=(RuleCall("layout", rule_id=rules[3].id), RuleCall("resources", rule_id=rules[2].id),
-            RuleCall("nodesets", rule_id="vibeflow.root.nodesets"), RuleCall("packages", rule_id="vibeflow.root.packages"), *quality_calls),
-            relations=(RuleRelation("structure", "dependencies", "requires", {"graph": "graph", "import_sites": "import_sites"}),)
-                      if quality_calls else ()),
+            RuleCall("nodesets", rule_id="vibeflow.root.nodesets"), RuleCall("packages", rule_id="vibeflow.root.packages"), *quality_calls, *use_calls),
+            relations=(*use_relations, *((RuleRelation("structure", "dependencies", "requires", {"graph": "graph", "import_sites": "import_sites"}),)
+                      if quality_calls else ()))),
     )
-    return (*rules, *quality, *graph_quality), rulesets
+    return (*rules, *quality, *graph_quality, *use_rules), rulesets
 
 
 def _finding(context, code, message, path, **details):
@@ -143,12 +147,12 @@ def root_resources(context, inputs, params):
 
 
 def governance_handlers():
+    from vibeflow.targets.shared.rule_support.resource_use import handlers
     from vibeflow.targets.shared.rule_support.source_quality import _files, _dependencies, _structure, _duplicates
     def root_quality(handler):
         def check(context, inputs, params):
             facts = context.facts["root"]
-            result = handler(replace(context, facts={**context.facts, "source_quality": facts["source_quality"],
-                "source_import_scopes":facts.get("source_import_scopes", ())}), inputs, params)
+            result = handler(replace(context, facts={**context.facts, "source_quality": facts["source_quality"]}), inputs, params)
             from pathlib import Path
             def annotate(finding):
                 location = dict(finding.source_location)
@@ -160,7 +164,7 @@ def governance_handlers():
             return replace(result, findings=tuple(map(annotate, result.findings)))
         return check
     from vibeflow.targets.shared.rule_support.resource_governance import project_structure, packages, nodesets, shared_dependencies
-    return {"vibeflow.project.structure": project_structure, "vibeflow.project.packages": packages,
+    return {**handlers(), "vibeflow.project.structure": project_structure, "vibeflow.project.packages": packages,
             "vibeflow.project.dependencies": shared_dependencies,
             "vibeflow.root.nodesets": nodesets, "vibeflow.root.packages": packages,
             "vibeflow.project.layout": project_layout,

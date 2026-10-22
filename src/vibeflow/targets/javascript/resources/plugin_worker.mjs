@@ -4,16 +4,12 @@ import { format } from "node:util";
 import path from "node:path";
 import process from "node:process";
 import readline from "node:readline";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
 import {sdkPlugin} from "./sdk_loader.mjs";
 
 const PLUGIN_ABI = "vibeflow.plugin.v4";
 const RULE_ABI = "vibeflow.rule.v3";
-// SDK files are kernel inputs, not project sources. Their ZIP extraction paths
-// are temporary, so keep them out of the project's source load-state facts.
-const sdkSourceDirectories = ["./"].map(relative =>
-  fileURLToPath(new URL(relative, import.meta.url)));
 const instances = new Map();
 const sourceAnalyses = new Map();
 // Keep trusted implementations' ordinary logging outside the JSONL protocol.
@@ -250,8 +246,7 @@ async function declarations(request) {
       plugins:[sdkPlugin(tools.ts)]});
     const loaded = await import(`data:text/javascript;base64,${Buffer.from(built.outputFiles[0].text).toString("base64")}`);
     return ruleJsonValue({resources:loaded.resources.map(resource=>({descriptor:resource.descriptor,origin:resource.origin})),
-      included_sources:Object.keys(built.metafile.inputs).filter(file=>file!=="vibeflow-resource-discovery.mjs").map(file=>path.resolve(packageRoot,file))
-        .filter(file=>!sdkSourceDirectories.some(directory=>file.startsWith(directory))),
+      included_sources:Object.keys(built.metafile.inputs).filter(file=>file!=="vibeflow-resource-discovery.mjs").map(file=>path.resolve(packageRoot,file)),
       loaded_sources:[entry]});
   }
   const result = await tools.esbuild.build({absWorkingDir: packageRoot, entryPoints: [request.module], bundle: true,
@@ -271,8 +266,7 @@ async function declarations(request) {
   }
   return ruleJsonValue({id: plugin.id, abi: plugin.abi, config_schema: plugin.config_schema,
     config_defaults: plugin.config_defaults, origin: plugin.origin, declaration: plugin.declaration,
-    included_sources: Object.keys(result.metafile.inputs).map(file => path.resolve(packageRoot,file))
-      .filter(file => !sdkSourceDirectories.some(directory => file.startsWith(directory))),
+    included_sources: Object.keys(result.metafile.inputs).map(file => path.resolve(packageRoot,file)),
     loaded_sources: [...new Set([path.resolve(request.module), ...plugin.resources.map(resource => resource.origin?.path).filter(Boolean)])],
     resources: plugin.resources.map(resource => ({descriptor: resource.descriptor, origin: resource.origin}))});
 }

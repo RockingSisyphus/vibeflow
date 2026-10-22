@@ -30,7 +30,7 @@ def test_shared_usage_counts_distinct_roots_and_writes_project_architecture(tmp_
     workflow = workspace.roots[0].path / "configs" / "workflow.jsonc"
     prepared = preparation.workflow_resources(workflow)
     report = preparation.review(write_architecture=True)
-    assert preparation.workflow_resources(workflow) is prepared
+    assert preparation.workflow_resources(workflow).catalogs is prepared.catalogs
     assert not report.findings
     row = next(item for item in report.resources if item["id"] == "shared.step")
     assert row["used_by_roots"] == ["backend", "desktop"]
@@ -89,6 +89,33 @@ def test_architecture_tracks_planned_real_references_and_survives_project_move(t
     row = next(item for item in document["resources"] if item["id"] == "shared.step")
     assert (tmp_path/"moved"/row["path"]).is_file()
     assert all((tmp_path/"moved"/item["path"]).is_file() for item in row["used_by_workflows"])
+
+
+def test_preview_cli_exports_root_workflow_and_registered_document_index(tmp_path):
+    from vibeflow.tooling.presentation.preview.cli import main
+    workspace=project(tmp_path,["desktop","backend"])
+    (tmp_path/"nodes/shared.py").write_text((tmp_path/"nodes/shared.py").read_text().replace('contract={}', 'flow_kind="terminal",contract={}'))
+    for owner in workspace.roots:
+        config=owner.path/"configs/workflow.jsonc"
+        value=json.loads(config.read_text());value["description"]="Workflow for "+owner.id
+        value["pipeline"].update(entries={"main":{"start":"step"}},default_entry="main")
+        config.write_text(json.dumps(value))
+        owner.config_path.write_text(json.dumps({"project_target":"python","architecture":{"documents":[
+            {"workflow":"configs/workflow.jsonc","document":"docs/custom-main.jsonc"}]}}))
+    assert main(["--workspace",str(workspace.path)])==0
+    document=json.loads("\n".join((tmp_path/"PROJECT_ARCHITECTURE.jsonc").read_text().splitlines()[2:]))
+    assert document["format"]=="vibeflow.project-architecture.v2"
+    assert {row["path"] for row in document["directories"] if row["role"]=="root"}=={"desktop","backend"}
+    for owner in document["roots"]:
+        row=owner["workflows"][0]
+        assert row["description"]=="Workflow for "+owner["id"]
+        assert row["entries"]=={"main":{"start":"step"}} and row["default_entry"]=="main"
+        assert row["architecture"]==owner["id"]+"/docs/custom-main.jsonc"
+        assert row["architecture_exists"] is False
+        assert not (tmp_path/row["architecture"]).exists()
+    script=(tmp_path/"vibeflow-preview/project.js").read_text()
+    payload=json.loads(script[len("VibeFlowPreview.project("):-3])
+    assert payload["architecture"]==document
 
 
 def test_project_custom_rule_is_loaded_atomically_without_activating_business_plugin(tmp_path):
@@ -254,10 +281,10 @@ def test_root_source_rule_receives_current_resource_ownership(tmp_path, target, 
         "id":"leaf","definition_id":"leaf","display_name":"Leaf","description":"Root ownership scope"}]}}))
     workspace = load_workspace_config(root.parent / "vibeflow_config.jsonc")
     report = ProjectPreparation(workspace).review()
-    findings = [item for item in report.findings if item.rule_id=="QUALITY.STRUCTURE.NODE_UNDECLARED_PROJECT_IMPORT"]
+    findings = [item for item in report.findings if item.rule_id=="RESOURCE.REFERENCE.UNDECLARED"]
     assert bool(findings) is not registered
     if findings:
-        assert findings[0].details["resource_id"] == "leaf"
+        assert "leaf" in findings[0].message
 
 
 def test_governance_only_exemption_does_not_hide_business_adoption(tmp_path):

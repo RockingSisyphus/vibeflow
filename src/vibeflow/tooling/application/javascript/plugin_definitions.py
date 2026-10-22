@@ -20,6 +20,7 @@ def plugin_source_paths(definition, contribution, *, owner, workspace, package, 
     """The bootstrap bundle already records imports; inspect delayed code once."""
     from pathlib import Path
     from vibeflow.targets.javascript.build.toolchain import run_quality_facts_driver
+    from vibeflow.targets.javascript.resources.identity import business_import_sites
     from vibeflow.core.descriptors.source_bundle import implementation_sources
     for entry in contribution.resources:
         for implementation in getattr(entry.descriptor, "implementations", ()):
@@ -37,6 +38,5 @@ def plugin_source_paths(definition, contribution, *, owner, workspace, package, 
         package_root = (getattr(owner, "toolchain_root", None) or owner.path) / owner.project_config.get("javascript", {}).get("package_root", ".")
         facts = run_quality_facts_driver({"qualityRoot":str(owner.path), "qualityFiles":files},
             package_root=package_root, node_command=node_command)
-        paths.update(site["resolved_path"] for file in facts.files for site in file["import_sites"]
-                     if site.get("resolved_path"))
+        paths.update(site["resolved_path"] for _, site in business_import_sites(facts.files))
     return paths

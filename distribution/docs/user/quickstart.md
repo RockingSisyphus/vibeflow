@@ -2,7 +2,7 @@
 
 当前源码使用 **Workflow ABI v10**。从旧版本升级时，重新构建 AOT；原生 `definition_id:"vibeflow.io"` / `io` 配置须迁移为普通 SDK 端口节点。命名入口、调用授权与跨 workflow 通信见[多入口与通信](workflow-coordination.md)。
 
-项目至少注册一个独立子目录 root，不能使用无 root 或同目录模式。当前 AOT v4、预览快照 v3；旧配置与产物需重新构建/生成，不提供读取兼容。布局、共享资源和治理选择见[项目治理](project-governance.md)。
+项目至少注册一个独立子目录 root，不能使用无 root 或同目录模式。当前 AOT v4、预览快照 v4；旧配置与产物需重新构建/生成，不提供读取兼容。布局、共享资源和治理选择见[项目治理](project-governance.md)。
 
 默认审查交付[离线 HTML 预览](local-preview.md)，SVG 使用 `review --with-svg` 按需生成。AOT 执行不生成预览报告。
 

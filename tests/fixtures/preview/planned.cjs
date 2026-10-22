@@ -20,6 +20,8 @@ const puppeteer=createRequire(renderer)('puppeteer');
       assert.equal(await page.$eval('.record.active',e=>e.dataset.recordId),id);
       for(const path of ['future','first','second','empty','loop','override']){
         assert.match(await page.$eval('[data-call-path="'+path+'"]',e=>e.textContent),/计划 · 尚未实现/);
+        assert.equal(await page.$eval('[data-call-path="'+path+'"]',e=>e.getAttribute('opacity')),'0.6');
+        assert.match(await page.$eval('[data-call-path="'+path+'"] .card-outline',e=>getComputedStyle(e).strokeDasharray),/6/);
         await context(path);const info=await details();
         assert.equal(info['状态'],'planned');
         assert.equal(info.kind,['future','empty'].includes(path)?'blocking':'transparent');
@@ -34,9 +36,13 @@ const puppeteer=createRequire(renderer)('puppeteer');
       await context('first');assert.equal(await page.$eval('#toggle',e=>e.disabled),false);
       await page.click('#toggle');await page.waitForSelector('[data-call-path="first/child"]');
       assert.equal(await page.$$eval('[data-call-path="second/child"]',e=>e.length),0);
+      assert.equal(await page.$eval('[data-call-path="first/child"]',e=>e.getAttribute('opacity')),null);
+      assert.equal(await page.$eval('[data-call-path="first"]',e=>e.getAttribute('opacity')),'0.6');
+      assert.match(await page.$eval('[data-call-path="first"] .call-boundary',e=>getComputedStyle(e).strokeDasharray),/6/);
       await context('loop');await page.click('#toggle');await page.waitForSelector('[data-call-path="loop/child"]');
       await context('first');await page.click('#toggle');await page.waitForFunction(()=>!document.querySelector('[data-call-path="first/child"]'));
     }
+    if(process.env.VIBEFLOW_PLANNED_SCREENSHOT){await page.setViewport({width:1500,height:1600});await page.click('#fit');await page.screenshot({path:process.env.VIBEFLOW_PLANNED_SCREENSHOT,fullPage:true});}
     // Hold an expansion's layout while switching to another snapshot. Its completion must be ignored.
     await page.waitForSelector('[data-call-path="first"]');
     await page.evaluate(()=>{

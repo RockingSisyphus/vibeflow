@@ -52,7 +52,7 @@ workflow 保留 JSONC 和原生连边，下面是插件选择与 Node 调用片�
 
 插件 source 的文件路径相对所属项目 root；使用 `scope: "project"` 选择项目共享包，默认只选择本 root 的包；不能引用其他 root 的私有 Plugin。默认导出名为 `plugin`，也支持显式 `export` 和已安装模块的 `source.kind: "module"/"package"`。
 
-返回对象的 key 与 `provides[].key` 一致；调用点 `params` 使用声明的参数 schema/defaults。`@node` 保存契约、规则选择、默认展示以及实现类的源码位置。
+返回对象的 key 与 `provides[].key` 一致；调用点 `params` 使用声明的参数 schema/defaults。参数项可设置 `required: true` 并省略其默认值，调用配置必须提供该键；其他参数继续要求默认值。`@node` 保存契约、规则选择、默认展示以及实现类的源码位置。
 
 直接装饰类或检查函数时，该对象决定实际实现和源码位置。通常让 SDK 自动定位即可；显式提供同语言 `source/implementations` 时，它们必须指向同一对象。同文件的导出别名、file/module 的同源定位可以使用。指向其他实际实现对象时，加载返回 `RESOURCE.IMPLEMENTATION.CONFLICT`，并提供声明与实际位置。需要绑定尚未导入的独立实现时，使用下文的延迟源码声明。
 

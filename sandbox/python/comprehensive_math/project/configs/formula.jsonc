@@ -293,5 +293,10 @@
         "as": "iterations"
       }
     ]
+  },
+  "base_lib": {
+    "modules": [
+      "math.helpers"
+    ]
   }
 }
