@@ -174,3 +174,23 @@ def test_generated_javascript_contracts_and_launch_migration():
     with pytest.raises(ValueError,match='allows only kind'):
         launch_configuration({'kind':'in_process','command':['fake']})
     assert launch_configuration({'kind':'in_process'})=={'kind':'in_process'}
+
+
+@async_case
+async def test_aborted_receive_after_handled_cancellation_keeps_queued_message():
+    from vibeflow.targets.python.runtime.lifecycle import CancellationSignal
+    scope = Coordinator()
+    identity = scope.register({'workflow': {'root': 'test', 'path': 'receiver'}})['id']
+    api = scope.operations(identity)
+    try:
+        api['send']({'id': identity, 'payload': 'retained'})
+        asyncio.current_task().cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.sleep(0)
+        signal = CancellationSignal()
+        signal.request_stop('already aborted')
+        with pytest.raises(asyncio.CancelledError):
+            await api['receive'].with_signal(signal)({'timeout': 0})
+        assert (await api['receive']({'timeout': 0}))['payload'] == 'retained'
+    finally:
+        await scope.aclose()

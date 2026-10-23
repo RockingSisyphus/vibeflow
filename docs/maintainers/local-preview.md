@@ -38,3 +38,7 @@ HTML 与 Mermaid 按事实、样式意图和交互验收，不要求像素一致
 PROJECT_ARCHITECTURE.jsonc 使用项目索引 v2，连接目录、root、workflow、入口和 architecture.documents 注册路径；页面总览和项目列表投影同一文档，不再独立枚举 configs。完整 review 与 preview --workspace 更新总览；局部 build 不覆盖完整文档。发布 workflow 文档后通过同次准备刷新文件存在状态，不重复执行 Rules 或扫描源码。
 
 操作关联来自调用节点的 workflow/launch/expected_workflows，规则 action 只描述操作。workflow_graphs 按身份去重，缺失目标保留局部错误；页面按本次事实跳转并记录 workflow 和入口，不再把独立 workflow 嵌入 Nodeset 展开路径。planned 配色覆盖已删除，节点及展开容器以虚线和 60% 不透明度表示，嵌套透明度不重复衰减。
+
+跨 workflow 右键及关联详情跳转复用独立记录导航：优先恢复目标上次查看的记录，否则选择其最新记录；左侧记录点击显式指定所属 workflow，避免沿用另一个图的身份。相机、展开及选中状态继续按快照、workflow、入口和视图保存。只有目标无独立记录时使用关联快照资料；历史链接原有的同期选择保持不变。
+
+Workflow 的 InvokeSync、Call、Wait、Send、Receive、Kill 默认统一使用缺角矩形，颜色和名称区分操作；CallAndWait 保留 Call 配色。样式由共享 node_presentation 交付，HTML 和 Mermaid 不单独维护 Wait 的形状特例。

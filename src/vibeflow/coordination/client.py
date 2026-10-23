@@ -8,7 +8,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from vibeflow.core.workflows.references import workflow_reference, launch_configuration
-from .operations import Operation
+from .operations import Operation, immediate_dispatch
 from .protocol import CoordinationError, json_value, error_record, merge_cleanup_error
 
 
@@ -110,10 +110,11 @@ class WorkflowClient:
         return await self.wait(identifier,timeout=timeout,signal=signal)
 
     def operations(self):
+        immediate = immediate_dispatch()
         return {'call':Operation(lambda r,s:self.call(r['workflow'],launch=r['launch'],inputs=r.get('inputs'),timeout=r.get('timeout'),signal=s)),
                 'wait':Operation(lambda r,s:self.wait(r['id'],timeout=r.get('timeout'),signal=s)),
                 'receive':Operation(lambda r,s:self.receive(r.get('port','default'),timeout=r.get('timeout'),signal=s)),
-                'send':Operation(lambda r,s:self.send(r['id'],r.get('port','default'),r.get('payload'))),
+                'send':Operation(lambda r,s:immediate(lambda:self.send(r['id'],r.get('port','default'),r.get('payload')))),
                 'kill':Operation(lambda r,s:self.kill(r['id'],workflow=r['workflow'],timeout=r.get('timeout'),signal=s))}
 
     async def finish(self, *, state='succeeded', outputs=None, error=None):

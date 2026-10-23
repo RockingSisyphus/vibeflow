@@ -7,6 +7,7 @@ from collections import deque
 from vibeflow.core.workflows.coordination import TERMINAL, validate_descriptor
 from vibeflow.core.workflows.entries import choose_entry
 from vibeflow.core.workflows.references import launch_configuration, workflow_reference
+from .async_support import cancel_once
 from .protocol import CoordinationError, instance_id, json_value, error_record
 
 
@@ -100,8 +101,12 @@ class Coordinator:
         while True:
             if self.closed:
                 raise CoordinationError('VF_SCOPE_CLOSED', 'coordinator is closed')
-            if signal is not None:
-                signal.throw_if_aborted()
+            if signal is not None and signal.aborted:
+                # Deliver abort as native task cancellation at the wait boundary.
+                # A queued cancellation must not first arrive in user finally.
+                cancel_once(asyncio.current_task())
+                await asyncio.sleep(0)
+                raise asyncio.CancelledError
             event = item['changed']
             if operation == 'ready':
                 if item['registered']:return {'id':identifier}
@@ -116,7 +121,7 @@ class Coordinator:
             remaining = None if deadline is None else deadline-loop.time()
             if remaining is not None and remaining <= 0:raise CoordinationError('VF_WAIT_TIMEOUT', identifier)
             task = asyncio.current_task()
-            unsubscribe = signal.subscribe(lambda reason:loop.call_soon_threadsafe(task.cancel)) if signal else lambda:None
+            unsubscribe = signal.subscribe(lambda reason:loop.call_soon_threadsafe(cancel_once, task)) if signal else lambda:None
             try:
                 await asyncio.wait_for(event.wait(), remaining)
             except TimeoutError as cause:
@@ -238,29 +243,12 @@ class Coordinator:
         if item['state'] not in TERMINAL:
             if not item['stop_supported']:raise CoordinationError('VF_STOP_UNSUPPORTED',item['id'])
             item.update(stop_requested=True,state='stopping')
-            if item['task'] is not None:item['task'].cancel()
+            if item['task'] is not None:cancel_once(item['task'])
             self._notify(item)
 
     def operations(self, identifier):
-        from .operations import Operation
-        # Ordinary nodes in an async graph run on owned workers. Immediate
-        # operations still mutate instance state on the host's event loop.
-        try:owner_loop = asyncio.get_running_loop()
-        except RuntimeError:owner_loop = None
-        def immediate(callback):
-            if owner_loop is None:
-                return callback()
-            try:current_loop = asyncio.get_running_loop()
-            except RuntimeError:current_loop = None
-            if current_loop is owner_loop:
-                return callback()
-            from concurrent.futures import Future
-            outcome = Future()
-            def execute():
-                try:outcome.set_result(callback())
-                except BaseException as error:outcome.set_exception(error)
-            owner_loop.call_soon_threadsafe(execute)
-            return outcome.result()
+        from .operations import Operation, immediate_dispatch
+        immediate = immediate_dispatch()
         async def call(request,signal):return await self.call(identifier,request,signal=signal)
         async def wait(request,signal):return await self.wait_for('wait',request['id'],timeout=request.get('timeout'),signal=signal)
         async def receive(request,signal):return await self.wait_for('receive',identifier,port=request.get('port','default'),timeout=request.get('timeout'),signal=signal)

@@ -1,12 +1,20 @@
 # 发行与文档装配
 
-当前分发版本为 1.4.0，Workflow ABI 为 v11、共享 AOT 为 v5、协作启动清单为 v2；Plugin ABI v4、Rule ABI v3、预览快照 v4 保持不变。
+当前分发版本为 1.4.1，Workflow ABI 为 v11、共享 AOT 为 v5、协作启动清单为 v2；Plugin ABI v4、Rule ABI v3、预览快照 v4 保持不变。
 
 1.3.5 修复 JavaScript 核心 SDK 解压到 workspace 内时被误认成业务资源的问题：Target 按既有资源清单识别准确文件，在形成业务引用与插件源码闭包时排除核心内部依赖；原始分析保留，用户贡献声明及共享 Rule 政策不变。1.3.4 统一资源使用 Rule 与 `vibeflow.resource_use.v1` 结果：独立 BaseLib（包括间接依赖）必须显式声明，Plugin 贡献资源整包引入并禁止重复声明，贡献代码实际路径必须位于所属 Plugin 目录。Python、JavaScript 的验证、构建、运行准备和展示共同消费规则结果；旧选择器及重复许可检查已删除。Python AOT 按实际引用收集实现，未引用的可用库不随包加载或复制。预览最新快照覆盖各注册 root 当前仍存在的 workflow，继续隐藏 Plugin 贡献资源。1.3.3 的 global_state 环境变量能力保留。
 
 既有版本 ZIP 保留原始字节。两个 profile 使用下述工具构建；正式发布需验证解压运行、wheel、sdist 与完整门禁，禁止同名覆盖既有 ZIP。
 
-## 1.4.0 构建内容
+## 1.4.1 构建内容
+
+修复 Python 普通同步节点通过 HTTP 协作宿主执行 Send 时的事件循环转交，并修复嵌套取消可能打断真实异步清理的边界。已中止的接收操作不会消费排队消息。协作实例、同步调用和异步生命周期合同不变。
+
+预览中的跨 workflow 跳转与左侧列表切换使用一致的独立记录，各 workflow 保留各自的阅读位置和展开状态。Wait 默认统一为其他协作操作的缺口矩形。`WORKFLOW.CALL.UNOBSERVED` 不再把 Wait 或 CallAndWait 当作缺少 Kill 的豁免，仍为警告并保留显式 `allow_background: true`；不增加自动停止行为。
+
+两端三个 workflow 数学沙箱增加与正常计算并发的 Kill 场景，检查真实异步 finally 清理完成、终态及无数值输出；正常公式和错误公式对照继续保留。Node 与真实无头 Chromium 执行同一个浏览器 AOT 产物，协作期间零网络请求。Workflow ABI v11、共享 AOT v5、协作启动清单 v2 及其他 ABI 保持不变。完整代码验收结果见[设计记录](../design/workflow-coordination.md)。
+
+## 1.4.0 历史构建内容
 
 Core workflows 统一入口、引用、完成合同及同步资格事实；Python HTTP 与同进程宿主共用独立 Coordination 组件，Node 与浏览器共用通用 JS 组件，运行时显式绑定实际 AOT 目标。官方 InvokeSync 同步返回普通值；Call、消息、Wait、Kill 维护独立实例及实际终态。Python 增加原生 `async def` 节点、异步入口、生命周期等待、取消与实际清理，并贯通源码和 plan/block/compiled AOT。
 

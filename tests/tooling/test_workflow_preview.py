@@ -257,3 +257,27 @@ assert.equal(model.resourceView(body,[]).facts.nodes.length,0);
 assert.equal(body.facts.nodes.length,9);assert.equal(body.facts.edges.length,7);
 '''], capture_output=True, text=True, timeout=10)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_three_workflows_keep_independent_reading_history(tmp_path):
+    from vibeflow.tooling.presentation.mermaid import _find_mmdc, is_mermaid_svg_renderer_available
+    from tests.fixtures.support.workflow_cooperation import prepare
+    from vibeflow.tooling.application.python import PythonBuildRequest, build_python_aot
+    if not is_mermaid_svg_renderer_available():
+        pytest.skip("browser dependencies are supplied by the full gate")
+    fixture = Path(__file__).resolve().parents[2] / "sandbox/python/workflow_cooperation_math"
+    output = prepare(fixture, tmp_path, "python")
+    workspace = load_workspace_config(tmp_path / "vibeflow_config.jsonc")
+    for index, name in enumerate(("a", "b", "c", "b")):
+        build_python_aot(PythonBuildRequest(workspace, tmp_path / f"project/configs/{name}.jsonc",
+                                          output / f"bundle-{index}", preview_root=tmp_path))
+    records = sorted((json.loads(path.read_text()) for path in
+                      (tmp_path / "vibeflow-preview/snapshots").glob("*/record.json")),
+                     key=lambda record: record["created_at"])
+    ids = {Path(record["workflow"]["path"]).stem: record["id"] for record in records}
+    ids["old_b"] = next(record["id"] for record in records if record["workflow"]["path"] == "configs/b.jsonc")
+    browser = Path(__file__).resolve().parents[1] / "fixtures/preview/workflow-reading.cjs"
+    result = subprocess.run(["node", str(browser), str(_find_mmdc().resolve()),
+                             str(tmp_path / "vibeflow-preview.html"), json.dumps(ids)],
+                            text=True, capture_output=True, timeout=60)
+    assert result.returncode == 0, result.stdout + result.stderr

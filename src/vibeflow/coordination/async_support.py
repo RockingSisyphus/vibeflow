@@ -2,6 +2,12 @@
 import asyncio
 
 
+def cancel_once(task):
+    """Request owned-task cancellation without interrupting its async finally again."""
+    if not task.cancelling():
+        task.cancel()
+
+
 async def finish_cleanup(awaitable):
     task = asyncio.ensure_future(awaitable)
     cancelled = None

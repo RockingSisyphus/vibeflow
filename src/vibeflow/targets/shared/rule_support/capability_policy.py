@@ -67,18 +67,18 @@ def policy_findings(graph, policies, descriptor, *, global_config=None, effectiv
                     object_type="node", object_id="/".join(path), message=str(error),
                     details={"call_path":list(path)}))
             calls = [action for action in actions if action.get("capability") == "vibeflow.workflow" and action.get("operation") == "call"]
-            if not calls or params.get("allow_background") is True or all(action.get("wait") is True for action in calls):
+            if not calls or params.get("allow_background") is True:
                 continue
             providers = {provider.type for provider in node.provides}
             handled = any(
                 edge.source == node.id and edge.target in nodes
                 and providers & {required.type for required in nodes[edge.target].requires}
-                and any(action.get("operation") in {"wait", "kill"} and action.get("capability") == "vibeflow.workflow"
+                and any(action.get("operation") == "kill" and action.get("capability") == "vibeflow.workflow"
                     for action in policies.get((*subject.call_path, edge.target), {}).get("actions", ()))
                 for edge in subject.graph.edges)
             if not handled:
                 findings.append(HealthFinding(rule_id="WORKFLOW.CALL.UNOBSERVED", severity="warning",
                     object_type="node", object_id="/".join(path), definition_id="vibeflow.capability.allow",
-                    message="call has no directly confirmed downstream wait/kill; the author owns cleanup. Set allow_background: true to acknowledge long-lived work.",
+                    message="call has no directly confirmed downstream kill; the author owns cleanup. Set allow_background: true to acknowledge long-lived work.",
                     details={"call_path": list(path), "actions": plain(calls)}))
     return tuple(findings)

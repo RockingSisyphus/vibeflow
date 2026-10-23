@@ -75,7 +75,7 @@ Node 通过 `context.capabilities["vibeflow.workflow"]` 使用接口。Python �
 | `receive` | `{port?, timeout?}` | 默认等待消息，返回 `{sender, port, payload}` |
 | `kill` | `{id, workflow, timeout?}` | 请求宿主停止该实例，等待真实终态；不支持时明确失败 |
 
-主要的跨实例动作是 Call、Send、Receive、Kill；`wait` 等待指定实例的真实终态，CallAndWait 是 Call 后接 Wait 的组合。四类主要操作默认共用缺角卡片形状 `notch-rect`，分别使用金色、浅蓝、深蓝、红色；节点卡片直接突出显示操作名。附带 `wait` 不改变主要操作配色；真正同时执行多个主要操作时显示各操作名，采用组合操作样式。作者显式声明的外观仍可覆盖默认值。
+主要的跨实例动作是 Call、Send、Receive、Kill；`wait` 等待指定实例的真实终态，CallAndWait 是 Call 后接 Wait 的组合。InvokeSync、Wait 与这四类主要操作默认共用缺角卡片形状 `notch-rect`，分别使用金色、浅蓝、深蓝、红色；节点卡片直接突出显示操作名。附带 `wait` 不改变主要操作配色；真正同时执行多个主要操作时显示各操作名，采用组合操作样式。作者显式声明的外观仍可覆盖默认值。
 
 ### 当前实例身份：所有 Node 均可读取
 
@@ -87,7 +87,7 @@ ID 属于一次 workflow 根调用，进入 Nodeset/Loop 不变，另一独立�
 
 默认端口是 `default`，超时以秒计。取消等待只结束当前等待，不自动停止对端。两端的等待操作均使用原生异步 completion，并接入 Node 取消信号。普通退出先完成本地待发交接，强制退出不保证尚未交接的消息。第一版只支持本机、内存中的普通 JSON；大于跨语言安全整数范围的整数须编码为字符串。
 
-需要一次性子工作时：`call → wait`。需要提前启动长期 workflow 时：`call` 后保存实例 ID，后续使用 `send / receive`，最后由作者安排 `kill` 或正常退出。`call` 没有可直接确认的下游 wait/kill 时产生 warning；普通调用节点可在其参数 schema 中声明 `allow_background`，在 config 设置 `true` 表示作者明确接受长期运行。该警告不证明所有分支都会清理。
+需要一次性子工作时：`call → wait`。需要提前启动长期 workflow 时：`call` 后保存实例 ID，后续使用 `send / receive`，最后由作者安排 `kill` 或正常退出。`call` 没有可直接确认的下游 kill 时产生 warning；普通调用节点可在其参数 schema 中声明 `allow_background`，在 config 设置 `true` 表示作者明确接受长期运行。Wait 或 CallAndWait 内置的等待不免除此检查；该警告只检查直接关联的 Kill 声明，不证明所有分支都会清理。
 
 实例 ID 是框架生成的不透明身份，不等于 PID，也不会随 PID 复用。作者负责保存、交换身份和业务请求 ID；框架不自动匹配请求与响应。
 
@@ -205,6 +205,8 @@ async def run_pure(self, inputs, params, context):
 `pipeline.entry_mode` 是整个 workflow 的执行合同，缺省为 `sync`。命名入口共用该模式。Python 同步入口使用 `PipelineRuntime.run()`、`PythonBundle.run()` 或 `run_workspace_checked()`；异步入口使用对应的 `run_async()` / `run_workspace_checked_async()`。JS 使用 `runWorkflow()` / `runWorkflowAsync()`。两端不会把同步入口悄悄改成异步。
 
 Python 的异步图可以混合同步节点与 `async def run_pure` 节点。协程在宿主已有事件循环执行；同步节点由框架持有的线程执行。节点、Nodeset、Loop 以及 plan/block/compiled 使用相同的依赖、分发额度与实际完成边界。同步图在当前调用内执行，不在后台执行分支。只有顶层 CLI 根据图的声明创建事件循环；SDK 与节点内部不调用 `asyncio.run()`。
+
+通过宿主提供的 `operations()` 绑定执行官方节点时，Python 同进程组件与 HTTP 客户端共用即时操作的线程转交逻辑：普通同步节点中的 Send 在宿主事件循环交接消息，节点仍直接返回；HTTP 发送的实际交付由 `flush()` / `finish()` 等待。直接使用底层 Client 方法的应用应在所属事件循环调用它们。
 
 同步图拒绝已知的挂起实现、挂起 Capability 与异步生命周期。运行时也拒绝错误声明的 Promise、coroutine、Future 等等待完成对象。异步图的 Python 节点应直接 await 等待操作：
 

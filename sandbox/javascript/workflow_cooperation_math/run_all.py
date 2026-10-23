@@ -12,7 +12,7 @@ sys.dont_write_bytecode = True
 FIXTURE = Path(__file__).resolve().parent
 ROOT = FIXTURE.parents[2]
 sys.path[:0] = [str(ROOT), str(ROOT / "src")]
-from tests.fixtures.support.workflow_cooperation import CASES, FAULTS, prepare, set_fault, verify_rows
+from tests.fixtures.support.workflow_cooperation import CASES, FAULTS, prepare, set_fault, verify_rows, verify_cancelled
 from vibeflow.tooling.application.javascript.build import ProjectBuildRequest, build_project_aot
 from vibeflow.targets.javascript.build.driver_session import check_scope
 
@@ -53,6 +53,7 @@ export function run(){{return verify(Coordinator,{{{','.join(modules)}}},{json.d
         assert done.returncode == 0, done.stdout + done.stderr
         report = json.loads(done.stdout)
         verify_rows(report["rows"])
+        verify_cancelled(report["cancelled"])
         assert {item["fault"]: item["observed"] for item in report["controls"]} == FAULTS, report
         if environment == "chromium":
             assert report["headless"] and report["networkRequests"] == 0, report

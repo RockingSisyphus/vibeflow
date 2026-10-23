@@ -1,5 +1,6 @@
 """One ready/dispatch state machine with synchronous and asyncio execution."""
 import asyncio
+from vibeflow.coordination.async_support import cancel_once
 from dataclasses import dataclass
 
 from vibeflow.core.flow import JOIN_POLICY_ALL
@@ -96,7 +97,7 @@ async def run_graph_async(runtime, state):
     def stop(reason):
         def cancel():
             for task in tuple(running.values()):
-                task.cancel()
+                cancel_once(task)
         loop.call_soon_threadsafe(cancel)
     unsubscribe = runtime._signal.subscribe(stop)
     try:
@@ -125,7 +126,7 @@ async def run_graph_async(runtime, state):
     finally:
         unsubscribe()
         for task in running.values():
-            task.cancel()
+            cancel_once(task)
         outcomes = asyncio.gather(*running.values(), return_exceptions=True)
         while not outcomes.done():
             try:

@@ -26,11 +26,11 @@ SYSTEM_STYLE_COLORS: Mapping[str, StyleColors] = {
 }
 
 WORKFLOW_OPERATION_STYLES = {
-    "invoke_sync": {"shape":"notch-rect", "fill":"#ecfccb", "stroke":"#4d7c0f", "text":"#1a2e05"},
+    "invoke_sync": {"shape":WORKFLOW_SHAPE, "fill":"#ecfccb", "stroke":"#4d7c0f", "text":"#1a2e05"},
     "call": {"shape": WORKFLOW_SHAPE, "fill": "#fef3c7", "stroke": "#b7791f", "text": "#713f12"},
     "kill": {"shape": WORKFLOW_SHAPE, "fill": "#ffe4e6", "stroke": "#be123c", "text": "#881337"},
     "receive": {"shape": WORKFLOW_SHAPE, "fill": "#1e3a8a", "stroke": "#172554", "text": "#ffffff"},
     "send": {"shape": WORKFLOW_SHAPE, "fill": "#e0f2fe", "stroke": "#0284c7", "text": "#0c4a6e"},
-    "wait": {"shape": "hex", "fill": "#e2e8f0", "stroke": "#475569", "text": "#1e293b"},
+    "wait": {"shape": WORKFLOW_SHAPE, "fill": "#e2e8f0", "stroke": "#475569", "text": "#1e293b"},
     "multiple": {"shape": WORKFLOW_SHAPE, "fill": "#ccfbf1", "stroke": "#0f766e", "text": "#134e4a"},
 }

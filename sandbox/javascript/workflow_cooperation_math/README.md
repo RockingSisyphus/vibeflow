@@ -18,3 +18,5 @@ python sandbox/javascript/workflow_cooperation_math/run_all.py \
 工具链使用仓库锁文件安装；可通过 `PUPPETEER_EXECUTABLE_PATH` 显式指定 Chromium。默认临时工作目录自动清理；显式目录保留 `report.json`、单文件脚本、AOT 和 Node／Chromium 的真实 trace。缺少 `--puppeteer-root` 只执行 Node，报告为 `REDUCED`，不能算完整通过。
 
 JS integration 与根目录 `python tools/verify_project.py --full` 自动包含该入口。HTTP、跨语言进程协作、取消清理和错误传播继续由现有专项覆盖；本项目不代表 ERA 生产验收。
+
+正常五组计算与一组 `stop:true` 的主动停止计算并发运行。A 使用官方 Kill，B 在第二轮等待节点的真实异步 finally 中清理并确认；A 在 Kill 返回后零超时读取确认，B 的终态必须为 cancelled 且无数值输出，其他五组答案保持正确。A 的正常完成 Nodeset 用于隔离官方 Wait/Kill 固定的输出 key，三个 workflow 的身份边界不变。详见 Python 沙箱中的主动停止说明。
