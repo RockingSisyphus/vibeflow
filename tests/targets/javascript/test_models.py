@@ -45,7 +45,7 @@ def _binding_workflow_plan() -> WorkflowPlan:
     root = BlockPlan(id='block:/', kind='workflow', path=(), source=SourceRef(kind='graph', ref='binding.workflow'), inputs=(), outputs=(), nodes=(_portable_call('start', 'demo.start'), _portable_call('group', 'demo.group', child_block='block:/group', is_nodeset=True), _portable_call('repeat', 'vibeflow.loop.while', child_block='block:/repeat', is_loop=True), _portable_call('receive', 'demo.receive')), routes=(), order=('start', 'group', 'repeat', 'receive'), entries=('start',), exits=('receive',), max_steps=50)
     nested = BlockPlan(id='block:/group', kind='nodeset', path=('group',), source=SourceRef(kind='graph', ref='demo.group'), inputs=(), outputs=(), nodes=(_portable_call('add', 'demo.add'),), routes=(), order=('add',), entries=('add',), exits=('add',), max_steps=20)
     loop = BlockPlan(id='block:/repeat', kind='loop', path=('repeat',), source=SourceRef(kind='graph', ref='demo.loop'), inputs=(), outputs=(), nodes=(_portable_call('multiply', 'demo.multiply'),), routes=(), order=('multiply',), entries=('multiply',), exits=('multiply',), max_steps=20)
-    return WorkflowPlan(abi_version='vibeflow.workflow.v10', workflow_id='binding.workflow', source=SourceRef(kind='graph', ref='binding.workflow'), entry_block='block:/', inputs=(), outputs=(), blocks=(root, nested, loop), max_steps=50, entry_mode='async')
+    return WorkflowPlan(abi_version='vibeflow.workflow.v11', workflow_id='binding.workflow', source=SourceRef(kind='graph', ref='binding.workflow'), entry_block='block:/', inputs=(), outputs=(), blocks=(root, nested, loop), max_steps=50, entry_mode='async')
 
 def test_binding_builder_shadows_all_call_paths_and_resource_facts() -> None:
     plan = _binding_workflow_plan()

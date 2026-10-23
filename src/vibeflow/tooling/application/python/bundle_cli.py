@@ -46,7 +46,11 @@ def main(path, argv=None):
                     initial = {'cli.argv':delegated} if delegate else {}
                     if not delegate and args.input:
                         initial = json.loads(Path(args.input).read_text(encoding='utf-8'))
-                    result = bundle.run(initial,runtime_options=options,
+                    run = bundle.run
+                    if bundle.workflow.entry_mode == 'async':
+                        import asyncio
+                        run = lambda *values, **settings: asyncio.run(bundle.run_async(*values, **settings))
+                    result = run(initial,runtime_options=options,
                         run_id=run_id,delegate_cli=delegate,_prepared_run_dir=directory,entry=args.entry)
                     if delegate:
                         from vibeflow.tooling.application.python.delegate_contract import extract_delegate_cli_exit_code

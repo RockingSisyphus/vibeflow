@@ -58,6 +58,53 @@ def test_native_declaration_checks_and_aot_execution(tmp_path,capsys):
     assert run(build(tmp_path,workspace,config,capsys))=={"number":7}
 
 
+@pytest.mark.parametrize("boundary", ["node", "capability", "lifecycle"])
+def test_validate_and_build_share_sync_completion_checks(tmp_path, capsys, boundary):
+    source, plugin = SOURCE, PLUGIN_SOURCE
+    if boundary == "node":
+        source = source.replace('run(inputs,params){return {result:7};}',
+            'completion:"suspend",async run(inputs,params){return {result:7};}')
+    elif boundary == "capability":
+        source = source.replace('id:"demo.calculate",',
+            'id:"demo.calculate",capabilities:[{id:"demo.pending",operations:["read"]}],')
+        source = source.replace('rulesets:["vibeflow.process","demo.checks"]',
+            'rulesets:["vibeflow.process","demo.checks",{rule_id:"vibeflow.capability.allow",'
+            'params:{capability:"demo.pending",operations:["read"]}}]')
+        plugin = plugin.replace('defineDataSchema}', 'defineDataSchema,defineCapability}')
+        plugin = plugin.replace('export const plugin=', '''
+export const pending=defineCapability({id:"demo.pending",targets:["node","browser"],
+  operations:{read:{input_type:"number",output_type:"number",completion:"suspend"}}});
+export const plugin=''')
+        plugin = plugin.replace('resources:[shell,health,checks,number]',
+            'resources:[shell,health,checks,number,pending]')
+    else:
+        plugin = plugin.replace('defineDataSchema}', 'defineDataSchema,defineResource}')
+        plugin = plugin.replace('export const plugin=', '''
+export function createLifecycle(){return {async beforeRun(){await Promise.resolve();}};}
+export const lifecycle=defineResource({kind:"plugin",id:"demo.lifecycle",type:"runtime",targets:["node","browser"],
+  implementations:[{language:"typescript",targets:["node","browser"],completion:"suspend",
+    source:{kind:"file",ref:"plugin.ts",export:"createLifecycle"}}]});
+export const plugin=''')
+        plugin = plugin.replace('resources:[shell,health,checks,number]',
+            'resources:[shell,health,checks,number,lifecycle]')
+    workspace, config = project(tmp_path, source, plugin_source=plugin)
+    expected = ("VF_ENTRY_MODE_PLUGIN_SUSPEND_IN_SYNC" if boundary == "lifecycle"
+                else "VF_ENTRY_MODE_SUSPEND_IN_SYNC")
+    commands = (["validate", "--json"],
+                ["build", "--target", "node", "--profile", "single-esm",
+                 "--out-dir", str(tmp_path / "build")])
+    for command in commands:
+        assert main([*command, "--workspace", str(workspace.path), "--config", str(config)]) == 1
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["code"] == expected, payload
+    document = json.loads(config.read_text())
+    document["pipeline"]["entry_mode"] = "async"
+    config.write_text(json.dumps(document))
+    for command in commands:
+        assert main([*command, "--workspace", str(workspace.path), "--config", str(config)]) == 0, capsys.readouterr().out
+        capsys.readouterr()
+
+
 def test_shorthand_callback_keeps_helpers_and_binding(tmp_path,capsys):
     source=SOURCE.replace('export const calculation=','const offset=3;\nfunction add(value){return value+offset;}\nfunction run(inputs,params){return {result:add(4)};}\nexport const calculation=').replace('run(inputs,params){return {result:7};}','run')
     workspace,config=project(tmp_path,source)

@@ -178,6 +178,7 @@ function prepareCapabilities(workflow, descriptors, requirements, schemas, suppl
               input,
               { signal: signal },
             );
+            if (output && typeof output.then === "function") throw vfError("VF_COMPLETION_MISMATCH", `immediate capability '${capabilityId}.${operationName}' returned pending work`, workflow, location);
             return validateCapabilityOutput(
               workflow,
               schemas,

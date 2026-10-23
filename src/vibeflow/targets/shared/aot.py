@@ -8,7 +8,7 @@ import tempfile
 
 from vibeflow.targets.shared.aot_publish import atomic_publish_directory, validate_owned_build_directory
 
-BUILD_MANIFEST_FORMAT = 'vibeflow.aot-build.v4'
+BUILD_MANIFEST_FORMAT = 'vibeflow.aot-build.v5'
 
 
 @dataclass(frozen=True)

@@ -28,10 +28,15 @@ from vibeflow.targets.python.runtime.trace_mixin import RuntimeTraceMixin
 from vibeflow.targets.python.runtime.execution_lock_mixin import RuntimeExecutionLockMixin
 from vibeflow.targets.python.runtime.support.contract_mixin import RuntimeContractMixin
 from vibeflow.targets.python.runtime.types import _RuntimeState
+from .async_execution import AsyncPipelineRuntime
+from .async_nodes import AsyncRuntimeNodeMixin
+from .async_composites import AsyncRuntimeNodesetMixin
+from .async_loops import AsyncRuntimeLoopMixin
+from .async_locks import AsyncRuntimeExecutionLockMixin
 from vibeflow.targets.python.runtime.observation import observe_run
 
 
-class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, RuntimeOutputMixin, RuntimeTraceMixin, RuntimeExecutionLockMixin):
+class PipelineRuntime(AsyncPipelineRuntime, AsyncRuntimeNodeMixin, AsyncRuntimeNodesetMixin, AsyncRuntimeLoopMixin, AsyncRuntimeExecutionLockMixin, RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, RuntimeNodesetMixin, RuntimeOutputMixin, RuntimeTraceMixin, RuntimeExecutionLockMixin):
     def __init__(
         self,
         graph: GraphConfig,
@@ -127,6 +132,7 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
         self._signal.request_stop(reason)
 
     def run(self, initial: Mapping[str, Any] | None = None) -> RunResult:
+        self._assert_entry_mode("sync")
         factory = getattr(self, "_runtime_plugin_factory", None)
         if factory is None or not self._owns_run:
             return self._run_with_observation(initial)
@@ -146,6 +152,7 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
                     self._plan = replace(self._plan,python_bindings=replace(self._plan.python_bindings,plugin_registry=plugins))
                 self._runtime_plugins = plugins.runtime_plugins()
                 self._hook_plan = runtime_hook_plan(self._runtime_plugins, self.runtime_options)
+                self._assert_entry_mode("sync")
                 return self._run_with_observation(initial)
 
     def _run_with_observation(self, initial: Mapping[str, Any] | None = None) -> RunResult:
@@ -239,6 +246,28 @@ class PipelineRuntime(RuntimeContractMixin, RuntimeLoopMixin, RuntimeNodeMixin, 
                             self._trace_sink.close()
                             self._trace_sink = None
         return state.result
+
+    def _assert_entry_mode(self, mode):
+        from .lifecycle import NodeContractError
+        if self.graph.entry_mode != mode:
+            raise NodeContractError("VF_ENTRY_MODE_MISMATCH", f"{self.graph.entry_mode} workflow requires {'run_async' if self.graph.entry_mode == 'async' else 'run'}()")
+        if mode == "sync":
+            from vibeflow.core.workflows.coordination import synchronous_violation
+            from .contracts import capability_descriptors
+            descriptors = capability_descriptors(self.registry)
+            for block in self._plan.workflow_plan.blocks:
+                for call in block.nodes:
+                    declared = self.registry.descriptor(call.definition_id) if call.definition_id in self.registry.available() else None
+                    problem = synchronous_violation(call.completion, capabilities=getattr(declared, "capabilities", ()), descriptors=descriptors)
+                    if problem:
+                        raise NodeContractError("VF_ENTRY_MODE_SUSPEND_IN_SYNC", f"{call.id}: {problem}")
+            for descriptor in getattr(self, '_runtime_plugin_descriptors', ()):
+                if any(item.completion == 'suspend' for item in descriptor.implementations):
+                    raise NodeContractError("VF_ENTRY_MODE_PLUGIN_SUSPEND_IN_SYNC", "sync workflow declares asynchronous runtime lifecycle")
+            import inspect
+            for plugin in self._runtime_plugins:
+                if any(inspect.iscoroutinefunction(getattr(plugin, name, None)) for name in (*self._hook_plan.__dataclass_fields__, "dispose")):
+                    raise NodeContractError("VF_ENTRY_MODE_PLUGIN_SUSPEND_IN_SYNC", "sync workflow has asynchronous runtime lifecycle")
 
     def _record_runtime_failure(
         self,

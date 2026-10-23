@@ -31,10 +31,13 @@ def node_interface(context, inputs, params):
     method=methods.get("run_pure")
     if method is None:
         report("missing_run_pure","node must define run_pure(self, inputs, params)")
-    elif isinstance(method,ast.AsyncFunctionDef):
-        report("async_run_pure","run_pure must not be async",method)
     elif not (_signature(method,("self","inputs","params")) or _signature(method,("self","inputs","params","context"))):
         report("run_pure_signature","run_pure must accept self, inputs, params and optional context",method)
+    if method is not None:
+        implementation = next(iter(node.descriptor.implementations), None)
+        actual = "suspend" if isinstance(method, ast.AsyncFunctionDef) else "immediate"
+        if implementation is not None and implementation.completion != actual:
+            report("completion", "run_pure completion does not match its declaration", method)
     if method is not None and any(isinstance(item, (ast.Yield, ast.YieldFrom))
             for item in _entry_body_nodes(method)):
         report("generator_run_pure", "run_pure must return a mapping rather than yield", method)

@@ -93,6 +93,9 @@ def validate_graph_health(graph, *, registry=None, plugin_registry=None,
         registry.call_capability_policies = policies_from_executions(state.rule_executions, paths)
         _append_findings(state, policy_findings(graph, registry.call_capability_policies,
             lambda key: registry.descriptor(key) if key in registry.available() else None, global_config=global_config))
+    if registry is not None:
+        from vibeflow.targets.python.runtime.contracts import graph_sync_findings
+        _append_findings(state, graph_sync_findings(graph, registry, source_context=source_context))
     report = _build_health_report(graph, compiled, plugin_registry, state)
     if graph.selected_entry:
         from dataclasses import replace

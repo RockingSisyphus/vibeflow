@@ -10,6 +10,7 @@ from vibeflow.core.rules.selection import selection_data
 
 
 from contextlib import contextmanager
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Mapping, Protocol
 
@@ -143,6 +144,15 @@ class PluginRegistry:
     def runtime_plugins(self) -> tuple[object, ...]:
         return tuple(self._plugins["runtime"])
 
+    def completion(self, instance):
+        import inspect
+        declaration = self._descriptors[id(instance)].declaration
+        if declaration is not None:
+            return declaration.implementations[0].completion
+        from vibeflow.targets.python.runtime.options import HookPlan
+        hooks = (*HookPlan.__dataclass_fields__, 'dispose')
+        return 'suspend' if any(inspect.iscoroutinefunction(getattr(instance,name,None)) for name in hooks) else 'immediate'
+
     def descriptors(self) -> tuple[PluginDescriptor, ...]:
         ordered: list[PluginDescriptor] = []
         for plugin_type in ("compiler", "runtime"):
@@ -164,7 +174,8 @@ def dispose_instances(instances, *, primary=None):
         dispose = getattr(instance, "dispose", None)
         if callable(dispose):
             try:
-                dispose()
+                from vibeflow.targets.python.runtime.completion import immediate
+                immediate(dispose())
             except BaseException as error:
                 errors.append(error)
     if primary is not None:
@@ -178,7 +189,7 @@ def dispose_instances(instances, *, primary=None):
         raise BaseExceptionGroup("plugin disposal failed", errors)
 
 
-def create_lifecycle_plugin(registry, descriptor, factory, context, **metadata):
+def create_lifecycle_plugin(registry, descriptor, factory, context, *, owned_instances=None, **metadata):
     """Create and adopt one native instance, releasing it if adoption fails."""
     import inspect
     instance = factory(context)
@@ -188,11 +199,22 @@ def create_lifecycle_plugin(registry, descriptor, factory, context, **metadata):
         raise ValueError("Python lifecycle factories must return an instance synchronously")
     if instance is None:
         raise ValueError("lifecycle factory must return an instance")
+    if owned_instances is not None:
+        owned_instances.append(instance)
     try:
+        from vibeflow.targets.python.runtime.options import HookPlan
+        hooks = (*HookPlan.__dataclass_fields__, "dispose") if descriptor.plugin_type == 'runtime' else ("before_compile", "after_compile", "dispose")
+        asynchronous = any(inspect.iscoroutinefunction(getattr(instance, name, None)) for name in hooks)
+        completion = descriptor.implementations[0].completion
+        if asynchronous and completion != 'suspend':
+            raise ValueError('asynchronous lifecycle requires completion suspend')
+        if descriptor.plugin_type == 'compiler' and completion != 'immediate':
+            raise ValueError('compiler lifecycle must use immediate completion')
         registry.register(instance,plugin_type=descriptor.plugin_type,name=descriptor.id,
             priority=descriptor.priority,declaration=descriptor,**metadata)
     except BaseException as error:
-        dispose_instances((instance,),primary=error)
+        if owned_instances is None:
+            dispose_instances((instance,),primary=error)
         raise
     return instance
 
@@ -217,6 +239,58 @@ def plugin_lifetime(plugin_registry, *, plugin_type="runtime"):
         raise
     finally:
         release_plugins(plugin_registry, plugin_type=plugin_type, primary=primary)
+
+
+@asynccontextmanager
+async def plugin_lifetime_async(plugin_registry):
+    primary = None
+    try:
+        yield plugin_registry
+    except BaseException as error:
+        primary = error
+        raise
+    finally:
+        await dispose_instances_async(plugin_registry.runtime_plugins(), primary=primary, completion_for=plugin_registry.completion)
+
+
+async def dispose_instances_async(instances, *, primary=None, completion_for=None):
+    from vibeflow.targets.python.runtime.async_support import finish_cleanup
+    from vibeflow.targets.python.runtime.completion import suspended
+    import asyncio
+    cancelled = None
+    errors = []
+    for instance in reversed(tuple(instances)):
+        dispose = getattr(instance, "dispose", None)
+        if callable(dispose):
+            try:
+                value = dispose()
+                if completion_for is not None and completion_for(instance) == 'immediate':
+                    from vibeflow.targets.python.runtime.completion import immediate
+                    immediate(value)
+                else:
+                    await finish_cleanup(suspended(value))
+            except asyncio.CancelledError as error:
+                cancelled = error
+                errors.extend(getattr(error, "cleanup_errors", ()))
+            except BaseException as error:
+                errors.append(error)
+    if primary is not None:
+        primary.cleanup_errors = [*getattr(primary, "cleanup_errors", ()), *errors]
+    elif cancelled is not None:
+        cancelled.cleanup_errors = errors
+        raise cancelled
+    elif errors:
+        raise BaseExceptionGroup("plugin disposal failed", errors)
+
+
+async def create_plugins_async(factory):
+    """Factories stay synchronous; partial construction still has async cleanup."""
+    owned = []
+    try:
+        return factory(owned)
+    except BaseException as error:
+        await dispose_instances_async(owned, primary=error)
+        raise
 
 
 def plugin_error(

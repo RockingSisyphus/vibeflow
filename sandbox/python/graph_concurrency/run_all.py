@@ -1,5 +1,6 @@
 """Public CLI and AOT bundle acceptance for ordinary graph concurrency."""
 from pathlib import Path
+import asyncio
 import json
 import sys
 sys.dont_write_bytecode=True
@@ -35,7 +36,7 @@ def run(work,*,toolchain=None):
         bundle=load_bundle(output/f'{name}-bundle')
         rounds=[]
         for _ in range(2):
-            result=bundle.run({'scenario':scenario},run_root=output/'aot-runs',runtime_options={'trace':'full'})
+            result=asyncio.run(bundle.run_async({'scenario':scenario},run_root=output/'aot-runs',runtime_options={'trace':'full'}))
             assert result.context.get('report')['value']==list(range(12))
             trace=[json.loads(line) for line in (result.run_dir/'runtime_trace.jsonl').read_text().splitlines()]
             rounds.append(assert_worker_trace(trace,capacity))

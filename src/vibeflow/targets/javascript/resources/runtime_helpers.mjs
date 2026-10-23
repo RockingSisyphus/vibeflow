@@ -1,4 +1,4 @@
-export const VIBEFLOW_WORKFLOW_ABI = "vibeflow.workflow.v10";
+export const VIBEFLOW_WORKFLOW_ABI = "vibeflow.workflow.v11";
 export const VIBEFLOW_PLUGIN_ABI = "vibeflow.plugin.v4";
 
 export class VibeFlowWorkflowError extends Error {
@@ -384,6 +384,7 @@ function validateNodeOutputs(node, outputs, state) {
       { nodePath: nodePath(state, node.id) },
     );
   }
+  if (outputs && typeof outputs.then === "function") throw vfError("VF_COMPLETION_MISMATCH", "immediate node returned pending work", state.workflow);
   const expected = node.provides.map((item) => item.key).sort();
   const actual = Object.keys(outputs).sort();
   if (expected.length !== actual.length

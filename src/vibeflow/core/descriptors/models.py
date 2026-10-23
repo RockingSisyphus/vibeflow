@@ -151,10 +151,6 @@ class ImplementationDescriptor:
                 "implementation.completion must be one of "
                 f"{sorted(IMPLEMENTATION_COMPLETIONS)}"
             )
-        if language == "python" and completion != "immediate":
-            raise DescriptorModelError(
-                "Python implementations currently support only immediate completion"
-            )
         object.__setattr__(self, "language", language)
         object.__setattr__(self, "targets", targets)
         object.__setattr__(self, "completion", completion)

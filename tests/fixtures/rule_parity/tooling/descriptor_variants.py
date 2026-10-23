@@ -32,7 +32,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
 
     rows = []
 
-    def emit(name, data, reason="", *, kind=None, metrics=None):
+    def emit(name, data, reason="", *, kind=None, metrics=None, classification="preserved"):
         try:
             descriptor = parse_descriptor_manifest(data, expected_kind=kind)
             payload = descriptor.to_dict()
@@ -41,7 +41,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
             actual = {"status": "ERROR", "codes": [{"code": "DESCRIPTOR.MODEL", "severity": "error"}], "positions": [], "metrics": {}, "message": str(error)}
         except Exception as error:
             actual = {"status": "ERROR", "codes": [], "positions": [], "metrics": {}, "message": repr(error)}
-        rows.append({"id": "tooling.descriptor." + name, "title": name, "family": "descriptor.contract", "classification": "preserved",
+        rows.append({"id": "tooling.descriptor." + name, "title": name, "family": "descriptor.contract", "classification": classification,
                      "expected": {"should_accept": not reason, "exact_codes": True,
                                   "codes": [{"code": "DESCRIPTOR.MODEL", "severity": "error"}] if reason else [],
                                   **({"message_contains": reason} if reason else {}), **({"metrics": metrics} if metrics else {})}, "actual": actual,
@@ -97,7 +97,7 @@ def run_cases(work_root: Path, variant: str, toolchain_root: Path | None = None)
                                  ("completion", {"completion": "eventual"}, "implementation.completion")):
         emit("implementation." + label, {**NODE, "implementations": [{**JS, **fields}]}, reason)
     emit("implementation.python_target", {**NODE, "implementations": [{**PYTHON, "targets": ["node"]}]}, "must target only 'python'")
-    emit("implementation.python_suspend", {**NODE, "implementations": [{**PYTHON, "completion": "suspend"}]}, "only immediate completion")
+    emit("implementation.python_suspend", {**NODE, "implementations": [{**PYTHON, "completion": "suspend"}]}, classification="approved_change")
     emit("implementation.js_alias", {**NODE, "implementations": [{**JS, "language": "js"}]}, metrics={"implementations": [{**JS, "completion": "immediate"}]})
     emit("implementation.ts_alias", {**NODE, "implementations": [{**JS, "language": "ts", "completion": "suspend"}]}, metrics={"implementations": [{**JS, "language": "typescript", "completion": "suspend"}]})
     for field in ("kind", "ref"):

@@ -4,16 +4,24 @@ from collections.abc import Mapping
 
 
 def portable_paths(value, *, roots, primary_root):
-    if isinstance(value, Mapping):
-        return {portable_paths(key, roots=roots, primary_root=primary_root): portable_paths(item, roots=roots, primary_root=primary_root) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [portable_paths(item, roots=roots, primary_root=primary_root) for item in value]
-    if isinstance(value, str) and value.startswith("/"):
-        for root_id, root_path in sorted(roots.items(), key=lambda item: len(str(item[1])), reverse=True):
-            try:
-                relative = Path(value).relative_to(root_path).as_posix()
-            except ValueError:
-                continue
-            prefix = root_id if root_id.startswith("@") else "@" + root_id
-            return relative if Path(root_path) == Path(primary_root) else f"{prefix}/{relative}"
-    return value
+    # Builtin declarations belong to the installed kernel, including when that
+    # kernel is imported from a ZIP rather than the source checkout.
+    locations = {"@kernel": Path(__file__).resolve().parents[2], **roots}
+    locations = sorted(locations.items(), key=lambda item: len(str(item[1])), reverse=True)
+
+    def visit(item):
+        if isinstance(item, Mapping):
+            return {visit(key): visit(child) for key, child in item.items()}
+        if isinstance(item, (list, tuple)):
+            return [visit(child) for child in item]
+        if isinstance(item, str) and Path(item).is_absolute():
+            for root_id, root_path in locations:
+                try:
+                    relative = Path(item).relative_to(root_path).as_posix()
+                except ValueError:
+                    continue
+                prefix = root_id if root_id.startswith("@") else "@" + root_id
+                return relative if Path(root_path) == Path(primary_root) else f"{prefix}/{relative}"
+        return item
+
+    return visit(value)

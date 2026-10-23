@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vibeflow"
-version = "1.3.8"
+version = "1.4.0"
 description = "Language-neutral workflow architecture, validation, and multi-target compilation"
 requires-python = ">=3.11"
 license = "AGPL-3.0-only"

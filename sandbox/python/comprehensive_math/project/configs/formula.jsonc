@@ -23,6 +23,7 @@
     }
   ],
   "pipeline": {
+    "entry_mode":"async",
     "entry_mode": "async",
     "inputs": [
       {

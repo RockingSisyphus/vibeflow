@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import asyncio
+
+def _execute(runtime,*args,**kwargs):
+    return asyncio.run(runtime.run_async(*args,**kwargs)) if runtime.graph.entry_mode == 'async' else runtime.run(*args,**kwargs)
+
 from dataclasses import replace
 from pathlib import Path
 import time
@@ -742,11 +747,7 @@ def test_python_runtime_projects_every_output_cardinality_through_public_name(
         }
     )
 
-    result = PipelineRuntime(
-        graph,
-        registry=_registry(),
-        run_dir=tmp_path,
-    ).run()
+    result = _execute(PipelineRuntime(graph, registry=_registry(), run_dir=tmp_path))
 
     assert result.get("renamed_exact")["value"] == 3
     assert result.get("renamed_optional")["value"] == 4
@@ -781,11 +782,7 @@ def test_python_runtime_output_without_alias_keeps_type_name(
         }
     )
 
-    result = PipelineRuntime(
-        graph,
-        registry=_registry(),
-        run_dir=tmp_path,
-    ).run()
+    result = _execute(PipelineRuntime(graph, registry=_registry(), run_dir=tmp_path))
 
     assert result.get("value.exact")["value"] == 3
 
@@ -817,7 +814,7 @@ def test_python_explicit_input_contract_fails_before_any_node(
         PipelineRuntimeError,
         match=expected_message,
     ):
-        runtime.run(inputs)
+        _execute(runtime, inputs)
 
     assert runtime.trace.step_count == 0
     assert runtime.trace.qualified_node_runs == {}
@@ -1093,12 +1090,7 @@ def test_python_result_key_async_node_rechecks_conditional_routes(
         _branch_document(managed=True, optional_targets=True)
     )
 
-    result = PipelineRuntime(
-        graph,
-        registry=_registry(),
-        run_dir=tmp_path / execution,
-        runtime_options=RuntimeOptions(execution=execution, trace="full"),
-    ).run({"number": 5})
+    result = _execute(PipelineRuntime(graph, registry=_registry(), run_dir=tmp_path / execution, runtime_options=RuntimeOptions(execution=execution, trace='full')), {"number": 5})
 
     assert result.get("selected")["value"] == 15
 
@@ -1133,7 +1125,7 @@ def test_python_result_key_activates_unconditional_route_once(
         run_dir=tmp_path / execution,
         runtime_options=RuntimeOptions(execution=execution, trace="full"),
     )
-    result = runtime.run({"number": 3})
+    result = _execute(runtime, {"number": 3})
 
     assert result.get("answer")["value"] == 6
     assert runtime.trace.edge_executions["calculate->end"] == 1
@@ -1299,8 +1291,8 @@ def test_portable_conformance_port_receive_transform_and_send(
         )
         for key in ("receive", "send")
     } == {
-        "receive": ("immediate", "inline", "current"),
-        "send": ("immediate", "inline", "current"),
+        "receive": ('suspend', "inline", 'event_loop'),
+        "send": ("immediate", "inline", 'thread'),
     }
 
 

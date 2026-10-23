@@ -46,6 +46,6 @@ def write_bundle_launches(destination, launches, *, base=".", workflow=None):
 def bundle_launches(path):
     path = Path(path).resolve()
     value = json.loads((path/"workflow-launches.json").read_text(encoding="utf-8"))
-    if value.get("format") != "vibeflow.workflow-launches.v1":
+    if value.get("format") != "vibeflow.workflow-launches.v2":
         raise ValueError("unsupported workflow launch declarations; rebuild the bundle")
     return [{**item, "base":str(path/item["base"])} for item in value["launches"]]

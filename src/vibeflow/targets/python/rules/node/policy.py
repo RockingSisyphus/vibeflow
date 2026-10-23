@@ -10,7 +10,6 @@ BANNED_IMPORT_ROOTS = {
     "concurrent",
     "dotenv",
     "httpx",
-    "asyncio",
     "multiprocessing",
     "nodriver",
     "os",

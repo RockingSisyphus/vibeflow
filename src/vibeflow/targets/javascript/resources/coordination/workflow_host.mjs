@@ -1,5 +1,5 @@
 // Browser and Node hosts report their actual invocation completion through one protocol.
-import {WorkflowClient} from "./workflow_client.mjs";
+import {WorkflowClient, errorRecord} from "./workflow_client.mjs";
 
 export async function runConnected(run, {url,id=null,workflow=null,initial={},entry,
     capabilities={},...options}={}) {
@@ -14,7 +14,7 @@ export async function runConnected(run, {url,id=null,workflow=null,initial={},en
     return outputs;
   } catch(error) {
     try {await client.finish({state:error?.code==="VF_ABORTED"||error?.name==="AbortError"?"cancelled":"failed",
-      error:{code:error?.code||error?.name||"Error",message:String(error)}});}
+      error:errorRecord(error)});}
     catch(delivery){if(delivery!==error)error.coordinationError=delivery;}
     throw error;
   }

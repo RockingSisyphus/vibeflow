@@ -114,7 +114,7 @@ def _linear_plan(
     entry_mode: str = "sync",
 ) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "test.workflow",
         "entry_mode": entry_mode,
         "inputs": [{"key": "number", "type": "number", "required": True}],
@@ -233,7 +233,7 @@ def _real_toolchain_project(tmp_path: Path) -> Path:
 
 def _empty_real_plan(module: Path) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "test.import-policy",
         "inputs": [],
         "outputs": [],
@@ -338,7 +338,7 @@ def test_emitted_esm_json_schema_const_uses_json_deep_equality(
     tmp_path: Path,
 ) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "test.schema-const",
         "inputs": [
             {
@@ -402,7 +402,7 @@ console.log(JSON.stringify({ value, mismatch, nullInput }));
 
 def test_emitted_esm_schema_length_counts_unicode_code_points(tmp_path: Path) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "test.unicode-length",
         "inputs": [
             {
@@ -445,7 +445,7 @@ def test_emitted_esm_preserves_magic_public_output_keys(
     tmp_path: Path,
 ) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "test.magic-output-key",
         "inputs": [],
         "outputs": [
@@ -717,7 +717,7 @@ def test_emitted_esm_exposes_only_each_nodes_declared_capability_operations(
     tmp_path: Path,
 ) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "test.capability-minimum-authority",
         "inputs": [],
         "outputs": [],
@@ -796,7 +796,7 @@ def test_emitted_esm_max_steps_has_root_block_and_next_node_path(
     tmp_path: Path,
 ) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "test.max-steps-path",
         "inputs": [],
         "outputs": [],
@@ -844,7 +844,7 @@ console.log(JSON.stringify(failure));
 
 def test_emitted_esm_supports_all_join_result_key_and_detached(tmp_path: Path) -> None:
     plan = {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "test.parallel",
         "inputs": [],
         "outputs": [{"type": "value", "cardinality": "all", "as": "values"}],
@@ -927,7 +927,7 @@ console.log(JSON.stringify(value));
     assert async_result == {"answer": 10}
 
     conditional_async_plan = {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "test.async-condition",
         "entry_mode": "async",
         "inputs": [{"key": "number", "type": "number", "required": True}],
@@ -1005,7 +1005,7 @@ console.log(JSON.stringify({
     }
 
     detached_plan = {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "test.detached",
         "entry_mode": "async",
         "inputs": [],
@@ -1039,7 +1039,7 @@ console.log(JSON.stringify({ value, calls: globalThis.__vfCalls }));
     }
 
     failure_plan = {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "test.detached.failure",
         "entry_mode": "async",
         "inputs": [],
@@ -1095,7 +1095,7 @@ def test_canonical_blocks_expand_child_nodeset_and_require_explicit_input_requir
         ),
     ]
     portable = {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "portable",
         "entry_block": "block:/",
         "inputs": [{"key": "number", "type": "number", "required": True}],
@@ -1174,7 +1174,7 @@ def test_process_only_root_is_not_promoted_to_a_workflow_entry(
     module = tmp_path / "node.mjs"
     module.write_text("export function run() { return {}; }\n", encoding="utf-8")
     plan = {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "test.no-entry",
         "inputs": [],
         "outputs": [],
@@ -1203,7 +1203,7 @@ def test_process_only_root_is_not_promoted_to_a_workflow_entry(
 
 def test_canonical_portable_loop_accepts_stop_when_carry_and_collect() -> None:
     portable = {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "portable.loop",
         "entry_block": "block:/",
         "inputs": [],
@@ -1293,7 +1293,7 @@ def test_emitted_esm_runs_nested_nodeset_and_bounded_or_unbounded_loop(
     tmp_path: Path,
 ) -> None:
     child = {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "nested.child",
         "inputs": [{"key": "number", "type": "number", "required": True}],
         "outputs": [{"type": "answer", "cardinality": "exactly_one", "as": "answer"}],
@@ -1352,7 +1352,7 @@ console.log(JSON.stringify(value));
     assert nested == {"answer": 12}
 
     body = {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "loop.body",
         "inputs": [{"key": "current", "type": "number", "required": True}],
         "outputs": [{"type": "next", "cardinality": "exactly_one", "as": "next"}],
@@ -1472,7 +1472,7 @@ def test_build_profiles_are_atomic_and_manifest_is_deterministic(
         encoding="utf-8",
     )
     plan = {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "build",
         "inputs": [],
         "outputs": [{"type": "value", "cardinality": "exactly_one", "as": "value"}],
@@ -1512,7 +1512,7 @@ def test_build_profiles_are_atomic_and_manifest_is_deterministic(
     )
     assert second.manifest.read_bytes() == first_manifest
     manifest = json.loads(second.manifest.read_text(encoding="utf-8"))
-    assert manifest["format"] == "vibeflow.aot-build.v4"
+    assert manifest["format"] == "vibeflow.aot-build.v5"
     assert manifest["project_target"] == "javascript"
     assert "timestamp" not in manifest
     assert manifest["target_metadata"]["profile"] == profile
@@ -2742,9 +2742,9 @@ def test_actual_aot_build_and_replace_need_no_npm_lock(tmp_path, lock_name):
     request = fixture_build_request(plan=_empty_real_plan(module), project_root=project,
         package_root=project, out_dir=project/'dist', target='node', profile='single-esm')
     built = build_aot(request)
-    manifest = validate_owned_build_directory(built.out_dir, manifest_format='vibeflow.aot-build.v4')
+    manifest = validate_owned_build_directory(built.out_dir, manifest_format='vibeflow.aot-build.v5')
     assert set(manifest['target_metadata']['toolchain']) == {'node','typescript','esbuild'}
-    assert manifest['abi_version'] == 'vibeflow.workflow.v10'
+    assert manifest['abi_version'] == 'vibeflow.workflow.v11'
     assert _run_esm(built.entry, 'await workflow.runWorkflow({}); console.log(JSON.stringify({ok:true}));') == {'ok':True}
     from dataclasses import replace
     assert build_aot(replace(request, replace=True)).entry.is_file()

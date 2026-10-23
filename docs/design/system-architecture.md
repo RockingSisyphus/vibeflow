@@ -36,7 +36,7 @@ Core 在拓扑分析前解析调用契约：
 
 ## 公共计划
 
-Workflow ABI 为 `vibeflow.workflow.v10`。公共计划只保存稳定 ID、可移植值、端口、路由、合流、普通图 Block、Loop、SourceRef、effect scope 与 execution-lock 事实。Target BindingPlan 保存语言实现。
+Workflow ABI 为 `vibeflow.workflow.v11`。公共计划只保存稳定 ID、可移植值、端口、路由、合流、普通图 Block、Loop、SourceRef、effect scope 与 execution-lock 事实。Target BindingPlan 保存语言实现。
 
 Python 和 JavaScript Target 使用相同 Core 语义，但分别声明可执行 feature。Target 不支持的 implemented 语义以稳定 finding 拒绝；planned 内容仍可进入架构审核。
 
@@ -87,11 +87,11 @@ Architecture JSONC 的 implementation_graph 保存当前项目的资源、源码
 
 ## 双语言计划与 AOT
 
-`core.graph_calls` 统一实际调用身份、子图、Loop、配置继承。Rule 在相同身份之上补充未调用定义的审查范围；它们不会成为执行调用。Block Compiler 生成可序列化及读取的 WorkflowPlan/BlockPlan，实际并发执行由 Target 的通用图调度器持有。ABI v10 不携带旧 async/result_key 并发字段。
+`core.graph_calls` 统一实际调用身份、子图、Loop、配置继承。Rule 在相同身份之上补充未调用定义的审查范围；它们不会成为执行调用。Block Compiler 生成可序列化及读取的 WorkflowPlan/BlockPlan，实际并发执行由 Target 的通用图调度器持有。ABI v11 不携带旧 async/result_key 并发字段。
 
 Python 将准备与装配分开：静态阶段保存共同计划及有限的原生图/编译记录，运行阶段绑定类、独立参数容器、活对象和现有 PipelineRuntime。源码与目录 bundle 共用装配函数。生成块在调用时读取追踪和 Hook 选项，不为各 profile 复制编译逻辑。无法生成块的结构保留原动态调度。
 
-Python 的文件收集、加载 API 与 CLI 属于 Tooling；框架通过包资源读取，因此源码、wheel 和 ZIP 发行采用同一构建入口。两种 Target 共用暂存、原子发布、构建结果与 v4 元数据；JS 保留 emitter、esbuild、Node/Browser runtime。加载只解析格式、ABI 和运行所需字段，不重新扫描源码或校验文件哈希。
+Python 的文件收集、加载 API 与 CLI 属于 Tooling；框架通过包资源读取，因此源码、wheel 和 ZIP 发行采用同一构建入口。两种 Target 共用暂存、原子发布、构建结果与 v5 元数据；JS 保留 emitter、esbuild、Node/Browser runtime。加载只解析格式、ABI 和运行所需字段，不重新扫描源码或校验文件哈希。
 
 命名入口和目标的纯解析位于 `core/workflows`，入口范围与调用授权写入公共计划。授权由显式 Rule Record 折叠，不由 `flow_kind` 或外观产生；Python 上下文与 JS 生成模块执行同一有效权限。端口收发改为普通 SDK Node，执行器和计划不再保留原生 IO 分支。
 
@@ -100,3 +100,5 @@ Python 的文件收集、加载 API 与 CLI 属于 Tooling；框架通过包资�
 `tooling/application/presentation_targets.py` 负责工作区定位及当次目标事实准备，跨 Target 通过命令边界加载；它不属于快照存储模块。各 Target 适配器提供架构事实，`tooling/presentation/preview/` 只负责格式、索引和快照写入。数据发布与网页安装分开，默认路径不调用 Mermaid。
 
 独立 HTML 唯一维护源在 `tools/workflow-viewer/`，只消费公开 v3 数据及配置；本地根入口是安装产物。JavaScript 的通信客户端与宿主源码集中在 `targets/javascript/resources/coordination/`，发行时仍交付原公开模块路径。
+
+协作合同、原生异步执行和宿主边界见 [Workflow 协作设计](workflow-coordination.md)。

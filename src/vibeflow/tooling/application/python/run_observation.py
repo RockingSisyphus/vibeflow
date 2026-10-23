@@ -33,31 +33,38 @@ def _effective_observation_options(config_path, overrides, workspace):
 
 
 def observed_checked_run(function):
+    import inspect
+    from contextlib import contextmanager
+
+    @contextmanager
+    def scope(args, kwargs):
+        from vibeflow.tooling.application.python.preview_run import source_run_preview, bind_run_observer
+        config = args[0] if args else kwargs['config_path']
+        with source_run_preview(config, workspace=kwargs.get('workspace'), preview_root=kwargs.get('preview_root'), entry=kwargs.get('entry')):
+            if current_observation() is not None:
+                yield
+                return
+            from .run_directory import prepare_run_dir
+            from .execution import _new_run_id
+            run_id = _new_run_id() if kwargs.get('run_id') is None else kwargs['run_id']
+            run_dir = kwargs.get('_prepared_run_dir') or prepare_run_dir(kwargs.get('run_root'), run_id)
+            kwargs.update(run_id=run_id, _prepared_run_dir=run_dir)
+            options = _resolve_observation_options(config, kwargs.get('runtime_options'), kwargs.get('workspace'))
+            with observe_run(run_dir, options) as observer:
+                bind_run_observer(observer)
+                with core_diagnostic_sink(observer.write_kernel):
+                    yield
+
     @wraps(function)
     def observed(*args, **kwargs):
-        from vibeflow.tooling.application.python.preview_run import source_run_preview
-        config = args[0] if args else kwargs["config_path"]
-        with source_run_preview(config, workspace=kwargs.get("workspace"), preview_root=kwargs.get("preview_root"), entry=kwargs.get("entry")):
-            return invoke(*args, **kwargs)
-
-    def invoke(*args, **kwargs):
-        if current_observation() is not None:
+        with scope(args, kwargs):
             return function(*args, **kwargs)
-        from vibeflow.tooling.application.python.run_directory import prepare_run_dir as _prepare_run_dir
-        from vibeflow.tooling.application.python.execution import (_new_run_id)
-        run_id = _new_run_id() if kwargs.get("run_id") is None else kwargs["run_id"]
-        run_dir = kwargs.get("_prepared_run_dir")
-        if run_dir is None:
-            run_dir = _prepare_run_dir(kwargs.get("run_root"), run_id)
-        kwargs.update(run_id=run_id, _prepared_run_dir=run_dir)
-        config_path = args[0] if args else kwargs["config_path"]
-        options = _resolve_observation_options(config_path, kwargs.get("runtime_options"), kwargs.get("workspace"))
-        with observe_run(run_dir, options) as observer:
-            from vibeflow.tooling.application.python.preview_run import bind_run_observer
-            bind_run_observer(observer)
-            with core_diagnostic_sink(observer.write_kernel):
-                return function(*args, **kwargs)
-    return observed
+
+    @wraps(function)
+    async def observed_async(*args, **kwargs):
+        with scope(args, kwargs):
+            return await function(*args, **kwargs)
+    return observed_async if inspect.iscoroutinefunction(function) else observed
 
 
 def print_run_report(payload):

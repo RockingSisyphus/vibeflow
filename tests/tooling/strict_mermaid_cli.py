@@ -334,7 +334,7 @@ def test_inspect_node_rejects_invalid_declarations(tmp_path, capsys, changes, re
     ("class DemoNode:\n    pass", "missing_run_pure"),
     (_valid_node_source(run_body='        return {"demo.out": 1}\n\n    def run(self, context):\n        return context'), "context_run_forbidden"),
     (_valid_node_source().replace("def run_pure(self, inputs, params):", "def run_pure(self, inputs, params, extra):"), "run_pure_signature"),
-    (_valid_node_source().replace("def run_pure(self, inputs, params):", "async def run_pure(self, inputs, params):"), "async_run_pure"),
+    (_valid_node_source().replace("def run_pure(self, inputs, params):", "async def run_pure(self, inputs, params):"), "completion"),
     (_valid_node_source(run_body='        while True:\n            return {"demo.out": 1}'), "internal_loop"),
     (_valid_node_source(run_body='        return {"demo.out": 1}\n\n    def helper(self):\n        return 1'), "public_callable"),
     (_valid_node_source().replace("class DemoNode:", "class DemoNode:\n    def __init__(self, client):\n        self.x = client"), "init_signature"),

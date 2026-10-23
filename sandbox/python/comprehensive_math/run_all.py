@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 
+import asyncio
 import argparse
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
@@ -27,7 +28,8 @@ from vibeflow.core.findings import HealthReport
 from vibeflow.targets.python.runtime import PipelineRuntime, RuntimeOptions
 from vibeflow.targets.python.runtime.planning import build_execution_plan
 from vibeflow.tooling.application.python.project.core import build_workspace_environment
-from vibeflow.tooling.application.python.workspace_service import _prepare_workspace_graph, run_workspace_checked
+from vibeflow.tooling.application.python.workspace_service import _prepare_workspace_graph
+from vibeflow.tooling.application.python.async_workspace import run_workspace_checked_async
 from vibeflow.tooling.project.workspace_loader import load_workspace_config
 
 
@@ -79,8 +81,8 @@ def run(work):
     workspace = load_workspace_config(workspace_path)
     checked_case = SCENARIOS[0]
     received, sent = [], []
-    checked = run_workspace_checked(config, workspace=workspace, run_root=output / "checked", run_id="positive",
-        runtime_options=RuntimeOptions(trace="full"), capabilities=_capabilities(checked_case, received, sent))
+    checked = asyncio.run(run_workspace_checked_async(config, workspace=workspace, run_root=output / "checked", run_id="positive",
+        runtime_options=RuntimeOptions(trace="full"), capabilities=_capabilities(checked_case, received, sent)))
     warning_counts = assert_warning_feedback(checked.health.to_dict())
     observations = [_assert_result(checked_case, checked.context, checked.run_dir / "runtime_trace.jsonl", received, sent)]
     for name in ("architecture.jsonc", "snapshot.js"):
@@ -96,7 +98,7 @@ def run(work):
     portable = plan.to_workflow_plan(workflow_id="comprehensive.math")
     inner = next(block for block in portable.blocks if any(node.id == "affine" for node in block.nodes))
     assert [node.id for node in inner.nodes] == ["start", "affine", "end"]
-    assert all([node.completion, node.schedule, node.executor] == ["immediate", "inline", "current"] for node in inner.nodes)
+    assert all([node.completion, node.schedule, node.executor] == ["immediate", "inline", "thread"] for node in inner.nodes)
     assert "tasks" not in inner.to_dict()
     prepare_frame = plan.frame("prepare")
     inner_frame = prepare_frame.subplan.frame("inner")
@@ -120,7 +122,7 @@ def run(work):
         driver["input"].update(case)
         driver["received"].clear()
         driver["sent"].clear()
-        result = driver["runtime"].run({"math.offset": case["offset"]} if "offset" in case else {})
+        result = asyncio.run(driver["runtime"].run_async({"math.offset": case["offset"]} if "offset" in case else {}))
         observation = _assert_result(case, result, driver["trace"], driver["received"], driver["sent"])
         observation["execution"] = execution
         return observation, driver

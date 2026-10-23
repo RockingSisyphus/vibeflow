@@ -12,7 +12,7 @@ import tempfile
 RESOURCE_NAMES = frozenset(
     {
         "capability_helpers.mjs", "plugin_helpers.mjs", "root_helpers.mjs",
-        "coordination/workflow_client.mjs", "coordination/workflow_host.mjs", "coordination/workflow_node.mjs",
+        "coordination/contracts.mjs", "coordination/coordinator.mjs", "coordination/workflow_client.mjs", "coordination/workflow_host.mjs", "coordination/workflow_node.mjs",
         "runtime_helpers.mjs", "execution_helpers.mjs", "status_helpers.mjs", "node_observation.mjs",
         "sdk.mjs", "sdk.d.ts", "sdk_loader.mjs", "node_declarations.mjs", "node_contracts.d.ts",
         "plugin_worker.mjs",
@@ -51,3 +51,13 @@ def materialized_resources():
 
 
 __all__ = ["RESOURCE_NAMES", "read_text", "resource", "materialized_resources"]
+
+
+def coordination_contract_source():
+    """Generate the portable coordination constants from Core declarations."""
+    import json
+    from vibeflow.core.workflows.coordination import TERMINAL, STATES
+    from vibeflow.core.workflows.interfaces import WORKFLOW_OPERATIONS
+    values = {"terminalStates": sorted(TERMINAL), "states": list(STATES), "operations": sorted(WORKFLOW_OPERATIONS)}
+    return "// Generated from core.workflows contracts.\n" + "".join(
+        f"export const {name} = {json.dumps(value)};\n" for name, value in values.items())

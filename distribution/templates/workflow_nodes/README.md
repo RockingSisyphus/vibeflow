@@ -22,3 +22,5 @@ host-provided `vibeflow.port`; coordination nodes require a connected host.
 Add explicit start/end terminals around these nodes and select
 `vibeflow.capability.restrict` at graph scope. Workflow operations use `flow_kind: "workflow-io"`. Call, Kill, Receive and Send share the notched-card shape (`notch-rect`), with gold, red, dark blue and light blue defaults respectively. `wait` awaits an instance's terminal state without replacing the main operation's color. Every Node can read its current instance ID with `context.workflow.self()` without a Capability declaration or Rule grant; there is no separate Self Node. Planned calls retain these colors and add a dashed outline at 60% opacity. Shapes/colors can be changed
 without granting or removing an operation.
+
+`InvokeSync` uses the immediate `invoke_sync` operation and requires only config.workflow. Call/CallAndWait use an explicit launch.kind (process or in_process). Python waiting nodes are async def and require entry_mode async. A host explicitly binds workflow_descriptor / workflowDescriptor to the corresponding Runtime or AOT method. See ../../docs/user/workflow-coordination.md in the distribution.

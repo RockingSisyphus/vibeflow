@@ -172,6 +172,7 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
             source_import_roots={relative(root):[relative(path) for path in namespace.roots]
                                  for root,namespace in registry.source_namespaces.items()},
             nodes=nodes,plugins=plugins,blocks=blocks,
+            capabilities=[item.to_dict() for item in registry.prepared_resources.catalogs.capabilities.descriptors()],
             config_path=relative(config),runtime_options=asdict(options),health=health.to_dict())
         from vibeflow.tooling.application.python.build_files import python_bundle_files, copy_python_framework
         files = python_bundle_files(workspace, environment.registry, config, inputs,
@@ -189,8 +190,11 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
         with preview_operation(preview_record), staged_build(request.out_dir,replace=request.replace) as staging:
             copy_python_framework(staging/'_framework/vibeflow')
             from vibeflow.tooling.project.workflow_launches import graph_launches, write_bundle_launches
-            write_bundle_launches(staging, graph_launches(compilation.workflow.graph, registry.prepared_resources.catalogs,
-                root=workspace.root_for_path(config), global_config=checked.resources.global_config), base=relative(workspace.root_for_path(config).path), workflow=data["workflow_reference"])
+            launches = graph_launches(compilation.workflow.graph, registry.prepared_resources.catalogs,
+                root=workspace.root_for_path(config), global_config=checked.resources.global_config)
+            from vibeflow.core.workflows.coordination import workflow_descriptor
+            data['workflow_descriptor'] = workflow_descriptor(prepared.workflow, data['workflow_reference'], launches)
+            write_bundle_launches(staging, launches, base=relative(workspace.root_for_path(config).path), workflow=data["workflow_reference"])
             copy_implementation_packages(dependency_resources,staging)
             for source in files:
                 target = staging / relative(source)

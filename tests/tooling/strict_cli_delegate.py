@@ -1,4 +1,9 @@
 from __future__ import annotations
+import asyncio
+
+def _execute(runtime,*args,**kwargs):
+    return asyncio.run(runtime.run_async(*args,**kwargs)) if runtime.graph.entry_mode == 'async' else runtime.run(*args,**kwargs)
+
 from vibeflow.core.descriptors import NodeDescriptor, NodeContractDescriptor
 from tests.fixtures.support.declarations import node_declaration, configured_declaration, native_registry
 
@@ -26,6 +31,8 @@ from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
 @pytest.fixture(autouse=True)
 def _stub_delegate_workspace_loader(monkeypatch):
     from contextlib import nullcontext
+    monkeypatch.setattr('vibeflow.tooling.application.python.cli.execution.load_workspace_config_document', lambda *a, **k: SimpleNamespace(data={'pipeline': {'entry_mode': 'sync'}}))
+
     monkeypatch.setattr("vibeflow.tooling.application.python.preview_run.source_run_preview",lambda *a, **k:nullcontext())
     monkeypatch.setattr(
         "vibeflow.tooling.application.python.cli.workspace_or_report",
@@ -281,7 +288,7 @@ def _graph(*, include_argv: bool = True, exit_cardinality: str = "exactly_one"):
 
 def _parallel_cli_graph(node_types, *, unconsumed=False):
     names=["branch"+str(index) for index in range(len(node_types))]
-    return parse_graph_config({"pipeline":{"inputs":[{"key":"cli.argv","type":"cli.argv","required":True,"display_name":"Arguments"}],
+    return parse_graph_config({"pipeline":{'entry_mode': 'async', "inputs":[{"key":"cli.argv","type":"cli.argv","required":True,"display_name":"Arguments"}],
         "outputs":[{"type":"cli.exit_code","cardinality":"exactly_one","display_name":"Status"}],
         "nodes":[{"id":"start","definition_id":"delegate.start","display_name":"Start","description":"Starts branches"},
             *[{"id":name,"definition_id":key,"display_name":name,"description":"Ordinary branch"} for name,key in zip(names,node_types)],
@@ -311,7 +318,7 @@ def _unconsumed_result_graph(*node_types):
 
 
 def _exit_with_pending_pipeline(*,pending_node_type,async_mode,exit_node_type="delegate.authorized_exit"):
-    return {"inputs":[{"required":True,"key":"cli.argv","type":"cli.argv","display_name":"Arguments"}],
+    return {'entry_mode': 'async', "inputs":[{"required":True,"key":"cli.argv","type":"cli.argv","display_name":"Arguments"}],
         "outputs":[{"type":"cli.exit_code","cardinality":"exactly_one","display_name":"Status"}],
         "nodes":[{"id":name,"definition_id":key,"display_name":name,"description":"Ordinary graph call",
             **({"join_policy":"all"} if name=="join" else {})} for name,key in
@@ -352,7 +359,7 @@ def _nested_exit_with_pending_graph(*, pending_node_type: str, async_mode: str):
     return parse_graph_config(
         {
             "nodeset_types": [inner],
-            "pipeline": {
+            "pipeline": {'entry_mode': 'async',
                 "inputs": [{"required": True, "key": "cli.argv", "type": "cli.argv", "display_name": "CLI argv"}],
                 "outputs": [{"type": "cli.exit_code", "cardinality": "exactly_one", "display_name": "CLI exit code"}],
                 "nodes": [
@@ -581,12 +588,7 @@ def test_delegate_cli_routes_async_core_diagnostics_to_run_log(monkeypatch, tmp_
     def run_async_graph(config_path, **kwargs):
         run_dir = Path(kwargs["_prepared_run_dir"])
         assert run_dir.is_dir()
-        context = PipelineRuntime(
-            _async_diagnostic_graph(),
-            registry=_runtime_registry(),
-            run_dir=run_dir,
-            delegate_cli=True,
-        ).run(kwargs["initial"])
+        context = _execute(PipelineRuntime(_async_diagnostic_graph(), registry=_runtime_registry(), run_dir=run_dir, delegate_cli=True), kwargs["initial"])
         return CheckedRunResult(kwargs["run_id"], run_dir, HealthReport(status="PASS"), context)
 
     monkeypatch.setattr("vibeflow.tooling.application.python.workspace_service.run_workspace_checked", run_async_graph)
@@ -1023,7 +1025,7 @@ def test_authorized_node_system_exit_becomes_delegate_result(tmp_path) -> None:
         run_dir=tmp_path,
         delegate_cli=True,
     )
-    result = runtime.run({"cli.argv": ["--help"]})
+    result = _execute(runtime, {"cli.argv": ["--help"]})
     assert result.get("cli.exit_code")["value"] == 2
     assert result.get("runtime.stop_reason") == "business_exit"
 
@@ -1065,7 +1067,7 @@ def test_delegate_cli_executes_normal_business_graph_once_in_every_execution_mod
         runtime_options={"execution": execution},
     )
 
-    result = runtime.run({"cli.argv": ["--business"]})
+    result = _execute(runtime, {"cli.argv": ["--business"]})
 
     assert result.get("cli.exit_code")["value"] == 0
     assert runtime._node_runs == {"start": 1, "output": 1, "end": 1}
@@ -1079,7 +1081,7 @@ def test_normal_runtime_node_system_exit_is_pipeline_failure(tmp_path) -> None:
     )
 
     with pytest.raises(PipelineRuntimeError, match="attempted SystemExit outside delegate CLI mode"):
-        runtime.run({"cli.argv": []})
+        _execute(runtime, {"cli.argv": []})
 
     assert runtime.trace.stop_reason == "node_failed"
     assert "SystemExit outside delegate CLI mode" in runtime.trace.exception
@@ -1093,7 +1095,7 @@ def test_authorized_node_system_exit_none_becomes_zero(tmp_path) -> None:
         delegate_cli=True,
     )
 
-    result = runtime.run({"cli.argv": []})
+    result = _execute(runtime, {"cli.argv": []})
 
     assert result.get("cli.exit_code")["value"] == 0
     assert result.get("runtime.stop_reason") == "business_exit"
@@ -1118,24 +1120,14 @@ def test_real_argparse_help_and_error_keep_business_streams_and_exit_codes(tmp_p
             }
         }
     )
-    help_result = PipelineRuntime(
-        graph,
-        registry=_runtime_registry(),
-        run_dir=tmp_path / "help",
-        delegate_cli=True,
-    ).run({"cli.argv": ["--help"]})
+    help_result = _execute(PipelineRuntime(graph, registry=_runtime_registry(), run_dir=tmp_path / 'help', delegate_cli=True), {"cli.argv": ["--help"]})
     help_streams = capsys.readouterr()
 
     assert help_result.get("cli.exit_code")["value"] == 0
     assert "usage: delegate-business" in help_streams.out
     assert help_streams.err == ""
 
-    error_result = PipelineRuntime(
-        graph,
-        registry=_runtime_registry(),
-        run_dir=tmp_path / "error",
-        delegate_cli=True,
-    ).run({"cli.argv": []})
+    error_result = _execute(PipelineRuntime(graph, registry=_runtime_registry(), run_dir=tmp_path / 'error', delegate_cli=True), {"cli.argv": []})
     error_streams = capsys.readouterr()
 
     assert error_result.get("cli.exit_code")["value"] == 2
@@ -1157,7 +1149,7 @@ def test_authorized_node_rejects_invalid_system_exit_codes(tmp_path, node_type) 
     )
 
     with pytest.raises(PipelineRuntimeError, match="integer code from 0 to 255"):
-        runtime.run({"cli.argv": []})
+        _execute(runtime, {"cli.argv": []})
 
     assert runtime.trace.stop_reason == "node_failed"
     assert "integer code from 0 to 255" in runtime.trace.exception
@@ -1171,7 +1163,7 @@ def test_unauthorized_node_system_exit_is_runtime_failure(tmp_path) -> None:
         delegate_cli=True,
     )
     with pytest.raises(PipelineRuntimeError, match="cannot control delegate CLI exit"):
-        runtime.run({"cli.argv": []})
+        _execute(runtime, {"cli.argv": []})
 
 
 def test_runtime_plugin_system_exit_becomes_delegate_result(tmp_path) -> None:
@@ -1188,7 +1180,7 @@ def test_runtime_plugin_system_exit_becomes_delegate_result(tmp_path) -> None:
         run_dir=tmp_path,
         delegate_cli=True,
     )
-    result = runtime.run({"cli.argv": []})
+    result = _execute(runtime, {"cli.argv": []})
     assert result.get("cli.exit_code")["value"] == 9
     assert result.get("cli.exit_code")["source_node"] == "plugin:exit-plugin"
 
@@ -1208,7 +1200,7 @@ def test_normal_runtime_plugin_system_exit_is_pipeline_failure(tmp_path) -> None
     )
 
     with pytest.raises(PipelineRuntimeError, match="runtime plugin 'exit-plugin'.*SystemExit outside delegate CLI mode"):
-        runtime.run({"cli.argv": []})
+        _execute(runtime, {"cli.argv": []})
 
     assert runtime.trace.stop_reason == "node_failed"
     assert "SystemExit outside delegate CLI mode" in runtime.trace.exception
@@ -1216,7 +1208,7 @@ def test_normal_runtime_plugin_system_exit_is_pipeline_failure(tmp_path) -> None
 
 def test_ordinary_authorized_exit_propagates_to_workflow(tmp_path):
     runtime=PipelineRuntime(_parallel_cli_graph(['delegate.authorized_exit']),registry=_runtime_registry(),run_dir=tmp_path,delegate_cli=True)
-    result=runtime.run({'cli.argv':['--help']})
+    result=_execute(runtime, {'cli.argv':['--help']})
     assert result.get('cli.exit_code')['value']==2
     assert runtime.trace.stop_reason=='business_exit'
 
@@ -1225,7 +1217,7 @@ def test_ordinary_authorized_exit_propagates_to_workflow(tmp_path):
 
 def test_normal_managed_node_system_exit_is_pipeline_failure(tmp_path):
     runtime=PipelineRuntime(_parallel_cli_graph(['delegate.authorized_exit']),registry=_runtime_registry(),run_dir=tmp_path)
-    with pytest.raises(RuntimeError,match='attempted SystemExit outside delegate CLI mode'):runtime.run({'cli.argv':[]})
+    with pytest.raises(RuntimeError,match='attempted SystemExit outside delegate CLI mode'):_execute(runtime, {'cli.argv':[]})
     assert runtime.trace.stop_reason=='node_failed'
 
 
@@ -1256,7 +1248,7 @@ def test_outer_business_exit_prioritizes_pending_framework_failure_and_records_t
     )
 
     with pytest.raises(RuntimeError, match="late detached failure"):
-        runtime.run({"cli.argv": []})
+        _execute(runtime, {"cli.argv": []})
 
     assert runtime.trace.stop_reason == "node_failed"
     assert "late detached failure" in runtime.trace.exception
@@ -1287,7 +1279,7 @@ def test_existing_framework_failure_is_not_replaced_by_detached_business_exit(tm
     )
 
     with pytest.raises(PipelineRuntimeError, match="cannot control delegate CLI exit"):
-        runtime.run({"cli.argv": []})
+        _execute(runtime, {"cli.argv": []})
 
     assert runtime.trace.stop_reason == "node_failed"
     assert "cannot control delegate CLI exit" in runtime.trace.exception
@@ -1332,7 +1324,7 @@ def test_nested_authorized_system_exit_stops_outer_runtime(tmp_path) -> None:
         }
     )
 
-    result = PipelineRuntime(graph, registry=_runtime_registry(), run_dir=tmp_path, delegate_cli=True).run(
+    result = _execute(PipelineRuntime(graph, registry=_runtime_registry(), run_dir=tmp_path, delegate_cli=True),
         {"cli.argv": ["--help"]}
     )
 
@@ -1354,7 +1346,7 @@ def test_nested_business_exit_prioritizes_pending_framework_failure(tmp_path, as
     )
 
     with pytest.raises(RuntimeError, match="late detached failure"):
-        runtime.run({"cli.argv": []})
+        _execute(runtime, {"cli.argv": []})
 
     child_trace = runtime._nodeset_runtimes["inner"].trace
     assert child_trace.stop_reason == "node_failed"
@@ -1374,7 +1366,7 @@ def test_nested_business_exit_propagates_after_successful_pending_result(tmp_pat
         delegate_cli=True,
     )
 
-    result = runtime.run({"cli.argv": []})
+    result = _execute(runtime, {"cli.argv": []})
 
     assert result.get("cli.exit_code")["value"] == 2
     assert result.get("cli.exit_code")["source_node"] == "inner_exit"
@@ -1404,7 +1396,7 @@ def test_delegate_cli_drains_all_detached_results_before_deciding_exit(
     )
 
     with pytest.raises(error_type, match=message):
-        runtime.run({"cli.argv": []})
+        _execute(runtime, {"cli.argv": []})
 
 
 @pytest.mark.parametrize(
@@ -1428,12 +1420,12 @@ def test_delegate_cli_drains_parallel_result_futures_before_deciding_exit(
     )
 
     with pytest.raises(error_type, match=message):
-        runtime.run({"cli.argv": []})
+        _execute(runtime, {"cli.argv": []})
 
 
 def test_delegate_cli_propagates_single_branch_exit(tmp_path):
     runtime=PipelineRuntime(_parallel_cli_graph(["delegate.detached_exit"]),registry=_runtime_registry(),run_dir=tmp_path,delegate_cli=True)
-    assert runtime.run({"cli.argv":[]}).get("cli.exit_code")["value"]==11
+    assert _execute(runtime, {"cli.argv":[]}).get("cli.exit_code")["value"]==11
 
 
 
@@ -1448,9 +1440,9 @@ def test_delegate_cli_observes_unconsumed_result_key_failure(tmp_path) -> None:
     )
 
     with pytest.raises(RuntimeError, match="late detached failure"):
-        runtime.run({"cli.argv": []})
+        _execute(runtime, {"cli.argv": []})
 
 
 def test_delegate_cli_rejects_conflicting_parallel_exits(tmp_path):
     runtime=PipelineRuntime(_parallel_cli_graph(["delegate.detached_exit","delegate.second_detached_exit"]),registry=_runtime_registry(),run_dir=tmp_path,delegate_cli=True)
-    with pytest.raises(PipelineRuntimeError,match="multiple business exits"):runtime.run({"cli.argv":[]})
+    with pytest.raises(PipelineRuntimeError,match="multiple business exits"):_execute(runtime, {"cli.argv":[]})

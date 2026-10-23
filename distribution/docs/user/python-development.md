@@ -158,4 +158,15 @@ python candidate-bundle/run.py delegate-cli -- --help
 
 业务标准流与退出码使用原 delegated CLI 协议；框架诊断写入 run 日志。构建保留原静态审查的 CONCERNS 和 planned stub 开发标记，不把它们改成 PASS。`--replace` 仅替换仍归本工具所有的完整构建目录。
 
-新计划为 Workflow ABI v10，构建元数据为 `vibeflow.aot-build.v4`；共同头保存工作流、ABI、入口和文件，`target_metadata` 保存该语言的 profile、工具链与绑定定位。旧计划或 manifest 不作兼容解码，请用当前源码重新构建；已有独立 JS 产物仍可继续使用其随附运行代码。
+新计划为 Workflow ABI v11，构建元数据为 `vibeflow.aot-build.v5`；共同头保存工作流、ABI、入口和文件，`target_metadata` 保存该语言的 profile、工具链与绑定定位。旧计划或 manifest 不作兼容解码，请用当前源码重新构建；已有独立 JS 产物仍可继续使用其随附运行代码。
+
+
+### 原生异步入口与生命周期
+
+`pipeline.entry_mode: "async"` 使用 `PipelineRuntime.run_async()`、`PythonBundle.run_async()`、`run_checked_async()` 或 `run_workspace_checked_async()`；后两者也从 `vibeflow.tooling.application.python` 导出。同步入口保留 `run()`，传错模式会报 `VF_ENTRY_MODE_MISMATCH`。仅顶层 CLI 创建事件循环，应用直接 await SDK 入口。
+
+SDK `@node` 根据实际 `run_pure` 是否为 async def 声明 completion；延迟实现使用显式 completion，源码检查核对其一致性。异步图的协程节点在宿主循环执行，普通节点在框架拥有的线程执行；取消仍等待实际 finally、操作清理和线程退出。
+
+运行期异步 Hook/dispose 用独立生命周期资源显式声明：`@lifecycle(id="project.runtime", type="runtime", completion="suspend")`，工厂仍是普通同步函数，返回的实例可定义 async Hook 和 async dispose，再将该资源加入 `Plugin(resources=[...])`。编译期扩展保持同步。未声明 suspend 的方法误返回协程时明确拒绝；部分工厂失败也等待已创建实例释放。
+
+节点直接使用宿主循环；不在节点内创建事件循环。自行创建的 asyncio 任务应由 async TaskGroup 管理，或在 finally 中取消并 await 实际退出。官方协作实例的独立生命周期与这些节点内部任务不同，见[Workflow 协作](workflow-coordination.md)。

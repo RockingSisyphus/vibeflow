@@ -40,7 +40,11 @@ def _interface_cases():
         "context_run_forbidden": "class DemoNode:\n    def run(self, context):\n        return {}\n    def run_pure(self, inputs, params):\n        return {\"demo.out\": 1}\n",
         "public_callable": "class DemoNode:\n    def public_helper(self):\n        return 1\n    def run_pure(self, inputs, params):\n        return {\"demo.out\": 1}\n",
     }
-    cases = [_case("interface." + name, name.replace("_", " "), "node-interface", source=source, code="NODE.CONTRACT." + name.upper()) for name, source in prefixes.items()]
+    cases = [_case("interface." + name, name.replace("_", " "), "node-interface", source=source,
+                   code="NODE.CONTRACT." + name.upper(),
+                   **({"classification":"approved_change", "expect":{"variants":{"current":{"codes":[{"code":"NODE.CONTRACT.COMPLETION","severity":"error"}]}}},
+                       "notes":"An async implementation is supported; this fixture still declares immediate completion."}
+                      if name == "async_run_pure" else {})) for name, source in prefixes.items()]
     cases.append(_case("interface.private_helper", "Private local helper is allowed", "node-interface", source='class DemoNode:\n    def _helper(self):\n        return 1\n    def run_pure(self, inputs, params):\n        return {"demo.out": self._helper()}\n'))
     cases.append(_case("authority.class_metadata_removed", "Canonical declaration replaces implementation class metadata", "declaration-authority", baseline_metadata=False, code="NODE.CONTRACT.MISSING_NODE_INFO", classification="approved_change", expect={"variants": {"current": {"should_accept": True, "codes": []}}}, notes="The current project still declares the complete Node resource; only the execution class has no legacy attributes."))
     return cases

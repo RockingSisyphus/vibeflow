@@ -94,7 +94,7 @@ def _default_rule_id(code: str) -> str:
     if code.startswith("node_"):
         return f"NODE.METADATA.{code.upper()}"
     if code.startswith("contract") or code in {
-        "async_run_pure",
+        "completion",
         "context_run_forbidden",
         "init_signature",
         "missing_run_pure",

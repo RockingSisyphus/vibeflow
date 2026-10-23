@@ -664,6 +664,21 @@ def _graph_concurrency_case(puppeteer_root):
     return report
 
 
+def _workflow_cooperation_case(puppeteer_root, *, skip_browser):
+    work = _OUTPUT_ROOT / "workflow_cooperation_math"
+    command = [sys.executable, str(_SOURCE_SANDBOX_ROOT.parent / "workflow_cooperation_math/run_all.py"),
+               "--work-dir", str(work), "--toolchain-root", str(PROJECT_ROOT)]
+    if not skip_browser:
+        command.extend(["--puppeteer-root", str(puppeteer_root)])
+    completed = subprocess.run(command, capture_output=True, text=True,
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+    if completed.returncode:
+        raise AssertionError(completed.stdout + completed.stderr)
+    report = json.loads((work / "report.json").read_text())
+    assert report["status"] == ("REDUCED" if skip_browser else "PASS"), report
+    return report
+
+
 
 def _comprehensive_math_case(puppeteer_root: Path, *, skip_browser: bool):
     work = _OUTPUT_ROOT / "comprehensive_math"
@@ -742,6 +757,8 @@ def main() -> int:
         cases: list[tuple[str, Any]] = [
             ("rules:selection-and-boundaries", _rule_selection_case),
             ("math:workflow-nesting-and-trace", lambda: _addition_case("workflow_math")),
+            ("workflow:cooperative-formula", lambda: _workflow_cooperation_case(
+                puppeteer_root, skip_browser=args.skip_browser)),
             ("graph:parallel-dispatch-and-collection", lambda: _graph_concurrency_case(puppeteer_root)),
             ("math:plugin-addition", lambda: _addition_case("plugin_addition")),
             ("math:async-addition", lambda: _addition_case("async_addition")),

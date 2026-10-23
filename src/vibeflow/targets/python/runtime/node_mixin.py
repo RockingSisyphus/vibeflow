@@ -152,6 +152,8 @@ class RuntimeNodeMixin:
         primary = None
         try:
             outputs = node.run_pure(inputs, params, context) if context else node.run_pure(inputs, params)
+            from .completion import immediate
+            outputs = immediate(outputs)
         except BaseException as exc:
             primary = exc
             raise
@@ -163,7 +165,7 @@ class RuntimeNodeMixin:
                     if primary is None:
                         raise
                     primary.add_note(str(cleanup))
-                    primary.cleanup_error = cleanup
+                    primary.cleanup_errors = [*getattr(primary, 'cleanup_errors', ()), cleanup]
         self._signal.throw_if_aborted()
         return self._validate_outputs(frame, outputs)
 

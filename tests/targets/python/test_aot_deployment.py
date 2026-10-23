@@ -1,3 +1,10 @@
+import asyncio
+
+from functools import partial
+
+def _run_async(runtime,*args,**kwargs):
+    return asyncio.run(runtime.run_async(*args,**kwargs))
+
 """Package resources, scopes and process-boundary deployment of Python AOT."""
 import json
 import os
@@ -232,7 +239,7 @@ def test_ordinary_ports_keep_host_objects_and_target_execution_metadata(tmp_path
     (source / "plugins/ports").mkdir(parents=True)
     (source / "plugins/ports/plugin.py").write_text(plugin)
     config.write_text(json.dumps({'rulesets':[], 'plugins':[{'source':{'kind':'file','ref':'plugins/ports/plugin.py'}}],
-        'pipeline':{'nodes':[{'id':name,'definition_id':key,'display_name':name,'description':name}
+        'pipeline':{'entry_mode': 'async', 'nodes':[{'id':name,'definition_id':key,'display_name':name,'description':name}
             for name,key in [('start','fixture.port.boundary'),('receive','fixture.port.receive'),
                              ('send','fixture.port.send'),('end','fixture.port.boundary')]],
             'edges':[['start','receive'],['receive','send'],['send','end']]}}))
@@ -241,10 +248,10 @@ def test_ordinary_ports_keep_host_objects_and_target_execution_metadata(tmp_path
     bundle = load_bundle(tmp_path/'bundle')
     received,seen = object(),[]
     port = {'receive':lambda _: {'value':received},'send':lambda item:seen.append(item['value'])}
-    bundle.run(capabilities={'vibeflow.port':port},run_root=tmp_path/'runs',runtime_options={'execution':execution})
+    asyncio.run(bundle.run_async(capabilities={'vibeflow.port': port}, run_root=tmp_path / 'runs', runtime_options={'execution': execution}))
     assert seen == [received]
     call = bundle.workflow.blocks[0].node("receive")
-    assert (call.completion,call.executor) == ('immediate','current')
+    assert (call.completion,call.executor) == ('suspend','event_loop')
     assert str(source) not in bundle.workflow.to_json()
 
 
@@ -261,10 +268,10 @@ def test_bundle_locators_are_relocated_and_publication_handles_python_caches(tmp
     cache = Path(descriptor.implementations[0].source.ref).parent / '__pycache__'
     cache.mkdir(parents=True, exist_ok=True)
     (cache/'plugin.cpython-313.pyc').write_bytes(b'generated cache')
-    validate_owned_build_directory(path,manifest_format='vibeflow.aot-build.v4')
+    validate_owned_build_directory(path,manifest_format='vibeflow.aot-build.v5')
     (cache/'personal.txt').write_text('must preserve')
     with pytest.raises(AotPublishError,match='untracked'):
-        validate_owned_build_directory(path,manifest_format='vibeflow.aot-build.v4')
+        validate_owned_build_directory(path,manifest_format='vibeflow.aot-build.v5')
 
 
 def test_business_path_strings_are_not_relocated(tmp_path):

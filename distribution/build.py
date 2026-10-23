@@ -754,9 +754,13 @@ def _copy_javascript_sdk(output: Path) -> None:
     target = output / "kernel/javascript"
     target.mkdir(parents=True, exist_ok=True)
     for name in ("sdk.mjs", "sdk.d.ts", "rule_abi.d.ts", "plugin_abi.d.ts",
-                 "workflow_client.mjs", "workflow_host.mjs", "workflow_node.mjs"):
-        origin = source / "coordination" if name.startswith("workflow_") else source
-        data = (origin / name).read_text(encoding="utf-8")
+                 "contracts.mjs", "coordinator.mjs", "workflow_client.mjs", "workflow_host.mjs", "workflow_node.mjs"):
+        origin = source / "coordination" if name.startswith("workflow_") or name in {"coordinator.mjs", "contracts.mjs"} else source
+        if name == "contracts.mjs":
+            from vibeflow.targets.javascript.resources import coordination_contract_source
+            data = coordination_contract_source()
+        else:
+            data = (origin / name).read_text(encoding="utf-8")
         (target / name).write_text(data, encoding="utf-8")
     for name in ("node_declarations.mjs", "node_contracts.d.ts"):
         shutil.copy2(source / name, target / name)

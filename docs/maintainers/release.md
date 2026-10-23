@@ -1,12 +1,22 @@
 # 发行与文档装配
 
-当前分发版本为 1.3.8，Workflow/AOT/Plugin ABI 维持 10/4/4。1.3.8 将 workflow 身份读取统一为任意 Node 可用的上下文接口，并改进协调节点与项目结构展示。
+当前分发版本为 1.4.0，Workflow ABI 为 v11、共享 AOT 为 v5、协作启动清单为 v2；Plugin ABI v4、Rule ABI v3、预览快照 v4 保持不变。
 
 1.3.5 修复 JavaScript 核心 SDK 解压到 workspace 内时被误认成业务资源的问题：Target 按既有资源清单识别准确文件，在形成业务引用与插件源码闭包时排除核心内部依赖；原始分析保留，用户贡献声明及共享 Rule 政策不变。1.3.4 统一资源使用 Rule 与 `vibeflow.resource_use.v1` 结果：独立 BaseLib（包括间接依赖）必须显式声明，Plugin 贡献资源整包引入并禁止重复声明，贡献代码实际路径必须位于所属 Plugin 目录。Python、JavaScript 的验证、构建、运行准备和展示共同消费规则结果；旧选择器及重复许可检查已删除。Python AOT 按实际引用收集实现，未引用的可用库不随包加载或复制。预览最新快照覆盖各注册 root 当前仍存在的 workflow，继续隐藏 Plugin 贡献资源。1.3.3 的 global_state 环境变量能力保留。
 
-既有版本 ZIP 保留原始字节，ABI 不变。两个 profile 使用下述工具构建；正式发布需验证解压运行、wheel、sdist 与完整门禁，禁止同名覆盖既有 ZIP。
+既有版本 ZIP 保留原始字节。两个 profile 使用下述工具构建；正式发布需验证解压运行、wheel、sdist 与完整门禁，禁止同名覆盖既有 ZIP。
 
-## 1.3.8 构建内容
+## 1.4.0 构建内容
+
+Core workflows 统一入口、引用、完成合同及同步资格事实；Python HTTP 与同进程宿主共用独立 Coordination 组件，Node 与浏览器共用通用 JS 组件，运行时显式绑定实际 AOT 目标。官方 InvokeSync 同步返回普通值；Call、消息、Wait、Kill 维护独立实例及实际终态。Python 增加原生 `async def` 节点、异步入口、生命周期等待、取消与实际清理，并贯通源码和 plan/block/compiled AOT。
+
+启动配置改为显式 `{kind:"process",command,...}` 或 `{kind:"in_process"}`。同步和异步入口严格区分；旧启动格式和旧构建产物明确拒绝，需按[协作迁移说明](../../distribution/docs/user/workflow-coordination.md)修改并重建，不保留旧执行路径。浏览器组件不承担 DOM、酒馆业务或刷新恢复。
+
+Python、JS 正式沙箱增加三个独立 workflow 的联合公式：两轮异步消息嵌入同步调用，覆盖并发身份和数据隔离、终态读取及错误公式对照。JS 使用同一单文件脚本验证 Node 与离线无头 Chromium，协作期间零网络请求。实现及分层说明见[设计与验收记录](../design/workflow-coordination.md)。
+
+保存的架构文档将内核引用统一为 `@kernel/...`，避免带入构建机源码绝对路径，使不同源码目录构建的分发包保持一致；实时诊断继续保留实际路径。
+
+## 1.3.8 历史构建内容
 
 任意 Python、JavaScript/TypeScript Node 都可通过 `context.workflow.self()` 读取本次实例的 `{id}`，无需 Capability 声明或授权。Nodeset、Loop 与父 workflow 共享身份；协同宿主使用服务注册的实例 ID。独立 Self 模板、Capability self 操作及其数据契约已删除，旧节点应迁移到上下文接口并重新构建 AOT。
 

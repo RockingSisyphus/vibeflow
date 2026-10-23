@@ -1,6 +1,6 @@
 # JavaScript/TypeScript 资源与 AOT
 
-用户资源从 `@vibeflow/plugin` 的 SDK 定义。业务声明与执行代码可以放在一起，置于 nodes/；Plugin 提供类型、规则、Schema 或 Capability，须位于独立包内。JS/TS 属于同一执行族，生成物继续是普通 ESM，使用原生 Workflow ABI v10。
+用户资源从 `@vibeflow/plugin` 的 SDK 定义。业务声明与执行代码可以放在一起，置于 nodes/；Plugin 提供类型、规则、Schema 或 Capability，须位于独立包内。JS/TS 属于同一执行族，生成物继续是普通 ESM，使用原生 Workflow ABI v11。
 
 
 任何 Node 的 `run(inputs, params, context)` 都可通过 `context.workflow.self().id` 读取当前 workflow 实例 ID，无需声明 Capability 或授权 Rule。Nodeset 和 Loop 内部共享该身份；每次独立调用生成新 ID，协同宿主使用服务注册 ID。宿主可通过 `WorkflowRunOptions.workflowInstanceId` 传入自身管理的 ID。该接口只读取身份，详见 [workflow 协同](workflow-coordination.md)。

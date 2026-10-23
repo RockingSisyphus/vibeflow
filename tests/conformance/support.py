@@ -9,6 +9,11 @@ runtime-private event payloads.
 
 from __future__ import annotations
 
+import asyncio
+
+def _execute(runtime,*args,**kwargs):
+    return asyncio.run(runtime.run_async(*args,**kwargs)) if runtime.graph.entry_mode == 'async' else runtime.run(*args,**kwargs)
+
 from collections import Counter
 from dataclasses import dataclass, field
 import json
@@ -175,7 +180,7 @@ def _run_python(
     result: RunResult | None = None
     error: ErrorObservation | None = None
     try:
-        result = runtime.run(inputs)
+        result = _execute(runtime, inputs)
     except Exception as exc:  # noqa: BLE001 - the observation is the test result
         category = _python_error_category(exc)
         error = _normalized_error(

@@ -1,19 +1,20 @@
-"""Report a host's actual completion without owning children or host lifetime."""
+"""Report actual invocation completion; hosts retain their own lifetime."""
+import asyncio
+import inspect
 from .client import WorkflowClient
+from .protocol import error_record
 
 
-def run_host(run, *, workflow=None, stop=None, url=None, identifier=None):
-    """``run(client)`` returns public JSON outputs after its own cleanup."""
-    client = (WorkflowClient(url, identifier=identifier, workflow=workflow, stop=stop)
-              if url is not None else WorkflowClient.from_environment(workflow=workflow, stop=stop))
+async def run_host(run, *, workflow=None, stop=None, url=None, identifier=None):
+    client = (await WorkflowClient.open(url,identifier=identifier,workflow=workflow,stop=stop)
+              if url is not None else await WorkflowClient.from_environment(workflow=workflow,stop=stop))
     try:
-        outputs = run(client)
+        outputs=run(client)
+        if inspect.isawaitable(outputs):outputs=await outputs
     except BaseException as error:
-        state = "cancelled" if getattr(error, "code", "") == "VF_ABORTED" or isinstance(error, KeyboardInterrupt) else "failed"
-        try:
-            client.finish(state=state, error={"code": getattr(error, "code", type(error).__name__), "message": str(error)})
-        except Exception as delivery:
-            error.add_note(f"coordination completion could not be delivered: {delivery}")
+        state='cancelled' if isinstance(error,asyncio.CancelledError) or getattr(error,'code','')=='VF_ABORTED' else 'failed'
+        try:await client.finish(state=state,error=error_record(error))
+        except BaseException as delivery:error.add_note(f'coordination completion could not be delivered: {delivery}')
         raise
-    client.finish(outputs=outputs)
+    await client.finish(outputs=outputs)
     return outputs

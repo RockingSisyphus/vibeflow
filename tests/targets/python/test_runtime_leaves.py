@@ -83,7 +83,7 @@ def test_python_block_compiler_source_is_deterministic_golden() -> None:
     plan = SimpleNamespace(
         order=("start", "finish"),
         frames={"start": frame(), "finish": frame()},
-        graph=SimpleNamespace(
+        graph=SimpleNamespace(entry_mode="sync",
             nodes=(SimpleNamespace(id="start"), SimpleNamespace(id="finish"))
         ),
         compiled=SimpleNamespace(resolved_schedule_edges=()),

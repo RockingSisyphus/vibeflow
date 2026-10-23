@@ -59,6 +59,9 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
 
     assert _files(first.directory) == _files(second.directory)
     assert first.archive.read_bytes() == second.archive.read_bytes()
+    for target in ("python_project", "javascript_project"):
+        architecture = (first.directory / target / "ARCHITECTURE.jsonc").read_text(encoding="utf-8")
+        assert str(distribution_builder.ROOT) not in architecture, "architecture leaked its source checkout"
     metadata = json.loads((first.directory / "DISTRIBUTION.json").read_text(encoding="utf-8"))
     assert metadata == {
         "agent_automation": {
@@ -142,7 +145,7 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
     assert b'FLOW_KIND_GLOBAL_STATE = "global_state"' in constants
     assert b'EFFECT_SCOPE_GLOBAL_STATE = "global_state"' in constants
     assert b"class ExecutionLockSpec" in flow
-    assert b'WORKFLOW_ABI_VERSION = "vibeflow.workflow.v10"' in workflow_model
+    assert b'WORKFLOW_ABI_VERSION = "vibeflow.workflow.v11"' in workflow_model
 
     with zipfile.ZipFile(first.archive) as archive:
         names = archive.namelist()

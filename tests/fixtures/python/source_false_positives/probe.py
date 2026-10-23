@@ -36,7 +36,7 @@ CASES = (
     ("inherited_diamond", "", VALUE, "", True),
     ("inherited_print", "", '        print("business")\n' + VALUE, "NODE.EFFECT.CALL_FORBIDDEN", False),
     ("inherited_bad_signature", "", VALUE, "NODE.CONTRACT.RUN_PURE_SIGNATURE", False),
-    ("inherited_async", "", VALUE, "NODE.CONTRACT.ASYNC_RUN_PURE", False),
+    ("inherited_async", "", VALUE, "VF_ENTRY_MODE_SUSPEND_IN_SYNC", False),
     ("missing_method", "", VALUE, "NODE.CONTRACT.MISSING_RUN_PURE", False),
     ("decision_flow_output", "", VALUE, "", True),
     ("decision_plain_output", "", VALUE, "", True),

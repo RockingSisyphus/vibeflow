@@ -13,7 +13,7 @@ from vibeflow.targets.shared.aot_publish import (
 )
 
 
-FORMAT = "vibeflow.aot-build.v4"
+FORMAT = "vibeflow.aot-build.v5"
 
 
 def _artifact(path: Path, marker: str) -> None:
@@ -24,7 +24,7 @@ def _artifact(path: Path, marker: str) -> None:
     plan_hash = hashlib.sha256(marker.encode()).hexdigest()
     manifest = {
         "format": FORMAT,
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "project_target": "javascript",
         "workflow_id": "publish-test",
         "entry_mode": "sync",

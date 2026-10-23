@@ -123,7 +123,7 @@ src/vibeflow/core/rules/
 
 读取器不执行规则；规划不解析语言源码。Python/JavaScript Target 提供语言事实、局部符号视图及实现绑定，消费相同选择和范围；不能各自再实现继承或接管。Tooling 负责配置、Plugin 装配、命令与报告投影，不增加隐式默认注入。
 
-JavaScript 的公开源码服务对未知路径报 `RULE.SOURCE.UNAVAILABLE`，不回退磁盘读取；有限图引用避免完整注册结构形成循环 JSON。Rule ABI 为 v3，Plugin ABI v4 与 Workflow ABI v10 继续承担各自原生协议。
+JavaScript 的公开源码服务对未知路径报 `RULE.SOURCE.UNAVAILABLE`，不回退磁盘读取；有限图引用避免完整注册结构形成循环 JSON。Rule ABI 为 v3，Plugin ABI v4 与 Workflow ABI v11 继续承担各自原生协议。
 
 ## 复用与可解释报告
 

@@ -22,7 +22,7 @@ class PythonBundle:
     def __init__(self, path):
         self.path = Path(path).resolve()
         self.metadata = json.loads((self.path / 'vibeflow-build.json').read_text(encoding='utf-8'))
-        if self.metadata.get('format') != 'vibeflow.aot-build.v4' or self.metadata.get('abi_version') != WORKFLOW_ABI_VERSION:
+        if self.metadata.get('format') != 'vibeflow.aot-build.v5' or self.metadata.get('abi_version') != WORKFLOW_ABI_VERSION:
             raise ValueError('unsupported Python AOT format or workflow ABI; rebuild the bundle')
         if self.metadata.get('project_target') != 'python':
             raise ValueError('bundle is not a Python workflow')
@@ -47,6 +47,11 @@ class PythonBundle:
                 source_roots=tuple(self.path / value for value in visible))
         self.generated = load_source_module(self.path / 'generated_blocks.py', '_vibeflow_aot_blocks_' + uuid4().hex)
 
+    @property
+    def workflow_descriptor(self):
+        from copy import deepcopy
+        return deepcopy(self.data['workflow_descriptor'])
+
     def _prepare_node(self, record):
         binding = dict(record['binding'])
         binding.update(path=self.path / binding['path'], load_root=self.path / binding['load_root'],
@@ -69,6 +74,7 @@ class PythonBundle:
 
     def _registry(self):
         registry = NodeRegistry()
+        registry.capability_descriptors = tuple(decode_resource(value) for value in self.data["capabilities"])
         for descriptor, binding, source, line in self._node_records:
             def resolve(binding=binding, key=descriptor.id):
                 def load():
@@ -83,9 +89,9 @@ class PythonBundle:
             registry.register(descriptor,loader=resolve,source=source,source_line=line)
         return registry
 
-    def _plugins(self):
+    def _plugins(self, _owned=None):
         result = PluginRegistry()
-        created = []
+        created = [] if _owned is None else _owned
         try:
             for descriptor, source, record in self._plugin_records:
                 factory = self._bindings(source).get(('plugin',descriptor.id))
@@ -99,13 +105,14 @@ class PythonBundle:
                 context = freeze_mapping({'config':record['config'],
                     'workflow_id':str(self.path / self.data['config_path']),
                     'config_path':str(self.path / self.data['config_path'])}, field_name='plugin.context')
-                created.append(create_lifecycle_plugin(result,descriptor,factory,context,
+                create_lifecycle_plugin(result,descriptor,factory,context,owned_instances=created,
                     source=descriptor.implementations[0].source.ref,
                     class_name=descriptor.implementations[0].source.export or '',
-                    config_keys=tuple(record['config']),rulesets=descriptor.rulesets))
+                    config_keys=tuple(record['config']),rulesets=descriptor.rulesets)
         except BaseException as error:
             from vibeflow.targets.python.project.plugins import dispose_instances
-            dispose_instances(created, primary=error)
+            if _owned is None:
+                dispose_instances(created, primary=error)
             raise
         return result
 
@@ -139,12 +146,17 @@ class PythonBundle:
                 workflow_instance_id=workflow_instance_id,
                 delegate_cli=delegate_cli, _execution_plan=plan)
         from vibeflow.tooling.application.python.execution import (_checked_runtime_binding)
+        runtime._runtime_plugin_descriptors = tuple(item[0] for item in self._plugin_records)
         runtime._runtime_plan_factory = lambda plugins: _checked_runtime_binding(
             lambda: bind(True, plugins), health=self.health, run_dir=runtime._run_dir)
         from vibeflow.tooling.application.python.project.lifecycle import checked_runtime_plugins
         runtime._runtime_plugin_factory = lambda: checked_runtime_plugins(
             self._plugins, config_path=self.path / self.data['config_path'],
             effective_policy=self.data['health']['effective_policy'], run_dir=runtime._run_dir)
+        from vibeflow.targets.python.project.plugins import create_plugins_async
+        runtime._runtime_plugin_factory_async = lambda: create_plugins_async(lambda owned: checked_runtime_plugins(
+            lambda: self._plugins(_owned=owned), config_path=self.path / self.data['config_path'],
+            effective_policy=self.data['health']['effective_policy'], run_dir=runtime._run_dir))
         runtime._bundle_source_roots = self.roots
         return runtime
 
@@ -222,6 +234,36 @@ class PythonBundle:
             _write_json(directory / 'output_summary.json', _summarize_run_result(context))
             from .execution import checked_result
             return checked_result(actual_id,directory,health,context,runtime.graph)
+
+    async def run_async(self, initial=None, *, runtime_options=None, capabilities=None, run_root=None, run_id=None, delegate_cli=False, node_config_overrides=None, global_config=None, _prepared_run_dir=None, entry=None, signal=None, workflow_instance_id=None):
+        from vibeflow.tooling.application.python.run_directory import prepare_run_dir as _prepare_run_dir
+        from vibeflow.tooling.application.python.execution import CheckedRunResult, _new_run_id, _write_json, _summarize_run_result, _ensure_trace_files
+        from vibeflow.targets.python.runtime.observation import observe_run
+        actual_id = _new_run_id() if run_id is None else run_id
+        directory = _prepared_run_dir or _prepare_run_dir(run_root, actual_id)
+        effective = self.effective_options(runtime_options)
+        with observe_run(directory, effective):
+            from vibeflow.core.workflows.entries import choose_entry
+            selected = choose_entry({item.name: item for item in self.workflow.named_entries}, self.workflow.default_entry, entry)
+            delegate_health = self.data['delegate_health_by_entry'][selected] if selected is not None else self.data['delegate_health']
+            health = self._health(delegate_health if delegate_cli else self.data['health'])
+            _write_json(directory / 'health_report.json', health.to_dict())
+            _write_json(directory / 'effective_policy.json', health.effective_policy)
+            if health.status in {'FAIL', 'ERROR'}:
+                from vibeflow.tooling.application.python.execution import CheckedRunError
+                raise CheckedRunError('bundle run refused: invalid delegated CLI contract', CheckedRunResult(actual_id, directory, health))
+            from vibeflow.targets.python.runtime.summaries import summarize_mapping
+            _write_json(directory / 'input_summary.json', summarize_mapping(dict(initial or {})))
+            runtime = self.create_runtime(runtime_options=effective, capabilities=capabilities, workflow_instance_id=workflow_instance_id, run_dir=directory, delegate_cli=delegate_cli, node_config_overrides=node_config_overrides, global_config=global_config, entry=entry)
+            unsubscribe = signal.subscribe(runtime.request_stop) if signal is not None else lambda: None
+            try:
+                context = await runtime.run_async(initial)
+            finally:
+                unsubscribe()
+                _ensure_trace_files(directory)
+            _write_json(directory / 'output_summary.json', _summarize_run_result(context))
+            from .execution import checked_result
+            return checked_result(actual_id, directory, health, context, runtime.graph)
 
     @property
     def health(self):

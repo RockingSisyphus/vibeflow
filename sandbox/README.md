@@ -10,6 +10,7 @@
 | 对象连续加法 | [object_addition](python/object_addition/README.md) | — |
 | 分段数学、互斥分支、汇合与数据旁路 | [piecewise_math](python/piecewise_math/README.md) | — |
 | 嵌套 Nodeset、多层循环、执行模式与 trace | [workflow_math](python/workflow_math/README.md) | [workflow_math](javascript/workflow_math/README.md) |
+| 三个独立 workflow 联合公式、同步子调用、两轮异步消息、并发隔离与无头浏览器同页运行 | [workflow_cooperation_math](python/workflow_cooperation_math/README.md) | [workflow_cooperation_math](javascript/workflow_cooperation_math/README.md) |
 | 多文件插件加法、覆盖与源码修改 | [plugin_addition](python/plugin_addition/README.md) | [plugin_addition](javascript/plugin_addition/README.md) |
 | 异步、Capability 与持续端口加法 | — | [async_addition](javascript/async_addition/README.md) |
 | 普通图分发与汇合、非法图拒绝、容量与清理后即时补位 | [graph_concurrency](python/graph_concurrency/README.md) | [graph_concurrency](javascript/graph_concurrency/README.md) |

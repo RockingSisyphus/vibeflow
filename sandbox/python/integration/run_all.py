@@ -298,7 +298,7 @@ INVALID_CASES = [
     {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "PublicHelperNode", "type": "bad.public_helper", "expect": "NODE.CONTRACT.PUBLIC_CALLABLE"},
     {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "InitWithClientNode", "type": "bad.init_client", "expect": "NODE.CONTRACT.INIT_SIGNATURE"},
     {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "ResourceFieldNode", "type": "bad.resource_field", "allowed": True, "retired_expect": "NODE.PURITY.RESOURCE_FIELD"},
-    {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "AsyncRunPureNode", "type": "bad.async_run_pure", "expect": "NODE.CONTRACT.ASYNC_RUN_PURE"},
+    {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "AsyncRunPureNode", "type": "bad.async_run_pure", "expect": "NODE.CONTRACT.COMPLETION"},
     {"kind": "inspect_node", "module": "illegal_nodes/signature_cases.py", "class": "GeneratorRunPureNode", "type": "bad.generator_run_pure", "expect": "NODE.CONTRACT.GENERATOR_RUN_PURE"},
     {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "OpenFileNode", "type": "bad.open", "expect": "NODE.EFFECT.CALL_FORBIDDEN"},
     {"kind": "inspect_node", "module": "illegal_nodes/side_effect_cases.py", "class": "PathReadTextNode", "type": "bad.path_read", "expect": "NODE.EFFECT.IMPORT_FORBIDDEN"},
@@ -402,7 +402,7 @@ def _run_sandbox(work_root: Path) -> int:
             _run_comprehensive_math_case(),
             _run_rule_selection_case(),
             *_run_review_cases(),
-            *(_run_addition_case(name) for name in ("cli_addition", "object_addition", "plugin_addition", "piecewise_math", "workflow_math", "graph_concurrency")),
+            *(_run_addition_case(name) for name in ("cli_addition", "object_addition", "plugin_addition", "piecewise_math", "workflow_math", "graph_concurrency", "workflow_cooperation_math")),
             *_run_execution_model_cases(),
             *_run_source_preflight_cases(),
             *_run_global_state_cases(),
@@ -1872,7 +1872,7 @@ def _assert_execution_plan(case: dict[str, Any], plan) -> None:
                     f"{list(expected)!r}, got {actual!r}"
                 )
         if case.get("expected_workflow_global_state"):
-            if portable.abi_version != "vibeflow.workflow.v10":
+            if portable.abi_version != "vibeflow.workflow.v11":
                 raise AssertionError(
                     f"expected WorkflowPlan v9, got {portable.abi_version!r}"
                 )

@@ -26,6 +26,7 @@ SYSTEM_STYLE_COLORS: Mapping[str, StyleColors] = {
 }
 
 WORKFLOW_OPERATION_STYLES = {
+    "invoke_sync": {"shape":"notch-rect", "fill":"#ecfccb", "stroke":"#4d7c0f", "text":"#1a2e05"},
     "call": {"shape": WORKFLOW_SHAPE, "fill": "#fef3c7", "stroke": "#b7791f", "text": "#713f12"},
     "kill": {"shape": WORKFLOW_SHAPE, "fill": "#ffe4e6", "stroke": "#be123c", "text": "#881337"},
     "receive": {"shape": WORKFLOW_SHAPE, "fill": "#1e3a8a", "stroke": "#172554", "text": "#ffffff"},

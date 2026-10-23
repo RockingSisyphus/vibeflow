@@ -1,3 +1,8 @@
+import asyncio
+
+def _execute(runtime,*args,**kwargs):
+    return asyncio.run(runtime.run_async(*args,**kwargs)) if runtime.graph.entry_mode == 'async' else runtime.run(*args,**kwargs)
+
 """A shared ordinary call must respect every dispatch that activated it."""
 
 import subprocess
@@ -56,7 +61,7 @@ def test_python_shared_call_respects_both_dispatch_limits(tmp_path):
         nodes.append(_call(name, "shared." + name,
             **({"config": {"max_concurrency": 1}} if name in {"left", "right"} else {}),
             join_policy="all" if name == "end" else "any_active"))
-    graph = parse_graph_config({"pipeline": {"nodes": nodes, "edges": EDGES}})
+    graph = parse_graph_config({"pipeline": {'entry_mode': 'async', "nodes": nodes, "edges": EDGES}})
     runtime = PipelineRuntime(graph, registry=registry, run_dir=tmp_path)
     thread, errors = _background(runtime)
     try:

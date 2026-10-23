@@ -195,11 +195,11 @@ def _adapt_implementation_facts(
             registered = source.descriptor(type_key) if callable(getattr(source, "descriptor", None)) else _require_registered_type(source, type_key)
         except Exception:
             continue
-        facts.append(_implementation_fact(type_key, registered, effect_scope=source.effect_scope(type_key) if callable(getattr(source, "effect_scope", None)) else "unconstrained"))
+        facts.append(_implementation_fact(type_key, registered, effect_scope=source.effect_scope(type_key) if callable(getattr(source, "effect_scope", None)) else "unconstrained", entry_mode=graph.entry_mode))
     return ImplementationFacts(tuple(facts), strict=True)
 
 
-def _implementation_fact(type_key: str, registered: Any, *, effect_scope: str = "unconstrained") -> ImplementationFact:
+def _implementation_fact(type_key: str, registered: Any, *, effect_scope: str = "unconstrained", entry_mode: str = "sync") -> ImplementationFact:
     flow_kind = _text_attribute(registered, "flow_kind")
     contract = getattr(registered, "contract", None)
     completion = _text_attribute(registered, "completion")
@@ -222,6 +222,7 @@ def _implementation_fact(type_key: str, registered: Any, *, effect_scope: str = 
         requires=tuple(getattr(contract, "requires", ()) or ()),
         provides=tuple(getattr(contract, "provides", ()) or ()),
         completion=completion or "immediate",
+        executor="event_loop" if completion == "suspend" else "thread" if entry_mode == "async" else "current",
         source_kind=source_kind,
         source_ref=source_ref,
         source_export=source_export,
@@ -247,7 +248,8 @@ def _call_compiler_plugins(
         if not callable(method):
             continue
         try:
-            method(*args)
+            from vibeflow.targets.python.runtime.completion import immediate
+            immediate(method(*args))
         except Exception as exc:
             plugin_name = str(
                 getattr(plugin, "name", plugin.__class__.__name__)

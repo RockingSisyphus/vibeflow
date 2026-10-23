@@ -62,6 +62,10 @@ def _declare(kind, options, value=None, source=None):
     if kind in {"node", "rule", "base_lib",  "plugin"} and not (kind == "rule" and options.get("handler") and value is None and source is None):
         locator = _json(source) if source is not None else {"kind": "file", "ref": path, "export": symbol}
         implementation = {"language": "python", "source": locator}
+        if kind == "plugin":
+            implementation["completion"] = data.pop("completion", "immediate")
+        if kind == "node" and value is not None:
+            implementation["completion"] = "suspend" if inspect.iscoroutinefunction(getattr(value, "run_pure", None)) else "immediate"
         if kind != "rule":
             implementation["targets"] = ["python"]
             if files:

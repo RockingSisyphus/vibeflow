@@ -10,7 +10,7 @@ from vibeflow.block_compiler.compiler import _block_id
 from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.config.scope import normalize_config_scope, scoped_node_params
 from vibeflow.core.flow import GraphConfig, LOOP_DEFINITION_IDS, STATUS_PLANNED
-from vibeflow.core.models import TargetFeatureSet
+from vibeflow.core.models import TargetFeatureSet, ImplementationFact
 from vibeflow.core.planned import effective_planned_behavior
 from vibeflow.core.graph_calls import graph_call_subjects
 from vibeflow.core.config.concurrency import business_config, scheduling_config
@@ -38,6 +38,7 @@ def prepare_python_workflow(graph, compiled, *, registry, global_config=None, no
         raise PipelineRuntimeError(str(error)) from error
     facts = _adapt_implementation_facts(graph, source=registry, nodeset_types=set(graph.nodeset_types))
     graphs, compilations, globals_by_block, parameters, overrides_by_block = {}, {}, {}, {}, {}
+    call_facts = {}
     subjects = graph_call_subjects(graph, global_config=global_config, node_config_overrides=overrides)
     for subject in subjects:
         if subject.declaration_only:
@@ -60,6 +61,9 @@ def prepare_python_workflow(graph, compiled, *, registry, global_config=None, no
                 continue
             composite = spec.definition_id in current.nodeset_types or spec.definition_id in LOOP_DEFINITION_IDS
             if composite:
+                call_facts[(*path,spec.id)] = ImplementationFact(spec.definition_id,
+                    completion='suspend' if graph.entry_mode == 'async' else 'immediate',
+                    executor='event_loop' if graph.entry_mode == 'async' else 'current')
                 parameters[(*path, spec.id)] = scheduling_config(
                     {**spec.params, **local_overrides.get(spec.id, {})}
                 )
@@ -73,7 +77,7 @@ def prepare_python_workflow(graph, compiled, *, registry, global_config=None, no
                 {**scoped, **local_overrides.get(spec.id, {})})
     try:
         workflow = compile_graph_plan(graph, compiled, implementation_facts=facts,
-            compiled_by_path=compilations, params_by_path=parameters,
+            compiled_by_path=compilations, params_by_path=parameters, call_execution_facts=call_facts,
             target_features=TargetFeatureSet(target='python', features=frozenset({'execution_locks', 'global_state'})),
         )
     except ValueError as exc:
@@ -123,6 +127,7 @@ def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_reg
     def bind(block_id):
         block = prepared.workflow.block(block_id)
         graph = prepared.graphs[block_id]
+        graph = replace(graph, entry_mode=prepared.workflow.entry_mode)
         specs = {node.id: node for node in graph.nodes}
         compiled = prepared.compiled[block_id]
         frames = {}
@@ -165,7 +170,7 @@ def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_reg
                 loop_spec=spec.loop, execution_lock=spec.execution_lock,
                 subplan=bind(call.child_block) if call.child_block else None,
                 accepts_context=accepts_context, planned_behavior=behavior,
-                capability_policy=call.capability_policy.to_value(),
+                capability_policy=call.capability_policy.to_value(), completion=call.completion,
                 planned_stub_module=behavior.stub_module, planned_stub_path=stub_path, planned_stub_hash=stub_hash)
         bindings = build_python_binding_plan(frames, order=block.order, path=block.path,
             plugin_registry=plugin_registry if block_id == prepared.workflow.entry_block else None)

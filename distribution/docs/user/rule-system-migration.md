@@ -1,6 +1,6 @@
 # 当前配置与接口迁移
 
-当前公开契约为 Workflow ABI v10、Plugin ABI v4、Rule ABI v3、AOT v4，预览快照 v4。旧源码按以下职责重新组织，旧 AOT 必须重新构建；不提供自动转换、兼容别名或双执行路径。
+当前公开契约为 Workflow ABI v11、Plugin ABI v4、Rule ABI v3、AOT v5，预览快照 v4。旧源码按以下职责重新组织，旧 AOT 必须重新构建；不提供自动转换、兼容别名或双执行路径。
 
 | 旧机制 | 当前方式 |
 | --- | --- |

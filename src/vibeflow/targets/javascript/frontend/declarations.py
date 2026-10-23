@@ -113,12 +113,13 @@ def declarations(workflow: EmissionWorkflow) -> str:
             "  readonly onStatus?: (status: WorkflowRunStatus) => void;",
             "}",
             "",
-            "export const VIBEFLOW_WORKFLOW_ABI: \"vibeflow.workflow.v10\";",
+            "export const VIBEFLOW_WORKFLOW_ABI: \"vibeflow.workflow.v11\";",
             "export const VIBEFLOW_PLUGIN_ABI: \"vibeflow.plugin.v4\";",
             _entry_declaration(workflow),
     ]
 
     lines.append("")
+    lines.append("export const workflowDescriptor: Readonly<{workflow: {root: string; path: string; entry?: string} | null; entry_mode: 'sync' | 'async'; inputs: readonly unknown[]; outputs: readonly unknown[]; calls: readonly Readonly<{operation: 'invoke_sync' | 'call'; workflow: {root: string; path: string; entry?: string}; launch?: unknown}>[]; entries: Readonly<Record<string, unknown>>; default_entry: string}>;")
     return "\n".join(lines)
 
 

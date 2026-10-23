@@ -27,3 +27,26 @@ def test_native_work_ownership_uses_bindings_and_actual_join_contract(tmp_path,b
     result=execute_python_node_rules(registry,context,phase='static')
     codes={item.rule_id for item in result.findings}
     assert ('VF_NODE_RESOURCE_UNOWNED' in codes) is forbidden,result.findings
+
+
+@pytest.mark.parametrize('body, forbidden', [
+    ('asyncio.create_task(asyncio.sleep(0))', True),
+    ('await asyncio.create_task(asyncio.sleep(0))', False),
+    ('task=asyncio.create_task(asyncio.sleep(0))\ntry:\n    await task\nfinally:\n    task.cancel()\n    await task', False),
+    ('async with asyncio.TaskGroup() as group:\n    group.create_task(asyncio.sleep(0))', False),
+])
+def test_native_coroutine_task_ownership(tmp_path,body,forbidden):
+    from vibeflow.targets.python.sdk import node
+    from vibeflow.targets.python.sdk.resources import definition
+    source='import asyncio\nclass Work:\n    async def run_pure(self,inputs,params):\n'+''.join('        '+line+'\n' for line in body.splitlines())+'        return {}\n'
+    path=tmp_path/'node.py';path.write_text(source)
+    from vibeflow.core.descriptors.models import ImplementationDescriptor, SourceLocator
+    registry=native_registry()
+    registry.register(NodeDescriptor('fixture.work','Work','Ownership fixture','1','process',
+        contract=NodeContractDescriptor(),rulesets=('vibeflow.process',),node_type='vibeflow.node',
+        implementations=(ImplementationDescriptor(language='python',targets=('python',),completion='suspend',source=SourceLocator('file',str(path),'Work')),)))
+    registry.source_locations={'fixture.work':(path,'Work','fixture',tmp_path)}
+    registry.source_roots=(tmp_path,);registry.source_root_ids={tmp_path:'fixture'}
+    context=analyze_node_source_context(registry,('fixture.work',))
+    report=execute_python_node_rules(registry,context,phase='static')
+    assert ('VF_NODE_RESOURCE_UNOWNED' in {item.rule_id for item in report.findings}) is forbidden,report.findings

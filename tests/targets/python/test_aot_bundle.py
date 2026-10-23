@@ -1,3 +1,10 @@
+import asyncio
+
+from functools import partial
+
+def _run_async(runtime,*args,**kwargs):
+    return asyncio.run(runtime.run_async(*args,**kwargs))
+
 """Source-free deployment and native execution contracts for Python AOT."""
 import json
 import os
@@ -134,8 +141,7 @@ def test_task_sandbox_runs_from_a_moved_bundle(tmp_path, execution, configuratio
     build_python_aot(PythonBuildRequest(workspace,config,tmp_path/'bundle'))
     shutil.rmtree(source)
     bundle = load_bundle(tmp_path/'bundle')
-    result = bundle.run({'scenario':'success'},run_root=tmp_path/'runs',
-        runtime_options={'execution':execution,'trace':'full'})
+    result = asyncio.run(bundle.run_async({'scenario': 'success'}, run_root=tmp_path / 'runs', runtime_options={'execution': execution, 'trace': 'full'}))
     assert result.context.get('runtime.stop_reason') == 'completed'
     trace = (result.run_dir/'runtime_trace.jsonl').read_text()
     assert 'worker_started' in trace and 'cleanup_finished' in trace
@@ -173,7 +179,7 @@ def test_bundle_failure_keeps_ordinary_workers_until_they_exit(tmp_path):
     build_python_aot(PythonBuildRequest(load_workspace_config(source/'vibeflow_config.jsonc'),config,tmp_path/'bundle'))
     shutil.rmtree(source)
     with pytest.raises(Exception,match='parent failed'):
-        load_bundle(tmp_path/'bundle').run({'scenario':'root_failure'},run_root=tmp_path/'runs')
+        asyncio.run(load_bundle(tmp_path / 'bundle').run_async({'scenario': 'root_failure'}, run_root=tmp_path / 'runs'))
     trace = next((tmp_path/'runs').glob('*/runtime_trace.jsonl')).read_text()
     assert 'cleanup_finished' in trace
 
@@ -214,7 +220,7 @@ def test_bundle_cancellation_waits_for_real_cleanup_and_releases_lock(tmp_path, 
     directory = tmp_path/'run'
     runtime = bundle.create_runtime(run_dir=directory,runtime_options={'execution':execution,'trace':'full'})
     with ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(runtime.run,{'scenario':'external_cancel'})
+        future = executor.submit(partial(_run_async, runtime),{'scenario':'external_cancel'})
         deadline = time.monotonic() + 10
         trace = directory/'runtime_trace.jsonl'
         try:
@@ -230,4 +236,4 @@ def test_bundle_cancellation_waits_for_real_cleanup_and_releases_lock(tmp_path, 
     kinds = [item['kind'] for item in events]
     assert 'cleanup_finished' in kinds
     assert kinds.index('cleanup_finished') < kinds.index('lock_released')
-    assert bundle.create_runtime(run_dir=tmp_path/'next').run({'scenario':'success'}).get('runtime.stop_reason') == 'completed'
+    assert asyncio.run(bundle.create_runtime(run_dir=tmp_path / 'next').run_async({'scenario': 'success'})).get('runtime.stop_reason') == 'completed'

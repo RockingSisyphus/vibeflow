@@ -120,9 +120,11 @@ class _BoundContext:
                 raise AotPlanError(f"node '{location}' requires unknown operations on capability '{requirement.id}': {unknown}")
         if self.plan.entry_mode != "sync":
             return
-        if binding.completion == "suspend":
+        from vibeflow.core.workflows.coordination import synchronous_violation
+        problem = synchronous_violation(binding.completion, capabilities=binding.capabilities, descriptors=self.capabilities)
+        if problem:
             raise AotPlanError(
-                f"sync workflow contains suspending node '{location}'",
+                f"sync workflow contains {problem} at '{location}'",
                 code="VF_ENTRY_MODE_SUSPEND_IN_SYNC",
             )
         if binding.schedule != "inline":
