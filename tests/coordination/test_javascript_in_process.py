@@ -71,8 +71,11 @@ export async function probe(){
 }
 '''.replace("import assert from 'ASSERT';", "const assert=(condition,message)=>{if(!condition)throw Error(message);};").replace('COORDINATOR',(resources/'coordination/coordinator.mjs').as_posix())
     (tmp_path/'probe.mjs').write_text(script)
-    esbuild=Path(os.environ['VIBEFLOW_TEST_TOOLCHAIN_ROOT'])/'node_modules/.bin/esbuild'
-    result=subprocess.run([str(esbuild),str(tmp_path/'probe.mjs'),'--bundle','--format=iife','--platform=browser','--global-name=Probe',f'--outfile={tmp_path / "probe.js"}'],text=True,capture_output=True,timeout=20)
+    esbuild=Path(os.environ['VIBEFLOW_TEST_TOOLCHAIN_ROOT'])/'node_modules/esbuild'
+    options={'entryPoints':[str(tmp_path/'probe.mjs')],'bundle':True,'format':'iife',
+             'platform':'browser','globalName':'Probe','outfile':str(tmp_path/'probe.js')}
+    result=subprocess.run(['node','-e','require(process.argv[1]).buildSync(JSON.parse(process.argv[2]))',
+        str(esbuild),json.dumps(options)],text=True,capture_output=True,timeout=20)
     assert result.returncode==0,result.stderr
     if environment=='node':
         driver=tmp_path/'run.cjs'
