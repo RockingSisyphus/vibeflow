@@ -101,5 +101,3 @@ class Cancelled:
         assert message["payload"]["cleanup"]=="finished"
         return {"answer":{"status":"cancelled","case_id":seed["case_id"],"cleanup":"finished", "identities":{
             "a":context.workflow.self()["id"],"b":status["id"],"c":message["payload"]["c_id"]}}}
-
-
