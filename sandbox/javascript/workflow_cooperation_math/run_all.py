@@ -36,8 +36,10 @@ import {{verify}} from {json.dumps((FIXTURE / 'verify.mjs').as_posix())};
 export function run(){{return verify(Coordinator,{{{','.join(modules)}}},{json.dumps(CASES)},{json.dumps(FAULTS)});}}
 ''', encoding="utf-8")
     bundle = output / "cooperative-math.js"
-    done = subprocess.run([str(toolchain / "node_modules/.bin/esbuild"), str(script), "--bundle", "--platform=browser",
-        "--format=iife", "--global-name=CooperativeMath", f"--outfile={bundle}"], capture_output=True, text=True, timeout=30)
+    options = {"entryPoints":[str(script)], "bundle":True, "platform":"browser", "format":"iife",
+               "globalName":"CooperativeMath", "outfile":str(bundle)}
+    done = subprocess.run(["node", "-e", "require(process.argv[1]).buildSync(JSON.parse(process.argv[2]))",
+        str(toolchain / "node_modules/esbuild"), json.dumps(options)], capture_output=True, text=True, timeout=30)
     assert done.returncode == 0, done.stdout + done.stderr
     # The deployed script must execute without the project sources or imports.
     shutil.rmtree(work / "project")
