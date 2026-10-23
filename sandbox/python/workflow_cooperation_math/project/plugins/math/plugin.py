@@ -2,7 +2,7 @@
 from vibeflow.targets.python.sdk import Plugin, data_schema
 
 resources = [data_schema(type_key="math." + name, schema=schema) for name, schema in {
-    "x": {"type": "number"}, "y": {"type": "number"}, "case_id": {"type": "string"},
+    "stop": {"type": "boolean"}, "x": {"type": "number"}, "y": {"type": "number"}, "case_id": {"type": "string"},
     "seed": {"type": "object"}, "local": {"type": "number"}, "checkpoint": {"type": "object"},
     "request": {"type": "object"}, "reply": {"type": "object"}, "shift": {"type": "object"},
     "square": {"type": "object"}, "answer": {"type": "object"},

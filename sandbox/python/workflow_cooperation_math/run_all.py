@@ -11,7 +11,7 @@ FIXTURE = Path(__file__).resolve().parent
 ROOT = FIXTURE.parents[2]
 sys.path[:0] = [str(ROOT), str(ROOT / "src")]
 from tests.fixtures.support.addition_sandboxes import main
-from tests.fixtures.support.workflow_cooperation import CASES, FAULTS, expected, prepare, reference, set_fault, verify_rows
+from tests.fixtures.support.workflow_cooperation import CASES, CANCEL_CASE, FAULTS, expected, prepare, reference, set_fault, verify_rows, verify_cancelled
 from vibeflow.coordination import Coordinator, CoordinationError
 from vibeflow.targets.python.runtime.workflow_host import bind_workflow
 from vibeflow.tooling.application.python import PythonBuildRequest, build_python_aot, load_bundle, run_workspace_checked, run_workspace_checked_async
@@ -49,12 +49,17 @@ async def exercise(scope):
             assert error.code == "VF_WORKFLOW_SYNC_UNSUPPORTED", error
         else:
             raise AssertionError("async workflow accepted by InvokeSync")
-        ended = await asyncio.wait_for(asyncio.gather(*(scope.run(reference("a"), case) for case in CASES)), 45)
+        ended = await asyncio.wait_for(asyncio.gather(*(scope.run(reference("a"), case) for case in [*CASES, CANCEL_CASE])), 45)
         assert all(item["state"] == "succeeded" for item in ended), ended
         assert scope.peak_parents > 1 and scope.active_parents == 0, "parent workflows did not overlap"
-        rows = [item["outputs"]["computed"] for item in ended]
+        rows = [item["outputs"]["computed"] for item in ended[:-1]]
+        cancelled = ended[-1]["outputs"]["computed"]
+        verify_cancelled(cancelled)
+        stopped = await scope.operations(ended[-1]["id"])["wait"]({"id":cancelled["identities"]["b"]})
+        assert stopped["state"] == "cancelled" and stopped["outputs"] is None, stopped
+        assert len({identity for row in [*rows,cancelled] for identity in row["identities"].values()}) == 3*(len(CASES)+1)
         verify_rows(rows)
-        assert len(scope.instances) == 2*len(CASES), "only A/B terminal records may remain"
+        assert len(scope.instances) == 2*(len(CASES)+1), "only A/B terminal records may remain"
         for item, row in zip(ended, rows):
             assert item["id"] == row["identities"]["a"]
             repeated = await scope.operations(item["id"])["wait"]({"id": row["identities"]["b"]})
@@ -62,7 +67,7 @@ async def exercise(scope):
         for identifier in list(scope.instances):
             scope.release(identifier)
         assert not scope.instances
-        return {"rows": rows, "peakParents": scope.peak_parents}
+        return {"rows": rows, "cancelled":cancelled, "peakParents": scope.peak_parents}
     finally:
         await scope.aclose()
 

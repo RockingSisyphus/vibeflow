@@ -24,7 +24,7 @@ const [renderer,entry,caller,worker,styleJson]=process.argv.slice(2),puppeteer=c
     const planned=VFShapes.measure({id:'planned',status:'planned',preview_operations:[{capability:'vibeflow.workflow',operation:'wait'}],presentation:{values:{fill:'#abcdef'},sources:{fill:'status'}}});
     return {rows,custom:{shape:custom.shape,fill:custom.values.fill},planned:planned.values.fill};
   },JSON.parse(styleJson));
-  for(const index of [0,2,3,4])assert.equal(styles.rows[index].shape,'notch-rect');
+  for(const index of [0,1,2,3,4])assert.equal(styles.rows[index].shape,'notch-rect');
   assert.equal(styles.rows[0].fill,'#fef3c7');assert.equal(styles.rows[2].fill,'#e0f2fe');assert.equal(styles.rows[3].fill,'#1e3a8a');assert.equal(styles.rows[4].fill,'#ffe4e6');
   const primary=await page.evaluate(()=>['call','send','receive','kill'].map(operation=>{
     const preview_operations=[{capability:'vibeflow.workflow',operation},{capability:'vibeflow.workflow',operation:'wait'}];

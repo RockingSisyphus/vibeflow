@@ -5,7 +5,7 @@
   let project = null;
   const collapsedRoots=new Set();
   let records = new Map(), currentRecord = null, refreshGeneration = 0;
-  const snapshots = new Map(), states = new Map(), modes = new Map(), entries = new Map();
+  const snapshots = new Map(), states = new Map(), modes = new Map(), entries = new Map(), workflowRecords = new Map();
   let entry="";
   const ns = "http://www.w3.org/2000/svg", elk = typeof ELK === "undefined" ? null : new ELK();
   const configured=window.VibeFlowViewerConfig;
@@ -59,11 +59,11 @@
   }
   const dateText=value=>value&&Number.isFinite(Date.parse(value))?new Date(value).toLocaleString():"未知";
   function recordButton(r,latest=false) {
-    const button=document.createElement("button");button.className="record"+(r.id===current?" active":"");button.dataset.status=r.status;button.dataset.recordId=r.id;
+    const button=document.createElement("button");button.className="record"+(r.id===current&&r.workflow.id===activeWorkflow?" active":"");button.dataset.status=r.status;button.dataset.recordId=r.id;
     const badge=document.createElement("span");badge.className="badge";badge.textContent=(latest?"最新 · ":"")+(categoryNames[r.category]||r.category);
     const title=document.createElement("strong");title.textContent=r.workflow.name||r.workflow.path;
     const info=document.createElement("small");info.textContent=(latest?r.workflow.path+"\n更新于 "+dateText(r.updated_at||r.created_at):dateText(r.created_at)+"\n"+r.workflow.root_id)+" · "+r.workflow.target+(r.entry?" · 入口 "+r.entry:"")+" · "+statusText(r)+(r.preview_error?" · 预览不可用":"");
-    button.append(badge,title,info);button.onclick=()=>navigate(r.id,"flow");return button;
+    button.append(badge,title,info);button.onclick=()=>navigate(r.id,"flow","",r.workflow.id);return button;
   }
   function projectHistory() {
     const roots=new Map((project?.roots||[]).map(root=>[root.id,{...root,workflows:new Map(root.workflows.map(w=>[w.id,{...w}]))}]));
@@ -134,14 +134,24 @@
     }catch(error){if(ticket===refreshGeneration)notice(error.message+"；可用 preview --reindex 重建索引。");}
   }
   function readHash(){return Object.fromEntries(new URLSearchParams(location.hash.slice(1)));}
-  function writeHash(call="") {
+  function writeHash(call="",replace=false) {
     const params=new URLSearchParams({snapshot:current,workflow:data?.workflow.id||records.get(current)?.workflow.id||"",view});
     if(call)params.set("call",call);
     if(entry)params.set("entry",entry);
-    const hash="#"+params.toString();if(location.hash!==hash) window.history.pushState(null,"",hash);
+    const hash="#"+params.toString();if(location.hash!==hash) window.history[replace?"replaceState":"pushState"](null,"",hash);
   }
   async function navigate(id,tab,call="",targetWorkflow=id===current?activeWorkflow:"",targetEntry=undefined) { await open(id,tab,call,targetEntry,targetWorkflow);if(current===id&&records.has(id))writeHash(call); }
+  function workflowRecord(workflowId) {
+    const remembered=records.get(workflowRecords.get(workflowId));
+    return remembered?.workflow.id===workflowId?remembered:sortedRecords().find(r=>r.workflow.id===workflowId);
+  }
+  function navigateWorkflow(workflowId,call="",selectedEntry=undefined) {
+    const record=workflowRecord(workflowId);
+    return navigate(record?.id||current,"flow",call,workflowId,selectedEntry);
+  }
   async function open(id,tab="flow",call="",selectedEntry=undefined,workflowId="") {
+    const originalId=id;
+    if(workflowId&&records.get(id)?.workflow.id!==workflowId)id=workflowRecord(workflowId)?.id||id;
     const token=++generation;
     current=id;activeWorkflow=workflowId||records.get(id)?.workflow.id||"";view=tab;entry=selectedEntry??entries.get(entryKey())??(activeWorkflow===records.get(id)?.workflow.id?records.get(id)?.entry:"")??"";entries.set(entryKey(),entry);mode=modes.get(entryKey())||"structured";data=null;state=null;visible=new Map();$("tabs").replaceChildren();$("scene").replaceChildren();$("dimensions").textContent="";history();empty("正在加载快照…");
     try {
@@ -158,6 +168,7 @@
       data={...snapshot,workflow:chosen.workflow,architecture:chosen.architecture,workflow_graphs:graphs,
         artifacts:activeWorkflow===snapshot.workflow.id?{...snapshot.artifacts,...record.artifacts}:{},
         bodies:VFModel.bodies(chosen.architecture,chosen.workflow)};
+      if(activeWorkflow===snapshot.workflow.id)workflowRecords.set(activeWorkflow,id);
       if(activeWorkflow!==snapshot.workflow.id)mode="structured";
       const named=data.architecture.workflow?.entries||{};
       if(entry&&!named[entry]){entry="";entries.set(entryKey(),entry);}
@@ -169,6 +180,7 @@
       if(call&&(!remembered||state?.selected!==call))await locate(call);
       else if(state?.selectedEdge){const edge=[...edgeFacts.values()].find(e=>e.key===state.selectedEdge);if(edge)showInfo(edge.label,edge.facts,"",edge);}
       else if(state?.selected&&visible.has(state.selected)){const item=visible.get(state.selected);showInfo(item.facts.id||state.selected,item.facts,state.selected);}
+      if(id!==originalId)writeHash(call,true);
     }catch(error){if(token===generation){$("scene").replaceChildren();empty(error.message);notice("其他历史记录仍可查看。");}}
   }
   function tabs() {
@@ -218,8 +230,8 @@
     const prepared=data?.workflow_graphs?.[root+":"+path];
     if(prepared?.error){const button=document.createElement("button");button.textContent=label+" → "+root+"/"+path+" · 本次目标不可用";button.disabled=true;button.title=prepared.error;return button;}
     if(prepared?.architecture){
-      const button=document.createElement("button");button.textContent=label+" → "+root+"/"+path+" · 本次快照";
-      button.onclick=()=>navigate(current,"flow",call,prepared.workflow.id,"");return button;
+      const button=document.createElement("button");button.textContent=label+" → "+root+"/"+path+(workflowRecord(prepared.workflow.id)?" · 工作流视图":" · 本次关联快照");
+      button.onclick=()=>navigateWorkflow(prepared.workflow.id,call);return button;
     }
     const target=sortedRecords().filter(r=>r.workflow.root_id===root&&r.workflow.path===path&&compareTime(r.created_at,currentRecord.created_at)<=0)[0];
     const button=document.createElement("button");
@@ -227,11 +239,11 @@
     button.onclick=()=>target?navigate(target.id,"flow",call):showInfo("目标暂无历史快照",{root,path});return button;
   }
   function workflowButton(option){
-    const button=document.createElement("button");button.textContent="跳转 → "+option.label;
+    const button=document.createElement("button");button.textContent="跳转 → "+option.label+(workflowRecord(option.id)?"":" · 本次关联快照");
     const target=data.workflow_graphs?.[option.id];const named=target?.architecture?.workflow?.entries||{};
     const error=option.error||(!target?.architecture?"本次快照没有目标事实":option.entry&&!named[option.entry]?"目标入口不存在":"");
     button.disabled=Boolean(error);button.title=error;
-    button.onclick=()=>{$("context-menu").hidden=true;navigate(current,"flow","",option.id,option.entry);};
+    button.onclick=()=>{$("context-menu").hidden=true;navigateWorkflow(option.id,"",option.entry);};
     return button;
   }
   function showInfo(title,facts,call="",edge=null) {

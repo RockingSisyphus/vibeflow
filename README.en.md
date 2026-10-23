@@ -61,6 +61,6 @@ Run the complete source-repository gate with:
 python tools/verify_project.py --full
 ```
 
-Current distribution version: `1.4.0`. Workflow ABI: `vibeflow.workflow.v11`. AOT manifest: `vibeflow.aot-build.v5`. Workflow launch manifest: v2. Plugin ABI: `vibeflow.plugin.v4`.
+Current distribution version: `1.4.1`. Workflow ABI: `vibeflow.workflow.v11`. AOT manifest: `vibeflow.aot-build.v5`. Workflow launch manifest: v2. Plugin ABI: `vibeflow.plugin.v4`.
 Python supports native asynchronous nodes. Python and JavaScript support official synchronous workflow calls and asynchronous in-process collaboration; Node and browsers share the same generic JS coordinator. Migrate older launch configurations and rebuild older AOT artifacts. Preview snapshots remain v4. Planned calls remain visible for review and are excluded from service launch declarations. See the [distribution build instructions](docs/maintainers/release.md).
 Both profiles include the offline HTML viewer, workflow history, and project/root navigation. Named entries and independent workflow coordination are supported. Project/root governance checks shared-resource boundaries; Python AOT carries declared support files of permitted cross-root dependencies. Rebuild older AOT artifacts for the current ABI. See the [coordination guide](distribution/docs/user/workflow-coordination.md), [project governance](distribution/docs/user/project-governance.md), and [distribution build instructions](docs/maintainers/release.md).

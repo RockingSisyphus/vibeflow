@@ -14,12 +14,12 @@ class Boundary:
         return {}
 
 
-@node(**{'id': 'math.seed', 'node_type': 'vibeflow.node', 'rulesets': ['vibeflow.process'], 'contract': {'requires': [{'type': 'math.x', 'cardinality': 'exactly_one', 'display_name': 'math.x'}, {'type': 'math.y', 'cardinality': 'exactly_one', 'display_name': 'math.y'}, {'type': 'math.case_id', 'cardinality': 'exactly_one', 'display_name': 'math.case_id'}], 'provides': [{'key': 'seed', 'type': 'math.seed', 'display_name': 'seed'}], 'input_semantics': {'math.x': ['Formula input'], 'math.y': ['Formula input'], 'math.case_id': ['Formula input']}, 'output_semantics': {'seed': ['Formula intermediate']}, 'params_schema': {'fault': {'type': 'string'}}, 'params_defaults': {'fault': ''}}})
+@node(**{'id': 'math.seed', 'node_type': 'vibeflow.node', 'rulesets': ['vibeflow.process'], 'contract': {'requires': [{'type': 'math.stop', 'cardinality': 'optional_one', 'display_name': 'Stop'}, {'type': 'math.x', 'cardinality': 'exactly_one', 'display_name': 'math.x'}, {'type': 'math.y', 'cardinality': 'exactly_one', 'display_name': 'math.y'}, {'type': 'math.case_id', 'cardinality': 'exactly_one', 'display_name': 'math.case_id'}], 'provides': [{'key': 'seed', 'type': 'math.seed', 'display_name': 'seed'}], 'input_semantics': {'math.stop': ['Request early cancellation'], 'math.x': ['Formula input'], 'math.y': ['Formula input'], 'math.case_id': ['Formula input']}, 'output_semantics': {'seed': ['Formula intermediate']}, 'params_schema': {'fault': {'type': 'string'}}, 'params_defaults': {'fault': ''}}})
 class Seed:
     def run_pure(self, inputs, params, context):
         x, y = value(inputs, "math.x"), value(inputs, "math.y")
         return {"seed": dict(x=x, y=y, u=3*x+y, v=y-4, case_id=value(inputs, "math.case_id"),
-                             a_id=context.workflow.self()["id"])}
+                             a_id=context.workflow.self()["id"], stop=(inputs.get("math.stop") or {}).get("value", False))}
 
 
 @node(**{'id': 'math.request', 'node_type': 'vibeflow.node', 'rulesets': ['vibeflow.process'], 'contract': {'requires': [{'type': 'math.seed', 'cardinality': 'exactly_one', 'display_name': 'math.seed'}], 'provides': [{'key': 'request_payload', 'type': 'example.payload', 'display_name': 'request_payload'}], 'input_semantics': {'math.seed': ['Formula input']}, 'output_semantics': {'request_payload': ['Formula intermediate']}, 'params_schema': {'fault': {'type': 'string'}}, 'params_defaults': {'fault': ''}}})
@@ -134,3 +134,35 @@ class Bias:
     def run_pure(self, inputs, params):
         squared = value(inputs, "math.square")
         return {"answer": dict(p=squared["s"]+5*squared["v"], case_id=squared["case_id"], c_id=squared["c_id"])}
+
+
+@node(**{'id': 'math.normal_seed',
+ 'node_type': 'vibeflow.node',
+ 'rulesets': ['vibeflow.process'],
+ 'contract': {'requires': [{'type': 'math.seed', 'cardinality': 'exactly_one', 'display_name': 'math.seed'},
+                           {'type': 'math.local', 'cardinality': 'exactly_one', 'display_name': 'math.local'},
+                           {'type': 'example.message',
+                            'cardinality': 'exactly_one',
+                            'display_name': 'example.message'},
+                           {'type': 'example.instance',
+                            'cardinality': 'exactly_one',
+                            'display_name': 'example.instance'}],
+              'provides': [{'key': 'seed_forward', 'type': 'math.seed', 'display_name': 'seed_forward'},
+                           {'key': 'local_forward', 'type': 'math.local', 'display_name': 'local_forward'},
+                           {'key': 'reply_forward',
+                            'type': 'example.message',
+                            'display_name': 'reply_forward'},
+                           {'key': 'instance_forward',
+                            'type': 'example.instance',
+                            'display_name': 'instance_forward'}],
+              'input_semantics': {'math.seed': ['Retain first round input'],
+                                  'math.local': ['Retain first round input'],
+                                  'example.message': ['Retain first round input'],
+                                  'example.instance': ['Retain first round input']},
+              'output_semantics': {'seed_forward': ['Forward to the normal completion nodes'],
+                                   'local_forward': ['Forward to the normal completion nodes'],
+                                   'reply_forward': ['Forward to the normal completion nodes'],
+                                   'instance_forward': ['Forward to the normal completion nodes']}}})
+class NormalSeed:
+    def run_pure(self,inputs,params):
+        return {'seed_forward': value(inputs,"math.seed"), 'local_forward': value(inputs,"math.local"), 'reply_forward': value(inputs,"example.message"), 'instance_forward': value(inputs,"example.instance")}
