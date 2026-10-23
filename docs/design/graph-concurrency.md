@@ -6,11 +6,11 @@
 
 NodeCallSpec 只描述正常调用；Nodeset 和 Loop 继续复用普通子图。断路检查沿正常调度边反向分析结束可达性，所有 worker 都参加检查。分支的首个必经合流点必须是多前驱 all 汇合节点；绕过收集器的出口、先隐式合流再放单输入标记都不构成有效收集。多前驱 all 节点继续分发多路时，由两 Target 共用的 join 检查产生错误级 `GRAPH.JOIN.FORK_CONFLICT`，阻止验证和构建；不再保留 mainline review 中仅作警告的重复路径。
 
-Workflow ABI v10 的 Block 种类限定为 workflow、nodeset、loop。解码器拒绝旧 ABI 和已删除字段，调用方必须重建产物。Core 和 Block Compiler 保存纯数据，不持有线程、Promise 或语言 callable。
+Workflow ABI v11 的 Block 种类限定为 workflow、nodeset、loop。解码器拒绝旧 ABI 和已删除字段，调用方必须重建产物。Core 和 Block Compiler 保存纯数据，不持有线程、Promise 或语言 callable。
 
 ## Target 调度
 
-Python 的 [scheduler.py](../../src/vibeflow/targets/python/runtime/scheduler.py) 是唯一图协调器：先在协调线程解析输入、消费汇合信号，再提交所有独立就绪调用；完成队列仅接收真实退出后的输出或异常。节点执行时继承 contextvars，锁租约覆盖正在运行的工作。plan、block、compiled 入口共用这个协调器；生成的块只调用公共块包装函数。
+Python 的 [scheduler.py](../../src/vibeflow/targets/python/runtime/scheduler.py) 是唯一图协调器：共享一份就绪、输入、汇合和分发状态。sync 在当前调用内执行；async 由事件循环运行协程，并为普通同步节点持有线程。结果仅在实际执行和清理结束后交付。节点执行时继承 contextvars，锁租约覆盖正在运行的工作。plan、block、compiled 入口共用这个协调器；生成的块只调用公共块包装函数。
 
 JavaScript 的 [codegen_scheduler.py](../../src/vibeflow/targets/javascript/frontend/codegen_scheduler.py) 发射事件循环调度。running Map 保存已启动调用，失败后向共享 AbortController 发出停止请求，并等待剩余调用结束。同步入口保持同步 ABI，不创建 Worker。
 

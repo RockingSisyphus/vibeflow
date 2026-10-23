@@ -32,7 +32,8 @@ def main(argv=None):
         if not args.url:
             parser.error("--url or VIBEFLOW_COORDINATION_URL is required; start the service explicitly")
         from vibeflow.tooling.application.python.coordination import run_python
-        outputs = run_python(args)
+        import asyncio
+        outputs = asyncio.run(run_python(args))
         print(json.dumps({"outputs": outputs}, ensure_ascii=False), flush=True)
         return 0
     except KeyboardInterrupt:

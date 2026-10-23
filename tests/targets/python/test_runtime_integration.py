@@ -1,3 +1,10 @@
+import asyncio
+
+from functools import partial
+
+def _run_async(runtime,*args,**kwargs):
+    return asyncio.run(runtime.run_async(*args,**kwargs))
+
 from tests.fixtures.support.graph_calls import normal_call
 """Integration gates for the Python Target runtime."""
 
@@ -393,18 +400,7 @@ def test_python_port_semantics_and_trace_match_all_execution_modes(
     def send(request: Mapping[str, object]) -> None:
         sent.append(dict(request))
 
-    result = PipelineRuntime(
-        graph,
-        registry=registry,
-        runtime_options=RuntimeOptions(execution=execution, trace="full"),
-        run_dir=tmp_path / execution,
-        capabilities={
-            "vibeflow.port": {
-                "receive": receive,
-                "send": send,
-            }
-        },
-    ).run()
+    result = asyncio.run(PipelineRuntime(graph, registry=registry, runtime_options=RuntimeOptions(execution=execution, trace='full'), run_dir=tmp_path / execution, capabilities={'vibeflow.port': {'receive': receive, 'send': send}}).run_async())
     kinds = [line["kind"] for line in _trace_lines(result)]
 
     assert result.get("answer")["value"] == 12

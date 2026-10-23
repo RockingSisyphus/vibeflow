@@ -6,11 +6,11 @@ from vibeflow.targets.python.sdk.loading import source_paths
 from vibeflow.targets.python.project.plugins import PluginRegistry, create_lifecycle_plugin, dispose_instances
 
 
-def lifecycle_registry(registry, *, workflow_id, config_path, plugin_types=("compiler", "runtime")):
+def lifecycle_registry(registry, *, workflow_id, config_path, plugin_types=("compiler", "runtime"), _owned=None):
     """Create instances at the native compile/run boundary, not declaration time."""
     result = PluginRegistry()
     loaded = registry.prepared_resources
-    created = []
+    created = [] if _owned is None else _owned
     try:
         for selection in loaded.lifecycle_selections:
             if selection.get("status") == "planned":
@@ -29,14 +29,14 @@ def lifecycle_registry(registry, *, workflow_id, config_path, plugin_types=("com
             config = freeze_mapping(selection["config"], field_name="plugin.config")
             context = freeze_mapping({"config": config, "workflow_id": workflow_id, "config_path": str(config_path)}, field_name="plugin.context")
             with source_paths(registry.source_roots):
-                instance = create_lifecycle_plugin(result, descriptor, factory, context,
+                instance = create_lifecycle_plugin(result, descriptor, factory, context, owned_instances=created,
                     source=descriptor.implementations[0].source.ref,
                     class_name=descriptor.implementations[0].source.export or "", config_keys=tuple(config),
                     source_path=loaded.catalogs.plugins.source_for(descriptor.id), rulesets=descriptor.rulesets, conflict="error")
-            created.append(instance)
     except BaseException as error:
         with source_paths(registry.source_roots):
-            dispose_instances(created, primary=error)
+            if _owned is None:
+                dispose_instances(created, primary=error)
         raise
     return result
 

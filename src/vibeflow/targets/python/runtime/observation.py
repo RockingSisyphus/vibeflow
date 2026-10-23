@@ -225,3 +225,13 @@ def observe_run(run_dir, options):
     with RunObservation(run_dir, interval=options.status_interval,
                         status_file=options.status_file).scope() as observer:
         yield observer
+
+
+@contextmanager
+def independent_observation():
+    """Start a separate workflow root while retaining the caller's lock context."""
+    token = _CURRENT.set(None)
+    try:
+        yield
+    finally:
+        _CURRENT.reset(token)

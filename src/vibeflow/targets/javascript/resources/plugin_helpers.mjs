@@ -66,7 +66,7 @@ function createRuntimePluginsSync(workflow, descriptors, factories, root) {
           workflow,
         );
       }
-      if (!instance || typeof instance !== "object" || Array.isArray(instance)) {
+      if (!instance || typeof instance !== "object" || Array.isArray(instance) || typeof instance.then === "function") {
         throw runtimePluginError(
           "VF_RUNTIME_PLUGIN_CREATE",
           descriptor,
@@ -81,7 +81,8 @@ function createRuntimePluginsSync(workflow, descriptors, factories, root) {
   } catch (failure) {
     for (let index = records.length - 1; index >= 0; index -= 1) {
       try {
-        records[index].instance.dispose?.();
+        const returned=records[index].instance.dispose?.();
+        if(returned&&typeof returned.then==='function')throw new TypeError('sync runtime disposal returned pending work');
       } catch (error) {
         (failure.cleanupErrors ||= []).push(runtimePluginError('VF_RUNTIME_PLUGIN_DISPOSE',records[index].descriptor,'dispose',error,workflow));
       }
@@ -116,7 +117,7 @@ async function createRuntimePluginsAsync(workflow, descriptors, factories, root)
           workflow,
         );
       }
-      if (!instance || typeof instance !== "object" || Array.isArray(instance)) {
+      if (!instance || typeof instance !== "object" || Array.isArray(instance) || typeof instance.then === "function") {
         throw runtimePluginError(
           "VF_RUNTIME_PLUGIN_CREATE",
           descriptor,
@@ -146,7 +147,8 @@ function invokeRuntimeHookSync(root, hook, details = {}, preserveFailure = false
     const callback = record.instance[hook];
     if (typeof callback !== "function") continue;
     try {
-      callback(summary);
+      const returned=callback(summary);
+      if(returned&&typeof returned.then==='function')throw new TypeError('sync runtime hook returned pending work');
     } catch (cause) {
       if (preserveFailure) {
         (root.cleanupErrors ||= []).push(runtimePluginError('VF_RUNTIME_PLUGIN_HOOK',record.descriptor,hook,cause,root.workflow,summary));
@@ -171,7 +173,7 @@ async function invokeRuntimeHookAsync(root, hook, details = {}, preserveFailure 
     if (typeof callback !== "function") continue;
     try {
       await awaitWithAbort(
-        Promise.resolve().then(() => callback(summary)),
+        Promise.resolve().then(() => pluginCompletion(record, callback(summary))),
         root.signal,
         root.workflow,
       );
@@ -196,7 +198,7 @@ function disposeRuntimePluginsSync(root, preserveFailure = false) {
   let firstFailure;
   for (let index=root.runtimePlugins.length-1;index>=0;index--) {
     const record=root.runtimePlugins[index];
-    try { record.instance.dispose?.(); }
+    try { const returned=record.instance.dispose?.(); if(returned&&typeof returned.then==='function')throw new TypeError('sync runtime disposal returned pending work'); }
     catch(cause) {
       const error=runtimePluginError('VF_RUNTIME_PLUGIN_DISPOSE',record.descriptor,'dispose',cause,root.workflow);
       if(preserveFailure)(root.cleanupErrors ||= []).push(error);
@@ -212,7 +214,7 @@ async function disposeRuntimePluginsAsync(root, preserveFailure = false) {
   let firstFailure;
   for (let index=root.runtimePlugins.length-1;index>=0;index--) {
     const record=root.runtimePlugins[index];
-    try { await record.instance.dispose?.(); }
+    try { await pluginCompletion(record, record.instance.dispose?.()); }
     catch(cause) {
       const error=runtimePluginError('VF_RUNTIME_PLUGIN_DISPOSE',record.descriptor,'dispose',cause,root.workflow);
       if(preserveFailure)(root.cleanupErrors ||= []).push(error);
@@ -222,4 +224,11 @@ async function disposeRuntimePluginsAsync(root, preserveFailure = false) {
   }
   root.runtimePlugins.length=0;
   if(firstFailure)throw firstFailure;
+}
+
+
+function pluginCompletion(record, value) {
+  if(record.descriptor.completion === 'immediate' && value && typeof value.then === 'function')
+    throw new TypeError('immediate runtime lifecycle returned pending work');
+  return value;
 }

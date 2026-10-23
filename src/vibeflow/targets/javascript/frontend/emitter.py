@@ -6,6 +6,7 @@ import json
 from typing import Any, Mapping
 
 from vibeflow.block_compiler.model import WorkflowPlan
+from vibeflow.core.workflows.coordination import workflow_descriptor
 from vibeflow.targets.javascript.frontend.bindings import JavascriptBindingPlan
 from vibeflow.targets.javascript.frontend.declarations import (
     declarations,
@@ -46,6 +47,8 @@ def emit_workflow_module(
     plan: WorkflowPlan,
     *,
     javascript_bindings: JavascriptBindingPlan,
+    workflow_reference=None,
+    workflow_launches=(),
 ) -> EmittedWorkflow:
     """Emit a side-effect-free ESM module from a canonical plan and bindings."""
     workflow = bound_workflow_view(plan, javascript_bindings)
@@ -132,6 +135,7 @@ def emit_workflow_module(
         plugin_source,
         static_source,
         public_entry,
+        "export const workflowDescriptor = deepFreeze(" + json.dumps(workflow_descriptor(plan, workflow_reference, workflow_launches), ensure_ascii=False) + ");",
         "",
     ]
     return EmittedWorkflow(

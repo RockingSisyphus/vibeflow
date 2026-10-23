@@ -1,6 +1,13 @@
 """Runtime conformance tests for global-state leases and named locks."""
 
 from __future__ import annotations
+import asyncio
+
+from functools import partial
+
+def _run_async(runtime,*args,**kwargs):
+    return asyncio.run(runtime.run_async(*args,**kwargs))
+
 from tests.fixtures.support.declarations import node_declaration, configured_declaration
 
 from concurrent.futures import ThreadPoolExecutor
@@ -804,7 +811,7 @@ def test_base_exception_cancellation_reports_state_change_and_releases_lease(
 
 
 def _parallel_graph(registry, targets, *, end_type="test.start", root_lock=""):
-    pipeline={"nodes":[_node_call("start","test.start","Starts graph"),
+    pipeline={'entry_mode': 'async', "nodes":[_node_call("start","test.start","Starts graph"),
         *[dict(call,id=key) for key,call in targets.items()],
         dict(_node_call("join",end_type,"Collects complete branches"),join_policy="all")],
         "edges":[["start",key] for key in targets]+[[key,"join"] for key in targets]}
@@ -821,7 +828,7 @@ def test_global_state_root_keeps_joined_managed_workers_parallel(tmp_path: Path)
         "right":_node_call("right","test.global_worker_right","Right worker")},end_type="test.worker_join")
     runtime = PipelineRuntime(graph,registry=registry,run_dir=tmp_path/"parallel")
     _GateState.reset(parties=2)
-    result=runtime.run()
+    result=asyncio.run(runtime.run_async())
     assert _GateState.maximum == 2
     kinds=[event["kind"] for event in _events(result)]
     assert "lock_released" not in kinds
@@ -848,7 +855,7 @@ def test_parallel_sibling_node_locks_use_logical_scope_reentrancy(tmp_path: Path
         end_type="test.worker_join")
     runtime=PipelineRuntime(graph,registry=registry,run_dir=tmp_path/"sibling-locks")
     _GateState.reset(parties=2 if expected_maximum==2 else 0)
-    runtime.run()
+    asyncio.run(runtime.run_async())
     assert _GateState.maximum==expected_maximum
 
 
@@ -867,7 +874,7 @@ def test_managed_worker_hooks_follow_its_actual_execution_thread(tmp_path: Path)
             calls.append(("after",name,threading.current_thread().name))
     plugins=PluginRegistry();plugins.register(HookPlugin(),plugin_type="runtime")
     graph=_parallel_graph(registry,{"worker":_node_call("worker","test.ordinary_worker","Worker")},end_type="test.worker_left_join")
-    PipelineRuntime(graph,registry=registry,plugin_registry=plugins,run_dir=tmp_path/"hooks").run()
+    asyncio.run(PipelineRuntime(graph, registry=registry, plugin_registry=plugins, run_dir=tmp_path / 'hooks').run_async())
     worker=[call for call in calls if call[1]=="worker"]
     assert [call[0] for call in worker]==["before","after"]
     assert worker[0][2]==worker[1][2] and worker[0][2] == "MainThread"
@@ -1084,13 +1091,12 @@ def test_inherited_root_protection_drains_nested_failure_tasks_before_release(tm
     body=_parallel_graph(registry,{"slow":_node_call("slow","test.protected_slow_result","Owns cleanup"),
         "bad":_node_call("bad","test.coordinated_failure","Fails after the sibling starts")})
     definition=NodesetTypeSpec("test.child","Child","Nested failure",(),(),body)
-    graph=GraphConfig(nodes=(NodeCallSpec("start","test.start"),NodeCallSpec("child","test.child"),NodeCallSpec("end","test.start")),
-        edges=(EdgeSpec("start","child"),EdgeSpec("child","end")),nodeset_types={"test.child":definition},execution_lock=ExecutionLockSpec(key))
+    graph=GraphConfig(entry_mode='async', nodes=(NodeCallSpec('start', 'test.start'), NodeCallSpec('child', 'test.child'), NodeCallSpec('end', 'test.start')), edges=(EdgeSpec('start', 'child'), EdgeSpec('child', 'end')), nodeset_types={'test.child': definition}, execution_lock=ExecutionLockSpec(key))
     outer=PipelineRuntime(graph,registry=registry,run_dir=tmp_path/"outer")
     competitor=_runtime("test.following_normal",tmp_path/"competitor",root_lock=key)
     _ProtectedTaskState.reset();_WriterPreferenceState.reset()
     with ThreadPoolExecutor(max_workers=2) as pool:
-        running=pool.submit(outer.run)
+        running=pool.submit(partial(_run_async, outer))
         assert _ProtectedTaskState.entered.wait(2)
         other=pool.submit(competitor.run)
         try:
@@ -1115,7 +1121,7 @@ def test_early_terminal_retains_lock_until_every_owned_task_exits(tmp_path: Path
     competitor=_runtime("test.following_normal",tmp_path/"competitor",root_lock=key)
     _ProtectedTaskState.reset();_WriterPreferenceState.reset()
     with ThreadPoolExecutor(max_workers=2) as pool:
-        running=pool.submit(outer.run)
+        running=pool.submit(partial(_run_async, outer))
         assert _ProtectedTaskState.entered.wait(2)
         other=pool.submit(competitor.run)
         try:
@@ -1137,7 +1143,7 @@ def test_unrelated_owned_sibling_has_its_own_lock_but_cannot_escape_workflow(tmp
     runtime=PipelineRuntime(graph,registry=registry,run_dir=tmp_path/"siblings")
     _ProtectedTaskState.reset();_GateState.reset()
     with ThreadPoolExecutor(max_workers=1) as pool:
-        running=pool.submit(runtime.run)
+        running=pool.submit(partial(_run_async, runtime))
         assert _ProtectedTaskState.entered.wait(2)
         try:assert not running.done() and not _ProtectedTaskState.finished.is_set()
         finally:_ProtectedTaskState.release.set()
@@ -1156,7 +1162,7 @@ def test_failure_warning_includes_global_task_before_actual_lease_release(tmp_pa
         "global":_node_call("global","test.late_global_result","Executes before final failure"),
         "bad":_node_call("bad","test.runtime_fail","Fails",config={"fail":True})},root_lock=key)
     runtime=PipelineRuntime(graph,registry=registry,run_dir=tmp_path/"late",runtime_options={})
-    with pytest.raises(RuntimeError,match="boom"):runtime.run()
+    with pytest.raises(RuntimeError,match="boom"):asyncio.run(runtime.run_async())
     events=[json.loads(line) for line in (tmp_path/"late/runtime_trace.jsonl").read_text().splitlines()]
     kinds=[event["kind"] for event in events]
     assert kinds.count("global_state_may_have_changed")==1

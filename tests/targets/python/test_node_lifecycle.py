@@ -1,3 +1,5 @@
+import asyncio
+
 """Graph scheduler cancellation owns real Node execution through final cleanup."""
 from threading import Event,Thread
 import time
@@ -16,7 +18,7 @@ def _runtime(tmp_path, implementations, execution="plan", plugin_registry=None, 
     registry.register(NodeDescriptor("native.terminal","Boundary","Boundary","1","terminal",contract=NodeContractDescriptor(),rulesets=(), node_type="vibeflow.node"),Terminal)
     for name,impl in implementations.items():
         registry.register(NodeDescriptor("native."+name,name,name,"1","process",contract=NodeContractDescriptor(),rulesets=(), node_type="vibeflow.node"),impl)
-    graph=parse_graph_config({"pipeline":{"nodes":[_call("start","native.terminal"),
+    graph=parse_graph_config({"pipeline":{'entry_mode': 'async', "nodes":[_call("start","native.terminal"),
         *[_call(name,"native."+name,**({"execution_lock":{"key":lock}} if lock else {})) for name in implementations],_call("end","native.terminal",join_policy="all")],
         "edges":[["start",name] for name in implementations]+[[name,"end"] for name in implementations]}})
     return PipelineRuntime(graph,registry=registry,run_dir=tmp_path,plugin_registry=plugin_registry,runtime_options=RuntimeOptions(execution=execution))
@@ -35,7 +37,7 @@ def test_external_cancel_waits_for_uncooperative_work_and_finally(tmp_path,execu
     runtime=_runtime(tmp_path,{"worker":Worker},execution)
     errors=[]
     def run():
-        try:runtime.run()
+        try:asyncio.run(runtime.run_async())
         except BaseException as error:errors.append(error)
     running=Thread(target=run);running.start()
     try:
@@ -52,7 +54,7 @@ def test_node_has_no_task_controller_even_with_rules_disabled(tmp_path):
         def run_pure(self,inputs,params,context):
             assert not hasattr(context,"tasks")
             return {}
-    _runtime(tmp_path,{"worker":Worker}).run()
+    asyncio.run(_runtime(tmp_path, {'worker': Worker}).run_async())
 
 
 def test_thread_start_failure_cleans_already_started_sibling(tmp_path,monkeypatch):
@@ -71,7 +73,7 @@ def test_thread_start_failure_cleans_already_started_sibling(tmp_path,monkeypatc
             raise RuntimeError("thread launch failed")
         return original(thread)
     monkeypatch.setattr(Thread,"start",start)
-    with pytest.raises(RuntimeError,match="thread launch failed"):runtime.run()
+    with pytest.raises(RuntimeError,match="thread launch failed"):asyncio.run(runtime.run_async())
     assert cleaned.is_set()
 
 
@@ -87,7 +89,7 @@ def test_block_failure_observer_preserves_primary_and_reports_cleanup(tmp_path,e
             raise RuntimeError("block observer failure")
     plugins=PluginRegistry();plugins.register(Hooks(),plugin_type="runtime",name="observer")
     runtime=_runtime(tmp_path,{"worker":Worker},execution,plugins)
-    with pytest.raises(ValueError,match="original branch failure") as caught:runtime.run()
+    with pytest.raises(ValueError,match="original branch failure") as caught:asyncio.run(runtime.run_async())
     assert len(observed)==1 and "original branch failure" in observed[0][2]
     assert any("block observer failure" in str(error) for error in caught.value.cleanup_errors)
 
@@ -123,8 +125,8 @@ def test_cancelled_invocation_waiting_for_a_lock_never_enters_business_code(tmp_
     holder=_runtime(tmp_path/"holder",{"holder":Holder},lock="native.cancelled-waiter")
     waiting=_runtime(tmp_path/"waiting",{"first":Waiting,"second":Waiting},lock="native.cancelled-waiter")
     with ThreadPoolExecutor(max_workers=2) as roots:
-        held=roots.submit(holder.run);assert entered.wait(3)
-        blocked=roots.submit(waiting.run)
+        held=roots.submit(lambda: asyncio.run(holder.run_async()));assert entered.wait(3)
+        blocked=roots.submit(lambda: asyncio.run(waiting.run_async()))
         try:
             trace=tmp_path/"waiting/runtime_trace.jsonl";deadline=time.monotonic()+5
             while time.monotonic()<deadline:

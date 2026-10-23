@@ -55,7 +55,7 @@ class RuntimeNodesetMixin:
         except _NestedRuntimeFailure as exc:
             self._merge_child_trace(frame, exc.child_trace)
             if exc.__cause__ is not None:
-                raise exc.__cause__ from exc
+                raise exc.__cause__
             raise
         self._merge_child_trace(frame, child_trace)
         return outputs

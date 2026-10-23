@@ -1,5 +1,6 @@
 """Public, pure Capability contracts. Plugins explicitly contribute these resources."""
 from vibeflow.core.descriptors import CapabilityDescriptor, CapabilityOperationDescriptor
+from .coordination import STATES
 
 
 PORT_CAPABILITY_ID = "vibeflow.port"
@@ -61,10 +62,13 @@ _ID = {"type": "string", "minLength": 1}
 _TIMEOUT = {"type": "number", "minimum": 0}
 WORKFLOW_REFERENCE_SCHEMA = {"type":"object", "required":["path"],
     "properties":{"root":{"type":"string"}, "path":_ID, "entry":_ID}, "additionalProperties":False}
-WORKFLOW_LAUNCH_SCHEMA = {"type":"object", "required":["command"],
-    "properties":{"command":{"type":"array","items":{"type":"string"},"minItems":1},
-        "cwd":{"type":"string"}, "env":{"type":"object","additionalProperties":{"type":"string"}}}, "additionalProperties":False}
+WORKFLOW_LAUNCH_SCHEMA = {"oneOf":[
+    {"type":"object", "required":["kind","command"],
+     "properties":{"kind":{"const":"process"}, "command":{"type":"array","items":{"type":"string"},"minItems":1},
+        "cwd":{"type":"string"}, "env":{"type":"object","additionalProperties":{"type":"string"}}}, "additionalProperties":False},
+    {"type":"object", "required":["kind"], "properties":{"kind":{"const":"in_process"}}, "additionalProperties":False}]}
 _REQUESTS = {
+    "invoke_sync": ({"workflow": WORKFLOW_REFERENCE_SCHEMA, "inputs":{"type":"object"}}, ["workflow"]),
     "call": ({"workflow": WORKFLOW_REFERENCE_SCHEMA, "launch":WORKFLOW_LAUNCH_SCHEMA,
               "inputs": {"type": "object"}, "timeout": _TIMEOUT}, ["workflow", "launch"]),
     "wait": ({"id": _ID, "timeout": _TIMEOUT}, ["id"]),
@@ -72,6 +76,7 @@ _REQUESTS = {
     "receive": ({"port": _ID, "timeout": _TIMEOUT}, []),
     "kill": ({"id": _ID, "workflow":WORKFLOW_REFERENCE_SCHEMA, "timeout": _TIMEOUT}, ["id", "workflow"]),
 }
+WORKFLOW_OPERATIONS = frozenset(_REQUESTS)
 WORKFLOW_SCHEMA_TYPES = {
     f"vibeflow.workflow.{name}.request": {"type": "object", "properties": fields,
         "required": required, "additionalProperties": False}
@@ -79,11 +84,12 @@ WORKFLOW_SCHEMA_TYPES = {
 }
 _IDENTITY = {"type": "object", "properties": {"id": _ID}, "required": ["id"], "additionalProperties": False}
 _STATUS = {"type": "object", "properties": {"id": _ID,
-    "state": {"enum": ["starting", "running", "stopping", "succeeded", "failed", "cancelled"]},
+    "state": {"enum": list(STATES)},
     "outputs": {}, "error": {}, "pid": {"type": ["number", "null"]},
     "workflow": {"type": ["object", "string", "null"]}, "entry": {"type": ["string", "null"]}},
     "required": ["id", "state"], "additionalProperties": False}
 WORKFLOW_SCHEMA_TYPES.update({
+    "vibeflow.workflow.invoke_sync.result": {"type":"object"},
     "vibeflow.workflow.call.result": _IDENTITY,
     "vibeflow.workflow.wait.result": _STATUS,
     "vibeflow.workflow.kill.result": _STATUS,
@@ -97,5 +103,5 @@ def workflow_capability_descriptor():
     return CapabilityDescriptor(id=WORKFLOW_CAPABILITY_ID, targets=("python", "node", "browser"),
         operations={name: CapabilityOperationDescriptor(
             input_type=f"vibeflow.workflow.{name}.request", output_type=f"vibeflow.workflow.{name}.result",
-            completion="immediate" if name == "send" else "suspend") for name in _REQUESTS},
+            completion="immediate" if name in {"send", "invoke_sync"} else "suspend") for name in _REQUESTS},
         display_name="Workflow coordination", description="Independent workflow instances and local JSON messages.")

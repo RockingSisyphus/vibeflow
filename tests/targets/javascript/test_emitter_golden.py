@@ -107,7 +107,7 @@ def _loop_plan(max_iterations: int | None) -> dict[str, object]:
 
 def _suspending_no_output_plan() -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "baseline.detached",
         "entry_mode": "async",
         "inputs": [],
@@ -143,7 +143,7 @@ def _port_plan() -> dict[str, object]:
         params={"port":"baseline.out"},
     )
     return {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": "vibeflow.workflow.v11",
         "workflow_id": "baseline.port",
         "entry_mode": "async",
         "inputs": [],
@@ -261,7 +261,7 @@ def test_representative_emission_public_declarations_and_plan_are_frozen(
             "sync_suspend",
             lambda plan: plan.update(entry_mode="sync"),
             "VF_ENTRY_MODE_SUSPEND_IN_SYNC",
-            "sync workflow contains suspending node 'calculate'",
+            "sync workflow contains suspending implementation at 'calculate'",
         ),
     ],
 )
@@ -434,8 +434,8 @@ def test_profile_manifest_and_driver_request_migration_fields_are_frozen(
         "external_packages": manifest["target_metadata"]["external_packages"],
         "files": sorted(manifest["files"]),
     } == {
-        "format": "vibeflow.aot-build.v4",
-        "abi_version": "vibeflow.workflow.v10",
+        "format": "vibeflow.aot-build.v5",
+        "abi_version": "vibeflow.workflow.v11",
         "project_target": "javascript",
         "workflow_id": "test.workflow",
         "entry_mode": "sync",

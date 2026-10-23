@@ -7,6 +7,7 @@ The runner now includes the independent [comprehensive math application](../comp
 
 Positive workflows:
 
+- [workflow_cooperation_math](../workflow_cooperation_math/README.md) combines three independent workflows through two asynchronous message rounds and a synchronous subcall. One bundled script runs in Node and offline headless Chromium, with concurrent numeric cases and four incorrect-formula controls;
 - The independent [workflow_math conditional route case](../workflow_math/project/configs/conditional_routes.jsonc)
   routes both `done` and `failed` from `receive_event` to the same `finish_call`.
   Its runner builds sync/async variants with reversed order, an identical duplicate,

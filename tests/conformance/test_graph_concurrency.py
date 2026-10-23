@@ -1,3 +1,5 @@
+import asyncio
+
 """Ordinary graph fanout/join owns execution, results and actual cleanup."""
 import json
 import subprocess
@@ -52,7 +54,7 @@ def test_python_dispatch_limit_can_exceed_default_and_repeats_in_nested_loops(tm
             contract=NodeContractDescriptor(provides=(DataProvider(f'receipt{index}','receipt',display_name='Receipt'),), output_semantics={f'receipt{index}':('Independent receipt',)}), rulesets=(), node_type="vibeflow.node"), implementation(index))
     nodes = [_call('start','native.terminal',config={'max_concurrency':count}), *[_call(f'w{i}',f'native.work{i}') for i in range(count)],
              _call('collect','native.collect',join_policy='all'), _call('end','native.terminal')]
-    graph = parse_graph_config({'pipeline':{'nodes':nodes,
+    graph = parse_graph_config({'pipeline':{'entry_mode': 'async', 'nodes':nodes,
         'edges':[['start',f'w{i}'] for i in range(count)]+[[f'w{i}','collect'] for i in range(count)]+[['collect','end']],
         'outputs':[{'type':'report','cardinality':'exactly_one','as':'report','display_name':'Report'},
                    {'type':'receipt','cardinality':'all','as':'receipts','display_name':'Receipts'}]}})
@@ -60,15 +62,11 @@ def test_python_dispatch_limit_can_exceed_default_and_repeats_in_nested_loops(tm
         from vibeflow.core.flow import GraphConfig,NodeCallSpec,NodesetTypeSpec,LoopSpec,LoopOutputSpec,EdgeSpec
         from vibeflow.core.contracts import PipelineOutputSpec
         definition=NodesetTypeSpec("native.batch","Batch","Ordinary parallel graph",(),(),graph)
-        graph=GraphConfig(nodes=(NodeCallSpec("start","native.terminal"),
-            NodeCallSpec("batch","vibeflow.loop.while",provides=(DataProvider("report","report",display_name="Report"),),
-                loop=LoopSpec(body="native.batch",stop_after=3,outputs=(LoopOutputSpec("report","report"),))),
-            NodeCallSpec("end","native.terminal")),edges=(EdgeSpec("start","batch"),EdgeSpec("batch","end")),
-            nodeset_types={definition.type_key:definition},outputs=(PipelineOutputSpec("report","exactly_one",display_name="Report"),))
+        graph=GraphConfig(nodes=(NodeCallSpec('start', 'native.terminal'), NodeCallSpec('batch', 'vibeflow.loop.while', provides=(DataProvider('report', 'report', display_name='Report'),), loop=LoopSpec(body='native.batch', stop_after=3, outputs=(LoopOutputSpec('report', 'report'),))), NodeCallSpec('end', 'native.terminal')), edges=(EdgeSpec('start', 'batch'), EdgeSpec('batch', 'end')), nodeset_types={definition.type_key: definition}, outputs=(PipelineOutputSpec('report', 'exactly_one', display_name='Report'),), entry_mode='async')
     runtime = PipelineRuntime(graph,registry=registry,run_dir=tmp_path,
                               runtime_options=RuntimeOptions(execution=execution))
     for round in range(3):
-        result = runtime.run()
+        result = asyncio.run(runtime.run_async())
         assert result.get('report')['value'] == list(range(count))
         assert len(collections)==(round+1)*(3 if nested else 1)
         if not nested:
@@ -101,13 +99,13 @@ def test_python_failure_waits_for_sibling_finally(tmp_path, execution):
     for key,kind,implementation in [('terminal','terminal',Terminal),('work','process',Worker),('fail','process',Failure)]:
         registry.register(NodeDescriptor('native.'+key,key,key,'1',kind,
             contract=NodeContractDescriptor(),rulesets=(), node_type="vibeflow.node"),implementation)
-    graph = parse_graph_config({'pipeline':{'nodes':[_call('start','native.terminal'),
+    graph = parse_graph_config({'pipeline':{'entry_mode': 'async', 'nodes':[_call('start','native.terminal'),
         _call('work','native.work'),_call('fail','native.fail'),
         _call('collect','native.terminal',join_policy='all')],
         'edges':[['start','work'],['start','fail'],['work','collect'],['fail','collect']]}})
     runtime = PipelineRuntime(graph,registry=registry,run_dir=tmp_path,
                               runtime_options=RuntimeOptions(execution=execution))
-    with pytest.raises(Exception,match='branch failed'): runtime.run()
+    with pytest.raises(Exception,match='branch failed'): asyncio.run(runtime.run_async())
     assert cleaned.is_set()
 
 

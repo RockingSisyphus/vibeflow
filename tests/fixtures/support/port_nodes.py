@@ -8,8 +8,8 @@ from vibeflow.targets.python.sdk import node
                 "output_semantics": {"number": ["Host-provided number"]},
                 "params_schema": {"port": {"type": "string"}}, "params_defaults": {"port": "math.in"}}, node_type="vibeflow.node")
 class Receive:
-    def run_pure(self, inputs, params, context):
-        value = context.capabilities["vibeflow.port"]["receive"]({"port": params["port"]})
+    async def run_pure(self, inputs, params, context):
+        value = await context.capabilities["vibeflow.port"]["receive"]({"port": params["port"]})
         return {"number": value["value"]}
 
 

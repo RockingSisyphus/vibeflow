@@ -4,6 +4,7 @@
 
 | 使用情境 | 实际验证入口 |
 | --- | --- |
+| 三个独立 workflow 联合求值；两轮 Send/Receive、InvokeSync、Call/Wait；五组并发输入、身份与终态；四个错误公式对照；源码及脱离原项目的 AOT；同一单文件脚本在 Node／离线无头 Chromium 中零网络运行 | 两 Target 的 workflow_cooperation_math/run_all.py；Python source/AOT 各 plan/block/compiled；integration 与根目录 `--full` 自动包含；[公式和故障判据](python/workflow_cooperation_math/README.md) |
 | 普通图并发与独立 all 汇合；同节点回收兼分发、断路的 CLI 验证与构建拒绝；显式容量 12、容量 4、默认 8 的峰值与清理后即时补位；Node／Chromium AOT | 两 Target 的 graph_concurrency/run_all.py 固定执行并逐项写入 report.json；integration 与根目录 `--full` 自动包含；取消、失败与嵌套循环另见 tests/conformance/test_graph_concurrency.py、test_dispatch_concurrency.py 及两个 Target 的 test_node_lifecycle.py |
 | Nodeset 声明源码归属、planned/implemented 对照及未登记导入 | tests/targets/javascript/test_source_audit_subjects.py、test_nodeset_rules.py 和 integration 源码规则负例；已删除任务目标专用 fixture |
 | 综合数学应用：自定义源码 Rule、typed records、warning 对照、配置覆盖、分支/汇合、Nodeset/Loop、Port 与复用并发 | 两 Target 的 comprehensive_math/run_all.py；各 integration runner 自动执行；[公式与通过判定](../docs/maintainers/comprehensive-math-sandbox.md) |

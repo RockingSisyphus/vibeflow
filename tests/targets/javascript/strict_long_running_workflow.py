@@ -1,4 +1,9 @@
 from __future__ import annotations
+import asyncio
+
+def _execute(runtime,*args,**kwargs):
+    return asyncio.run(runtime.run_async(*args,**kwargs)) if runtime.graph.entry_mode == 'async' else runtime.run(*args,**kwargs)
+
 from tests.fixtures.support.declarations import configured_declaration, native_registry
 
 import json
@@ -51,7 +56,7 @@ const workflow = await import(pathToFileURL({json.dumps(str(path))}).href);
 
 def _empty_sync_plan(node_module: Path) -> dict[str, object]:
     return {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": 'vibeflow.workflow.v11',
         "workflow_id": "test.host-lifecycle",
         "entry_mode": "sync",
         "inputs": [],
@@ -161,7 +166,7 @@ def test_python_port_nodes_receive_transform_and_send(
         },
     )
 
-    result = runtime.run()
+    result = _execute(runtime)
 
     assert result.get("answer")["value"] == 12
     assert sent == [{"port": "math.out", "value": 12}]
@@ -190,7 +195,7 @@ export function double(inputs) {
         encoding="utf-8",
     )
     plan = {
-        "abi_version": "vibeflow.workflow.v10",
+        "abi_version": 'vibeflow.workflow.v11',
         "workflow_id": "test.port",
         "entry_mode": "async",
         "inputs": [],

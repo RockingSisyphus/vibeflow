@@ -56,6 +56,54 @@ class ExecutionLockCoordinator:
     def __init__(self) -> None:
         self._condition = Condition()
         self._domains: dict[str, _DomainState] = {}
+        self._async_waiters = {}
+
+    def _wake_async(self):
+        for future, loop in tuple(self._async_waiters.items()):
+            def wake(future=future):
+                if not future.done():
+                    future.set_result(None)
+            loop.call_soon_threadsafe(wake)
+
+    async def acquire_async(self, key, *, mode, lease, allow_reentrant=True):
+        import asyncio
+        loop = asyncio.get_running_loop()
+        started = time.perf_counter()
+        if mode not in {"shared", "exclusive"} or not key:
+            raise ValueError("execution lock requires a key and shared or exclusive mode")
+        waiting = False
+        state = None
+        try:
+            while True:
+                with self._condition:
+                    state = self._domains.setdefault(key, _DomainState())
+                    reentrant = allow_reentrant and (state.writer == lease.lease_id or lease.lease_id in state.readers)
+                    blocked = bool(state.writer or (state.readers if mode == 'exclusive' else state.waiting_writers)) and not reentrant
+                    if not blocked:
+                        if waiting:
+                            if mode == 'exclusive': state.waiting_writers -= 1
+                            else: state.waiting_readers -= 1
+                            waiting = False
+                        result = self.acquire(key, mode=mode, lease=lease, allow_reentrant=allow_reentrant)
+                        return ExecutionLockAcquisition(result.token, (time.perf_counter()-started)*1000)
+                    if not waiting:
+                        if mode == 'exclusive': state.waiting_writers += 1
+                        else: state.waiting_readers += 1
+                        waiting = True
+                    future = loop.create_future()
+                    self._async_waiters[future] = loop
+                try:
+                    await future
+                finally:
+                    with self._condition:
+                        self._async_waiters.pop(future, None)
+        finally:
+            with self._condition:
+                if waiting:
+                    if mode == 'exclusive': state.waiting_writers -= 1
+                    else: state.waiting_readers -= 1
+                    self._condition.notify_all()
+                    self._wake_async()
 
     def acquire(
         self,
@@ -124,6 +172,7 @@ class ExecutionLockCoordinator:
             ):
                 self._domains.pop(token.key, None)
             self._condition.notify_all()
+            self._wake_async()
 
     def _acquire_shared(
         self,

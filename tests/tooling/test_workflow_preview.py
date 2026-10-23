@@ -30,7 +30,7 @@ def preview_project(root, *, configs=False, expected=False):
     caller["pipeline"]["default_entry"] = "cli"
     work = caller["pipeline"]["nodes"][1]
     work["config"]={"workflow":{"root":"worker","path":"workflow.jsonc","entry":"other"},
-        "launch":{"command":["python","-m","vibeflow.coordination","run-python","--config","workflow.jsonc"],"cwd":"../worker"}}
+        "launch":{"kind":"process","command":["python","-m","vibeflow.coordination","run-python","--config","workflow.jsonc"],"cwd":"../worker"}}
     if expected:
         work["config"]["expected_workflows"] = [{"root":"worker","path":"workflow.jsonc"},
             {"root":"worker","path":"missing.jsonc"}]
@@ -47,8 +47,8 @@ def preview_project(root, *, configs=False, expected=False):
     config.write_text(json.dumps(caller))
     plugin = root / "caller/nodes/steps.py"
     source = plugin.read_text().replace('["send","receive"]', '["send","receive","call","wait"]')
-    source = source.replace('        message=api["receive"]({"port":"request"})',
-        '        peer=api["call"]({"workflow":params["workflow"],"launch":params["launch"]})\n        api["send"]({"id":peer["id"],"port":"request","payload":{"value":7}})\n        message=api["receive"]({"port":"reply"})\n        api["wait"]({"id":peer["id"]})')
+    source = source.replace('        message=await api["receive"]({"port":"request"})',
+        '        peer=await api["call"]({"workflow":params["workflow"],"launch":params["launch"]})\n        api["send"]({"id":peer["id"],"port":"request","payload":{"value":7}})\n        message=await api["receive"]({"port":"reply"})\n        await api["wait"]({"id":peer["id"]})')
     source = source.replace('        api["send"]({"id":message["sender"],"port":"reply","payload":{"value":value,"self":context.workflow.self()["id"]}})\n', '')
     plugin.write_text(source)
     workspace_file = root / "vibeflow_config.jsonc"

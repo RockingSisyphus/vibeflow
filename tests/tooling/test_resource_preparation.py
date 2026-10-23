@@ -65,8 +65,8 @@ def test_python_aot_uses_prepared_nodes_and_rejects_old_artifact_format(tmp_path
     result = build_python_aot(PythonBuildRequest(workspace.path, workflow, tmp_path / "aot",
                                                 preview_root=tmp_path / "preview"))
     metadata = json.loads(result.manifest.read_text())
-    assert metadata["format"] == "vibeflow.aot-build.v4"
-    assert metadata["abi_version"] == "vibeflow.workflow.v10"
+    assert metadata["format"] == "vibeflow.aot-build.v5"
+    assert metadata["abi_version"] == "vibeflow.workflow.v11"
     bundle = PythonBundle(result.out_dir)
     runtime = bundle.create_runtime(run_dir=tmp_path / "aot-run")
     runtime.run()
@@ -169,7 +169,7 @@ export const step=defineNode({id:"app.step",node_type:"layout.step",flow_kind:"t
     from vibeflow.tooling.application.javascript.build import ProjectBuildRequest, build_project_aot
     result = build_project_aot(ProjectBuildRequest(workspace.path, workflow, tmp_path / "aot-js",
         target="node", profile="esm-module", preview_root=tmp_path / "preview-js"))
-    assert json.loads(result.manifest.read_text())["format"] == "vibeflow.aot-build.v4"
+    assert json.loads(result.manifest.read_text())["format"] == "vibeflow.aot-build.v5"
     import subprocess
     executed = subprocess.run(["node", "--input-type=module", "-e",
         "const m=await import(process.argv[1]); if('createWorkflowHost' in m)throw new Error('retired Host export'); m.runWorkflow({});",

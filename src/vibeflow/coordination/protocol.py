@@ -2,8 +2,8 @@
 import json
 from uuid import uuid4
 
-OPERATIONS = frozenset({"call", "wait", "send", "receive", "kill"})
-TERMINAL = frozenset({"succeeded", "failed", "cancelled"})
+from vibeflow.core.workflows.coordination import TERMINAL
+from vibeflow.core.workflows.interfaces import WORKFLOW_OPERATIONS as OPERATIONS
 
 
 class CoordinationError(RuntimeError):
@@ -31,3 +31,27 @@ def json_value(value):
 
 def instance_id():
     return uuid4().hex
+
+
+def error_record(error, _ancestors=frozenset()):
+    """Keep execution and cleanup failures as finite, portable error data."""
+    result = {'code':getattr(error,'code',type(error).__name__),'message':str(error)}
+    if id(error) in _ancestors:
+        return {**result, 'recursive':True}
+    ancestors = _ancestors | {id(error)}
+    if getattr(error, 'workflow_calls', None):
+        result['workflow_calls'] = error.workflow_calls
+    if error.__cause__ is not None:
+        result['cause'] = error_record(error.__cause__, ancestors)
+    if isinstance(error, BaseExceptionGroup):
+        result['errors'] = [error_record(item, ancestors) for item in error.exceptions]
+    if getattr(error, 'cleanup_errors', None):
+        result['cleanup_errors'] = [error_record(item, ancestors) for item in error.cleanup_errors]
+    return result
+
+
+def merge_cleanup_error(primary, cleanup):
+    if primary is None:
+        return cleanup
+    record = primary if isinstance(primary, dict) else {'cause':primary}
+    return {**record, 'cleanup_errors':[*record.get('cleanup_errors', ()), cleanup]}

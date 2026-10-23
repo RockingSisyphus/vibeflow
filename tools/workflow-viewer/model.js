@@ -36,7 +36,7 @@ window.VFModel = (()=>{
       if(action.capability!=="vibeflow.workflow")continue;
       const refs=action.workflow?[action.workflow]:action.expected_workflows||[];
       for(const ref of refs){
-        const {id,entry,error}=workflowTarget(ref,graphs,action.operation==="call"),key=id+"|"+entry;
+        const {id,entry,error}=workflowTarget(ref,graphs,["call","invoke_sync"].includes(action.operation)),key=id+"|"+entry;
         result.set(key,{id,entry,workflow:ref,
           label:id+(entry?" · 入口 "+entry:"")+(action.expected_workflows?" · 预期交互":""),error});
       }
@@ -54,7 +54,7 @@ window.VFModel = (()=>{
   function operationLabel(action){
     if(action.planned&&action.operation==="call")return "计划启动 workflow";
     if(action.operation==="call")return action.wait===true?"启动 workflow · 等待结束":"启动 workflow · 不等待结束";
-    return ({wait:"等待实例结束",send:"发送消息 · 不等待处理",receive:"接收消息 · 等待",kill:"停止实例 · 确认终态"})[action.operation]||action.operation;
+    return ({invoke_sync:"同步调用 workflow · 当前调用返回",wait:"等待实例结束",send:"发送消息 · 不等待处理",receive:"接收消息 · 等待",kill:"停止实例 · 确认终态"})[action.operation]||action.operation;
   }
   function workflowOperation(actions){
     const operations=new Set(actions.filter(a=>a.capability==="vibeflow.workflow").map(a=>a.operation));
@@ -62,7 +62,7 @@ window.VFModel = (()=>{
     return visible.length===1?visible[0]:visible.length?"multiple":"";
   }
   function operationTitle(action){
-    const name=({call:action.wait?"启动并等待":"启动",kill:"停止",send:"发送",receive:"接收",wait:"等待结束"})[action.operation]||action.operation;
+    const name=({invoke_sync:"同步调用",call:action.wait?"启动并等待":"启动",kill:"停止",send:"发送",receive:"接收",wait:"等待结束"})[action.operation]||action.operation;
     return action.operation.toUpperCase()+" · "+name;
   }
   const roleNames={mainline:"流程主线",schedule:"触发调度",transfer:"允许数据传递",data_bypass:"仅传递数据"};

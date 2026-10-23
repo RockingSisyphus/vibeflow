@@ -218,6 +218,7 @@ def audit_javascript_project(
         document.data,
         catalogs=catalogs,
     )
+    _validate_entry_completion(plan, catalogs=catalogs, plugin_ids=plugin_ids)
     package_root = safe_project_path(
         root.path,
         javascript["package_root"],
@@ -471,6 +472,32 @@ def _validate_graph_tree(
         used_types.update(item.type for item in node.provides)
     schemas_for_types(used_types, catalogs=catalogs)
     return compilation
+
+
+def _validate_entry_completion(plan, *, catalogs, plugin_ids):
+    if plan.entry_mode != "sync":
+        return
+    from vibeflow.core.workflows.coordination import synchronous_violation
+    capabilities = catalogs.capabilities.descriptors()
+    for block in plan.blocks:
+        for call in block.nodes:
+            descriptor = catalogs.nodes.get(call.definition_id)
+            if call.status == STATUS_PLANNED or descriptor is None:
+                continue
+            problem = synchronous_violation(call.completion,
+                capabilities=descriptor.capabilities, descriptors=capabilities)
+            if problem:
+                path = (*block.path, call.id)
+                raise ProjectBuildError("VF_ENTRY_MODE_SUSPEND_IN_SYNC",
+                    f"sync workflow contains {problem} at '{'.'.join(path)}'", path)
+    for plugin_id in plugin_ids:
+        descriptor = catalogs.plugins.get(plugin_id)
+        if descriptor.plugin_type == "runtime" and any(
+            item.completion == "suspend" for item in descriptor.implementations
+            if item.language in {"javascript", "typescript"}
+        ):
+            raise ProjectBuildError("VF_ENTRY_MODE_PLUGIN_SUSPEND_IN_SYNC",
+                f"sync workflow cannot use suspending plugin '{plugin_id}'")
 
 
 def _plugin_records(

@@ -97,6 +97,7 @@ def build_aot(request: BuildRequest) -> BuildResult:
     _validate_existing_target(out_dir, replace=request.replace)
     emitted = emit_workflow_module(
         request.plan, javascript_bindings=request.javascript_bindings,
+        workflow_reference=request.workflow_reference, workflow_launches=request.workflow_launches,
     )
     entry_name = _entry_name(profile, request.entry_name)
     html_template, app_entry = _web_inputs(

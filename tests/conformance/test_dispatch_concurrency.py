@@ -1,3 +1,8 @@
+import asyncio
+
+def _execute(runtime,*args,**kwargs):
+    return asyncio.run(runtime.run_async(*args,**kwargs)) if runtime.graph.entry_mode == 'async' else runtime.run(*args,**kwargs)
+
 """Per-dispatch admission, incremental refill and actual-exit ownership."""
 
 import subprocess
@@ -48,7 +53,7 @@ def _python_runtime(tmp_path, groups, make_worker, execution, *, wrapped=False):
         nodes.append(_call(group + "_join", "budget.dispatch", join_policy="all"))
         edges.append([group + "_join", "end"])
     nodes.append(_call("end", "budget.boundary", join_policy="all"))
-    graph = parse_graph_config({"nodeset_types": nodeset_types, "pipeline": {"nodes": nodes, "edges": edges}})
+    graph = parse_graph_config({"nodeset_types": nodeset_types, "pipeline": {'entry_mode': 'async', "nodes": nodes, "edges": edges}})
     return PipelineRuntime(graph, registry=registry, run_dir=tmp_path,
         runtime_options=RuntimeOptions(execution=execution))
 
@@ -58,7 +63,7 @@ def _background(runtime):
 
     def run():
         try:
-            runtime.run()
+            _execute(runtime)
         except BaseException as error:
             errors.append(error)
 

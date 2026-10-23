@@ -32,8 +32,14 @@ def workflow_reference(value, *, root=""):
 
 
 def launch_configuration(value):
-    if not isinstance(value, Mapping) or set(value) - {"command", "cwd", "env"}:
-        raise ValueError("launch must contain command and optional cwd/env")
+    if not isinstance(value, Mapping) or "kind" not in value:
+        raise ValueError("launch.kind is required; migrate to process or in_process and rebuild")
+    if value["kind"] == "in_process":
+        if set(value) != {"kind"}:
+            raise ValueError("in_process launch allows only kind; bind the target explicitly")
+        return {"kind": "in_process"}
+    if value["kind"] != "process" or set(value) - {"kind", "command", "cwd", "env"}:
+        raise ValueError("launch.kind must be process or in_process")
     command = value.get("command")
     if not isinstance(command, (list, tuple)) or not command or any(not isinstance(v, str) for v in command) or not command[0]:
         raise ValueError("launch.command must be a non-empty argument array")
@@ -41,7 +47,7 @@ def launch_configuration(value):
     if not isinstance(cwd, str) or not isinstance(env, Mapping) or any(
             not isinstance(k, str) or not k or not isinstance(v, str) for k, v in env.items()):
         raise ValueError("launch.cwd must be a string and launch.env must map strings")
-    return {"command": list(command), "cwd": cwd, "env": dict(env)}
+    return {"kind": "process", "command": list(command), "cwd": cwd, "env": dict(env)}
 
 
 def node_workflow_actions(actions, params, *, root=""):
@@ -53,7 +59,7 @@ def node_workflow_actions(actions, params, *, root=""):
             if set(action) & {"target", "entry", "workflow", "launch", "expected_workflows"}:
                 raise ValueError("workflow action target aliases are removed; configure node.workflow")
             operation = action.get("operation")
-            if operation in {"call", "kill"}:
+            if operation in {"invoke_sync", "call", "kill"}:
                 action["workflow"] = workflow_reference(params.get("workflow"), root=root)
                 if operation == "call":
                     launch_configuration(params.get("launch"))
@@ -69,12 +75,12 @@ def node_workflow_actions(actions, params, *, root=""):
 def action_references(action):
     if action.get("capability") != "vibeflow.workflow":
         return ()
-    if action.get("operation") in {"call", "kill"}:
+    if action.get("operation") in {"invoke_sync", "call", "kill"}:
         return (action["workflow"],)
     return tuple(action.get("expected_workflows", ()))
 
 
 def launch_document(launches, *, base=".", workflow=None):
-    return {"format":"vibeflow.workflow-launches.v1",
+    return {"format":"vibeflow.workflow-launches.v2",
             "workflow":workflow,
             "launches":[{**item, "base":base} for item in launches]}

@@ -9,7 +9,7 @@
   ],
   "rulesets": ["vibeflow.workflow"],
   "pipeline": {
-    "entry_mode": "sync",
+    "entry_mode": "async",
     "inputs": [
       {
         "key": "scenario",

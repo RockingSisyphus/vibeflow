@@ -3,4 +3,6 @@ from .client import WorkflowClient
 from .server import WorkflowServer
 from .protocol import CoordinationError
 
-__all__ = ["WorkflowClient", "WorkflowServer", "CoordinationError"]
+__all__ = ["WorkflowClient", "WorkflowServer", "CoordinationError", "Coordinator"]
+
+from .engine import Coordinator

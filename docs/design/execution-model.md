@@ -1,6 +1,6 @@
 # 执行模型
 
-Core 提供语言无关的图结构与依赖；Block Compiler 生成 Workflow ABI v10 的普通工作流、Nodeset 与 Loop Block。Target 负责真实执行，Tooling 负责配置、质量检查与展示。
+Core 提供语言无关的图结构与依赖；Block Compiler 生成 Workflow ABI v11 的普通工作流、Nodeset 与 Loop Block。Target 负责真实执行，Tooling 负责配置、质量检查与展示。
 
 所有执行节点通过正常边激活下游。就绪队列提交独立分支；节点完成真实清理后交付输出；`join_policy: all` 消费本轮所有前驱的完成信号再执行。分发节点通过 `config.max_concurrency` 设置自身直接调用的容量，默认 8，任一调用实际退出后补位。串行关系由依赖链表达。
 
@@ -23,6 +23,6 @@ AOT 在构建时保存每个入口的范围和策略，运行时直接选择已�
 
 ## 跨 workflow 的宿主责任
 
-普通节点通过 Capability 和调用级策略使用 `self/call/wait/send/receive/kill`。call 等待新实例接入后返回身份，wait 等待真实终态；send 只等待本地交接，receive 无消息时等待。取消等待不自动停止对端，kill 由目标宿主确认停止或明确拒绝。命令包装进程退出不能代替实例终态。
+普通节点通过 Capability 和调用级策略使用 `invoke_sync/call/wait/send/receive/kill`，身份通过 context.workflow.self() 读取。call 等待新实例接入后返回身份，wait 等待真实终态；send 只等待本地交接，receive 无消息时等待。取消等待不自动停止对端，kill 由目标宿主确认停止或明确拒绝。命令包装进程退出不能代替实例终态。
 
 本机 JSON 协议、邮箱和启动握手位于 `coordination/`，不承担业务调度。作者提供命令、环境、宿主和长期实例清理；没有运行组、自动子进程清理或隐式进程池。内部图分支的取消与清理仍由原执行器负责，与独立 workflow 的生命周期分开。端口 IO 也是普通 SDK 节点调用 Capability，不再有原生 IO 执行分支。接口与迁移见[用户手册](../../distribution/docs/user/workflow-coordination.md)。

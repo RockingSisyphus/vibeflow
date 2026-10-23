@@ -93,7 +93,7 @@ def handle_delegate_cli(args) -> int:
 
             initial = {CLI_ARGV_TYPE: list(getattr(args, "delegate_argv", ()))}
             options = _runtime_options_from_args(args)
-            from vibeflow.tooling.application.python.workspace_service import run_workspace_checked
+            from vibeflow.tooling.application.python.cli.execution import dispatch_workspace as run_workspace_checked
 
             with source_paths((workspace.root_for_path(Path(args.config).resolve()).path, workspace.root)):
                 result = run_workspace_checked(

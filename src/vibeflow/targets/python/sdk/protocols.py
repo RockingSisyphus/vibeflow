@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, Protocol
+from typing import Any, Awaitable, Mapping, Protocol
 
 from vibeflow.core.constants import (
     EFFECT_SCOPE_GLOBAL_STATE,
@@ -13,5 +13,5 @@ EFFECT_SCOPE_PYTHON_IO = "python_io"
 
 
 class PureNode(Protocol):
-    def run_pure(self, inputs: Mapping[str, Any], params: Mapping[str, Any]) -> Mapping[str, Any]:
+    def run_pure(self, inputs: Mapping[str, Any], params: Mapping[str, Any]) -> Mapping[str, Any] | Awaitable[Mapping[str, Any]]:
         ...

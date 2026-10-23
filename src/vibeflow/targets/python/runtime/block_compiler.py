@@ -87,6 +87,8 @@ def _compile_generated_graph_block(plan: "ExecutionPlan") -> CompiledBlock:
     block_name = f"graph:{plan.order[0]}"
     nodes = tuple(plan.order)
     source = _generated_graph_block_source(block_name, nodes)
+    if plan.graph.entry_mode == "async":
+        source = source.replace("def compiled_block", "async def compiled_block").replace("run_graph_block", "run_graph_block_async").replace("return run_graph_block_async(", "return await run_graph_block_async(")
     namespace = {}
     exec(source, namespace)
     compiled_block = namespace["compiled_block"]
@@ -113,6 +115,12 @@ def _compile_loop_block(frame: "NodeFrame") -> CompiledBlock:
         outputs = runtime._execute_loop_block(frame.id, inputs)
         return CompiledBlockResult(last_node=frame.id, outputs=outputs)
 
+    source = _loop_block_source(frame)
+    if frame.subplan.graph.entry_mode == "async":
+        source = source.replace("def compiled_loop_block", "async def compiled_loop_block").replace("runtime._execute_loop_block(", "await runtime._execute_loop_block_async(")
+        namespace = {"CompiledBlockResult": CompiledBlockResult}
+        exec(source, namespace)
+        compiled_loop_block = namespace["compiled_loop_block"]
     return CompiledBlock(
         name=block_name,
         entry=frame.id,
@@ -120,7 +128,7 @@ def _compile_loop_block(frame: "NodeFrame") -> CompiledBlock:
         nodes=(frame.id,),
         edge_routes={frame.id: ()},
         callable=compiled_loop_block,
-        source=_loop_block_source(frame),
+        source=source,
         supports_full_trace=True,
         supports_node_hooks=True,
         kind="loop",
@@ -136,6 +144,12 @@ def _compile_nodeset_block(frame: "NodeFrame") -> CompiledBlock:
         outputs = runtime._execute_nodeset_block(frame.id, inputs)
         return CompiledBlockResult(last_node=frame.id, outputs=outputs)
 
+    source = _nodeset_block_source(frame)
+    if frame.subplan.graph.entry_mode == "async":
+        source = source.replace("def compiled_nodeset_block", "async def compiled_nodeset_block").replace("runtime._execute_nodeset_block(", "await runtime._execute_nodeset_block_async(")
+        namespace = {"CompiledBlockResult": CompiledBlockResult}
+        exec(source, namespace)
+        compiled_nodeset_block = namespace["compiled_nodeset_block"]
     return CompiledBlock(
         name=block_name,
         entry=frame.id,
@@ -143,7 +157,7 @@ def _compile_nodeset_block(frame: "NodeFrame") -> CompiledBlock:
         nodes=(frame.id,),
         edge_routes={frame.id: ()},
         callable=compiled_nodeset_block,
-        source=_nodeset_block_source(frame),
+        source=source,
         supports_full_trace=True,
         supports_node_hooks=True,
         kind="nodeset",
@@ -333,3 +347,26 @@ def _loop_stop_text(frame: "NodeFrame") -> str:
 
 
 __all__ = ["CompiledBlock", "CompiledBlockResult", "PythonCompiledBlock", "compile_blocks", "explain_block_compilation", "graph_block", "loop_block", "nodeset_block"]
+
+
+async def run_graph_block_async(runtime, state, name, nodes):
+    """Generated blocks add observation around the same graph coordinator."""
+    from .scheduler import run_graph_async
+    started = time.perf_counter()
+    runtime._record_runtime_event('block_enter', name, 'block')
+    await runtime._call_runtime_plugins_async('before_block', name, nodes)
+    try:
+        last_node, outputs = await run_graph_async(runtime, state)
+        summary = {'output_summary': summarize_mapping(outputs)} if runtime.runtime_options.trace == 'full' or runtime.runtime_options.node_hooks else {}
+        runtime._record_runtime_event('block_exit', name, 'block', elapsed_ms=elapsed_ms(started), **summary)
+        await runtime._call_runtime_plugins_async('after_block', name, nodes)
+        return CompiledBlockResult(last_node=last_node, outputs=outputs)
+    except DelegateCliExit:
+        raise
+    except BaseException as error:
+        runtime._record_runtime_event('block_failed', name, 'block', failure=str(error), elapsed_ms=elapsed_ms(started))
+        try:
+            await runtime._call_runtime_plugins_async('block_failed', name, nodes, str(error))
+        except BaseException as cleanup:
+            error.cleanup_errors = [*getattr(error, 'cleanup_errors', ()), cleanup]
+        raise

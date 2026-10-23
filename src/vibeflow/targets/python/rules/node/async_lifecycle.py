@@ -37,7 +37,8 @@ class _OwnedWorkScanner:
         from vibeflow.targets.python.quality.policy_parameters import source_policy
         from vibeflow.targets.python.quality.source_analysis.resource_slices import node_source_slices
         constructors = {'threading.Thread', 'multiprocessing.Process',
-                        'concurrent.futures.ThreadPoolExecutor', 'concurrent.futures.ProcessPoolExecutor'}
+                        'concurrent.futures.ThreadPoolExecutor', 'concurrent.futures.ProcessPoolExecutor',
+                        'asyncio.TaskGroup'}
         diagnostics = []
         for source, tree in node_source_slices(context, node, symbol):
             parents = {id(child): parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)}
@@ -79,6 +80,8 @@ class _OwnedWorkScanner:
                         if not isinstance(statement,ast.Try):continue
                         for final in statement.finalbody:
                             for item in ast.walk(final):
+                                if cleanup == 'await' and isinstance(item,ast.Await) and ast.unparse(item.value)==handle:
+                                    return True
                                 if isinstance(item,ast.Call) and isinstance(item.func,ast.Attribute) and item.func.attr==cleanup and ast.unparse(item.func.value)==handle:
                                     if cleanup=='join':
                                         if not item.args and all(k.arg=='timeout' and isinstance(k.value,ast.Constant) and k.value.value is None for k in item.keywords):return True
@@ -87,6 +90,10 @@ class _OwnedWorkScanner:
 
                 def _check_effect_call(self, call):
                     names={qualified_reference_name(call.func,a) for a in self._call_alias_views(call)}
+                    if names & {'asyncio.run','asyncio.Runner','asyncio.new_event_loop'}:
+                        diagnostics.append(finding(context,'VF_NODE_EVENT_LOOP_OWNERSHIP',
+                            'Node code uses its host event loop; only the top-level CLI creates a loop',
+                            path=source.path,line=call.lineno))
                     native=next((name for name in names if name in constructors),'')
                     parent=parents.get(id(call))
                     if native and isinstance(parent,ast.Assign) and len(parent.targets)==1:
@@ -95,6 +102,16 @@ class _OwnedWorkScanner:
                         self.handles[ast.unparse(parent.target)]=native
                     if native and isinstance(parent,ast.withitem) and parent.optional_vars:
                         self.handles[ast.unparse(parent.optional_vars)]=native
+                    task = bool(names & {'asyncio.create_task','asyncio.ensure_future'})
+                    group = isinstance(call.func,ast.Attribute) and self.handles.get(ast.unparse(call.func.value)) == 'asyncio.TaskGroup'
+                    if group and call.func.attr == 'create_task':
+                        task = not self._owned(call,ast.unparse(call.func.value),'await')
+                    if task and not isinstance(parent,ast.Await):
+                        handle = ast.unparse(parent.targets[0]) if isinstance(parent,ast.Assign) and len(parent.targets)==1 else ''
+                        if not handle or not self._owned(call,handle,'await'):
+                            diagnostics.append(finding(context,'VF_NODE_RESOURCE_UNOWNED',
+                                'native coroutine tasks must be awaited through finally or owned by an async TaskGroup',
+                                path=source.path,line=call.lineno))
                     if isinstance(call.func,ast.Attribute):
                         handle=ast.unparse(call.func.value)
                         kind=self.handles.get(handle,'')

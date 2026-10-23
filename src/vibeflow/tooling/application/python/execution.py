@@ -201,3 +201,17 @@ def _ensure_trace_files(run_dir: Path) -> None:
         path = run_dir / name
         if not path.exists():
             path.write_text("", encoding="utf-8")
+
+
+async def _execute_runtime_async(graph: GraphConfig, registry: NodeRegistry, plugin_registry, initial: Mapping[str, Any] | None, run_dir: Path, runtime_options: object | None, resources: PythonResources, *, capabilities: Mapping[str, object] | None=None, workflow_instance_id: str | None=None, delegate_cli: bool=False, health: HealthReport | None=None, entry: str | None=None, signal=None):
+    from vibeflow.targets.python.runtime.engine import PipelineRuntime
+    from vibeflow.targets.python.sdk.loading import source_paths
+    with source_paths(getattr(registry, 'source_roots', ())):
+        runtime = _checked_runtime_binding(lambda: PipelineRuntime(graph, registry=registry, plugin_registry=plugin_registry, run_dir=run_dir, global_config=resources.global_config, runtime_options=runtime_options, capabilities=capabilities, workflow_instance_id=workflow_instance_id, delegate_cli=delegate_cli, entry=entry), health=health, run_dir=run_dir)
+        unsubscribe = signal.subscribe(runtime.request_stop) if signal is not None else lambda: None
+        try:
+            context = await runtime.run_async(initial)
+        finally:
+            unsubscribe()
+            _ensure_trace_files(run_dir)
+        return context

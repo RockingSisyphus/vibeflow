@@ -19,6 +19,8 @@ _EXPORTS = {
         "vibeflow.tooling.application.python.execution",
         "CheckedRunResult",
     ),
+    "run_checked_async": ("vibeflow.tooling.application.python.runner", "run_checked_async"),
+    "run_workspace_checked_async": ("vibeflow.tooling.application.python.async_workspace", "run_workspace_checked_async"),
     "run_checked": (
         "vibeflow.tooling.application.python.runner",
         "run_checked",

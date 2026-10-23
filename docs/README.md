@@ -15,6 +15,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 
 - [系统架构](design/system-architecture.md)：当前内核分层、插件装配与共享架构资料。
 - [执行模型](design/execution-model.md)：普通图调度、显式汇合、规则入口与宿主生命周期。
+- [Workflow 协作与 Python 原生异步](design/workflow-coordination.md)：合同、实例组件、宿主边界与执行复核。
 - [普通图并发设计](design/graph-concurrency.md)：当前 ABI 编译链路、分发局部额度、两侧执行器、取消收尾与维护验证。
 - [Rule 机制设计](design/rule-system.md)：统一选择、资料与负责范围、协作、复用及维护边界。
 - [Workflow 异常处理与资源收尾计划](design/workflow-error-handling-plan.md)：未来能力，待设计；包含报错、取消和浏览器监听收尾。

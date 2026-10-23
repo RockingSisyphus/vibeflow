@@ -1,3 +1,5 @@
+import asyncio
+
 """Ordinary outputless calls and conditional activation use graph edges."""
 import json
 
@@ -38,7 +40,7 @@ def test_outputless_branch_completes_before_terminal(tmp_path, execution, revers
         "outputs":[]}})
     runtime = PipelineRuntime(graph, registry=registry, run_dir=tmp_path,
         runtime_options=RuntimeOptions(execution=execution, trace="full"))
-    result = runtime.run({})
+    result = asyncio.run(runtime.run_async({}))
     assert set(result.to_dict()) == {"runtime"}
     assert runtime.trace.node_runs == {"start":1, "audit":1, "end":1}
     events = [json.loads(line) for line in (tmp_path / "runtime_trace.jsonl").read_text().splitlines()]
@@ -73,7 +75,7 @@ def test_inactive_conditional_edge_does_not_start_a_node(tmp_path, execution):
             {"from":"route", "to":"end", "when":"flow.route == 'done'"},{"from":"audit","to":"end"}], "outputs":[]}})
     runtime = PipelineRuntime(graph, registry=registry, run_dir=tmp_path,
         runtime_options=RuntimeOptions(execution=execution, trace="full"))
-    runtime.run({})
+    asyncio.run(runtime.run_async({}))
     assert runtime.trace.node_runs == {"start":1, "route":1, "end":1}
     assert not any(json.loads(line)["kind"].startswith("task_")
         for line in (tmp_path / "runtime_trace.jsonl").read_text().splitlines())

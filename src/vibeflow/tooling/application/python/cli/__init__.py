@@ -263,7 +263,7 @@ def _handle_run(args: argparse.Namespace) -> int:
     try:
         from vibeflow.core.findings import HealthReport
         from vibeflow.tooling.project.workspace_loader import load_project_workspace
-        from vibeflow.tooling.application.python.workspace_service import run_workspace_checked
+        from vibeflow.tooling.application.python.cli.execution import dispatch_workspace as run_workspace_checked
         workspace = workspace_or_report(Path(args.workspace)) if args.workspace else workspace_or_report(Path(args.config), registered_source=True)
         if isinstance(workspace, HealthReport):
             print_run_report({"status": workspace.status, "error": "workspace load failed", "health": workspace.to_dict()})

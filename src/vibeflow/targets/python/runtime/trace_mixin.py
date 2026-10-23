@@ -46,7 +46,8 @@ class RuntimeTraceMixin:
             return
         for plugin_name, method in methods:
             try:
-                method(*args)
+                from .completion import immediate
+                immediate(method(*args))
             except SystemExit as exc:
                 if not self.delegate_cli:
                     raise PipelineRuntimeError(

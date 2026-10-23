@@ -284,7 +284,7 @@ def test_abi_v5_serializes_global_state_and_locks_without_dispatch() -> None:
     payload = plan.to_dict()
     root = plan.block(plan.entry_block)
 
-    assert plan.abi_version == WORKFLOW_ABI_VERSION == "vibeflow.workflow.v10"
+    assert plan.abi_version == WORKFLOW_ABI_VERSION == "vibeflow.workflow.v11"
     assert plan.contains_global_state is True
     assert "root_exclusive" not in payload
     assert payload["execution_lock"] == {"key": "trainer", "scope": "root"}

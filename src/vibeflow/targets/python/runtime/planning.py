@@ -45,6 +45,7 @@ class NodeFrame:
     planned_stub_path: str = ""
     planned_stub_hash: str = ""
     capability_policy: Mapping[str, object] = field(default_factory=dict)
+    completion: str = "immediate"
 
     @property
     def is_planned_stub(self) -> bool:

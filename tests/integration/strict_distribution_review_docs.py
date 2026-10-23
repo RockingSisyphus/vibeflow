@@ -46,7 +46,7 @@ def test_distribution_composes_collaborative_prompt_and_documents(
     assert "人机协同" in (docs_root / "user/profiles/collaborative.md").read_text(encoding="utf-8")
     combined = "\n".join(path.read_text(encoding="utf-8") for path in docs)
     for marker in (
-        "vibeflow.workflow.v10",
+        "vibeflow.workflow.v11",
         "global_state",
         "execution_lock",
         "工作流执行探针",
@@ -93,7 +93,7 @@ def test_agent_prompt_is_a_document_router(built_distribution: Path) -> None:
         "NodeRegistry.register(",
         "createPlugin(context",
         "params_schema",
-        "vibeflow.workflow.v10",
+        "vibeflow.workflow.v11",
     ):
         assert implementation_detail not in agents
 
@@ -249,7 +249,7 @@ def test_kernel_archive_and_architecture_are_profile_neutral(
     assert hashlib.sha256(kernel.read_bytes()).hexdigest() == metadata["kernel"]["sha256"]
     with zipfile.ZipFile(kernel) as archive:
         model = archive.read("vibeflow/block_compiler/model.py")
-    assert b'WORKFLOW_ABI_VERSION = "vibeflow.workflow.v10"' in model
+    assert b'WORKFLOW_ABI_VERSION = "vibeflow.workflow.v11"' in model
     for project in ("python_project", "javascript_project"):
         text = (built_distribution / project / "ARCHITECTURE.jsonc").read_text(encoding="utf-8")
         assert '"effect_scope"' in text
