@@ -37,7 +37,7 @@ class ObservedCoordinator(Coordinator):
         return super().bind(descriptor, observed)
 
 
-async def exercise(scope):
+async def exercise(scope, *, timeout=45):
     try:
         immediate = scope.invoke_sync({"workflow": reference("c"), "inputs": {
             "request": {"u": 13, "v": 3, "case_id": "direct"}}})
@@ -49,7 +49,7 @@ async def exercise(scope):
             assert error.code == "VF_WORKFLOW_SYNC_UNSUPPORTED", error
         else:
             raise AssertionError("async workflow accepted by InvokeSync")
-        ended = await asyncio.wait_for(asyncio.gather(*(scope.run(reference("a"), case) for case in [*CASES, CANCEL_CASE])), 45)
+        ended = await asyncio.wait_for(asyncio.gather(*(scope.run(reference("a"), case) for case in [*CASES, CANCEL_CASE])), timeout)
         assert all(item["state"] == "succeeded" for item in ended), ended
         assert scope.peak_parents > 1 and scope.active_parents == 0, "parent workflows did not overlap"
         rows = [item["outputs"]["computed"] for item in ended[:-1]]
@@ -106,7 +106,10 @@ def run(work, *, toolchain=None):
         work / f"project/configs/{name}.jsonc", output / f"bundle-{name}")).out_dir) for name in ("a", "b", "c")}
     observations = []
     for execution in ("plan", "block", "compiled"):
-        result = asyncio.run(exercise(bind_sources(bundles, workspace, output / f"source-{execution}", execution)))
+        # Checked source runs repeat synchronous project preparation and auditing.
+        # Give each parent its budget; AOT retains the execution-only 45s bound.
+        result = asyncio.run(exercise(bind_sources(bundles, workspace, output / f"source-{execution}", execution),
+                                      timeout=45*(len(CASES)+1)))
         observations.append({"execution": f"source-{execution}", "status": "PASS", **result})
     # Retain four intentionally wrong A builds: the independent oracle must
     # detect incorrect arithmetic/data wiring, rather than bless any number.
