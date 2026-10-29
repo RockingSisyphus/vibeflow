@@ -1,7 +1,6 @@
 """Publish portable architecture facts without any graphics dependency."""
 from pathlib import Path
 from datetime import datetime, timezone
-import json
 from .catalog import new_record, script_call
 from vibeflow.tooling.architecture.documents import render_architecture_payload
 from vibeflow.tooling.file_io import atomic_write
@@ -85,15 +84,3 @@ def publish_preview(*, root, workflow, category, status, architecture, links=(),
 def _operation_links(architecture, workflow):
     from vibeflow.tooling.architecture.relations import workflow_relations
     return workflow_relations(architecture, workflow)
-
-
-def attach_svg(record, source):
-    """Attach an explicitly requested, already rendered review file."""
-    path=record.directory / "snapshot.js"
-    text=path.read_text(encoding="utf-8")
-    payload=json.loads(text[len("VibeFlowPreview.snapshot("):-3])
-    atomic_write(record.directory / "review.svg", Path(source).read_text(encoding="utf-8"))
-    payload["artifacts"]["svg"]="review.svg"
-    atomic_write(path, script_call("snapshot", payload))
-    record.metadata["artifacts"] = dict(payload["artifacts"])
-    record.update(record.metadata["status"])

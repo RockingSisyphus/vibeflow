@@ -49,7 +49,7 @@ pytest 使用独立进程，并按文件分组；同一文件内的测试按顺�
 
 并发改动的专项入口为两个 Target 的 `sandbox/<target>/graph_concurrency/run_all.py`。它们固定验证正常容量 12、容量 4 和默认 8 的真实峰值及清理后补位，并要求回收兼分发、断路配置同时被 `validate` 和 `build` 拒绝。JavaScript 必须提供 `--puppeteer-root` 才能计为完整通过；缺少浏览器时报告 `REDUCED`。命令、逐项判定和报告位置见 [Python 沙箱](../../sandbox/python/graph_concurrency/README.md)与 [JavaScript 沙箱](../../sandbox/javascript/graph_concurrency/README.md)。发布验证保留本次实际批次，不把此前测试结果改称新全量。
 
-资源专项通过正式 CLI 覆盖声明归属、规则、修改、展示和原生运行。固定输入与验证命令见 [Python 多文件资源](../../sandbox/python/multifile_resources/README.md)和 [JavaScript 多文件资源](../../sandbox/javascript/multifile_resources/README.md)；图形判定与单独重跑命令见 [Python 资源目录](../../tests/fixtures/python/resource_sections/README.md)、[JavaScript 资源目录](../../tests/fixtures/javascript/resource_sections/README.md)及 [SVG 布局](../../tests/fixtures/python/review_layout/README.md)。
+资源专项通过正式 CLI 覆盖声明归属、规则、修改、展示和原生运行。固定输入与验证命令见 [Python 多文件资源](../../sandbox/python/multifile_resources/README.md)和 [JavaScript 多文件资源](../../sandbox/javascript/multifile_resources/README.md)；图形判定与单独重跑命令见 [Python 资源目录](../../tests/fixtures/python/resource_sections/README.md)、[JavaScript 资源目录](../../tests/fixtures/javascript/resource_sections/README.md)。
 
 仓库自检器为：
 
@@ -75,4 +75,4 @@ python repo_check/run.py --profile all
 
 项目清单、可见声明唯一性、默认/显式跨 root 导入及搬移 AOT 由 `tests/tooling/test_project_inventory.py`、`test_project_dependency_scope.py` 和 `test_project_preparation.py` 覆盖。正式质量命令的默认、替换、空选择及旧参数拒绝由 `test_root_quality_command.py` 覆盖；源码测量和图算法用当前事实收集器与规则求值器验证，不保留独立旧扫描接口。效果分析的别名、策略和定位由 `tests/targets/python/test_source_effect_parameters.py` 与规则沙箱覆盖。
 
-JavaScript 源码拼接顺序断言已退役，生成物语义由两端 AOT 和 JavaScript integration 的真实运行验证；SVG 标签测试仅保留对齐、边界和文本等算法契约，最终资源视图、离线和历史交互由真实浏览器测试验证。不要用测试数量下降代替覆盖和耗时比较。
+JavaScript 源码拼接顺序断言已退役，生成物语义由两端 AOT 和 JavaScript integration 的真实运行验证；最终资源视图、离线和历史交互由真实浏览器测试验证。不要用测试数量下降代替覆盖和耗时比较。

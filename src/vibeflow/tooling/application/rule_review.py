@@ -234,11 +234,7 @@ def main(argv=None) -> int:
         text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n" if args.json else rule_plans_mermaid(payload)
         if args.output:
             args.output.parent.mkdir(parents=True, exist_ok=True)
-            if args.output.suffix.lower() == ".svg":
-                from vibeflow.tooling.presentation.mermaid import render_mermaid_svg
-                render_mermaid_svg(rule_plans_mermaid(payload), args.output)
-            else:
-                args.output.write_text(text, encoding="utf-8")
+            args.output.write_text(text, encoding="utf-8")
         else:
             print(text, end="")
         return 0

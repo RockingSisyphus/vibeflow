@@ -127,7 +127,7 @@ def test_formal_cli_checks_import_entrypoint_before_publication(tmp_path, capsys
         project_path.write_text(json.dumps(project))
         workspace = tmp_path.parent / "vibeflow_config.jsonc"
         arguments.extend(["--workspace", str(workspace)])
-    arguments.extend(["--json"] if command == "validate" else ["--output", str(output)])
+    arguments.extend(["--json"] if command == "validate" else [])
     assert main(arguments) == 1
     payload = json.loads(capsys.readouterr().out)
     report = payload if command == "validate" else payload["validation"]

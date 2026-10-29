@@ -42,6 +42,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - [Python 检查会话与展示资料](maintainers/python-check-sessions.md)
 - [JS/TS 检查会话与释放](maintainers/javascript-check-sessions.md)
 - [发行与文档装配](maintainers/release.md)
+- [1.4.5 本地验证记录](maintainers/release-1.4.5-validation.md)
 - [目录职责与产物约定](maintainers/directory-layout.md)
 
 

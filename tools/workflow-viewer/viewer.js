@@ -5,7 +5,7 @@
   let project = null;
   const collapsedRoots=new Set();
   let records = new Map(), currentRecord = null, refreshGeneration = 0;
-  const snapshots = new Map(), states = new Map(), modes = new Map(), entries = new Map(), workflowRecords = new Map();
+  const snapshots = new Map(), states = new Map(), entries = new Map(), workflowRecords = new Map();
   let entry="";
   const ns = "http://www.w3.org/2000/svg", elk = typeof ELK === "undefined" ? null : new ELK();
   const configured=window.VibeFlowViewerConfig;
@@ -14,14 +14,14 @@
   const resourceUrl=path=>{if(!dataRoot)throw new Error("缺少 dataRoot 配置");return new URL(path,dataRoot).href;};
   let activeWorkflow="";
   const entryKey=()=>current+"|"+activeWorkflow;
-  let current = null, data = null, view = "flow", mode = "structured", generation = 0;
+  let current = null, data = null, view = "flow", generation = 0;
   let state = null, visible = new Map(), edgeFacts = new Map(), contextPath = null, sequence = 0;
   const categoryNames = {review:"审查",build:"构建",run:"运行"};
   const statusNames = {passed:"审查通过",reviewing:"审查中 / 未记录结束",succeeded:"成功",running:"运行中 / 未记录结束",building:"构建中 / 未记录结束",failed:"失败",preview_failed:"预览生成失败"};
   const statusText = record => (record.status==="succeeded"?(categoryNames[record.category]||"")+"成功":statusNames[record.status]||record.status)+(record.check_status==="CONCERNS"?"（有关注项）":"");
-  const {drawFlow,drawResources,drawLinks}=VFViews({getData:()=>data,getMode:()=>mode,getCurrent:()=>current,
+  const {drawFlow,drawResources,drawLinks}=VFViews({getData:()=>data,
     getEntry:()=>entry,
-    getVisible:()=>visible,getEdgeFacts:()=>edgeFacts,isCurrent:token=>token===generation,elk,node,layoutBody,factsNodes,empty,showInfo,resourceUrl});
+    getVisible:()=>visible,getEdgeFacts:()=>edgeFacts,isCurrent:token=>token===generation,elk,node,layoutBody,factsNodes,empty,showInfo});
   const renderers = new Map([["flow", drawFlow], ["resources", drawResources], ["links", drawLinks]]);
   window.VibeFlowPreview = {
     record(value) {
@@ -122,13 +122,9 @@
         const record=records.get(current);
         if(record){
           currentRecord=record;$("identity").textContent=record.workflow.name+" · "+statusText(record);
-          notice(record.preview_error||record.svg_error||"");
+          notice(record.preview_error||"");
           if(!data&&record.views.length)await open(current,view,readHash().call);
-          else if(data){
-            const previous=data.artifacts?.svg;
-            data={...data,artifacts:{...data.artifacts,...record.artifacts}};
-            if(previous!==data.artifacts.svg&&mode==="original"&&data.views.find(v=>v.id===view)?.renderer==="flow")await draw();
-          }
+
         }else if(data)notice("当前记录不在索引中；保留已加载的视图。");
       }
     }catch(error){if(ticket===refreshGeneration)notice(error.message+"；可用 preview --reindex 重建索引。");}
@@ -153,11 +149,11 @@
     const originalId=id;
     if(workflowId&&records.get(id)?.workflow.id!==workflowId)id=workflowRecord(workflowId)?.id||id;
     const token=++generation;
-    current=id;activeWorkflow=workflowId||records.get(id)?.workflow.id||"";view=tab;entry=selectedEntry??entries.get(entryKey())??(activeWorkflow===records.get(id)?.workflow.id?records.get(id)?.entry:"")??"";entries.set(entryKey(),entry);mode=modes.get(entryKey())||"structured";data=null;state=null;visible=new Map();$("tabs").replaceChildren();$("scene").replaceChildren();$("dimensions").textContent="";history();empty("正在加载快照…");
+    current=id;activeWorkflow=workflowId||records.get(id)?.workflow.id||"";view=tab;entry=selectedEntry??entries.get(entryKey())??(activeWorkflow===records.get(id)?.workflow.id?records.get(id)?.entry:"")??"";entries.set(entryKey(),entry);data=null;state=null;visible=new Map();$("tabs").replaceChildren();$("scene").replaceChildren();$("dimensions").textContent="";history();empty("正在加载快照…");
     try {
       const record=records.get(id);
       if(!record)throw new Error("索引中没有此快照："+id);
-      currentRecord=record;$("identity").textContent=record.workflow.name+" · "+statusText(record);notice(record.preview_error||record.svg_error||"");showInfo(record.workflow.name,{workflow:record.workflow,operation:record});
+      currentRecord=record;$("identity").textContent=record.workflow.name+" · "+statusText(record);notice(record.preview_error||"");showInfo(record.workflow.name,{workflow:record.workflow,operation:record});
       if(record.preview_error&&!record.views.length)throw new Error(record.preview_error);
       if(!record.views.length&&["running","building","reviewing"].includes(record.status))throw new Error("预览正在生成；稍后刷新历史。");
       if(!snapshots.has(id))await loadScript(resourceUrl("snapshots/"+encodeURIComponent(id)+"/snapshot.js"));
@@ -166,10 +162,8 @@
       const graphs={...snapshot.workflow_graphs,[snapshot.workflow.id]:{workflow:snapshot.workflow,architecture:snapshot.architecture}};
       const chosen=graphs[activeWorkflow];if(!chosen?.architecture)throw new Error(chosen?.error||"本次快照中没有目标 workflow");
       data={...snapshot,workflow:chosen.workflow,architecture:chosen.architecture,workflow_graphs:graphs,
-        artifacts:activeWorkflow===snapshot.workflow.id?{...snapshot.artifacts,...record.artifacts}:{},
         bodies:VFModel.bodies(chosen.architecture,chosen.workflow)};
       if(activeWorkflow===snapshot.workflow.id)workflowRecords.set(activeWorkflow,id);
-      if(activeWorkflow!==snapshot.workflow.id)mode="structured";
       const named=data.architecture.workflow?.entries||{};
       if(entry&&!named[entry]){entry="";entries.set(entryKey(),entry);}
       $("entry").replaceChildren(new Option("全部入口",""),...Object.keys(named).map(name=>new Option(name+(name===data.architecture.workflow.default_entry?"（默认）":""),name)));$("entry").value=entry;
@@ -189,7 +183,7 @@
       button.onclick=()=>navigate(current,item.id);return button;
     }));
   }
-  function stateKey(){return current+"|"+activeWorkflow+"|"+view+"|"+entry+"|"+(data.views.find(v=>v.id===view)?.renderer==="flow"?mode:"single");}
+  function stateKey(){return current+"|"+activeWorkflow+"|"+view+"|"+entry;}
   function getState() {
     const key=stateKey();
     if(!states.has(key))states.set(key,{x:0,y:0,k:1,expanded:new Set(),selected:"",fitted:false});
@@ -204,10 +198,9 @@
     const token=++generation;
     state=getState();visible=new Map();edgeFacts=new Map();$("scene").replaceChildren();empty("");
     const descriptor=data.views.find(v=>v.id===view), renderer=renderers.get(descriptor?.renderer);
-    $("legend").hidden=descriptor?.renderer!=="flow"||mode!=="structured";
-    $("mode").disabled=descriptor?.renderer!=="flow";$("mode").value=descriptor?.renderer==="flow"?mode:"structured";
-    $("entry").disabled=descriptor?.renderer!=="flow"||mode!=="structured";
-    $("collapse").disabled=descriptor?.renderer!=="flow"||mode!=="structured";
+    $("legend").hidden=descriptor?.renderer!=="flow";
+    $("entry").disabled=descriptor?.renderer!=="flow";
+    $("collapse").disabled=descriptor?.renderer!=="flow";
     try {
       if(!renderer)throw new Error("缺少此视图的渲染器："+descriptor?.renderer);
       const result=await renderer(descriptor,token);
@@ -319,7 +312,6 @@
   async function locate(query) {
     if(!query||!data)return;
     if(view!=="flow"){await navigate(current,"flow",query);return;}
-    if(mode!=="structured"){mode="structured";modes.set(entryKey(),mode);$("mode").value=mode;state=getState();}
     const found=findPath(query);if(!found){notice("没有找到节点："+query);return;}
     const {path}=found;
     const parts=path.split("/");for(let i=1;i<parts.length;i++)state.expanded.add(parts.slice(0,i).join("/"));
@@ -352,7 +344,7 @@
     event.preventDefault();contextPath=event.target.closest("[data-call-path]")?.dataset.callPath;
     if(!contextPath)return;
     select(contextPath);const item=visible.get(contextPath),menu=$("context-menu");
-    $("toggle").hidden=!item?.facts.invokes;$("toggle").disabled=mode!=="structured"||!item||!expandable(item.facts);$("toggle").textContent=state.expanded.has(contextPath)?"原地收起":"原地展开";
+    $("toggle").hidden=!item?.facts.invokes;$("toggle").disabled=!item||!expandable(item.facts);$("toggle").textContent=state.expanded.has(contextPath)?"原地收起":"原地展开";
     const targets=item?VFModel.workflowOptions(item.facts,item.architecture,item.localPath,data.workflow_graphs):[];
     $("context-targets").replaceChildren(...targets.map(workflowButton));
     menu.hidden=false;menu.style.left=Math.min(event.clientX,innerWidth-175)+"px";menu.style.top=Math.min(event.clientY,innerHeight-100)+"px";
@@ -361,7 +353,6 @@
   $("toggle").onclick=()=>{const path=contextPath;$("context-menu").hidden=true;toggle(path);};
   $("locate").onclick=()=>{$("context-menu").hidden=true;locate(contextPath);};
   $("refresh").onclick=()=>refresh();for(const id of ["category","workflow","target","status","navigation"])$(id).onchange=history;
-  $("mode").onchange=()=>{mode=$("mode").value;modes.set(entryKey(),mode);draw();};
   $("plus").onclick=()=>state&&zoom(state.k*1.25);$("minus").onclick=()=>state&&zoom(state.k/1.25);
   $("zoom").onchange=()=>zoom(Number($("zoom").value.replace(/%$/, ""))/100);
   $("actual").onclick=()=>zoom(1);$("fit").onclick=fit;

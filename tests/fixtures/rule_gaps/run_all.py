@@ -42,7 +42,7 @@ def environment(toolchain=None, renderer=None):
     if toolchain:
         env["VIBEFLOW_TEST_TOOLCHAIN_ROOT"] = str(toolchain)
     if renderer:
-        env["VIBEFLOW_MERMAID_RENDERER_ROOT"] = str(renderer)
+        env["VIBEFLOW_BROWSER_RUNTIME_ROOT"] = str(renderer)
     return env
 
 
@@ -88,7 +88,7 @@ def run(work, groups, report, *, toolchain=None, renderer=None, workers=DEFAULT_
     if needs_js and toolchain is None:
         toolchain = install(work, "javascript-toolchain", ROOT / "sandbox/javascript/minimal/project")
     if any(group in {"javascript", "composition"} for group in groups) and renderer is None:
-        renderer = install(work, "mermaid-renderer", ROOT / "tools/mermaid-renderer")
+        renderer = install(work, "browser-runtime", ROOT / "tests/browser-runtime")
     rows, errors = [], []
     with ThreadPoolExecutor(max_workers=workers) as pool:
         jobs = {pool.submit(observe, group, work, toolchain, renderer, workers=workers):group for group in groups}

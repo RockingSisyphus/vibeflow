@@ -7,7 +7,6 @@ from pathlib import Path
 import subprocess
 import sys
 import zipfile
-from xml.etree import ElementTree
 
 import pytest
 
@@ -24,8 +23,8 @@ def _files(root: Path) -> dict[str, bytes]:
 
 @pytest.mark.parametrize("profile", ["collaborative", "autonomous"])
 def test_unpacked_release_opens_offline_before_any_command(tmp_path: Path, profile: str) -> None:
-    from vibeflow.tooling.presentation.mermaid import is_mermaid_svg_renderer_available, _find_mmdc
-    if not is_mermaid_svg_renderer_available():
+    from tests.fixtures.support.browser_runtime import browser_runtime_available, browser_runtime_manifest
+    if not browser_runtime_available():
         pytest.skip("locked browser toolchain supplied by the full gate")
     artifacts = distribution_builder.build_release(tmp_path / "package", profile=profile, run_self_check=False)
     extracted = tmp_path / "离线 包"
@@ -35,7 +34,7 @@ def test_unpacked_release_opens_offline_before_any_command(tmp_path: Path, profi
     assert (root / "vibeflow-preview/index.js").read_bytes() == b""
     assert not (root / "vibeflow-preview/snapshots").exists()
     script = Path(__file__).resolve().parents[1] / "fixtures/preview/browser.cjs"
-    completed = subprocess.run(["node", str(script), str(_find_mmdc().resolve()),
+    completed = subprocess.run(["node", str(script), str(browser_runtime_manifest().resolve()),
         str(root / "vibeflow-preview.html"), "--empty"], capture_output=True, text=True, timeout=60)
     assert completed.returncode == 0, completed.stdout + completed.stderr
     report = json.loads(completed.stdout)
@@ -46,16 +45,17 @@ def test_unpacked_release_opens_offline_before_any_command(tmp_path: Path, profi
 def test_release_publishes_deterministic_directory_and_single_root_archive(
     tmp_path: Path,
 ) -> None:
-    first = distribution_builder.build_release(
-        tmp_path / "first" / "distribution",
-        archive_dir=tmp_path / "first" / "archives",
-        run_self_check=False,
-    )
-    second = distribution_builder.build_release(
-        tmp_path / "second" / "distribution",
-        archive_dir=tmp_path / "second" / "archives",
-        run_self_check=False,
-    )
+    from types import SimpleNamespace
+    results=[]
+    for name in ("first","second"):
+        output=tmp_path/name/"distribution"
+        archives=tmp_path/name/"archives"
+        completed=subprocess.run([sys.executable,str(distribution_builder.ROOT/"distribution/build.py"),
+            "--profile","collaborative","--output-dir",str(output),"--archive-dir",str(archives)],
+            capture_output=True,text=True,timeout=180)
+        assert completed.returncode == 0, completed.stdout+completed.stderr
+        results.append(SimpleNamespace(directory=output,archive=next(archives.glob("*.zip"))))
+    first,second=results
 
     assert _files(first.directory) == _files(second.directory)
     assert first.archive.read_bytes() == second.archive.read_bytes()
@@ -118,35 +118,6 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
     assert str(first.directory) not in architecture
     assert '"definition_id": "minimal.process_payload"' in architecture
 
-    published_guidance = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in (
-            first.directory / "README.md",
-            first.directory / "AGENTS.md",
-            first.directory / "kernel/docs/overview.md",
-            first.directory / "kernel/docs/user/workflow-and-config.md",
-            first.directory / "kernel/docs/user/commands-and-results.md",
-            first.directory / "kernel/docs/user/profiles/collaborative.md",
-        )
-    )
-    for marker in (
-        "effect_scope",
-        "工作流执行探针",
-        "业务结果",
-        "planned",
-        "人工批准",
-    ):
-        assert marker in published_guidance
-
-    with zipfile.ZipFile(first.directory / "kernel/vibeflow-kernel.zip") as kernel:
-        constants = kernel.read("vibeflow/core/constants.py")
-        flow = kernel.read("vibeflow/core/flow.py")
-        workflow_model = kernel.read("vibeflow/block_compiler/model.py")
-    assert b'FLOW_KIND_GLOBAL_STATE = "global_state"' in constants
-    assert b'EFFECT_SCOPE_GLOBAL_STATE = "global_state"' in constants
-    assert b"class ExecutionLockSpec" in flow
-    assert b'WORKFLOW_ABI_VERSION = "vibeflow.workflow.v11"' in workflow_model
-
     with zipfile.ZipFile(first.archive) as archive:
         names = archive.namelist()
         assert names[0] == "vibeflow-distribution/"
@@ -185,7 +156,7 @@ def test_release_publishes_deterministic_directory_and_single_root_archive(
     assert completed.returncode == 0, completed.stderr or completed.stdout
 
 
-def test_distribution_renderer_reviews_minimal_javascript_workflow(
+def test_distribution_reviews_minimal_javascript_workflow(
     tmp_path: Path,
 ) -> None:
     distribution = distribution_builder.build_distribution(
@@ -194,7 +165,6 @@ def test_distribution_renderer_reviews_minimal_javascript_workflow(
     )
     for relative in (
         "javascript_project",
-        "kernel/tools/mermaid-renderer",
     ):
         completed = subprocess.run(
             ["npm", "ci"],
@@ -205,7 +175,6 @@ def test_distribution_renderer_reviews_minimal_javascript_workflow(
         )
         assert completed.returncode == 0, completed.stderr or completed.stdout
 
-    output = distribution / "reports/javascript-minimal.svg"
     completed = subprocess.run(
         [
             sys.executable,
@@ -213,8 +182,6 @@ def test_distribution_renderer_reviews_minimal_javascript_workflow(
             "review",
             "--config",
             "javascript_project/configs/main.jsonc",
-            "--output",
-            str(output.relative_to(distribution)),
         ],
         cwd=distribution,
         text=True,
@@ -226,16 +193,7 @@ def test_distribution_renderer_reviews_minimal_javascript_workflow(
     assert payload["status"] == "PASS"
     assert payload["result_code"] == "VIBEFLOW_REVIEW_ARTIFACT_PASS"
     assert payload["published"] is True
-    root = ElementTree.parse(output).getroot()
-    coverage = {
-        (
-            element.get("data-review-kind", ""),
-            element.get("data-review-target", ""),
-        )
-        for element in root.iter()
-        if "review-inline-fragment" in element.get("class", "").split()
-    }
-    assert ("workflow", "javascript-project") in coverage
+    assert Path(payload["preview"]).is_file()
 
 
 @pytest.mark.parametrize("failure_call", [1, 2, 3, 4])

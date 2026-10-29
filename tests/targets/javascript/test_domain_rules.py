@@ -153,7 +153,7 @@ def test_domain_locations_are_rejected_by_formal_commands_without_publishing(dom
     architecture, output = project / "Architecture.jsonc", tmp_path / "review.svg"
     architecture.write_text("previous Architecture", encoding="utf-8")
     output.write_text("previous SVG", encoding="utf-8")
-    reviewed = _domain_cli(workspace, project, "review", "--output", str(output))
+    reviewed = _domain_cli(workspace, project, "review")
     assert reviewed.returncode == 1, reviewed.stderr or reviewed.stdout
     payload = json.loads(reviewed.stdout)
     assert payload["status"] == "FAIL" and payload["failed_stage"] == "preflight" and payload["published"] is False

@@ -242,7 +242,7 @@ def _prepare_runtime_project(root: Path) -> None:
 
 
 def _prepare_temporary_puppeteer(destination: Path) -> Path:
-    source = REPOSITORY_ROOT / "tools" / "mermaid-renderer"
+    source = REPOSITORY_ROOT / "tests" / "browser-runtime"
     destination.mkdir(parents=True, exist_ok=True)
     for name in ("package.json", "package-lock.json"):
         shutil.copy2(source / name, destination / name)

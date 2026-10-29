@@ -32,7 +32,7 @@ def run_command(project: Path, command, kernel: Path, *, name="observation", env
     if toolchain:
         overrides["VIBEFLOW_TEST_TOOLCHAIN_ROOT"] = str(toolchain)
     if renderer:
-        overrides["VIBEFLOW_MERMAID_RENDERER_ROOT"] = str(renderer)
+        overrides["VIBEFLOW_BROWSER_RUNTIME_ROOT"] = str(renderer)
     started = perf_counter()
     completed = subprocess.run(list(map(str, command)), cwd=project,
         env=environment(kernel, **overrides), capture_output=True, text=True, timeout=timeout)

@@ -12,7 +12,6 @@ import sys
 import tempfile
 import threading
 import time
-import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,9 +42,7 @@ WORK_ROOT = SANDBOX_DIR
 PROJECT_DIR = FIXTURE_PROJECT_DIR
 CONFIG_DIR = PROJECT_DIR / "configs"
 REPORT_DIR = WORK_ROOT / "reports"
-ASCII_DIR = REPORT_DIR / "ascii"
 MERMAID_DIR = REPORT_DIR / "mermaid"
-SVG_DIR = REPORT_DIR / "svg"
 COMPILED_BLOCK_DIR = REPORT_DIR / "compiled_blocks"
 RUN_ROOT = WORK_ROOT / "runs"
 WORKSPACE_PATH = FIXTURE_WORKSPACE_PATH
@@ -117,7 +114,6 @@ VALID_RUN_CASES = [
         },
         "reset_global_state_probe": True,
         "expected_workflow_global_state": True,
-        "expected_svg_cloud_nodes": ("state",),
         "expected_global_state_trace": True,
     },
     {
@@ -142,7 +138,6 @@ VALID_RUN_CASES = [
             "forward@{ shape: cloud",
             "execution_lock: none",
         ),
-        "expected_svg_cloud_nodes": ("forward", "backward", "step"),
     },
     {
         "name": "training_non_json_metrics",
@@ -461,8 +456,8 @@ def _run_addition_case(name: str) -> CaseResult:
 
 
 def _configure_runtime(work_root: Path) -> None:
-    global WORK_ROOT, PROJECT_DIR, CONFIG_DIR, REPORT_DIR, ASCII_DIR
-    global MERMAID_DIR, SVG_DIR, COMPILED_BLOCK_DIR, RUN_ROOT
+    global WORK_ROOT, PROJECT_DIR, CONFIG_DIR, REPORT_DIR
+    global MERMAID_DIR, COMPILED_BLOCK_DIR, RUN_ROOT
     global WORKSPACE_PATH, REVIEW_ARCHITECTURE_DIR, REVIEW_ARCHITECTURE_PATH
     global REVIEW_DIR
     global EXTERNAL_DEDUP_REVIEW_CONFIG_PATH
@@ -487,9 +482,7 @@ def _configure_runtime(work_root: Path) -> None:
         shutil.move(path, negative_configs / path.name)
     (WORK_ROOT / "project_rules.jsonc").write_text('{"rulesets":[]}')
     REPORT_DIR = WORK_ROOT / "reports"
-    ASCII_DIR = REPORT_DIR / "ascii"
     MERMAID_DIR = REPORT_DIR / "mermaid"
-    SVG_DIR = REPORT_DIR / "svg"
     COMPILED_BLOCK_DIR = REPORT_DIR / "compiled_blocks"
     RUN_ROOT = WORK_ROOT / "runs"
     REVIEW_ARCHITECTURE_DIR = PROJECT_DIR / "review_artifacts"
@@ -503,7 +496,6 @@ def _configure_runtime(work_root: Path) -> None:
 def _prepare_environment() -> None:
     if not (SOURCE_ROOT / "vibeflow").is_dir():
         raise EnvironmentError(f"VibeFlow source package is missing: {SOURCE_ROOT}")
-    _prepare_temporary_mermaid_renderer()
     for path in (SOURCE_ROOT, PROJECT_DIR):
         text = str(path)
         if text not in sys.path:
@@ -511,45 +503,12 @@ def _prepare_environment() -> None:
     os.chdir(WORK_ROOT)
 
 
-def _prepare_temporary_mermaid_renderer() -> None:
-    supplied = os.environ.get("VIBEFLOW_MERMAID_RENDERER_ROOT")
-    if supplied:
-        if not (Path(supplied) / "node_modules/.bin/mmdc").is_file():
-            raise EnvironmentError(f"explicit Mermaid renderer is unavailable: {supplied}")
-        return
-    source = REPO_ROOT / "tools" / "mermaid-renderer"
-    destination = WORK_ROOT / "mermaid-renderer"
-    destination.mkdir(parents=True, exist_ok=True)
-    for name in ("package.json", "package-lock.json"):
-        source_file = source / name
-        if not source_file.is_file():
-            raise EnvironmentError(f"Mermaid renderer manifest is missing: {source_file}")
-        shutil.copy2(source_file, destination / name)
-    try:
-        completed = subprocess.run(
-            ["npm", "ci"],
-            cwd=destination,
-            check=False,
-            text=True,
-        )
-    except FileNotFoundError as exc:
-        raise EnvironmentError("npm is not available") from exc
-    if completed.returncode != 0:
-        raise EnvironmentError(
-            "temporary Mermaid renderer install failed with status "
-            f"{completed.returncode}"
-        )
-    os.environ["VIBEFLOW_MERMAID_RENDERER_ROOT"] = str(destination)
-
-
 def _reset_outputs() -> None:
     for path in (REPORT_DIR, RUN_ROOT, REVIEW_ARCHITECTURE_DIR):
         if path.exists():
             shutil.rmtree(path)
-    ASCII_DIR.mkdir(parents=True, exist_ok=True)
     COMPILED_BLOCK_DIR.mkdir(parents=True, exist_ok=True)
     MERMAID_DIR.mkdir(parents=True, exist_ok=True)
-    SVG_DIR.mkdir(parents=True, exist_ok=True)
     REVIEW_DIR.mkdir(parents=True, exist_ok=True)
     RUN_ROOT.mkdir(parents=True, exist_ok=True)
 
@@ -579,7 +538,6 @@ def _run_workspace_quality_case() -> CaseResult:
 def _run_review_cases() -> list[CaseResult]:
     cases = (
         ("review:registered_expanded", _run_registered_review_case),
-        ("review:external_nodeset_dedup_visual", _run_external_nodeset_dedup_review_case),
         ("review:unregistered_fail_closed", _run_unregistered_review_case),
     )
     results: list[CaseResult] = []
@@ -601,13 +559,9 @@ def _run_published_diagram_audit_case(results: list[CaseResult]) -> CaseResult:
 
 
 def _audit_published_diagrams(results: list[CaseResult]) -> CaseResult:
-    from vibeflow.tooling.presentation.mermaid import (
-        is_mermaid_svg_renderer_available,
-    )
 
     valid_names = {str(case["name"]) for case in VALID_RUN_CASES}
     success_run_names = valid_names
-    success_run_svgs: set[Path] = set()
     for run_name in sorted(success_run_names):
         run_dir = RUN_ROOT / run_name
         health_path = run_dir / "health_report.json"
@@ -623,71 +577,15 @@ def _audit_published_diagrams(results: list[CaseResult]) -> CaseResult:
         if snapshot["artifacts"] or not snapshot["architecture"]["workflow"]["nodes"]:
             raise AssertionError(f"default run did not produce data-only architecture: {run_name}")
 
-    expected_report_svgs: set[Path] = {
-        REVIEW_DIR / "pass_nodeset_nested.expanded.svg",
-        REVIEW_DIR / "external_nodeset_dedup.expanded.svg",
-    }
-    if is_mermaid_svg_renderer_available():
-        for run_name in valid_names:
-            expected_report_svgs.add(SVG_DIR / f"{run_name}.svg")
-            expected_report_svgs.add(SVG_DIR / f"{run_name}.expanded.svg")
-    actual_report_svgs = set(REPORT_DIR.rglob("*.svg"))
-    if actual_report_svgs != expected_report_svgs:
-        raise AssertionError(
-            "published report SVG set does not match health-gated producers: "
-            f"unexpected={sorted(str(path.relative_to(WORK_ROOT)) for path in actual_report_svgs - expected_report_svgs)}, "
-            f"missing={sorted(str(path.relative_to(WORK_ROOT)) for path in expected_report_svgs - actual_report_svgs)}"
-        )
-
-    result_by_name = {result.name: result for result in results}
-    registered_review = result_by_name.get("review:registered_expanded")
-    registered_payload = registered_review.payload if registered_review is not None else None
-    if not isinstance(registered_payload, dict) or registered_payload.get("status") not in {"PASS", "CONCERNS"}:
-        raise AssertionError("registered review SVG does not have a successful validation result")
-    external_review = result_by_name.get("review:external_nodeset_dedup_visual")
-    external_payload = external_review.payload if external_review is not None else None
-    if not isinstance(external_payload, dict) or external_payload.get("health") != "PASS":
-        raise AssertionError("external/dedup review SVG does not have a strict PASS validation result")
-
-    for svg_path in sorted((*expected_report_svgs, *success_run_svgs)):
-        try:
-            root = ET.parse(svg_path).getroot()
-        except ET.ParseError as exc:
-            raise AssertionError(f"published success SVG is not valid XML: {svg_path}") from exc
-        if _xml_local_name(root.tag) != "svg":
-            raise AssertionError(f"published success diagram root is not svg: {svg_path}")
-
-    return CaseResult(
-        "audit:published_diagrams_health_gated",
-        "PASS",
-        payload={
-            "report_svgs": len(actual_report_svgs),
-            "successful_run_svgs": len(success_run_svgs),
-            "health_gated_success_runs": len(success_run_names),
-            "data_only_success_runs": len(success_run_names),
-        },
-    )
-
-
-
-
-
-
-
-
-
-
-
-
+    return CaseResult("audit:published_diagrams_health_gated", "PASS",
+        payload={"health_gated_success_runs":len(success_run_names), "data_only_success_runs":len(success_run_names)})
 
 
 def _run_registered_review_case() -> CaseResult:
     REVIEW_ARCHITECTURE_DIR.mkdir(parents=True, exist_ok=True)
     REVIEW_ARCHITECTURE_PATH.write_text("stale architecture\n", encoding="utf-8")
-    output_path = REVIEW_DIR / "pass_nodeset_nested.expanded.svg"
-    output_path.write_text("legacy svg\n", encoding="utf-8")
 
-    completed, payload = _run_review_cli(CONFIG_DIR / "pass_nodeset_nested.jsonc", output_path)
+    completed, payload = _run_review_cli(CONFIG_DIR / "pass_nodeset_nested.jsonc")
     if completed.returncode != 0:
         raise AssertionError(f"review returned {completed.returncode}: {payload}")
     if payload.get("status") not in {"PASS", "CONCERNS"}:
@@ -697,7 +595,6 @@ def _run_registered_review_case() -> CaseResult:
     expected_paths = {
         "config": str((CONFIG_DIR / "pass_nodeset_nested.jsonc").resolve()),
         "architecture": str(REVIEW_ARCHITECTURE_PATH.resolve()),
-        "svg": str(output_path.resolve()),
     }
     for field, expected in expected_paths.items():
         if payload.get(field) != expected:
@@ -713,27 +610,8 @@ def _run_registered_review_case() -> CaseResult:
         if marker not in architecture_text:
             raise AssertionError(f"canonical architecture is missing nested nodeset marker {marker!r}")
 
-    root = ET.parse(output_path).getroot()
-    if _xml_local_name(root.tag) != "svg":
-        raise AssertionError("review output root is not svg")
-    if root.attrib.get("aria-roledescription") != "flowchart-review-columns":
-        raise AssertionError("review output is missing the canonical review-columns marker")
-    fragments = [
-        element
-        for element in root.iter()
-        if _xml_local_name(element.tag) == "g"
-        and "review-inline-fragment" in element.attrib.get("class", "").split()
-        and len(list(element)) > 0
-    ]
-    if len(fragments) < 2:
-        raise AssertionError(f"expected expanded main/nodeset SVG fragments, got {len(fragments)}")
-    if list(REVIEW_DIR.rglob("*.provenance.json")):
-        raise AssertionError("review unexpectedly emitted a provenance sidecar")
-    if list(REVIEW_DIR.rglob("*.mmd")):
-        raise AssertionError("review unexpectedly published an intermediate Mermaid file")
-    if "provenance" in output_path.read_text(encoding="utf-8").lower():
-        raise AssertionError("review unexpectedly embedded provenance metadata")
-
+    if not Path(payload["preview"]).is_file():
+        raise AssertionError("review did not publish HTML preview")
     return CaseResult(
         "review:registered_expanded",
         "PASS",
@@ -741,29 +619,23 @@ def _run_registered_review_case() -> CaseResult:
             "status": payload["status"],
             "published": True,
             "architecture": str(REVIEW_ARCHITECTURE_PATH.relative_to(WORK_ROOT)),
-            "svg": str(output_path.relative_to(WORK_ROOT)),
-            "svg_fragments": len(fragments),
         },
     )
 
 
 def _run_unregistered_review_case() -> CaseResult:
-    output_path = REVIEW_DIR / "unregistered.svg"
-    output_path.unlink(missing_ok=True)
     architecture_before = REVIEW_ARCHITECTURE_PATH.read_bytes()
 
-    completed, payload = _run_review_cli(CONFIG_DIR / "pass_free_nodes.jsonc", output_path)
+    completed, payload = _run_review_cli(CONFIG_DIR / "pass_free_nodes.jsonc")
     if completed.returncode != 1:
         raise AssertionError(f"unregistered review returned {completed.returncode}, expected 1: {payload}")
     if payload.get("status") != "FAIL" or payload.get("failed_stage") != "architecture":
         raise AssertionError(f"unregistered review failed with the wrong stage/status: {payload}")
     if payload.get("published") is not False:
-        raise AssertionError("unregistered review reported an SVG publication")
+        raise AssertionError("unregistered review reported an preview publication")
     error = payload.get("error")
     if not isinstance(error, dict) or error.get("rule_id") != "REVIEW.ARCHITECTURE.UNREGISTERED":
         raise AssertionError(f"unexpected unregistered review error: {error}")
-    if output_path.exists():
-        raise AssertionError("unregistered review published an SVG")
     if REVIEW_ARCHITECTURE_PATH.read_bytes() != architecture_before:
         raise AssertionError("unregistered review modified the registered architecture document")
 
@@ -778,120 +650,7 @@ def _run_unregistered_review_case() -> CaseResult:
     )
 
 
-def _run_external_nodeset_dedup_review_case() -> CaseResult:
-    output_path = REVIEW_DIR / "external_nodeset_dedup.expanded.svg"
-    output_path.unlink(missing_ok=True)
-
-    validation = _run_validate_cli(EXTERNAL_DEDUP_REVIEW_CONFIG_PATH)
-    if validation.returncode != 0 or "VIBEFLOW_STRUCTURE_PASS" not in validation.stdout:
-        raise AssertionError(
-            "review fixture must pass health validation before SVG export: "
-            f"returncode={validation.returncode}, stdout={validation.stdout!r}, stderr={validation.stderr!r}"
-        )
-
-    completed = _run_export_svg_cli(EXTERNAL_DEDUP_REVIEW_CONFIG_PATH, output_path)
-    if completed.returncode != 0:
-        raise AssertionError(
-            f"expanded SVG export returned {completed.returncode}: "
-            f"stdout={completed.stdout!r}, stderr={completed.stderr!r}"
-        )
-    root = ET.parse(output_path).getroot()
-    if root.attrib.get("aria-roledescription") != "flowchart-review-columns":
-        raise AssertionError("expanded SVG is missing the canonical review-columns marker")
-
-    svg_text = output_path.read_text(encoding="utf-8")
-    for marker in ("stroke-width:7px", "vector-effect:non-scaling-stroke"):
-        if marker not in svg_text:
-            raise AssertionError(f"expanded SVG is missing external boundary marker {marker!r}")
-
-    external_nodes = [
-        element
-        for element in root.iter()
-        if _xml_local_name(element.tag) == "g"
-        and "externalBoundary" in element.attrib.get("class", "").split()
-    ]
-    if len(external_nodes) != 1:
-        raise AssertionError(f"expected one externalBoundary node, got {len(external_nodes)}")
-    external_classes = set(external_nodes[0].attrib.get("class", "").split())
-    if "externalDependency" not in external_classes:
-        raise AssertionError(f"external node lost its color class: {sorted(external_classes)}")
-
-    text_elements = [
-        " ".join("".join(element.itertext()).split())
-        for element in root.iter()
-        if _xml_local_name(element.tag) == "text"
-    ]
-    visible_text = " ".join(text_elements)
-    for marker in (
-        "[EXTERNAL] External Boost",
-        "external: true",
-        "body: visual.reusable_worker",
-        "id: worker_a",
-        "id: worker_b",
-        "id: worker_c",
-        "id: worker_d",
-        "id: end",
-    ):
-        if marker not in visible_text:
-            raise AssertionError(f"expanded SVG is missing visible marker {marker!r}")
-
-    svg_ids = {element.attrib["id"] for element in root.iter() if "id" in element.attrib}
-    for worker_id in ("worker_a", "worker_b", "worker_c", "worker_d"):
-        expected_suffix = f"L_{worker_id}_n_end_0"
-        if not any(svg_id.endswith(expected_suffix) for svg_id in svg_ids):
-            raise AssertionError(f"expanded SVG is missing {worker_id}->end edge {expected_suffix!r}")
-
-    review_titles = [
-        " ".join("".join(element.itertext()).split())
-        for element in root.iter()
-        if _xml_local_name(element.tag) == "text"
-        and "review-title" in element.attrib.get("class", "").split()
-    ]
-    grouped_titles = [title for title in review_titles if "type_key: visual.reusable_worker" in title]
-    if len(grouped_titles) != 1:
-        raise AssertionError(f"expected one locally deduplicated worker detail, got {grouped_titles!r}")
-    grouped_title = grouped_titles[0]
-    for marker in (
-        "calls: 4",
-        "worker_a",
-        "worker_b{node_configs=1}",
-        "worker_c{node_configs=1}",
-        "+1",
-    ):
-        if marker not in grouped_title:
-            raise AssertionError(f"grouped detail title is missing {marker!r}: {grouped_title!r}")
-    if "101" in grouped_title or "202" in grouped_title:
-        raise AssertionError(f"grouped detail title leaked config values: {grouped_title!r}")
-
-    fragments = [
-        element
-        for element in root.iter()
-        if _xml_local_name(element.tag) == "g"
-        and "review-inline-fragment" in element.attrib.get("class", "").split()
-    ]
-    if len(fragments) != 4:
-        raise AssertionError(f"expected main graph, plugins, base_lib and one deduplicated detail, got {len(fragments)}")
-    if set(review_titles) != {"main pipeline", "plugins", "base_lib", grouped_title}:
-        raise AssertionError(f"expanded review has unexpected resource groups: {review_titles!r}")
-    if "resources and implementation files" in visible_text or "Node types and rules" in visible_text:
-        raise AssertionError("expanded review must show selected resource directories without source or rule projections")
-
-    return CaseResult(
-        "review:external_nodeset_dedup_visual",
-        "PASS",
-        payload={
-            "health": "PASS",
-            "result_code": "VIBEFLOW_STRUCTURE_PASS",
-            "svg": str(output_path.relative_to(WORK_ROOT)),
-            "external_nodes": len(external_nodes),
-            "worker_calls": 4,
-            "worker_detail_fragments": len(grouped_titles),
-            "svg_fragments": len(fragments),
-        },
-    )
-
-
-def _run_review_cli(config_path: Path, output_path: Path) -> tuple[subprocess.CompletedProcess[str], dict[str, Any]]:
+def _run_review_cli(config_path: Path) -> tuple[subprocess.CompletedProcess[str], dict[str, Any]]:
     completed = subprocess.run(
         [
             sys.executable,
@@ -902,8 +661,6 @@ def _run_review_cli(config_path: Path, output_path: Path) -> tuple[subprocess.Co
             str(WORKSPACE_PATH),
             "--config",
             str(config_path),
-            "--output",
-            str(output_path),
         ],
         cwd=WORK_ROOT,
         env=_sandbox_cli_environment(),
@@ -920,29 +677,6 @@ def _run_review_cli(config_path: Path, output_path: Path) -> tuple[subprocess.Co
     if not isinstance(payload, dict):
         raise AssertionError(f"review stdout JSON is not an object: {payload!r}")
     return completed, payload
-
-
-def _run_export_svg_cli(config_path: Path, output_path: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "vibeflow",
-            "export-svg",
-            "--workspace",
-            str(WORKSPACE_PATH),
-            "--config",
-            str(config_path),
-            "--expand-nodesets",
-            "--output",
-            str(output_path),
-        ],
-        cwd=WORK_ROOT,
-        env=_sandbox_cli_environment(),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
 
 
 def _run_validate_cli(config_path: Path) -> subprocess.CompletedProcess[str]:
@@ -972,10 +706,6 @@ def _sandbox_cli_environment() -> dict[str, str]:
         python_paths.append(environment["PYTHONPATH"])
     environment["PYTHONPATH"] = os.pathsep.join(python_paths)
     return environment
-
-
-def _xml_local_name(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1]
 
 
 def _node_declaration(descriptor, contract, *, schema=None, defaults=None):
@@ -1214,8 +944,6 @@ def _run_global_state_protected_async_compile_case() -> CaseResult:
             rejected.append(mode)
         else:raise AssertionError("legacy task entry was accepted")
     return CaseResult("global-state:explicit-task-migration","PASS",payload={"rejected":rejected})
-
-
 
 
 def _global_state_runtime_graph(
@@ -1481,18 +1209,11 @@ def _run_python_inline_thread_case() -> CaseResult:
     return CaseResult("execution:python-single-call-inline","PASS")
 
 
-
-
-
-
-
-
 def _run_valid_case(case: dict[str, Any]) -> CaseResult:
     from vibeflow.targets.python.quality.workflow import validate_graph_health
     from vibeflow.targets.python.runtime.options import RuntimeOptions
     from vibeflow.targets.python.runtime.planning import build_execution_plan
     from vibeflow.tooling.application.python.runner import run_checked
-    from vibeflow.tooling.application.python.presentation.ascii_flowchart import export_ascii_flowchart
     from vibeflow.tooling.application.python.presentation.architecture_document import (
         build_architecture_document,
     )
@@ -1502,13 +1223,8 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
         prepare_python_presentation,
     )
     from vibeflow.targets.python.project.check_session import python_check_scope
-    from vibeflow.tooling.presentation.mermaid import (
-        is_mermaid_svg_renderer_available,
-        render_mermaid_svg,
-    )
     from vibeflow.tooling.project.config_loader import load_config_document
     from vibeflow.tooling.project.config_schema import collect_config_schema_findings
-
 
 
     name = str(case["name"])
@@ -1560,19 +1276,9 @@ def _run_valid_case(case: dict[str, Any]) -> CaseResult:
             _assert_global_state_architecture(architecture)
         collapsed = export_mermaid(graph, health_report=health, resources=resources, prepared=presentation)
         expanded = export_mermaid(graph, expand_nodesets=True, health_report=health, resources=resources, prepared=presentation)
-        ascii_collapsed = export_ascii_flowchart(graph, health_report=health, prepared=presentation)
-        ascii_expanded = export_ascii_flowchart(graph, expand_nodesets=True, health_report=health, prepared=presentation)
     _assert_mermaid_contains(case, name, collapsed, expanded)
-    _assert_ascii_contains(name, ascii_collapsed, ascii_expanded)
-    (ASCII_DIR / f"{name}.txt").write_text(ascii_collapsed, encoding="utf-8")
-    (ASCII_DIR / f"{name}.expanded.txt").write_text(ascii_expanded, encoding="utf-8")
     (MERMAID_DIR / f"{name}.mmd").write_text(collapsed, encoding="utf-8")
     (MERMAID_DIR / f"{name}.expanded.mmd").write_text(expanded, encoding="utf-8")
-    if is_mermaid_svg_renderer_available():
-        collapsed_svg = SVG_DIR / f"{name}.svg"
-        render_mermaid_svg(collapsed, collapsed_svg)
-        render_mermaid_svg(expanded, SVG_DIR / f"{name}.expanded.svg", max_text_size=500_000, max_edges=5_000)
-        _assert_svg_cloud_nodes(case, collapsed_svg)
     initial = case["initial_factory"]() if "initial_factory" in case else case.get("initial", {})
     hook_marker = REPORT_DIR / "plugin_hooks.jsonl"
     hook_count_before = len(hook_marker.read_text(encoding="utf-8").splitlines()) if hook_marker.exists() else 0
@@ -1721,44 +1427,6 @@ def _assert_compiled_block_sources(case: dict[str, Any], plan, source_paths: lis
 
 def _runtime_trace_lines(run_dir: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in (run_dir / "runtime_trace.jsonl").read_text(encoding="utf-8").splitlines()]
-
-
-def _assert_svg_cloud_nodes(case: dict[str, Any], path: Path) -> None:
-    expected = tuple(str(item) for item in case.get("expected_svg_cloud_nodes", ()))
-    if not expected:
-        return
-    document = ET.parse(path)
-    groups = [
-        element
-        for element in document.getroot().iter()
-        if _xml_local_name(element.tag) == "g"
-    ]
-    for node_id in expected:
-        matches = [
-            group
-            for group in groups
-            if node_id in group.attrib.get("id", "")
-        ]
-        if not matches:
-            raise AssertionError(
-                f"SVG {path.name} has no geometry group for {node_id!r}"
-            )
-        cloud = next(
-            (
-                group
-                for group in matches
-                if any(_xml_local_name(child.tag) == "path" for child in group)
-            ),
-            None,
-        )
-        if cloud is None:
-            raise AssertionError(
-                f"SVG {path.name} node {node_id!r} is missing cloud path geometry"
-            )
-        if any(_xml_local_name(child.tag) == "rect" for child in cloud):
-            raise AssertionError(
-                f"SVG {path.name} node {node_id!r} regressed to rect geometry"
-            )
 
 
 def _assert_global_state_architecture(architecture: dict[str, Any]) -> None:
@@ -1980,19 +1648,7 @@ def _assert_run_mermaid(case: dict[str, Any], run_dir: Path) -> None:
     if missing or present:raise AssertionError(f"architecture facts: missing={missing}, forbidden={present}")
 
 
-def _assert_ascii_contains(name: str, collapsed: str, expanded: str) -> None:
-    if "TOPOLOGY FLOWCHART" not in collapsed:
-        raise AssertionError("collapsed ASCII missing header")
-    if "Flow edges:" not in collapsed:
-        raise AssertionError("collapsed ASCII missing flow edges")
-    if "nodeset" in name and "nodeset " not in expanded:
-        raise AssertionError("expanded nodeset ASCII missing nodeset section")
-
-
 def _assert_artifacts(run_dir: Path) -> None:
-    from vibeflow.tooling.presentation.mermaid import (
-        is_mermaid_svg_renderer_available,
-    )
 
     required = (
         "health_report.json",

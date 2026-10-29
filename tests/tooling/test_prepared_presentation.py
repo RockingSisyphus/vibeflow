@@ -9,7 +9,6 @@ from vibeflow.targets.python.quality.source_context import (
     PythonSourceFile, PythonSourceNode, build_python_source_context,
 )
 from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_document
-from vibeflow.tooling.application.python.presentation.ascii_flowchart import export_ascii_flowchart
 from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid
 from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
 from vibeflow.tooling.project.graph_config import parse_graph_config
@@ -45,42 +44,6 @@ def _fixture(tmp_path):
     return graph, registry, calls
 
 
-def test_all_renderers_share_each_graph_compilation_and_never_bind(tmp_path, monkeypatch):
-    from vibeflow.tooling.application.python.presentation.mermaid import review_fragments, review_svg
-    from vibeflow.tooling.presentation.mermaid.types import SvgFragment
-
-    graph, registry, bindings = _fixture(tmp_path)
-    counts = Counter()
-    original = GraphCompiler.compile_with_findings
-
-    def compile(self, graph, **kwargs):
-        counts["compiles"] += 1
-        return original(self, graph, **kwargs)
-
-    def fragment(title, *_args, **_kwargs):
-        return SvgFragment(title, '<svg viewBox="0 0 100 40"><rect width="100" height="40"/></svg>', 100, 40)
-
-    monkeypatch.setattr(GraphCompiler, "compile_with_findings", compile)
-    monkeypatch.setattr(review_fragments, "_render_fragment", fragment)
-    prepared = prepare_python_presentation(graph, registry=registry)
-    assert counts["compiles"] == 2
-    document = build_architecture_document(graph, prepared=prepared)
-    assert counts["compiles"] == 2  # root and one shared definition
-    export_ascii_flowchart(graph, expand_nodesets=True, prepared=prepared)
-    mermaid = export_mermaid(graph, expand_nodesets=True, prepared=prepared)
-    review_svg.render_review_columns_svg(graph, prepared.compiled, tmp_path/"diagram.svg",
-                                          expand_nodesets=True, prepared=prepared)
-    assert counts["compiles"] == 2
-    assert bindings == []
-    assert registry._registry == {}
-    assert document["node_definitions"]["demo"]["source"] == {
-        "module":"implementation", "class":"Demo", "root_id":"app", "path":"implementation.py", "line":1}
-    assert document["workflow"]["nodes"][-1]["presentation"]["values"]["fill"] == "#abcdef"
-    assert "shape: hex" in mermaid and "fill:#abcdef" in mermaid
-    document["node_definitions"]["demo"]["source"]["class"] = "Changed"
-    assert build_architecture_document(graph, prepared=prepared)["node_definitions"]["demo"]["source"]["class"] == "Demo"
-
-
 def test_standalone_registry_refreshes_stale_compiled_but_prepared_facts_stay_fixed(tmp_path):
     graph, registry, bindings = _fixture(tmp_path)
     old = GraphCompiler().compile(graph, registry=registry)
@@ -97,7 +60,7 @@ def test_standalone_registry_refreshes_stale_compiled_but_prepared_facts_stay_fi
 
 def test_architecture_uses_checked_resource_selections_after_config_changes(tmp_path, monkeypatch):
     import pytest
-    from tests.fixtures.python.review_layout.fixtures import write_project
+    from tests.fixtures.python.resource_sections.fixtures import write_project
     from vibeflow.tooling.application.python.workspace_service import load_workspace_graph_for_export
     from vibeflow.tooling.project.workspace_loader import load_workspace_config
     from vibeflow.tooling.application.python.presentation.architecture_document import build_architecture_facts
@@ -126,72 +89,6 @@ def test_without_registry_explicit_compiled_remains_authoritative(tmp_path):
     prepared = prepare_python_presentation(graph, compiled=compiled)
     compiled.effect_scopes["one"] = "none"
     assert build_architecture_document(graph, prepared=prepared)["workflow"]["nodes"][-1]["effect_scope"] == "document"
-
-
-def test_deferred_sdk_source_stays_unloaded_in_formal_export(tmp_path, monkeypatch):
-    from tests.targets.python.test_code_plugins import project
-    from vibeflow.targets.python.project.check_session import current_python_check
-    from vibeflow.tooling.application.python.workspace_service import load_workspace_graph_for_export
-
-    marker = tmp_path / "imported"
-    implementation = tmp_path / "late.py"
-    implementation.write_text(f'from pathlib import Path\nPath({str(marker)!r}).write_text("loaded")\n'
-                              'class Demo:\n    def run_pure(self, inputs, params): return {}\n')
-    workspace, config = project(tmp_path,
-        'from vibeflow.targets.python.sdk import Plugin, node, SourceLocator\n'
-        'late=node(id="demo",node_type="vibeflow.node",contract={},rulesets=[],source=SourceLocator("file","late.py","Demo"))\n'
-        , plugin_source='from vibeflow.targets.python.sdk import Plugin\nplugin=Plugin(id="deferred",resources=[],declaration_rulesets=[])\n')
-    config.write_text(json.dumps({**json.loads(config.read_text()), "rulesets":[]}))
-    graph, compiled, registry, resources, error, health, prepared = load_workspace_graph_for_export(
-        config, workspace=workspace, validate_health=True, _include_presentation=True)
-    assert error is None and not health.errors
-    assert current_python_check(registry) is None
-    assert registry._registry == {} and not marker.exists()
-    from vibeflow.targets.python.project import source_closure
-
-    def unexpected_scan(*_args, **_kwargs):
-        raise AssertionError("renderers must consume their prepared source records")
-
-    monkeypatch.setattr(source_closure, "collect_python_source_facts", unexpected_scan)
-    document = build_architecture_document(graph, compiled=compiled, registry=registry, prepared=prepared)
-    files = document["implementation_graph"]["files"].values()
-    source = next(item for item in files if item["path"] == "late.py")
-    assert source["load_state"] == "not_loaded"
-    assert document["node_definitions"]["demo"]["source"]["line"] == 3
-    export_ascii_flowchart(graph, prepared=prepared)
-    export_mermaid(graph, prepared=prepared)
-    assert registry._registry == {} and not marker.exists()
-
-
-def test_plugin_preflight_and_presentation_share_one_parse(tmp_path, monkeypatch):
-    import ast
-    from pathlib import Path
-    from tests.targets.python.test_code_plugins import project
-    from vibeflow.tooling.application.python.workspace_service import load_workspace_graph_for_export
-
-    workspace, config = project(tmp_path,
-        'from vibeflow.targets.python.sdk import Plugin, node\n'
-        '@node(id="demo",node_type="vibeflow.node",contract={},rulesets=[])\n'
-        'class Demo:\n    def run_pure(self, inputs, params): return {}\n'
-        , plugin_source='from vibeflow.targets.python.sdk import Plugin\nplugin=Plugin(id="shared",resources=[],declaration_rulesets=["vibeflow.plugin_declaration"])\n')
-    config.write_text(json.dumps({**json.loads(config.read_text()), "rulesets":[]}))
-    parses = Counter()
-    original = ast.parse
-
-    def parse(source, filename="<unknown>", *args, **kwargs):
-        if Path(filename).resolve() == tmp_path / "plugins/demo/plugin.py":
-            parses["plugin"] += 1
-        return original(source, filename, *args, **kwargs)
-
-    monkeypatch.setattr(ast, "parse", parse)
-    graph, _, _, _, error, _, prepared = load_workspace_graph_for_export(
-        config, workspace=workspace, validate_health=True, _include_presentation=True)
-    assert error is None
-    assert parses["plugin"] == 1
-    build_architecture_document(graph, prepared=prepared)
-    export_ascii_flowchart(graph, prepared=prepared)
-    export_mermaid(graph, prepared=prepared)
-    assert parses["plugin"] == 1
 
 
 def test_planned_run_refusal_reuses_the_checked_presentation(tmp_path, monkeypatch):

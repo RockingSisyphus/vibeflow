@@ -102,8 +102,8 @@ def test_obsolete_or_missing_project_document_does_not_block_snapshot_publicatio
 @pytest.mark.parametrize("expected", [False,True])
 def test_offline_browser_selects_entries_and_navigates_to_workflow(tmp_path, expected):
     import pytest
-    from vibeflow.tooling.presentation.mermaid import _find_mmdc, is_mermaid_svg_renderer_available
-    if not is_mermaid_svg_renderer_available():
+    from tests.fixtures.support.browser_runtime import browser_runtime_manifest, browser_runtime_available
+    if not browser_runtime_available():
         pytest.skip("browser dependencies are supplied by the full gate")
     record = preview_project(tmp_path, expected=expected)
     record.metadata.update(category="run", entry="cli")
@@ -111,17 +111,17 @@ def test_offline_browser_selects_entries_and_navigates_to_workflow(tmp_path, exp
     from vibeflow.tooling.presentation.preview import reindex
     reindex(tmp_path)
     browser = Path(__file__).resolve().parents[1] / "fixtures/preview/workflows.cjs"
-    result = subprocess.run(["node", str(browser), str(_find_mmdc().resolve()), str(tmp_path / "vibeflow-preview.html"), str(expected)],
+    result = subprocess.run(["node", str(browser), str(browser_runtime_manifest().resolve()), str(tmp_path / "vibeflow-preview.html"), str(expected)],
         text=True, capture_output=True, timeout=60)
     assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_offline_project_directory_and_workflow_operation_styles(tmp_path):
     import pytest
-    from vibeflow.tooling.presentation.mermaid import _find_mmdc, is_mermaid_svg_renderer_available
+    from tests.fixtures.support.browser_runtime import browser_runtime_manifest, browser_runtime_available
     from vibeflow.tooling.presentation.preview.exporter import publish_preview, publish_project
     from vibeflow.tooling.presentation.preview.catalog import new_record
-    if not is_mermaid_svg_renderer_available():
+    if not browser_runtime_available():
         pytest.skip("browser dependencies are supplied by the preview test environment")
     record = preview_project(tmp_path, configs=True)
     payload = json.loads((record.directory / "snapshot.js").read_text()[len("VibeFlowPreview.snapshot("):-3])
@@ -157,7 +157,7 @@ def test_offline_project_directory_and_workflow_operation_styles(tmp_path):
         operations=(op,"wait") if op in {"call","send","receive","kill"} else (op,)),))).to_dict()
         for op in ("call","wait","send","receive","kill")}
     browser = Path(__file__).resolve().parents[1] / "fixtures/preview/project-navigation.cjs"
-    result = subprocess.run(["node", str(browser), str(_find_mmdc().resolve()), str(tmp_path / "vibeflow-preview.html"), record.metadata["id"], worker.metadata["id"],json.dumps(styles)],
+    result = subprocess.run(["node", str(browser), str(browser_runtime_manifest().resolve()), str(tmp_path / "vibeflow-preview.html"), record.metadata["id"], worker.metadata["id"],json.dumps(styles)],
         text=True, capture_output=True, timeout=60)
     assert result.returncode == 0, result.stdout + result.stderr
 
@@ -260,10 +260,10 @@ assert.equal(body.facts.nodes.length,9);assert.equal(body.facts.edges.length,7);
 
 
 def test_three_workflows_keep_independent_reading_history(tmp_path):
-    from vibeflow.tooling.presentation.mermaid import _find_mmdc, is_mermaid_svg_renderer_available
+    from tests.fixtures.support.browser_runtime import browser_runtime_manifest, browser_runtime_available
     from tests.fixtures.support.workflow_cooperation import prepare
     from vibeflow.tooling.application.python import PythonBuildRequest, build_python_aot
-    if not is_mermaid_svg_renderer_available():
+    if not browser_runtime_available():
         pytest.skip("browser dependencies are supplied by the full gate")
     fixture = Path(__file__).resolve().parents[2] / "sandbox/python/workflow_cooperation_math"
     output = prepare(fixture, tmp_path, "python")
@@ -277,7 +277,7 @@ def test_three_workflows_keep_independent_reading_history(tmp_path):
     ids = {Path(record["workflow"]["path"]).stem: record["id"] for record in records}
     ids["old_b"] = next(record["id"] for record in records if record["workflow"]["path"] == "configs/b.jsonc")
     browser = Path(__file__).resolve().parents[1] / "fixtures/preview/workflow-reading.cjs"
-    result = subprocess.run(["node", str(browser), str(_find_mmdc().resolve()),
+    result = subprocess.run(["node", str(browser), str(browser_runtime_manifest().resolve()),
                              str(tmp_path / "vibeflow-preview.html"), json.dumps(ids)],
                             text=True, capture_output=True, timeout=60)
     assert result.returncode == 0, result.stdout + result.stderr

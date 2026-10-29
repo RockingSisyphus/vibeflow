@@ -27,7 +27,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
           cache-dependency-path: |
-            tools/mermaid-renderer/package-lock.json
+            tests/browser-runtime/package-lock.json
             sandbox/javascript/minimal/project/package-lock.json
             sandbox/javascript/integration/project/package-lock.json
       - name: Install test environment

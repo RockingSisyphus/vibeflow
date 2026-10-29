@@ -20,10 +20,8 @@ def _spec(target, form, variant="normal", branch="left"):
     if normal:
         metrics.update(numeric_result=10 if form == "branch" and branch == "right" else 7,
                        architecture_tags=["model_block"], architecture_fill="#cceeff",
-                       mermaid_light_blue=True, svg_valid=True, svg_light_blue=True,
-                       svg_model_count=2 if form == "branch" else 1,
-                       svg_model_fills=["#cceeff"] * (2 if form == "branch" else 1),
-                       diagram_exit_codes=[0, 0, 0])
+                       mermaid_light_blue=True,
+                       diagram_exit_codes=[0, 0])
         if target == "python":
             metrics["runtime_model_count"] = 1
     else:

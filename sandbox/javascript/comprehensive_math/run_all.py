@@ -131,7 +131,7 @@ def main():
         if not args.skip_browser and not args.puppeteer_root:
             renderer.mkdir()
             for name in ("package.json", "package-lock.json"):
-                shutil.copy2(REPOSITORY / "tools/mermaid-renderer" / name, renderer / name)
+                shutil.copy2(REPOSITORY / "tests/browser-runtime" / name, renderer / name)
             subprocess.run(["npm", "ci"], cwd=renderer, check=True)
         started = perf_counter()
         report = run(work, toolchain=args.toolchain_root, renderer=renderer, skip_browser=args.skip_browser)

@@ -19,12 +19,12 @@ def test_expanding_repeated_nodesets_preserves_entrance_and_nested_branch_order(
     from functools import partial
     from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
     from threading import Thread
-    from vibeflow.tooling.presentation.mermaid import _find_mmdc, is_mermaid_svg_renderer_available
+    from tests.fixtures.support.browser_runtime import browser_runtime_manifest, browser_runtime_available
     from vibeflow.tooling.presentation.preview.exporter import publish_preview
 
-    if not is_mermaid_svg_renderer_available():
+    if not browser_runtime_available():
         pytest.skip("locked browser toolchain supplied by the full gate")
-    renderer = _find_mmdc().resolve()
+    renderer = browser_runtime_manifest().resolve()
     install_page(tmp_path)
     def call(identifier, target=None):
         return {"id":identifier, "definition_id":"fixture.node", "flow_kind":"process",
@@ -267,38 +267,6 @@ def test_source_run_is_not_blocked_by_preview_status_write_failure(tmp_path, mon
     assert "preview device unavailable" in (run_dir/"preview.error.txt").read_text()
 
 
-def test_data_snapshot_has_no_render_dependency_and_separates_installer(tmp_path, monkeypatch):
-    from vibeflow.tooling.presentation.preview.exporter import publish_preview
-    from vibeflow.tooling.presentation import mermaid
-    monkeypatch.setattr(mermaid,"render_mermaid_svg",lambda *a,**k:pytest.fail("data export invoked Mermaid"))
-    record=publish_preview(root=tmp_path,workflow={"id":"r:main"},category="review",status="passed",
-        architecture={"workflow":{"nodes":[],"edges":[]}})
-    payload=json.loads((record.directory/"snapshot.js").read_text()[len("VibeFlowPreview.snapshot("):-3])
-    assert payload["version"]==4 and "bodies" not in payload
-    assert payload["artifacts"]=={} and not (tmp_path/"vibeflow-preview.html").exists()
-    assert not list(record.directory.glob("*.svg"))
-    install_page(tmp_path)
-    config=tmp_path/"vibeflow-preview.config.js";config.write_text('window.VibeFlowViewerConfig={dataRoot:"other/"};')
-    install_page(tmp_path)
-    assert 'dataRoot:"other/"' in config.read_text()
-    legacy=record.directory.parent/"legacy";legacy.mkdir();(legacy/"record.json").write_text('{"id":"legacy","workflow":{}}')
-    result=reindex(tmp_path)
-    assert result["obsolete"]==1 and result["records"]==1
-
-
-def test_svg_attachment_is_published_to_operation_metadata(tmp_path):
-    from vibeflow.tooling.presentation.preview.exporter import publish_preview, attach_svg
-    record=publish_preview(root=tmp_path,workflow={"id":"r:main"},category="review",status="reviewing",
-        architecture={"workflow":{"nodes":[],"edges":[]}})
-    source=tmp_path/"explicit.svg";source.write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
-    attach_svg(record,source)
-    metadata=json.loads((record.directory/"record.json").read_text())
-    payload=json.loads((record.directory/"snapshot.js").read_text()[len("VibeFlowPreview.snapshot("):-3])
-    assert metadata["artifacts"] == payload["artifacts"] == {"svg":"review.svg"}
-    assert (record.directory/"review.svg").read_text() == source.read_text()
-    assert metadata["status"] == "reviewing"
-
-
 def _presentations(root):
     from vibeflow.core.descriptors import DescriptorCatalogs, NodeDescriptor, NodeContractDescriptor
     from vibeflow.core.style import NODE_SHAPES
@@ -347,48 +315,11 @@ def _presentations(root):
     return prepared,javascript,workspace,config
 
 
-def test_real_offline_shapes_nested_browser_and_history(tmp_path):
-    from vibeflow.core.style import NODE_SHAPES
-    from vibeflow.tooling.presentation.mermaid import is_mermaid_svg_renderer_available, _find_mmdc
-    if not is_mermaid_svg_renderer_available():
-        pytest.skip("locked Mermaid renderer required; supplied by the full gate")
-    from vibeflow.tooling.application.python.presentation.preview import python_preview
-    from vibeflow.tooling.application.javascript.presentation.preview import javascript_preview
-
-    prepared,javascript,workspace,config = _presentations(tmp_path)
-    first = python_preview(prepared,config=config,workspace=workspace,status="passed")
-    second = javascript_preview(javascript,status="passed")
-    assert first.metadata["workflow"]["target"] == "python"
-    assert second.metadata["workflow"]["target"] == "javascript"
-    # Read the actual producer protocol, not a second rendering implementation.
-    payload = json.loads((first.directory/"snapshot.js").read_text()[len("VibeFlowPreview.snapshot("):-3])
-    assert payload["version"] == 4 and "bodies" not in payload
-    assert payload["architecture"] == prepared.architecture()
-    assert not list(first.directory.glob("*.svg"))
-    from vibeflow.tooling.presentation.preview.exporter import attach_svg
-    svg=tmp_path/"reference.svg";svg.write_text('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"><rect width="600" height="300" fill="#ece7da"/><text x="20" y="80">Optional opaque SVG reference</text></svg>')
-    attach_svg(first,svg)
-    destination=tmp_path/"搬移 空格";destination.mkdir()
-    shutil.copy2(tmp_path/"vibeflow-preview.html",destination)
-    shutil.copy2(tmp_path/"vibeflow-preview.config.js",destination)
-    shutil.copytree(tmp_path/"vibeflow-preview",destination/"vibeflow-preview")
-    tool=tmp_path/"独立 工具"
-    shutil.copytree(Path(__file__).resolve().parents[2]/"tools/workflow-viewer",tool)
-    (tool/"preview.config.js").write_text('window.VibeFlowViewerConfig={dataRoot:"../搬移 空格/vibeflow-preview/"};')
-    browser = Path(__file__).resolve().parents[1]/"fixtures/preview/browser.cjs"
-    renderer = _find_mmdc().resolve()
-    result=subprocess.run(["node",str(browser),str(renderer),str(destination/"vibeflow-preview.html"),
-            first.metadata["id"],second.metadata["id"],str(tool/"index.html"),json.dumps(sorted(NODE_SHAPES))],capture_output=True,text=True,timeout=120)
-    assert result.returncode == 0, result.stdout+result.stderr
-    report=json.loads(result.stdout)
-    assert report["shapes"] == len(NODE_SHAPES) and report["network_requests"] == [] and not report["page_errors"]
-
-
 def test_real_project_resource_views(tmp_path):
-    from vibeflow.tooling.presentation.mermaid import is_mermaid_svg_renderer_available, _find_mmdc
-    if not is_mermaid_svg_renderer_available():
+    from tests.fixtures.support.browser_runtime import browser_runtime_available, browser_runtime_manifest
+    if not browser_runtime_available():
         pytest.skip("locked Mermaid renderer required; supplied by the full gate")
-    from tests.fixtures.python.review_layout.fixtures import write_project
+    from tests.fixtures.python.resource_sections.fixtures import write_project
     from vibeflow.tooling.project.workspace_loader import load_workspace_config
     from vibeflow.tooling.application.python.workspace_service import load_workspace_graph_for_export
     from vibeflow.tooling.application.python.presentation.preview import python_preview
@@ -400,7 +331,7 @@ def test_real_project_resource_views(tmp_path):
     assert loaded[4] is None
     record = python_preview(loaded[-1],config=config,workspace=workspace)
     browser = Path(__file__).resolve().parents[1]/"fixtures/preview/browser.cjs"
-    result = subprocess.run(["node",str(browser),str(_find_mmdc().resolve()),str(record.root/"vibeflow-preview.html"),"--resources"],
+    result = subprocess.run(["node",str(browser),str(browser_runtime_manifest().resolve()),str(record.root/"vibeflow-preview.html"),"--resources"],
                             capture_output=True,text=True,timeout=90)
     assert result.returncode == 0, result.stdout+result.stderr
     assert json.loads(result.stdout)["resources"] is True
@@ -414,8 +345,8 @@ def test_node_details_edge_roles_and_contracts_in_real_browser(tmp_path):
     from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
     from vibeflow.tooling.application.javascript.presentation.architecture import build_architecture_facts
     from vibeflow.tooling.presentation.preview.exporter import publish_preview
-    from vibeflow.tooling.presentation.mermaid import _find_mmdc, is_mermaid_svg_renderer_available
-    if not is_mermaid_svg_renderer_available(): pytest.skip("full gate supplies locked browser")
+    from tests.fixtures.support.browser_runtime import browser_runtime_manifest, browser_runtime_available
+    if not browser_runtime_available(): pytest.skip("full gate supplies locked browser")
     registry=NodeRegistry();catalogs=DescriptorCatalogs.empty()
     contracts={"emit":NodeContractDescriptor(provides=(DataProvider("payload","fixture.payload","计算结果"),),
         output_semantics={"payload":("结果携带本次计算的完整数值。",)},
@@ -448,68 +379,10 @@ def test_node_details_edge_roles_and_contracts_in_real_browser(tmp_path):
             category="review",status="passed",architecture=architecture))
     install_page(tmp_path)
     browser=Path(__file__).resolve().parents[1]/"fixtures/preview/details.cjs"
-    result=subprocess.run(["node",str(browser),str(_find_mmdc().resolve()),str(tmp_path/"vibeflow-preview.html"),
+    result=subprocess.run(["node",str(browser),str(browser_runtime_manifest().resolve()),str(tmp_path/"vibeflow-preview.html"),
                            *(r.metadata["id"] for r in records)],capture_output=True,text=True,timeout=120)
     assert result.returncode==0,result.stdout+result.stderr
     assert json.loads(result.stdout)["targets"]==["python","javascript"]
-
-
-def test_default_python_commands_and_explicit_svg_failure(tmp_path, monkeypatch, capsys):
-    import builtins
-    from tests.fixtures.python.review_layout.fixtures import write_project
-    from vibeflow.tooling.application.cli import main
-    from vibeflow.tooling.presentation import mermaid
-    project=tmp_path/"python";write_project(project)
-    def no_renderer(*args,**kwargs):
-        raise RuntimeError("Mermaid deliberately unavailable")
-    monkeypatch.setattr(mermaid,"_find_mmdc",no_renderer)
-    common=["--workspace",str(project.parent/"vibeflow_config.jsonc"),"--config",str(project/"workflow.jsonc")]
-    original_import=builtins.__import__
-    def no_graphics_import(name,globals=None,locals=None,fromlist=(),level=0):
-        if ".presentation.mermaid" in name or name=="vibeflow.tooling.presentation" and "mermaid" in fromlist:
-            pytest.fail("default command imported Mermaid: "+name)
-        return original_import(name,globals,locals,fromlist,level)
-    with monkeypatch.context() as scope:
-        scope.setattr(builtins,"__import__",no_graphics_import)
-        review_status=main(["review",*common]);review_output=capsys.readouterr().out
-        assert review_status==0,review_output
-        assert main(["build",*common,"--out-dir",str(tmp_path/"bundle")])==0;capsys.readouterr()
-        assert main(["run",*common,"--run-root",str(tmp_path/"runs"),"--run-id","actual"] )==0;capsys.readouterr()
-    records=[json.loads(f.read_text()) for f in (project.parent/"vibeflow-preview/snapshots").glob("*/record.json")]
-    assert {(r["category"],r["status"]) for r in records}=={("review","passed"),("build","succeeded"),("run","succeeded")}
-    assert all(r["version"]==4 for r in records)
-    assert not list((project.parent/"vibeflow-preview/snapshots").rglob("*.svg"))
-    assert main(["review",*common,"--with-svg"])==1;capsys.readouterr()
-    failed=[json.loads(f.read_text()) for f in (project.parent/"vibeflow-preview/snapshots").glob("*/record.json") if json.loads(f.read_text())["status"]=="failed"]
-    assert len(failed)==1
-    data=json.loads((project.parent/"vibeflow-preview/snapshots"/failed[0]["id"]/"snapshot.js").read_text()[len("VibeFlowPreview.snapshot("):-3])
-    assert data["architecture"]["workflow"]["nodes"] and not data["artifacts"]
-
-
-def test_default_javascript_commands_and_explicit_svg_failure(tmp_path, monkeypatch, capsys):
-    from tests.targets.javascript.test_code_plugins import project as javascript_project
-    from vibeflow.tooling.application.cli import main
-    from vibeflow.tooling.presentation import mermaid
-    project=tmp_path/"javascript"
-    javascript_project(project)
-    (project / "vibeflow_project.jsonc").write_text(json.dumps({"project_target":"javascript", "architecture":{"documents":[
-        {"workflow":"workflow.jsonc","document":"ARCHITECTURE.jsonc"}]}}))
-    monkeypatch.setattr(mermaid,"_find_mmdc",lambda:(_ for _ in ()).throw(RuntimeError("Mermaid deliberately unavailable")))
-    common=["--workspace",str(project.parent/"vibeflow_config.jsonc"),"--config",str(project/"workflow.jsonc")]
-    review_status=main(["review",*common]);review_output=capsys.readouterr().out
-    assert review_status==0,review_output
-    assert main(["build",*common,"--target","node","--profile","single-esm","--out-dir",str(tmp_path/"bundle")])==0;capsys.readouterr()
-    records=[json.loads(f.read_text()) for f in (project.parent/"vibeflow-preview/snapshots").glob("*/record.json")]
-    assert {(r["category"],r["status"]) for r in records}=={("review","passed"),("build","succeeded")}
-    for record in records:
-        script=(project.parent/"vibeflow-preview/snapshots"/record["id"]/"snapshot.js").read_text()
-        architecture=json.loads(script[len("VibeFlowPreview.snapshot("):-3])["architecture"]
-        assert {"rule_selections","rule_checks","implementation_graph"} <= architecture.keys()
-        assert architecture["implementation_graph"] and architecture["workflow"]["nodes"]
-    assert main(["review",*common,"--with-svg"])==1;capsys.readouterr()
-    records=[json.loads(f.read_text()) for f in (project.parent/"vibeflow-preview/snapshots").glob("*/record.json")]
-    failed=next(r for r in records if r["status"]=="failed")
-    assert (project.parent/"vibeflow-preview/snapshots"/failed["id"]/"snapshot.js").is_file()
 
 
 def test_cancelled_run_uses_observer_terminal_result(tmp_path):
@@ -531,12 +404,12 @@ def test_cancelled_run_uses_observer_terminal_result(tmp_path):
 
 def test_real_resource_cards_express_all_declared_shapes(tmp_path):
     from vibeflow.core.style import NODE_SHAPES
-    from vibeflow.tooling.presentation.mermaid import is_mermaid_svg_renderer_available, _find_mmdc
+    from tests.fixtures.support.browser_runtime import browser_runtime_available, browser_runtime_manifest
     from tests.fixtures.support.projects import register_root
     from vibeflow.tooling.project.workspace_loader import load_project_workspace
     from vibeflow.tooling.application.python.workspace_service import load_workspace_graph_for_export
     from vibeflow.tooling.application.python.presentation.preview import python_preview
-    if not is_mermaid_svg_renderer_available():
+    if not browser_runtime_available():
         pytest.skip("full gate supplies the locked browser")
     root = tmp_path / "project"
     register_root(root)
@@ -570,7 +443,7 @@ def test_real_resource_cards_express_all_declared_shapes(tmp_path):
     for library in libraries:
         assert snapshot["architecture"]["implementation_graph"]["resources"]["base_lib:" + library]["owner"]["kind"] == "root"
     browser = Path(__file__).resolve().parents[1] / "fixtures/preview/resource-shapes.cjs"
-    result = subprocess.run(["node",str(browser),str(_find_mmdc().resolve()),str(record.root/"vibeflow-preview.html"),json.dumps(sorted(NODE_SHAPES))],
+    result = subprocess.run(["node",str(browser),str(browser_runtime_manifest().resolve()),str(record.root/"vibeflow-preview.html"),json.dumps(sorted(NODE_SHAPES))],
         capture_output=True,text=True,timeout=90)
     assert result.returncode == 0, result.stdout + result.stderr
     assert json.loads(result.stdout)["cards"] == len(NODE_SHAPES) * 2

@@ -158,17 +158,16 @@ def _platform_cases(s, work: Path, tools: Path | None) -> list[dict[str, Any]]:
             s.write_json(descriptor, data)
         for command in ("validate", "quality-check", "review"):
             before = len(project.events())
-            options = ("--output", str(project.root / "review.svg")) if command=="review" else ("--json",)
+            options = () if command=="review" else ("--json",)
             actual, _ = s.command(project, command, *options)
             actual["metrics"]["new_consumer_executions"] = len(project.events())-before
             actual["metrics"]["consumer_executed"] = actual["metrics"]["new_consumer_executions"] > 0
             if command=="review":
-                svg = project.root / "review.svg"
-                actual["metrics"]["published_svg"] = svg.is_file() and "<svg" in svg.read_text()
+                actual["metrics"]["published_preview"] = (project.root / "vibeflow-preview.html").is_file()
             expected = ({"should_accept":False,"codes":["DESCRIPTOR.INVALID"],"metrics":{"exit_code":1,"consumer_executed":False},"message_contains":"duplicate execution families"} if split else {"should_accept":True,"metrics":{"exit_code":0,"consumer_executed":True}})
             expected["metrics"]["consumer_executed"] = not split
             if command=="review":
-                expected["metrics"]["published_svg"] = not split
+                expected["metrics"]["published_preview"] = not split
             title = "重复 JS 执行族在正式 "+command+" 加载前被拒绝" if split else "共享 Rule 实现通过正式 "+command
             rows.append(_row("platform."+label+"."+command, title,
                 "javascript.rule.platform_selection", expected, actual,

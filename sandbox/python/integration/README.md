@@ -12,14 +12,10 @@ PYTHONPATH=src python sandbox/python/integration/run_all.py
 
 脚本会把项目复制到临时目录，并在同一临时目录执行 `npm ci` 安装 Mermaid CLI/Puppeteer，再批量运行合法配置、非法 Node 源码、非法独立声明、非法 `base_lib`、非法配置和 Rule 处理器错误。可以用 `VIBEFLOW_MERMAID_RENDERER_ROOT` 复用已经按锁文件安装的渲染器。默认不在源码树留下依赖、报告或运行产物；需要检查产物时使用 `--keep-artifacts`，结果会写入本目录的 `.artifacts/`。它还会使用真实 CLI 验证本工作区新增的 `review` 审核流程：
 
-- 对已登记的嵌套 nodeset workflow，先写入陈旧架构，再确认 `review` 自动刷新 canonical `ARCHITECTURE.jsonc` 并发布 expanded `review-columns` SVG。
-- 对未登记的 workflow，确认返回 `REVIEW.ARCHITECTURE.UNREGISTERED`，不修改已登记架构，也不发布 SVG。
 - 确认审核结果不发布中间 `.mmd`、provenance sidecar 或嵌入式 provenance metadata。
-- 对专用可视化 fixture 先执行真实 `validate` 并要求严格 `PASS`，再执行 `export-svg --expand-nodesets`：确认 external node 同时保留颜色 class、`[EXTERNAL]` 标题和 `7px` non-scaling 粗边框；同一父图中的四个 loop 调用全部连接到同一个 `end`，共享的 nodeset body 只生成一个带调用摘要的详情 fragment。
 - 独立 comprehensive_math 通过注入的 `vibeflow.port` 验证 Python `receive → 两层 Nodeset/数学 Node/BaseLib/Loop → send`，同时检查计算结果、发送值、准确 warning 详情以及修正源码后的 warning 消失。
 - 执行模型专项验证单个就绪节点可在调用线程执行；独立 graph_concurrency 沙箱验证普通分支的 all 汇合、显式容量 12、容量 4 与默认 8 的排队补位，以及回收兼分发和断路的 CLI 拒绝，覆盖 plan/block/compiled 与 AOT。
 - 旧 async/result_key/detached 字段必须报迁移错误；正向示例只使用普通节点和显式下游边。
-- 在全部 case 结束后集中审计所有发布 SVG：`reports/svg` 必须逐一对应 health 无 error 的合法 case，成功运行目录必须包含 `PASS/CONCERNS` 且 errors 为空的 `health_report.json`，review SVG 必须带有各自的成功校验结果。只有 `expected_fail_*` / `expected_runtime_fail_*` 明确错误路径下的诊断 SVG 可以豁免。
 - 独立 [cli_addition](../cli_addition/README.md) 使用 YAML、pathlib、标准流三个适配配置执行 `2+3+4=9`。精确检查 stdout/stderr、文件字节、退出码、效果范围、执行次数、日志隔离和架构导出无业务副作用。
 - 独立 [object_addition](../object_addition/README.md) 用 Box 和 Counter 做连续加法，检查原对象身份、非 JSON 报告、Nodeset 导出、绑定参数、固定与条件循环，以及 plan/block/compiled 执行。
 - 独立 [plugin_addition](../plugin_addition/README.md) 检查多文件 Node/BaseLib/Plugin、参数覆盖、编译/运行钩子，并在临时 helper 修改、恢复后确认 `5→6→5`。
@@ -38,7 +34,6 @@ python tools/run_tests.py -- tests/targets/python/test_quality_workspace_sandbox
 - `.artifacts/reports/summary.json`
 - `.artifacts/reports/summary.md`
 - `.artifacts/reports/mermaid/*.mmd`
-- `.artifacts/reports/review/*.svg`
 - `.artifacts/{cli_addition,object_addition,plugin_addition,piecewise_math,workflow_math}/report.json`
 - `.artifacts/runs/<case_name>/...`
 
@@ -76,3 +71,5 @@ Node 声明显式选择 `vibeflow.process`、`vibeflow.io`、`vibeflow.document`
 - 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
 
 完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。
+
+正式 review 验证已登记架构刷新、HTML 发布和未登记 workflow 的明确拒绝；运行场景核对健康报告及结构化预览。

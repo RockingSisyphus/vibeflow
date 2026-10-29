@@ -73,20 +73,13 @@ window.VibeFlowViewerConfig = {
 
 相对路径以配置文件所在目录为基准，重新生成预览保留已有配置。查看器可单独部署，配置数据目录即可浏览快照。
 
-索引通过 `VibeFlowPreview.record(metadata)` 登记列表元数据，同一操作按较大 revision 更新；选中记录后加载 `snapshots/<ID>/snapshot.js` 的 `VibeFlowPreview.snapshot(data)`。本地经典脚本支持离线读取，快照保存流程、资源、视图、关联与可选附件引用。
+索引通过 `VibeFlowPreview.record(metadata)` 登记列表元数据，同一操作按较大 revision 更新；选中记录后加载 `snapshots/<ID>/snapshot.js` 的 `VibeFlowPreview.snapshot(data)`。本地经典脚本支持离线读取，快照保存流程、资源、视图、关联。
 
-## SVG 附件：仅在用户主动要求时生成
 
-默认使用 HTML 审核。除非用户主动要求 SVG，否则不生成 SVG，也不将其作为 AI 的内部检查材料。AI 仅在用户明确要求查看 SVG 时打开或渲染该图。
-
-用户要求 SVG 时，可选择：
+`review` 的 JSON 审查结果写到标准输出。如需保存报告，可使用 shell 重定向：
 
 ```bash
-python run.py review --config <root>/configs/main.jsonc --with-svg
-python run.py review --config <root>/configs/main.jsonc --output review.svg
-python run.py export-svg --config <root>/configs/main.jsonc --output review.svg --expand-nodesets
+python run.py review --config <root>/configs/main.jsonc > review-report.json
 ```
 
-前两条在 HTML 审核之外增加静态附件，第三条单独导出 SVG。需要布局源码时，可使用 `export-mermaid --mermaid-layout review-columns` 导出 Mermaid。SVG 对照支持平移缩放，资源目录依次展示所选 Plugin 与独立 BaseLib；主流程与嵌套父流程纵向显示，叶子 Nodeset 横向显示。
-
-NodesetType 的 `expand` 控制静态展开，缺省为 `true`；`false` 时在该调用停止向内展开，同一定义的各调用及 Loop body 共用此设置。完整内部定义和检查资料继续保留。HTML 的手动展开按具体调用独立操作。
+使用 `--preview-root` 指定离线预览目录。

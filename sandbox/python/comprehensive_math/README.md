@@ -10,7 +10,7 @@ python sandbox/python/comprehensive_math/run_all.py \
   --work-dir /path/outside/repository/python-comprehensive-math-new
 ```
 
-默认使用当前仓库 src，不需要 Mermaid/Puppeteer；自动清理临时目录。保留目录中 `report.json` 列出 13 次数值观察与 warning 数量，`checked/positive` 有 health、compiled 和 runtime_trace，预览目录有 Architecture 和 snapshot.js；`repaired-health.json` 是修正源码后的对照。
+默认使用当前仓库 src，不需要 Puppeteer；自动清理临时目录。保留目录中 `report.json` 列出 13 次数值观察与 warning 数量，`checked/positive` 有 health、compiled 和 runtime_trace，预览目录有 Architecture 和 snapshot.js；`repaired-health.json` 是修正源码后的对照。
 
 该 runner 也被 Python integration 调用，无需单独添加完整门禁步骤。
 

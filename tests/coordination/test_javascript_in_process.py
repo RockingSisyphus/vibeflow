@@ -10,12 +10,12 @@ import pytest
 from tests.coordination.test_hosts import node_module
 from tests.targets.javascript.aot_fixtures import plan_fixture
 from vibeflow.targets.javascript.frontend.emitter import emit_workflow_module
-from vibeflow.tooling.presentation.mermaid import _find_mmdc, is_mermaid_svg_renderer_available
+from tests.fixtures.support.browser_runtime import browser_runtime_manifest, browser_runtime_available
 
 
 @pytest.mark.parametrize('environment',['node','browser'])
 def test_bundled_in_process_sync_async_and_actual_cleanup(tmp_path,environment):
-    if environment == 'browser' and not is_mermaid_svg_renderer_available():
+    if environment == 'browser' and not browser_runtime_available():
         pytest.skip('Chromium dependencies are supplied by the full gate')
     resources = Path(__file__).resolve().parents[2]/'src/vibeflow/targets/javascript/resources'
     # This peer is an emitted async workflow, including native cancellation.
@@ -90,6 +90,6 @@ try {const page=await browser.newPage();let network=0;page.on('request',()=>netw
 await page.goto('about:blank');await page.addScriptTag({path:process.argv[3]});
 const result=await page.evaluate(()=>Probe.probe());if(network)throw Error('unexpected network requests: '+network);
 console.log(JSON.stringify(result));}finally{await browser.close();}})().catch(error=>{console.error(error);process.exitCode=1;});''')
-        result=subprocess.run(['node',str(driver),str(_find_mmdc().resolve()),str(tmp_path/'probe.js')],text=True,capture_output=True,timeout=25)
+        result=subprocess.run(['node',str(driver),str(browser_runtime_manifest().resolve()),str(tmp_path/'probe.js')],text=True,capture_output=True,timeout=25)
     assert result.returncode==0,result.stdout+result.stderr
     assert json.loads(result.stdout)=={'result':42,'cleaned':3}

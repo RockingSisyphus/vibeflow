@@ -161,7 +161,7 @@ def test_runtime_instances_are_independent_and_disposed(tmp_path,capsys):
 
 
 def test_native_browser_execution(tmp_path,capsys):
-    renderer=os.environ.get("VIBEFLOW_MERMAID_RENDERER_ROOT")
+    renderer=os.environ.get("VIBEFLOW_BROWSER_RUNTIME_ROOT")
     if not renderer:pytest.skip("full gate supplies locked Puppeteer")
     from sandbox.javascript.integration.sandbox_support import run_browser
     workspace,config=project(tmp_path);entry=build(tmp_path,workspace,config,capsys,target="browser")

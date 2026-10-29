@@ -110,7 +110,7 @@ def _compileall(scratch: Path) -> None:
     )
 
 
-def _pytest(scratch: Path, *, with_renderer: bool = False, workers: int = DEFAULT_WORKERS) -> None:
+def _pytest(scratch: Path, *, with_browser_runtime: bool = False, workers: int = DEFAULT_WORKERS) -> None:
     _run(
         (
             PYTHON,
@@ -121,8 +121,8 @@ def _pytest(scratch: Path, *, with_renderer: bool = False, workers: int = DEFAUL
             "--",
             *(ROOT / item for item in TEST_GROUPS if (ROOT / item).exists()),
         ),
-        overrides={"VIBEFLOW_MERMAID_RENDERER_ROOT": str(_puppeteer_root(scratch))}
-        if with_renderer else None,
+        overrides={"VIBEFLOW_BROWSER_RUNTIME_ROOT": str(_puppeteer_root(scratch))}
+        if with_browser_runtime else None,
     )
 
 
@@ -140,10 +140,10 @@ def _puppeteer_root(scratch: Path) -> Path:
         return root
     root.mkdir(parents=True, exist_ok=True)
     for name in ("package.json", "package-lock.json"):
-        shutil.copy2(ROOT / "tools/mermaid-renderer" / name, root / name)
+        shutil.copy2(ROOT / "tests/browser-runtime" / name, root / name)
     _run(("npm", "ci"), cwd=root)
     if not (root / "node_modules/puppeteer").is_dir():
-        raise VerificationError("Puppeteer was not installed by the renderer lockfile")
+        raise VerificationError("Puppeteer was not installed by the browser test lockfile")
     return root
 
 
@@ -201,23 +201,15 @@ def _javascript_review_performance(scratch: Path) -> None:
 
 def _review_performance_regressions(scratch: Path) -> None:
     _run((PYTHON, "tests/fixtures/python/review_performance/run_all.py",
-          "--work", scratch / "review-performance", "--report", scratch / "review-performance.json",
-          "--renderer", _puppeteer_root(scratch)))
-
-
-def _review_layout_regressions(scratch: Path) -> None:
-    _run((PYTHON, "tests/fixtures/python/review_layout/run_all.py",
-          "--work", scratch / "review-layout", "--report", scratch / "review-layout.json",
-          "--renderer", _puppeteer_root(scratch)))
+          "--work", scratch / "review-performance", "--report", scratch / "review-performance.json"))
 
 
 def _resource_sections_regressions(scratch: Path) -> None:
     _run((PYTHON, "tests/fixtures/python/resource_sections/run_all.py",
-          "--work", scratch / "python-resource-sections", "--report", scratch / "python-resource-sections.json",
-          "--renderer", _puppeteer_root(scratch)))
+          "--work", scratch / "python-resource-sections", "--report", scratch / "python-resource-sections.json"))
     _run((PYTHON, "tests/fixtures/javascript/resource_sections/run_all.py",
           "--work", scratch / "javascript-resource-sections", "--report", scratch / "javascript-resource-sections.json",
-          "--renderer", _puppeteer_root(scratch), "--toolchain", scratch / "pytest/javascript-toolchain"))
+          "--toolchain", scratch / "pytest/javascript-toolchain"))
 
 
 def _adaptation_regressions(scratch: Path, *, workers: int = DEFAULT_WORKERS) -> None:
@@ -710,7 +702,7 @@ def _steps(*, full: bool, workers: int = DEFAULT_WORKERS) -> tuple[Step, ...]:
     base = (
         Step("repository-quality", _repository_quality),
         Step("compileall", _compileall),
-        Step("pytest", lambda scratch: _pytest(scratch, with_renderer=full, workers=workers)),
+        Step("pytest", lambda scratch: _pytest(scratch, with_browser_runtime=full, workers=workers)),
     )
     if not full:
         return base
@@ -721,7 +713,6 @@ def _steps(*, full: bool, workers: int = DEFAULT_WORKERS) -> tuple[Step, ...]:
         Step("javascript-integration", _javascript_integration),
         Step("rule-regressions", lambda scratch: _rule_regressions(scratch, workers=workers)),
         Step("runtime-observation-browser", _runtime_observation_browser),
-        Step("review-layout-regressions", _review_layout_regressions),
         Step("resource-sections-regressions", _resource_sections_regressions),
         Step("review-performance-regressions", _review_performance_regressions),
         Step("javascript-review-performance", _javascript_review_performance),

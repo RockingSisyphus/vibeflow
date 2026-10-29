@@ -60,8 +60,6 @@ PROTECTED_FILES = (
     "kernel/LICENSE",
     KERNEL_ZIP_RELATIVE.as_posix(),
     "kernel/THIRD_PARTY_NOTICES.md",
-    "kernel/tools/mermaid-renderer/package.json",
-    "kernel/tools/mermaid-renderer/package-lock.json",
 )
 PROTECTED_DIRS = (
     "kernel/docs",
@@ -395,7 +393,6 @@ def _populate_distribution(output: Path, *, profile: DistributionProfile | None 
         output / "javascript_project",
     )
     _write_profile_assets(output, profile)
-    _copy_mermaid_renderer_config(output)
     _copy_license(output)
     _copy_third_party_notices(output)
     _copy_javascript_sdk(output)
@@ -782,16 +779,6 @@ def _copy_coordination_templates(output: Path) -> None:
     source += "export const capabilities=" + json.dumps(capabilities, ensure_ascii=False) + ";\n"
     source += "export const schemas=" + json.dumps({**WORKFLOW_SCHEMA_TYPES, **PORT_SCHEMA_TYPES}) + ";\n"
     (target / "workflow_nodes/interfaces.mjs").write_text(source, encoding="utf-8")
-
-
-def _copy_mermaid_renderer_config(output: Path) -> None:
-    source = ROOT / "tools" / "mermaid-renderer"
-    target = output / "kernel" / "tools" / "mermaid-renderer"
-    target.mkdir(parents=True, exist_ok=True)
-    for name in ("package.json", "package-lock.json"):
-        path = source / name
-        if path.exists():
-            (target / name).write_bytes(path.read_bytes())
 
 
 def _copy_third_party_notices(output: Path) -> None:

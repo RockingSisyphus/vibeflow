@@ -52,52 +52,6 @@ def build_parser() -> argparse.ArgumentParser:
     architecture.add_argument("--output", required=False)
     architecture.add_argument("--check", action="store_true", help="check that --output is canonical and current without writing it")
 
-    ascii_chart = sub.add_parser("export-ascii", help="export topology config to ASCII flowchart")
-    ascii_chart.add_argument("--config", required=True)
-    ascii_chart.add_argument("--workspace", required=False, help="workspace vibeflow_config.jsonc path")
-    ascii_chart.add_argument("--output", required=False)
-    ascii_chart.add_argument("--expand-nodesets", dest="expand_nodesets", action="store_true")
-    ascii_chart.add_argument("--collapse-nodeset_types", dest="expand_nodesets", action="store_false")
-    ascii_chart.add_argument("--hide-contract", action="store_true")
-    ascii_chart.add_argument("--hide-semantics", action="store_true")
-    ascii_chart.set_defaults(expand_nodesets=False)
-
-    svg = sub.add_parser("export-svg", help="render topology config Mermaid flowchart to SVG")
-    svg.add_argument("--config", required=True)
-    svg.add_argument("--workspace", required=False, help="workspace vibeflow_config.jsonc path")
-    svg.add_argument("--output", required=False)
-    svg.add_argument("--expand-nodesets", dest="expand_nodesets", action="store_true")
-    svg.add_argument("--collapse-nodeset_types", dest="expand_nodesets", action="store_false")
-    svg.add_argument("--hide-contract", action="store_true")
-    svg.add_argument("--hide-semantics", action="store_true")
-    svg.add_argument("--theme", default="default")
-    svg.add_argument("--background", default="transparent")
-    svg.add_argument(
-        "--mermaid-layout",
-        choices=("default", "review-columns"),
-        default="default",
-        help="Mermaid layout strategy for collapsed SVG rendering; expanded SVG always uses review-columns",
-    )
-    svg.add_argument(
-        "--mermaid-max-text-size",
-        type=int,
-        default=None,
-        help="override Mermaid maxTextSize for SVG rendering",
-    )
-    svg.add_argument(
-        "--mermaid-max-edges",
-        type=int,
-        default=None,
-        help="override Mermaid maxEdges for SVG rendering",
-    )
-    svg.add_argument(
-        "--review-fragment-max-width",
-        type=float,
-        default=None,
-        help="override review-columns SVG fragment display width cap",
-    )
-    svg.set_defaults(expand_nodesets=False)
-
     run = sub.add_parser("run", help="run topology config after mandatory health checks")
     run.add_argument("--config", required=True)
     run.add_argument("--workspace", required=False, help="workspace vibeflow_config.jsonc path")
@@ -148,9 +102,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "validate": _handle_validate,
         "inspect-node": _handle_inspect_node,
         "inspect-config": _handle_inspect_config,
-        "export-ascii": _handle_export_ascii,
         "export-architecture": _handle_export_architecture,
-        "export-svg": _handle_export_svg,
         "export-mermaid": _handle_export_mermaid,
         "review": _handle_review,
         "run": _handle_run,
@@ -222,16 +174,8 @@ def _handle_export_mermaid(args: argparse.Namespace) -> int:
     return _handle_export_graph(args, export_kind="mermaid")
 
 
-def _handle_export_ascii(args: argparse.Namespace) -> int:
-    return _handle_export_graph(args, export_kind="ascii")
-
-
 def _handle_export_architecture(args: argparse.Namespace) -> int:
     return _handle_export_graph(args, export_kind="architecture")
-
-
-def _handle_export_svg(args: argparse.Namespace) -> int:
-    return _handle_export_graph(args, export_kind="svg")
 
 
 def _handle_review(args: argparse.Namespace) -> int:
@@ -349,7 +293,6 @@ def _inspect_workspace_config_payload(config_path: Path, workspace_path: Path) -
         "effective_edges": [{"from": edge.source, "to": edge.target, "when": edge.when} for edge in compiled.effective_edges],
     }
     return payload, 0
-
 
 
 def _load_initial_input(path: Path) -> dict[str, object]:

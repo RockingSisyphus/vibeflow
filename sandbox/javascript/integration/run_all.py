@@ -11,7 +11,6 @@ import subprocess
 import sys
 import tempfile
 from typing import Any
-from xml.etree import ElementTree
 
 
 _SOURCE_SANDBOX_ROOT = Path(__file__).resolve().parent
@@ -268,7 +267,7 @@ def _review_case(puppeteer_root: Path) -> dict[str, Any]:
     shutil.copy2(_RUNTIME_ROOT / "vibeflow_config.jsonc", subject / "vibeflow_config.jsonc")
     environment = dict(os.environ)
     environment["PYTHONPATH"] = str(_REPOSITORY_ROOT / "src")
-    environment["VIBEFLOW_MERMAID_RENDERER_ROOT"] = str(puppeteer_root)
+    environment["VIBEFLOW_BROWSER_RUNTIME_ROOT"] = str(puppeteer_root)
     specs = (
         ("nodeset.jsonc", "NODESET_ARCHITECTURE.jsonc", {"sandbox.arithmetic_nodeset"}),
         (
@@ -284,7 +283,6 @@ def _review_case(puppeteer_root: Path) -> dict[str, Any]:
     )
     reviewed: dict[str, Any] = {}
     for config_name, architecture_name, expected_targets in specs:
-        output = _OUTPUT_ROOT / "reports" / f"{Path(config_name).stem}.expanded.svg"
         completed = subprocess.run(
             [
                 sys.executable,
@@ -295,8 +293,6 @@ def _review_case(puppeteer_root: Path) -> dict[str, Any]:
                 str(subject / "vibeflow_config.jsonc"),
                 "--config",
                 str(project / "configs" / config_name),
-                "--output",
-                str(output),
             ],
             cwd=_RUNTIME_ROOT,
             env=environment,
@@ -309,17 +305,8 @@ def _review_case(puppeteer_root: Path) -> dict[str, Any]:
         payload = json.loads(completed.stdout)
         if payload.get("status") != "PASS" or payload.get("published") is not True:
             raise AssertionError(payload)
-        root = ElementTree.parse(output).getroot()
-        coverage = {
-            element.attrib.get("data-review-target", "")
-            for element in root.iter()
-            if "review-inline-fragment" in element.attrib.get("class", "").split()
-        }
-        missing = expected_targets - coverage
-        if missing:
-            raise AssertionError(
-                f"review {config_name} is missing expanded targets: {sorted(missing)}"
-            )
+        if not Path(payload["preview"]).is_file():
+            raise AssertionError("review did not publish the offline HTML preview")
         architecture = project / "review_artifacts" / architecture_name
         architecture_text = architecture.read_text(encoding="utf-8")
         for target in expected_targets:
@@ -328,8 +315,8 @@ def _review_case(puppeteer_root: Path) -> dict[str, Any]:
                     f"Architecture {architecture_name} is missing {target}"
                 )
         reviewed[config_name] = {
-            "bytes": output.stat().st_size,
-            "coverage": sorted(coverage),
+            "bytes": Path(payload["preview"]).stat().st_size,
+            "targets": sorted(expected_targets),
         }
     return reviewed
 
@@ -677,7 +664,6 @@ def _workflow_cooperation_case(puppeteer_root, *, skip_browser):
     report = json.loads((work / "report.json").read_text())
     assert report["status"] == ("REDUCED" if skip_browser else "PASS"), report
     return report
-
 
 
 def _comprehensive_math_case(puppeteer_root: Path, *, skip_browser: bool):

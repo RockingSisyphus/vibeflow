@@ -12,7 +12,7 @@
 | `javascript` | typed records 的合法数组、空值、对象和 async；非法 Map/Date/undefined/非有限数字/bigint/循环值；provider 状态和 requires consumer；静态、动态、require 导入；双平台实现的 validate/quality/review/build；普通资源与 Plugin 包冲突由资源准备专项覆盖 |
 | `graph` | 不同默认值和新增参数的实现替换及来源；显式 includes；未绑定/冲突输入、参数 schema；源码 consumer 的 typed inputs/有效参数缓存和新 session；直接选择公开 implementation leaf 的真实正常/超限源码；合法和非法 findings 的 Core/Python/JS 边界 |
 | `tooling` | 完整 Node shape、已移除分类资源的明确诊断、Rule 端口类型；正式单个 JSON、资源位置和实现尚未执行；混合语言同 ID、项目共享包与双方冲突来源；预览选择一致 |
-| `composition` | 领域 Bundle 的模型 Node 在分支、Nodeset、Loop 中实际计算；参数化 tags 归属、非法 helper 模型定义、完整调用路径；Node 自己声明浅蓝色，验证 Architecture、Mermaid 和真实 SVG |
+| `composition` | 领域 Bundle 的模型 Node 在分支、Nodeset、Loop 中实际计算；参数化 tags 归属、非法 helper 模型定义、完整调用路径；Node 自己声明浅蓝色，验证 Architecture 与 Mermaid 文本 |
 
 ## 运行
 
@@ -24,7 +24,7 @@ npm_config_cache=/tmp/vibeflow-npm-cache python tests/fixtures/rule_gaps/run_all
   --report /tmp/vibeflow-rule-gaps-run.json
 ```
 
-默认按仓库锁文件准备 TypeScript/esbuild 和 Mermaid/Puppeteer。可通过 `--toolchain /path/to/project-toolchain`、`--renderer /path/to/mermaid-renderer` 复用已按对应锁文件安装的目录；不需要修改测试源码。`--group python` 等参数可重复使用，只运行所选组。
+默认按仓库锁文件准备 TypeScript/esbuild 和 Puppeteer。可通过 `--toolchain /path/to/project-toolchain`、`--renderer /path/to/browser-runtime` 复用已按对应锁文件安装的目录；不需要修改测试源码。`--group python` 等参数可重复使用，只运行所选组。
 
 每组使用独立进程和临时项目，保存命令输出、handler 事件、实际产物和 `observations.json`。最终 JSON 列出每项期待、实际资料和具体不匹配原因。退出码为：全部满足 `0`，存在不匹配 `1`，观察进程或环境失败 `2`。空观察组、重复 ID 或残缺记录不能作为通过的覆盖。
 

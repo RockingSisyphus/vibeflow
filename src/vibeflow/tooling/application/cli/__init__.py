@@ -31,8 +31,6 @@ _SHARED_COMMANDS = frozenset(
         "inspect-config",
         "export-mermaid",
         "export-architecture",
-        "export-ascii",
-        "export-svg",
         "review",
         "quality-check",
     }
@@ -128,8 +126,6 @@ def build_parser() -> argparse.ArgumentParser:
         ("inspect-config", "inspect a workflow configuration"),
         ("export-mermaid", "export a workflow as Mermaid"),
         ("export-architecture", "export a workflow architecture document"),
-        ("export-ascii", "export a workflow as ASCII"),
-        ("export-svg", "render a workflow as SVG"),
         ("review", "review a workflow"),
         ("preview", "open or rebuild the local preview catalog"),
         ("coordination", "serve local workflow communication or connect a host"),
@@ -242,8 +238,6 @@ def _show_shared_command_help(command: str) -> int:
         "inspect-config": "inspect a workflow configuration",
         "export-mermaid": "export a workflow as Mermaid",
         "export-architecture": "export a workflow architecture document",
-        "export-ascii": "export a workflow as ASCII",
-        "export-svg": "render a workflow as SVG",
         "review": "review a workflow",
         "quality-check": "check project architecture and maintainability",
     }
@@ -278,13 +272,15 @@ def _show_shared_command_help(command: str) -> int:
         parser.add_argument("--json", action="store_true")
     else:
         parser.add_argument("--config", required=True, help="workflow JSONC path")
+        if command == "review":
+            parser.add_argument("--preview-root", help="override offline preview directory")
         if command == "validate":
             parser.add_argument("--json", action="store_true")
-        if command.startswith("export-") or command == "review":
+        if command.startswith("export-"):
             parser.add_argument("--output", help="output file")
         if command == "export-architecture":
             parser.add_argument("--check", action="store_true")
-        if command in {"export-mermaid", "export-ascii", "export-svg"}:
+        if command == "export-mermaid":
             parser.add_argument(
                 "--expand-nodesets",
                 dest="expand_nodesets",
@@ -299,18 +295,11 @@ def _show_shared_command_help(command: str) -> int:
             )
             parser.add_argument("--hide-contract", action="store_true")
             parser.add_argument("--hide-semantics", action="store_true")
-        if command in {"export-mermaid", "export-svg"}:
             parser.add_argument(
                 "--mermaid-layout",
                 choices=("default", "review-columns"),
                 default="default",
             )
-        if command == "export-svg":
-            parser.add_argument("--theme", default="default")
-            parser.add_argument("--background", default="transparent")
-            parser.add_argument("--mermaid-max-text-size", type=int)
-            parser.add_argument("--mermaid-max-edges", type=int)
-            parser.add_argument("--review-fragment-max-width", type=float)
     parser.print_help()
     return 0
 

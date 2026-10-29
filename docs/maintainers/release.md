@@ -1,20 +1,26 @@
 # 发行与文档装配
 
-当前分发版本为 1.4.4，Workflow ABI 为 v11、共享 AOT 为 v5、协作启动清单为 v2；Plugin ABI v4、Rule ABI v3、预览快照 v4 保持不变。
+当前分发版本为 1.4.5，Workflow ABI 为 v11、共享 AOT 为 v5、协作启动清单为 v2；Plugin ABI v4、Rule ABI v3、预览快照 v4 保持不变。
 
 1.3.5 修复 JavaScript 核心 SDK 解压到 workspace 内时被误认成业务资源的问题：Target 按既有资源清单识别准确文件，在形成业务引用与插件源码闭包时排除核心内部依赖；原始分析保留，用户贡献声明及共享 Rule 政策不变。1.3.4 统一资源使用 Rule 与 `vibeflow.resource_use.v1` 结果：独立 BaseLib（包括间接依赖）必须显式声明，Plugin 贡献资源整包引入并禁止重复声明，贡献代码实际路径必须位于所属 Plugin 目录。Python、JavaScript 的验证、构建、运行准备和展示共同消费规则结果；旧选择器及重复许可检查已删除。Python AOT 按实际引用收集实现，未引用的可用库不随包加载或复制。预览最新快照覆盖各注册 root 当前仍存在的 workflow，继续隐藏 Plugin 贡献资源。1.3.3 的 global_state 环境变量能力保留。
 
 既有版本 ZIP 保留原始字节。两个 profile 使用下述工具构建；正式发布需验证解压运行、wheel、sdist 与完整门禁，禁止同名覆盖既有 ZIP。
 
+## 1.4.5 构建内容
+
+审核出口统一为 Architecture 和离线 HTML，结果 JSON 写到标准输出。保留 Mermaid 文本导出；旧静态附件与字符流程图的生成链、命令、依赖和查看器模式彻底移除。浏览器验收使用独立测试依赖，不随分发包交付。旧 review 输出参数明确拒绝，帮助文案与实际参数同步。
+
+验证范围和首轮失败后的修复记录见[1.4.5 验证记录](release-1.4.5-validation.md)。本机验证不代表远端 CI 或其他平台验收。
+
 ## 1.4.4 构建内容
 
 用户文档按主题归位，AGENTS 只保留核心目标、通用开发规范与任务导航。新增项目、root 和 workflow 的统一架构阅读与维护指南，明确 AI 优先阅读项目总览、目标 root 条目及相关 workflow，再定位真实源码；架构登记、字段及更新命令集中维护。
 
-协同审核使用 HTML，AI 只有在用户明确要求查看时才打开或渲染 SVG；SVG 生成说明位于预览手册末节，只有用户主动要求时才生成。两个 profile 均携带新的架构指南和文档路由。ABI、AOT 和预览格式保持不变。
+协同审核使用 HTML。两个 profile 均携带新的架构指南和文档路由。ABI、AOT 和预览格式保持不变。
 
 HTML 查看器的互不连通分支改为独立布局后按快照节点的首次出现顺序排列，展开或收起 Nodeset 不再因尺寸变化交换入口位置；嵌套子图沿用同一规则，资源视图继续紧凑排版。真实鼠标回归能在旧布局上复现入口换位，在新布局上通过；相关定向验证为 29 passed。
 
-本地 collaborative / autonomous 两个 1.4.4 ZIP 已重新构建并包含上述查看器修复。构建器的仓库检查通过（0 error、0 warning）；从最终 ZIP 分别解压，通过内核校验、Python 模板验证及 AOT 构建运行、JavaScript 构建、Node 执行探针及执行后的 HTML review 命令检查。两包内核字节一致，包内独立查看器和内核 ZIP 中的布局文件均与当前源码一致。此前仅文档重整的 1.4.4 构建内核与 1.4.3 相同，本次已因查看器修复变化；旧 ZIP 和校验文件保留原始字节归档，当前两个 ZIP 与 SHA256SUMS 位于 dist。本轮没有生成或查看 SVG，未重跑完整仓库功能门禁、wheel/sdist 验证或远端 CI。
+本地 collaborative / autonomous 两个 1.4.4 ZIP 已重新构建并包含上述查看器修复。构建器的仓库检查通过（0 error、0 warning）；从最终 ZIP 分别解压，通过内核校验、Python 模板验证及 AOT 构建运行、JavaScript 构建、Node 执行探针及执行后的 HTML review 命令检查。两包内核字节一致，包内独立查看器和内核 ZIP 中的布局文件均与当前源码一致。此前仅文档重整的 1.4.4 构建内核与 1.4.3 相同，本次已因查看器修复变化；旧 ZIP 和校验文件保留原始字节归档，当前两个 ZIP 与 SHA256SUMS 位于 dist。未重跑完整仓库功能门禁、wheel/sdist 验证或远端 CI。
 
 ## 1.4.3 历史构建内容
 
@@ -62,7 +68,7 @@ SDK 的声明与实现附属文件共用文件引用解析，正确处理 Window
 
 ## 1.3.7 历史构建内容
 
-自有 JSON、AOT 元数据与绑定、workflow 启动声明、CLI 输入、源码及工具输出明确使用 UTF-8；文本子进程按协议指定编码，Python 子进程同时明确标准流编码。procfs 的数字内容按 ASCII 读取，可能包含任意进程名称字节的 stat 文件按二进制解析。外部业务文件仍可显式选择自身格式的编码，不改变 Python 全局默认值。
+自有 JSON、AOT 元数据与绑定、workflow 启动声明、CLI 输入、源码及工具输出明确使用 UTF-8；文本子进程按协议指定编码，Python 子进程同时明确标准流编码。procfs 的数字内容按纯数字文本读取，可能包含任意进程名称字节的 stat 文件按二进制解析。外部业务文件仍可显式选择自身格式的编码，不改变 Python 全局默认值。
 
 仓库自检的 base/all profile 新增 `TEXT_ENCODING_UNSPECIFIED`，检查常见文本文件及子进程调用未明确编码的情况，输出源码位置和修复建议。检查范围、动态调用和字符串内嵌代码等静态分析边界见 [repo checker 说明](../../repo_check/README.md)。回归测试从真实 AOT 包调用 API、CLI 和协同宿主，在移除源项目及非 UTF-8 默认环境下验证中文配置、输入和输出。
 
@@ -105,7 +111,7 @@ python distribution/build.py --profile autonomous --output-dir /tmp/vf-autonomou
 
 更新公共接口时，同时核对使用手册、AI 阅读路由、最小项目 README 和当前设计说明。详细 API 放在主题手册，提示词保留导航与执行协议。多文件资源和 Rule/Ruleset 均有公共文档入口。
 
-运行观测接口的业务用法和双语言更新示例集中在 `distribution/docs/user/runtime-observation.md`；开发手册与公共提示词通过文档路由定位。架构阅读、登记及更新集中在 `distribution/docs/user/architecture.md`。审核页面与 SVG 附件说明集中在 `distribution/docs/user/local-preview.md`。从最终 ZIP 解压包验证随包文档、公开 SDK、业务输出与状态资料，按实际覆盖范围记录结果。
+运行观测接口的业务用法和双语言更新示例集中在 `distribution/docs/user/runtime-observation.md`；开发手册与公共提示词通过文档路由定位。架构阅读、登记及更新集中在 `distribution/docs/user/architecture.md`。审核页面说明集中在 `distribution/docs/user/local-preview.md`。从最终 ZIP 解压包验证随包文档、公开 SDK、业务输出与状态资料，按实际覆盖范围记录结果。
 
 修改 canonical 文档及 prompt fragments 后重新构建两个 profile，发布目录和 ZIP 中的文档、AGENTS 与清单随构建更新。验收报告中的归档哈希对应当次构建；后续文档修订产生新的归档哈希，历史字节保存在版本 ZIP 中，代码和文档变化由 Git 追溯。
 

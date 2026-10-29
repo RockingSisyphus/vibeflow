@@ -30,12 +30,7 @@ from vibeflow.targets.python.runtime.planning import (
 )
 from vibeflow.tooling.application.python.execution import CheckedRunError
 from vibeflow.tooling.application.python.runner import run_checked
-from vibeflow.tooling.application.python.presentation.ascii_flowchart import export_ascii_flowchart
 from vibeflow.tooling.application.python.presentation.mermaid import export_mermaid
-from vibeflow.tooling.presentation.mermaid import (
-    is_mermaid_svg_renderer_available,
-    render_mermaid_svg,
-)
 from vibeflow.tooling.project.config_loader import ConfigLoadError, load_config_document
 from vibeflow.tooling.project.config_schema import collect_config_schema_findings
 from vibeflow.tooling.project.schema_resources import schema_text
