@@ -40,7 +40,7 @@ if(result.result!==16||active||JSON.stringify(calls)!=='["open","close"]')throw 
 
 @pytest.mark.parametrize("profile",["web-app","esm-module"])
 def test_browser_message_listener_is_explicit_isolated_and_cancelled(tmp_path, profile):
-    renderer=os.environ.get("VIBEFLOW_MERMAID_RENDERER_ROOT")
+    renderer=os.environ.get("VIBEFLOW_BROWSER_RUNTIME_ROOT")
     if not renderer:
         pytest.skip("full browser gate supplies the locked Puppeteer runtime")
     source=example(tmp_path)

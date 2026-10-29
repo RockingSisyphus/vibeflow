@@ -9,23 +9,19 @@ import sys
 ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
-from tests.fixtures.adaptation_regressions.common import run_cli, run_command, row, write_json
-from tests.fixtures.python.review_layout.fixtures import write_project
-from tests.fixtures.python.review_layout.run_all import user_resource_failures
+from tests.fixtures.adaptation_regressions.common import run_cli, row, write_json
+from tests.fixtures.python.resource_sections.fixtures import write_project
 
-HERE = Path(__file__).resolve().parent
-LAYOUT = HERE.parent / "review_layout"
+
 CASES = (
     ("py.sections.review.default", "review", "default"),
     ("py.sections.review.rules", "review", "rules"),
-    ("py.sections.svg.rules", "export-svg", "rules"),
     ("py.sections.mermaid.columns", "export-mermaid", "columns"),
     ("py.sections.mermaid.rules", "export-mermaid", "rules"),
     ("py.expand.outer.false", "review", "outer-false"),
     ("py.expand.inner.false", "review", "inner-false"),
+    ("py.expand.loop.false", "review", "loop-false"),
     ("py.expand.shared.false", "export-mermaid", "inner-false"),
-    ("py.expand.loop.false", "export-svg", "loop-false"),
-    ("py.expand.ascii.false", "export-ascii", "outer-false"),
     ("py.expand.validate.false", "validate", "outer-false"),
     ("py.expand.quality.false", "quality-check", "outer-false"),
     ("py.expand.health.false", "validate", "rejected"),
@@ -69,13 +65,13 @@ health_set = ruleset(id="layout.health_set", calls=[{"id":"health", "rule_id":"l
 def observe(args, identifier, command, variant):
     path = args.work / identifier
     fixture(path, variant)
-    output = path / ("graph.svg" if command in {"review", "export-svg"} else "graph.mmd" if command == "export-mermaid" else "graph.txt")
+    output = path / "graph.mmd"
     cli = [command, "--workspace", path.parent / "vibeflow_config.jsonc"]
     if command != "quality-check":
         cli.extend(("--config", path / "workflow.jsonc"))
     else:
         cli.extend(("--path", path, "--json"))
-    if command.startswith("export") or command == "review":
+    if command.startswith("export"):
         cli.extend(("--output", output))
     if command.startswith("export"):
         cli.append("--expand-nodesets")
@@ -92,27 +88,11 @@ def observe(args, identifier, command, variant):
         preparation = run_cli(path, ["export-architecture", "--workspace", path.parent / "vibeflow_config.jsonc",
             "--config", path / "workflow.jsonc", "--output", path / "ARCHITECTURE.jsonc"],
             args.kernel, name="prepare-architecture", timeout=120)
-    report = path / "observation.json"
-    instrumentation = run_command(path, [sys.executable, "-B", LAYOUT / "observe_cli.py",
-        "--report", report, "--", *cli], args.kernel, name="instrumentation", renderer=args.renderer, timeout=300)
-    if not report.is_file():
-        # Removed internal-diagram options are rejected before plugin loading.
-        stdout_file, stderr_file = report.with_suffix(".stdout.txt"), report.with_suffix(".stderr.txt")
-        actual = {"exit_code":instrumentation["exit_code"],
-            "stdout":stdout_file.read_text() if stdout_file.is_file() else instrumentation["stdout"],
-            "stderr":stderr_file.read_text() if stderr_file.is_file() else instrumentation["stderr"]}
-        failures = []
-        if variant != "rules" or actual["exit_code"] != 2 or "unrecognized arguments: --show-rules" not in actual["stderr"]:
-            failures.append("the removed internal-diagram option must be explicitly rejected with exit 2")
-        if output.exists() or (path / "ARCHITECTURE.jsonc").exists():
-            failures.append("an unrecognized option must not publish a user diagram or Architecture")
-        return row(identifier, "resource-sections", "CLI argument rejection", {},
-            actual, failures, path)
-    actual = json.loads(report.read_text())
-    if preparation is not None:
-        actual["preparation_exit_code"] = preparation["exit_code"]
-    actual["stdout"] = report.with_suffix(".stdout.txt").read_text()
-    actual["stderr"] = report.with_suffix(".stderr.txt").read_text()
+    result = run_cli(path, cli, args.kernel, name="cli", timeout=300)
+    actual = {"exit_code":result["exit_code"], "error":None, "stdout":result["stdout"], "stderr":result["stderr"]}
+    if variant == "rules":
+        failures = [] if actual["exit_code"] == 2 and "unrecognized arguments: --show-rules" in actual["stderr"] else ["Removed option must be rejected"]
+        return row(identifier,"resource-sections","CLI argument rejection",{},actual,failures,path)
     expected_exit = 1 if variant == "rejected" else 0
     failures = []
     if preparation is not None and preparation["exit_code"] != 0:
@@ -127,54 +107,20 @@ def observe(args, identifier, command, variant):
                                or not item.get("source_location", {}).get("path", "").endswith("plugins/layout/check.py")
                                or item.get("source_location", {}).get("line") != 4 for item in findings):
             failures.append("hidden health rejection must retain only the target error, exact file and line")
-    if command in {"review", "export-svg"} and output.is_file():
-        actual["titles"] = [title for group in actual["columns"] for title in group]
-        expected = ["main pipeline", "plugins", "base_lib"]
-        if actual["titles"][:3] != expected:
-            failures.append("user resource directories must follow selected plugins and base_lib before Nodeset details")
-        frames = actual["frames"]
-        texts = "\n".join(Path(frame["mermaid_path"]).read_text() for frame in frames)
-        failures.extend(user_resource_failures(texts))
-        if variant == "outer-false" and any(title not in expected for title in actual["titles"]):
-            failures.append("folded Outer and Loop body must not render descendant panels")
-        if variant == "inner-false" and (any("layout.leaf_a" in frame["title"] for frame in frames) or not any("layout.leaf_b" in frame["title"] for frame in frames)):
-            failures.append("folded shared Leaf A must disappear while sibling Leaf B remains visible")
-        if variant == "loop-false" and (any("layout.loop_body" in title for title in actual["titles"]) or not any("layout.outer" in title for title in actual["titles"])):
-            failures.append("folding the Loop body must preserve independent visible Nodesets")
-        for frame in frames:
-            if frame["title"] in expected[1:] and frame["direction"] != "flowchart LR":
-                failures.append("resource fragment direction must remain LR")
-        if variant in {"default", "outer-false"}:
-            browser = run_command(path, ["node", LAYOUT / "browser.mjs", args.renderer, output, path / "graph.png"], args.kernel, name="browser", timeout=90)
-            if browser["exit_code"] or not browser["payload"] or not browser["payload"].get("nodes"):
-                failures.append("real browser SVG inspection failed")
-            else:
-                write_json(path / "browser.json", browser["payload"])
-                nodes = browser["payload"]["nodes"]
-                failures.extend(user_resource_failures("\n".join(item.get("text", "") for item in nodes)))
-                if any(item["width"] <= 0 or item["height"] <= 0 for item in nodes):
-                    failures.append("actual user SVG must retain visible node geometry")
-                for section, identity, fill in (("plugins", "id: layout.resources", "rgb(217, 230, 255)"),
-                                                ("base_lib", "id: layout.helper", "rgb(255, 230, 179)")):
-                    matches = [item for item in nodes if item["fragments"] == [section] and identity in item["text"]]
-                    if len(matches) != 1 or not any(shape["tag"] == "polygon" and shape["fill"] == fill
-                                                 for item in matches for shape in item["shapes"]):
-                        failures.append("actual selected resource shape or colour changed: " + identity)
-    elif command == "export-mermaid" and output.is_file():
+    if command == "export-mermaid" and output.is_file():
         text = output.read_text()
+        failures.extend("implementation details leaked into Mermaid: "+marker for marker in ("vf_resource_", "Node types", "Rule:", "Ruleset:", "contributes", " (type)") if marker in text)
         if variant == "columns":
             if not all(label in text for label in ('"plugins"', '"base_lib"', 'resource_plugins -.-> resource_plugins_0', 'resource_base_lib -.-> resource_base_lib_0')):
                 failures.append("Mermaid must contain parent-to-selected-resource directories")
-        failures.extend(user_resource_failures(text))
         if variant == "inner-false" and ("a_start@" in text or "b_start@" not in text):
             failures.append("Mermaid must stop at shared hidden Leaf A but render visible Leaf B")
-    elif command == "export-ascii" and output.is_file():
-        if "nodeset " in output.read_text():
-            failures.append("ASCII must retain only the folded outer call boxes")
     if command == "review" and (path / "ARCHITECTURE.jsonc").is_file():
         document = json.loads("\n".join(line for line in (path / "ARCHITECTURE.jsonc").read_text().splitlines() if not line.strip().startswith("//")))
         actual["architecture_expand"] = {key: value.get("expand") for key, value in document["nodeset_types"].items()}
         expected = {"layout.outer": variant != "outer-false", "layout.leaf_a": variant != "inner-false", "layout.leaf_b": True}
+        if variant == "loop-false":
+            expected["layout.loop_body"] = False
         if actual["architecture_expand"] != expected:
             failures.append("Architecture must record explicit and default expand values")
         if not document["nodeset_types"]["layout.leaf_a"].get("body"):
@@ -188,7 +134,7 @@ def observe(args, identifier, command, variant):
     evidence = args.report.parent / "evidence" / args.report.stem / identifier
     evidence.mkdir(parents=True, exist_ok=True)
     for source in path.iterdir():
-        if source.suffix in {".svg", ".png", ".mmd"} or source.name in {"observation.json", "browser.json", "ARCHITECTURE.jsonc", "observation.stdout.txt", "observation.stderr.txt"}:
+        if source.suffix in {".mmd"} or source.name in {"observation.json", "browser.json", "ARCHITECTURE.jsonc", "observation.stdout.txt", "observation.stderr.txt"}:
             shutil.copy2(source, evidence / source.name)
     return row(identifier, "resource-sections", "User resource directories and display-only Nodeset folding",
         {"exit_code": expected_exit}, actual, failures, path)
@@ -199,13 +145,12 @@ def main():
     parser.add_argument("--kernel", type=Path, default=ROOT / "src")
     parser.add_argument("--work", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
-    parser.add_argument("--renderer", type=Path, required=True)
     parser.add_argument("--case", action="append")
     args = parser.parse_args()
     known_cases = [identifier for identifier, _command, _variant in CASES]
     if args.case and set(args.case) - set(known_cases):
         parser.error("unknown cases: " + ", ".join(sorted(set(args.case) - set(known_cases))))
-    args.kernel, args.work, args.report, args.renderer = (path.resolve() for path in (args.kernel, args.work, args.report, args.renderer))
+    args.kernel, args.work, args.report = (path.resolve() for path in (args.kernel, args.work, args.report))
     cases = []
     for identifier, command, variant in CASES:
         if args.case and identifier not in args.case:

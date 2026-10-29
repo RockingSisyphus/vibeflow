@@ -124,7 +124,7 @@ def review_graph(context):
             if not getattr(node.metadata, name, "").strip():
                 findings.append(HealthFinding(rule_id="GRAPH.SMELL.MISSING_NODE_" + name.upper(), severity="warning",
                     object_type="node", object_id=node.id, failure_layer="topology",
-                    message=f"config node '{node.id}' should declare {name} for readable SVG diagrams", details={"field": name, "owner": owner}))
+                    message=f"config node '{node.id}' should declare {name} for readable workflow diagrams", details={"field": name, "owner": owner}))
     if owner == "pipeline":
         findings.extend(HealthFinding(rule_id=item.rule_id, severity=str(item.details.get("severity", "warning")),
             object_type="node", object_id=item.source, message=item.message, failure_layer="topology",

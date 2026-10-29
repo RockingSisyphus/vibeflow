@@ -23,11 +23,8 @@ PROTECTED_FILES = {
     "kernel/LICENSE",
     "kernel/vibeflow-kernel.zip",
     "kernel/THIRD_PARTY_NOTICES.md",
-    "kernel/tools/mermaid-renderer/package.json",
-    "kernel/tools/mermaid-renderer/package-lock.json",
 }
 GENERATED_PREFIXES = (
-    "kernel/tools/mermaid-renderer/node_modules/",
 )
 
 
@@ -152,18 +149,14 @@ from vibeflow.tooling.application.cli import main as kernel_cli_main  # noqa: E4
 WORKSPACE_CONFIG_PATH = ROOT / "vibeflow_config.jsonc"
 COMMAND_ALIASES = {
     "architecture": "export-architecture",
-    "ascii": "export-ascii",
     "mermaid": "export-mermaid",
     "quality": "quality-check",
-    "svg": "export-svg",
 }
 WORKSPACE_COMMANDS = {
     "build",
     "delegate-cli",
     "export-architecture",
-    "export-ascii",
     "export-mermaid",
-    "export-svg",
     "inspect-config",
     "inspect-resources",
     "quality-check",

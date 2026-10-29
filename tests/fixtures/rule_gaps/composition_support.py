@@ -7,7 +7,6 @@ from copy import deepcopy
 import json
 from pathlib import Path
 import sys
-import xml.etree.ElementTree as ET
 
 from common import cli, command, copy_project, diagnostics, row, write
 
@@ -251,40 +250,19 @@ def _walk(value):
 def _documents(project):
     architecture = project / "Architecture.jsonc"
     mermaid = project.parent / "composition.mmd"
-    svg = project.parent / "composition.svg"
     steps = [cli(project, name, name=name, extra=["--output", output, *flags])
              for name, output, flags in (("export-architecture", architecture, []),
-                 ("export-mermaid", mermaid, ["--expand-nodesets"]),
-                 ("export-svg", svg, ["--expand-nodesets"]))]
+                 ("export-mermaid", mermaid, ["--expand-nodesets"]))]
     architecture_text = architecture.read_text() if architecture.exists() else ""
     document = json.loads(architecture_text[architecture_text.index("{"):]) if "{" in architecture_text else {}
     descriptor = document.get("node_definitions", {}).get("example.model", {})
     tags = descriptor.get("tags", descriptor.get("info", {}).get("tags", []))
     models = [item for item in _walk(document) if item.get("definition_id") == "example.model" and "presentation" in item]
     fills = {item.get("presentation", {}).get("values", {}).get("fill", "") for item in models}
-    svg_text = svg.read_text() if svg.exists() else ""
-    model_fills = []
-    try:
-        svg_root = ET.fromstring(svg_text)
-        svg_valid = svg_root.tag == "{http://www.w3.org/2000/svg}svg"
-        for group in svg_root.iter():
-            text = " ".join(" ".join(group.itertext()).split())
-            if "node" not in group.attrib.get("class", "").split() or "definition_id: example.model " not in text:
-                continue
-            geometry = [child for child in group if child.tag.rsplit("}", 1)[-1] in {"rect", "polygon", "circle", "ellipse", "path"}]
-            for element in geometry:
-                styles = {key.strip(): value.strip().removesuffix(" !important").strip()
-                          for declaration in element.attrib.get("style", "").split(";") if ":" in declaration
-                          for key, value in [declaration.split(":", 1)]}
-                model_fills.append(styles.get("fill", element.attrib.get("fill", "")).lower())
-    except ET.ParseError:
-        svg_valid = False
     metrics = {"diagram_exit_codes": [item["metrics"]["exit_code"] for item in steps],
         "architecture_tags": tags, "architecture_fill": next(iter(fills)) if len(fills) == 1 else "",
         "mermaid_light_blue": mermaid.exists() and "#cceeff" in mermaid.read_text().lower(),
-        "svg_valid": svg_valid, "svg_light_blue": "#cceeff" in svg_text.lower() or "rgb(204, 238, 255)" in svg_text,
-        "svg_model_count": len(model_fills), "svg_model_fills": model_fills,
-        "diagram_files": [str(path) for path in (architecture, mermaid, svg)]}
+        "diagram_files": [str(path) for path in (architecture, mermaid)]}
     return steps, metrics
 
 

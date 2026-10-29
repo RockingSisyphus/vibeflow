@@ -117,18 +117,3 @@ def test_same_endpoints_keep_each_conditional_edges_own_roles():
         assert "linkStyle 0 stroke-width:4px" in text
         assert "linkStyle 1 stroke-dasharray:6 4,stroke-width:2px" in text
         assert "linkStyle 2 stroke-width:4px" in text
-
-
-@pytest.mark.parametrize('target',[0,1],ids=['python','javascript'])
-def test_real_svg_draws_both_parallel_calls_as_double_circles(tmp_path,target):
-    from xml.etree import ElementTree as E
-    from vibeflow.tooling.presentation.mermaid import render_mermaid_svg
-    _,texts=_presentations(*_parallel_fixture())
-    svg=render_mermaid_svg(texts[target],tmp_path/'parallel.svg')
-    root=E.parse(svg).getroot()
-    ns={'s':'http://www.w3.org/2000/svg'}
-    for name in ('dispatch','collect'):
-        groups=[g for g in root.findall('.//s:g',ns) if 'node' in g.get('class','').split()
-            and any(f'flowchart-{prefix}{name}-' in g.get('id','') for prefix in ('','vf_'))]
-        assert len(groups)==1,(name,[g.get('id') for g in root.findall('.//s:g',ns)])
-        assert len(groups[0].findall('.//s:circle',ns))==2,E.tostring(groups[0],encoding='unicode')

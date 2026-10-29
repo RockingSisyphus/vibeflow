@@ -59,14 +59,14 @@ export const calc=defineNode({id:"fixture.calc",node_type:"vibeflow.node",contra
     relations=workflow_relations(architecture,{'root_id':'project','path':'workflow.jsonc'})
     assert relations[0]['kind']=='invoke_sync' and relations[0]['entry']=='evaluate'
     if language=='python':
-        from vibeflow.tooling.presentation.mermaid import is_mermaid_svg_renderer_available, _find_mmdc
-        if is_mermaid_svg_renderer_available():
+        from tests.fixtures.support.browser_runtime import browser_runtime_available, browser_runtime_manifest
+        if browser_runtime_available():
             from vibeflow.tooling.application.python.workspace_service import load_workspace_graph_for_export
             from vibeflow.tooling.application.python.presentation.preview import python_preview
             exported=load_workspace_graph_for_export(config,workspace=workspace,validate_health=True,_include_presentation=True)
             preview=python_preview(exported[6],config=config,workspace=workspace,preview_root=tmp_path/'preview')
             browser=Path(__file__).resolve().parents[1]/'fixtures/preview/invoke-sync.cjs'
-            navigated=subprocess.run(['node',str(browser),str(_find_mmdc().resolve()),str(tmp_path/'preview/vibeflow-preview.html'),preview.metadata['id']],text=True,capture_output=True,timeout=30)
+            navigated=subprocess.run(['node',str(browser),str(browser_runtime_manifest().resolve()),str(tmp_path/'preview/vibeflow-preview.html'),preview.metadata['id']],text=True,capture_output=True,timeout=30)
             assert navigated.returncode==0,navigated.stdout+navigated.stderr
         from vibeflow.tooling.application.python import PythonBuildRequest,build_python_aot,load_bundle
         from vibeflow.coordination import Coordinator

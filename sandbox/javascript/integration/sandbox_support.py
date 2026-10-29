@@ -45,9 +45,9 @@ SOURCE_ROOT = REPOSITORY_ROOT / "src"
 DISTRIBUTION_KERNEL_ARCHIVE = (
     REPOSITORY_ROOT / "kernel" / "vibeflow-kernel.zip"
 )
-REPOSITORY_PUPPETEER_ROOT = REPOSITORY_ROOT / "tools" / "mermaid-renderer"
+REPOSITORY_PUPPETEER_ROOT = REPOSITORY_ROOT / "tests" / "browser-runtime"
 DISTRIBUTION_PUPPETEER_ROOT = (
-    REPOSITORY_ROOT / "kernel" / "tools" / "mermaid-renderer"
+    REPOSITORY_ROOT / "tests" / "browser-runtime"
 )
 DEFAULT_PUPPETEER_ROOT = (
     REPOSITORY_PUPPETEER_ROOT

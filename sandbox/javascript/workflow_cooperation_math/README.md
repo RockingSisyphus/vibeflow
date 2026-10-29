@@ -12,7 +12,7 @@ A、B 为 async，C 为 sync；两轮异步消息中嵌入一次同步调用，�
 python sandbox/javascript/workflow_cooperation_math/run_all.py \
   --work-dir /path/to/new-work-directory \
   --toolchain-root /path/to/typescript-esbuild-toolchain \
-  --puppeteer-root /path/to/mermaid-renderer
+  --puppeteer-root /path/to/browser-runtime
 ```
 
 工具链使用仓库锁文件安装；可通过 `PUPPETEER_EXECUTABLE_PATH` 显式指定 Chromium。默认临时工作目录自动清理；显式目录保留 `report.json`、单文件脚本、AOT 和 Node／Chromium 的真实 trace。缺少 `--puppeteer-root` 只执行 Node，报告为 `REDUCED`，不能算完整通过。

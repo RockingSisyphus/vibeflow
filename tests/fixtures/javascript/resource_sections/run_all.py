@@ -1,4 +1,4 @@
-"""Real SDK, CLI, Mermaid/SVG and execution checks for JavaScript review sections."""
+"""Real SDK, CLI, Mermaid text and execution checks for JavaScript review sections."""
 from __future__ import annotations
 
 import argparse
@@ -12,7 +12,6 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 from tests.fixtures.adaptation_regressions.common import run_cli, run_command, row, write_json
 from tests.fixtures.adaptation_regressions.js_fixtures import project, native_shape, cli_args, cli_summary, check_cli, edit
-from tests.fixtures.javascript.resource_sections.audit_browser import audit as audit_browser
 
 CASES = (
     ("js.sections.review.default", "review", "nested", "default"),
@@ -20,10 +19,8 @@ CASES = (
     ("js.sections.mermaid.default", "export-mermaid", "serial", "default"),
     ("js.sections.mermaid.columns", "export-mermaid", "nested", "columns"),
     ("js.sections.mermaid.rules", "export-mermaid", "nested", "rules"),
-    ("js.sections.svg.columns", "export-svg", "nested", "columns"),
     ("js.expand.outer.false", "review", "nested", "outer-false"),
     ("js.expand.inner.false", "export-mermaid", "nested", "inner-false"),
-    ("js.expand.ascii.false", "export-ascii", "nested", "outer-false"),
     ("js.expand.shared.false", "export-mermaid", "shared", "body-false"),
     ("js.expand.loop.false", "review", "loop", "body-false"),
     ("js.expand.validate.false", "validate", "nested", "outer-false"),
@@ -56,11 +53,11 @@ def observe(args, identifier, command, shape, variant):
     work = args.work / identifier
     write_fixture(work, args.toolchain, shape, variant)
     extra = []
-    suffix = ".svg" if command in {"review", "export-svg"} else ".mmd" if command == "export-mermaid" else ".txt"
+    suffix = ".mmd"
     output = work / ("graph" + suffix)
-    if command.startswith("export") or command == "review":
+    if command.startswith("export"):
         extra += ["--output", output]
-    if command in {"export-mermaid", "export-svg", "export-ascii"} and shape != "serial":
+    if command == "export-mermaid" and shape != "serial":
         extra.append("--expand-nodesets")
     if variant == "columns":
         extra += ["--mermaid-layout", "review-columns"]
@@ -68,7 +65,7 @@ def observe(args, identifier, command, shape, variant):
         extra.append("--show-rules")
     if command == "build":
         extra += ["--target", "node", "--profile", "single-esm", "--out-dir", work / "dist"]
-    result = run_cli(work, cli_args(work, command, *extra), args.kernel, name="cli", toolchain=args.toolchain, renderer=args.renderer, timeout=300)
+    result = run_cli(work, cli_args(work, command, *extra), args.kernel, name="cli", toolchain=args.toolchain, timeout=300)
     actual = cli_summary(result)
     actual.update({key: result[key] for key in ("command", "stdout_path", "stderr_path", "stderr")})
     if variant == "rules":
@@ -84,18 +81,7 @@ def observe(args, identifier, command, shape, variant):
         text = output.read_text()
         actual["output"] = str(output)
         actual["rule_graph_visible"] = "ruleset:" in text.lower() or "rule:" in text.lower()
-        if suffix == ".svg":
-            tree = ET.fromstring(text)
-            actual["titles"] = [item.text for item in tree.iter() if item.tag.rsplit("}", 1)[-1] == "text" and item.get("class") == "review-title"]
-            expected = ["main pipeline", "plugins", "base_lib"]
-            if actual["titles"][:3] != expected:
-                failures.append(f"user resource directories must retain fixed order: {actual['titles']}")
-            for forbidden in ("Node types", "引用 / reference", "Rule:", "Ruleset:", "plugin_support.ts", "math_support.ts", "host_support.ts", "owners:"):
-                if forbidden in text:
-                    failures.append("internal resource material must not appear in the user diagram: " + forbidden)
-            if variant in {"outer-false", "body-false"} and any("type_key: audit." in (title or "") for title in actual["titles"]):
-                failures.append("expand:false must stop formal SVG detail recursion")
-        elif suffix == ".mmd":
+        if suffix == ".mmd":
             actual["sections"] = [line for line in text.splitlines() if line.startswith("%% resources:")]
             if variant == "columns":
                 expected = ["%% resources: plugins", "%% resources: base_lib"]
@@ -112,19 +98,6 @@ def observe(args, identifier, command, shape, variant):
                 failures.append("visible parent must not expand its hidden child")
             if variant == "inner-false" and not text.partition("%% expanded nodeset: audit.outer\n")[2].startswith("flowchart TD"):
                 failures.append("a parent with folded child calls must preserve its vertical direction")
-        elif variant == "outer-false" and "nodeset audit." in text:
-            failures.append("ASCII must stop at the hidden definition")
-    if identifier in {"js.sections.review.default", "js.expand.outer.false"} and output.is_file():
-        browser = run_command(work, ["node", ROOT / "tests/fixtures/python/review_layout/browser.mjs",
-            args.renderer, output, work / "graph.png"], args.kernel, name="browser", timeout=90)
-        actual["browser_exit_code"] = browser["exit_code"]
-        if browser["exit_code"] != 0 or not browser.get("payload"):
-            failures.append("the real browser must render this formal SVG: " + browser["stderr"])
-        else:
-            write_json(work / "browser.json", browser["payload"])
-            observed = audit_browser(work, hidden=variant == "outer-false")
-            actual["browser_audit"] = observed
-            failures.extend(observed["failures"])
     if command == "review" and (work / "ARCHITECTURE.jsonc").is_file():
         document = json.loads("\n".join(line for line in (work / "ARCHITECTURE.jsonc").read_text().splitlines() if not line.strip().startswith("//")))
         actual["architecture_expand"] = {key: value.get("expand") for key, value in document["nodeset_types"].items()}
@@ -152,11 +125,10 @@ def main():
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--kernel", type=Path, default=ROOT / "src")
     parser.add_argument("--toolchain", type=Path, required=True)
-    parser.add_argument("--renderer", type=Path, required=True)
     parser.add_argument("--case", action="append")
     args = parser.parse_args()
-    args.kernel, args.work, args.report, args.toolchain, args.renderer = (
-        path.resolve() for path in (args.kernel, args.work, args.report, args.toolchain, args.renderer))
+    args.kernel, args.work, args.report, args.toolchain = (
+        path.resolve() for path in (args.kernel, args.work, args.report, args.toolchain))
     if (args.kernel / "src/vibeflow").is_dir():
         args.kernel /= "src"
     manifest = json.loads((Path(__file__).parent / "cases.json").read_text())

@@ -70,7 +70,7 @@ Unused driver prefetch objects stay in the analysis service, outside fact views.
 
 复现入口为 [`memory_probe.py`](../../tests/fixtures/javascript/review_performance/memory_probe.py)，方法见[夹具说明](../../tests/fixtures/javascript/review_performance/README.md)。它直接运行当前源码的真实 build/review，固定顺序空节点图，仅改变节点数和源码文件分组。两侧选用默认 `vibeflow.process` 规则，关闭可选 project/root 治理检查以隔离变量。登记的 Architecture 预先生成，不计入测量。
 
-2026-10-25 本机环境为 Linux、Python 3.13.13、Node v24.18.0、TypeScript 7.0.2、esbuild 0.28.1。JS build 使用 `--target node --profile single-esm`，Python 使用 `python-package`；review 使用默认 HTML 预览，不请求可选 SVG。验证对象为当前工作区源码，未替换或独立验收发行包。
+2026-10-25 本机环境为 Linux、Python 3.13.13、Node v24.18.0、TypeScript 7.0.2、esbuild 0.28.1。JS build 使用 `--target node --profile single-esm`，Python 使用 `python-package`；review 使用默认 HTML 预览。验证对象为当前工作区源码，未替换或独立验收发行包。
 
 正式修改后的结果与修改前诊断对照如下，单元格为 `tsc --api` 峰值数量 / RSS 合计峰值：
 
@@ -87,7 +87,7 @@ RSS 为 CLI 及全部后代进程的合计采样峰值，可能重复计算共�
 本轮验证边界：
 
 - `test_analysis_session.py` 与 `strict_aot_toolchain.py`：24 passed。新增真实 driver 进程观察覆盖连续相同请求复用同一服务、同文件内容变化重新创建、切换 8 个文件并返回先前文件时不保留旧服务。
-- `test_aot_core.py`、`strict_aot_project_build.py` 与 `test_javascript_review_publish.py`：121 passed、1 skipped。跳过项需要未安装的 Mermaid SVG renderer；真实默认 HTML review 已在上表验收。两批合计 145 passed、1 skipped，未运行仓库全量回归。
+- 历史两批定向验证合计 145 passed、1 skipped，未运行当时的仓库全量回归。
 - S02 资源分析夹具的 validate 与 quality-check 两例均 PASS，测得最多一个活动分析环境、结束后零活动环境，函数指标与调用图无重复提取；节点权限仍独立检查。
 - 复杂性能夹具的三组配置各跑三个新进程，全部通过。8 节点 / 4 BaseLib 的 Nodeset 从 1 次变为 4 次调用后，每次均为 77 个 driver 请求、24 次 Program 构造、8 次自定义 source Rule 执行。相应墙钟中位数为 8.124 s 和 8.767 s，仅作本机观察，不宣称跨机器速度保证。
 - 随后的 JS 相关整批为 1188 passed、0 failed、0 skipped；锁定 Mermaid 11.17.2 的图形补验为 147 passed、0 failed、0 skipped，JS integration 为 51 passed、0 failed、0 skipped。本地 1.4.3 双 profile 包已构建并解压复验；包内 8 节点 / 8 文件 review 的编译服务峰值为 1、RSS 合计峰值为 252.9 MiB，结束后零编译服务残留。新增 JS 模板目录声明问题及其 34 项回归见[发行说明](release.md)。

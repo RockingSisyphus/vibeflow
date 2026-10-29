@@ -479,7 +479,7 @@ def test_mermaid_renders_sectioned_labels_default_node_and_custom_style() -> Non
                     _node_call(
                         "seed",
                         "test.seed",
-                        "Produces a seed value with a long readable description that should wrap deterministically in the SVG label.",
+                        "Produces a seed value with a long readable description that should wrap deterministically in the flowchart label.",
                         display_name="Readable Seed",
                         style={"fill": "#123abc", "stroke": "#456def", "text": "#654321"},
 
@@ -494,7 +494,7 @@ def test_mermaid_renders_sectioned_labels_default_node_and_custom_style() -> Non
     assert "classDef defaultNode fill:#ECECFF,stroke:#9370DB,color:#333333;" in text
     assert 'seed@{ shape: rect, label: "Readable Seed\\n\\nid: seed\\ndefinition_id: test.seed' in text
     assert "\\n---------- meta ----------\\ndesc: Produces a seed value with a long readable" in text
-    assert "\\n      description that should wrap deterministically in\\n      the SVG label." in text
+    assert "\\n      description that should wrap deterministically in\\n      the flowchart label." in text
     assert "requires:" not in text
     assert "provides:" not in text
     assert "class seed defaultNode;" in text
@@ -534,64 +534,6 @@ def test_mermaid_custom_style_overrides_health_class_color() -> None:
 
     assert "class seed healthWarning;" in text
     assert "style seed fill:#123abc,stroke:#456def,color:#654321;" in text
-
-
-def test_mermaid_external_boundary_composes_with_health_and_custom_style(tmp_path) -> None:
-    registry = _registry()
-    register_node(registry, ExternalVisualNode_DECLARATION, ExternalVisualNode)
-    register_node(registry, ExternalResultVisualNode_DECLARATION, ExternalResultVisualNode)
-    graph = parse_graph_config(
-        {
-            "pipeline": {
-                "nodes": [
-                    _node_call("external_default", "test.external_visual", "Uses the default external style."),
-                    _node_call("external_warning", "test.external_visual", "Keeps its external boundary under a warning."),
-                    _node_call(
-                        "external_custom",
-                        "test.external_result_visual",
-                        "Keeps its external boundary under custom colors.",
-                        display_name="[EXTERNAL] Custom External",
-                        style={"fill": "#123abc", "stroke": "#456def", "text": "#654321"},
-                    ),
-                ]
-            }
-        }
-    )
-    report = HealthReport(
-        status="CONCERNS",
-        warnings=(
-            HealthFinding(
-                rule_id="TEST.WARNING",
-                severity="warning",
-                object_type="node",
-                object_id="external_warning",
-                message="fixture warning",
-            ),
-        ),
-    )
-
-    text = export_mermaid(graph, registry=registry, health_report=report)
-
-    assert "classDef externalBoundary stroke-width:7px,vector-effect:non-scaling-stroke;" in text
-    assert "class external_default externalDependency;" in text
-    assert "class external_warning healthWarning;" in text
-    assert "class external_custom externalDependency;" in text
-    for node_id in ("external_default", "external_warning", "external_custom"):
-        assert f"class {node_id} externalBoundary;" in text
-    assert "style external_custom fill:#123abc,stroke:#456def,color:#654321;" in text
-    assert text.count("[EXTERNAL] Custom External") == 1
-    assert "[EXTERNAL] [EXTERNAL]" not in text
-    assert "external: true" in text
-    assert "definition_id: test.external_result_visual" in text
-
-    if not is_mermaid_svg_renderer_available():
-        pytest.skip("Mermaid SVG renderer is not installed")
-    svg_path = tmp_path / "external.svg"
-    render_mermaid_svg(text, svg_path)
-    svg = svg_path.read_text(encoding="utf-8")
-    assert ".externalBoundary rect{stroke-width:7px!important;vector-effect:non-scaling-stroke!important;}" in svg
-    assert "externalDependency externalBoundary" in svg
-    assert "healthWarning externalBoundary" in svg
 
 
 def test_mermaid_renders_contracts_on_edges_and_hides_them_when_requested() -> None:
@@ -1354,182 +1296,6 @@ def test_planned_nodes_compile_without_registry_and_render_as_architecture() -> 
     assert "---------- status ----------" in text
     assert "planned" in text
     assert "class a plannedNode;" in text
-
-
-def test_global_state_uses_cloud_shape_and_keeps_visual_styles(tmp_path) -> None:
-    graph = parse_graph_config(
-        {
-            "pipeline": {
-                "nodes": [
-                    _node_call(
-                        "runtime_state",
-                        "future.runtime_state",
-                        "Declares a future ambient-state operation.",
-                        status="planned",
-                        flow_kind="global_state",
-                        style={
-                            "fill": "#ddeeff",
-                            "stroke": "#224466",
-                            "text": "#112233",
-                        },
-                    ),
-                    _node_call(
-                        "normal_process",
-                        "future.normal_process",
-                        "Provides a rectangular geometry control.",
-                        status="planned",
-                        flow_kind="process",
-                    ),
-                ],
-                "edges": [{"from": "runtime_state", "to": "normal_process"}],
-            }
-        }
-    )
-
-    mermaid = export_mermaid(graph)
-
-    assert 'runtime_state@{ shape: cloud, label: "Runtime State' in mermaid
-    assert "effect_scope: unavailable" in mermaid
-    assert "class runtime_state plannedNode;" in mermaid
-    assert "class runtime_state vibeflowCloudNode;" in mermaid
-    assert (
-        "style runtime_state fill:#ddeeff,stroke:#224466,color:#112233;"
-        in mermaid
-    )
-
-    if not is_mermaid_svg_renderer_available():
-        pytest.skip("Mermaid SVG renderer is not installed")
-    svg_path = tmp_path / "global-state.svg"
-    render_mermaid_svg(mermaid, svg_path)
-    svg = svg_path.read_text(encoding="utf-8")
-    assert "runtime_state" in svg
-    document = ElementTree.parse(svg_path)
-    groups = {
-        group.attrib.get("id", ""): group
-        for group in document.getroot().iter()
-        if group.tag.endswith("}g")
-    }
-    cloud = next(
-        group for identifier, group in groups.items()
-        if "runtime_state" in identifier
-    )
-    process = next(
-        group for identifier, group in groups.items()
-        if "normal_process" in identifier
-    )
-    assert any(child.tag.endswith("}path") for child in cloud)
-    assert not any(child.tag.endswith("}rect") for child in cloud)
-    assert any(child.tag.endswith("}rect") for child in process)
-    cloud_label = next(
-        child
-        for child in list(cloud)
-        if child.tag.endswith("}g") and "label" in child.attrib.get("class", "").split()
-    )
-    assert cloud_label.attrib["transform"].startswith("translate(0, ")
-
-
-def test_global_state_cloud_survives_health_external_and_custom_styles(
-    tmp_path,
-) -> None:
-    registry = _registry()
-    register_node(registry, GlobalVisualNode_DECLARATION, GlobalVisualNode)
-    register_node(
-        registry,
-        ExternalGlobalVisualNode_DECLARATION,
-        ExternalGlobalVisualNode,
-    )
-    graph = parse_graph_config(
-        {
-            "pipeline": {
-                "nodes": [
-                    _node_call(
-                        "warning_cloud",
-                        "test.global_visual",
-                        "Keeps cloud geometry under a health warning.",
-                    ),
-                    _node_call(
-                        "error_external_cloud",
-                        "test.external_global_visual",
-                        "Keeps cloud geometry under error and external styles.",
-                    ),
-                    _node_call(
-                        "custom_cloud",
-                        "test.global_visual",
-                        "Keeps cloud geometry under custom colors.",
-                        style={
-                            "fill": "#ddeeff",
-                            "stroke": "#224466",
-                            "text": "#112233",
-                        },
-                    ),
-                ]
-            }
-        }
-    )
-    report = HealthReport(
-        status="FAIL",
-        errors=(
-            HealthFinding(
-                rule_id="TEST.ERROR",
-                severity="error",
-                object_type="node",
-                object_id="error_external_cloud",
-                message="fixture error",
-            ),
-        ),
-        warnings=(
-            HealthFinding(
-                rule_id="TEST.WARNING",
-                severity="warning",
-                object_type="node",
-                object_id="warning_cloud",
-                message="fixture warning",
-            ),
-        ),
-    )
-
-    mermaid = export_mermaid(
-        graph,
-        registry=registry,
-        health_report=report,
-    )
-
-    for node_id in (
-        "warning_cloud",
-        "error_external_cloud",
-        "custom_cloud",
-    ):
-        assert f"{node_id}@{{ shape: cloud" in mermaid
-    assert "class warning_cloud healthWarning;" in mermaid
-    assert "class error_external_cloud healthError;" in mermaid
-    assert "class error_external_cloud externalBoundary;" in mermaid
-    assert (
-        "style custom_cloud fill:#ddeeff,stroke:#224466,color:#112233;"
-        in mermaid
-    )
-
-    if not is_mermaid_svg_renderer_available():
-        pytest.skip("Mermaid SVG renderer is not installed")
-    svg_path = tmp_path / "global-state-combinations.svg"
-    render_mermaid_svg(mermaid, svg_path)
-    document = ElementTree.parse(svg_path)
-    node_groups = [
-        group
-        for group in document.getroot().iter()
-        if group.tag.endswith("}g")
-        and any(
-            node_id in group.attrib.get("id", "")
-            for node_id in (
-                "warning_cloud",
-                "error_external_cloud",
-                "custom_cloud",
-            )
-        )
-    ]
-    assert len(node_groups) == 3
-    for group in node_groups:
-        assert any(child.tag.endswith("}path") for child in group)
-        assert not any(child.tag.endswith("}rect") for child in group)
 
 
 def test_implemented_node_cannot_declare_config_flow_kind() -> None:

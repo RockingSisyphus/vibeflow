@@ -304,9 +304,9 @@ second = ruleset(id="case.second", calls=[{"id":"check", "rule_id":"case.config"
             "seconds": sum(item["seconds"] for item in observations)}, failures
 
 
-def observe_cases(work: Path, kernel: Path, renderer: Path | None, *, installed=False):
+def observe_cases(work: Path, kernel: Path, *, installed=False):
     """Return machine cases; every observation uses a new formal CLI process."""
-    args = SimpleNamespace(kernel=kernel, renderer=renderer, installed=installed)
+    args = SimpleNamespace(kernel=kernel, installed=installed)
     cases = [("cache-params-diagnostics", _params_case),
              ("cache-ruleset-local-call-diagnostics", _calls_case),
              ("cache-error-records", lambda root, args: _records_case(root, args, "completed")),

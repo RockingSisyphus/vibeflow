@@ -40,7 +40,7 @@ def scenarios(representative=False):
         yield 'cross-root-'+command, {'cross_root':True}, command
     for kind in ('nodeset','loop'):
         yield kind+'-run', {'nested':True,'loop':kind=='loop','repeats':4}, 'run'
-    for command in ('validate','quality-check','review','export-architecture','export-ascii','export-mermaid','run'):
+    for command in ('validate','quality-check','review','export-architecture','export-mermaid','run'):
         yield f"entry-{command}", {}, command
     for command in ('validate','export-architecture','export-mermaid','run'):
         yield f"late-{command}", {'late':True}, command
@@ -55,11 +55,11 @@ def command_arguments(command, project):
         result += ['--config', str(project/'workflow.jsonc')]
     if command in ('validate','quality-check'):
         result += ['--json']
-    if command.startswith('export-') or command == 'review':
-        suffix = {'export-architecture':'jsonc','export-ascii':'txt','export-mermaid':'mmd'}.get(command,'svg')
+    if command.startswith('export-'):
+        suffix = {'export-architecture':'jsonc','export-mermaid':'mmd'}.get(command,'mmd')
         filename = 'ARCHITECTURE.jsonc' if command == 'export-architecture' else 'graph.'+suffix
         result += ['--output', str(project/filename)]
-    if command in ('export-mermaid','export-svg'):
+    if command == 'export-mermaid':
         result += ['--expand-nodesets']
     if command == 'run':
         result += ['--input',str(project/'input.json'),'--run-root',str(project/'runs'),'--run-id','observed']
@@ -81,8 +81,8 @@ def verify(identifier, options, command, observation, project, *, baseline):
         allowed = {'NODE.EFFECT.CALL_FORBIDDEN','BASE_LIB.SIDE_EFFECT_CALL','NODE.BASE_LIB.INDIRECT_VIOLATION'}
         if any(item.get('rule_id') not in allowed for item in health.get('errors',())):
             failures.append('unrelated errors obscured the targeted source failure')
-        if command == 'review' and (payload.get('published') is not False or (project/'graph.svg').exists()):
-            failures.append('failed review published SVG')
+        if command == 'review' and (payload.get('published') is not False):
+            failures.append('failed review reported publication')
         if command == 'run':
             path = project/'runs/observed/health_report.json'
             written = json.loads(path.read_text()) if path.exists() else {}
@@ -125,13 +125,13 @@ def observe(identifier, options, command, args, index=0):
                           preload='perf.late' if options.get('preload') else None)
     failures = verify(identifier, options, command, observation,project,baseline=args.baseline)
     if command == 'review' and not options.get('violation') and observation['exit_code'] == 0:
-        failures += inspect_products(project, args)
+        failures += inspect_products(project)
     return {'id':identifier,'iteration':index,'options':options,'command':command,
             'matched':not failures,'failures':failures,'artifact_root':str(project),**observation}
 
 
-def inspect_products(project, args):
-    """Inspect the canonical JSONC, Mermaid and computed SVG in a browser."""
+def inspect_products(project):
+    """Inspect the canonical JSONC and published offline HTML."""
     failures = []
     document = json.loads('\n'.join(line for line in (project/'ARCHITECTURE.jsonc').read_text().splitlines()
                                     if not line.strip().startswith('//')))
@@ -142,24 +142,8 @@ def inspect_products(project, args):
     descriptor = document['node_definitions']['perf.step.0']
     if 'group0.py' not in json.dumps(descriptor) or 'perf.calls' not in json.dumps(descriptor):
         failures.append('canonical Architecture lost implementation or ruleset sources')
-    mermaid = (project/'graph.mmd').read_text() if (project/'graph.mmd').exists() else ''
-    if '#d6eaff' not in mermaid:
-        failures.append('review Mermaid lost declared color')
-    if not args.renderer:
-        return failures+['browser evidence requires --renderer']
-    result = subprocess.run(['node',str(ROOT/'tests/fixtures/support/svg_browser.mjs'),
-                             str(args.renderer),str(project/'graph.svg'),str(project/'graph.png')],
-                             capture_output=True,text=True,timeout=60,check=False)
-    if result.returncode:
-        raise RuntimeError(f"SVG browser exited {result.returncode}: {result.stdout}\n{result.stderr}")
-    browser = json.loads(result.stdout)
-    (project/'browser.json').write_text(json.dumps(browser,indent=2)+'\n')
-    selected = [item for item in browser['nodes'] if 'step0' in item['text']]
-    colored = [shape for item in selected for shape in item['shapes'] if shape['fill']=='rgb(214, 234, 255)']
-    if not colored or any(shape['width']<=0 or shape['height']<=0 for shape in colored):
-        failures.append('final SVG has no visible declared node geometry/color')
-    if not any(shape['tag']=='rect' and float(shape.get('rx') or 0)>0 for shape in colored):
-        failures.append('final SVG does not use the declared rounded shape')
+    if not (project.parent / "vibeflow-preview.html").is_file():
+        failures.append("review did not publish the offline HTML preview")
     return failures
 
 
@@ -169,8 +153,6 @@ def run_cli(project, arguments, args, name='observation', *, preload=None):
     paths = [str(ROOT)] if args.installed else [str(args.kernel),str(ROOT)]
     env['PYTHONPATH'] = os.pathsep.join(paths)
     env['PYTHONDONTWRITEBYTECODE'] = '1'
-    if args.renderer:
-        env['VIBEFLOW_MERMAID_RENDERER_ROOT'] = str(args.renderer)
     invocation = [sys.executable,'-B','-m','tests.fixtures.python.review_performance.observe_cli',
                   '--report',str(report)]
     if preload:
@@ -190,7 +172,6 @@ def main():
     parser.add_argument('--installed',action='store_true')
     parser.add_argument('--baseline',action='store_true')
     parser.add_argument('--representative',action='store_true')
-    parser.add_argument('--renderer',type=Path)
     parser.add_argument('--timing-repeats',type=int,default=3)
     args = parser.parse_args()
     args.work.mkdir(parents=True,exist_ok=True)
@@ -206,7 +187,7 @@ def main():
                 errors.append({'id':identifier,'iteration':iteration,'error':repr(error)})
                 print(f'{identifier}/{iteration}: observation error {error}',flush=True)
     from tests.fixtures.python.review_performance.cache_cases import observe_cases
-    for item in observe_cases(args.work/'cache',args.kernel,args.renderer,installed=args.installed):
+    for item in observe_cases(args.work/'cache',args.kernel,installed=args.installed):
         results.append(item)
         print(f"{item['id']}: {'PASS' if item['matched'] else item['failures']}",flush=True)
     medians = {key:statistics.median(item['seconds'] for item in results if item['id']==key)

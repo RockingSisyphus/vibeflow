@@ -92,35 +92,6 @@ def test_category_rules_public_ast_helpers_and_actual_numerical_run(domain_proje
     assert _evidence(run_health, "example.model")["definitions"] == evidence["definitions"]
 
 
-def test_category_style_and_call_override_enter_formal_review(domain_project, capsys, tmp_path, monkeypatch):
-    workspace, project = domain_project
-    output = tmp_path / "model.mmd"
-    assert main(["export-mermaid", *_common(workspace, project), "--output", str(output)]) == 0
-    assert "#cceeff" in output.read_text()
-    config = project / "configs/model.jsonc"
-    document = json.loads(config.read_text())
-    document["pipeline"]["nodes"][1]["style"] = {"fill": "#ddeeff"}
-    config.write_text(json.dumps(document))
-    _register_architecture(project)
-    # Rendering is an external browser boundary; the formal review still
-    # compiles, generates the architecture, runs selected Rules and publishes.
-    import vibeflow.tooling.application.python.presentation.mermaid.review_svg as svg
-    def render(graph, compiled, target, **kwargs):
-        Path(target).write_text('<svg xmlns="http://www.w3.org/2000/svg" aria-roledescription="flowchart-review-columns"><g class="review-inline-fragment"><g id="model"/></g></svg>')
-    monkeypatch.setattr(svg, "render_review_columns_svg", render)
-    code, payload = _call(capsys, ["review", *_common(workspace, project), "--output", str(tmp_path / "model.svg")])
-    assert code == 0, payload
-    assert payload["published"] is True
-    from vibeflow.tooling.project.config_loader import strip_jsonc_comments
-    architecture = json.loads(strip_jsonc_comments((project / "ARCHITECTURE.jsonc").read_text()))
-    model = next(item for item in architecture["workflow"]["nodes"] if item["id"] == "model")
-    assert "model_block" in architecture["node_definitions"]["example.model"]["info"]["tags"]
-    assert model["presentation"]["values"]["fill"] == "#ddeeff"
-    assert model["presentation"]["sources"]["fill"] == "call"
-    assert main(["export-mermaid", *_common(workspace, project), "--output", str(output)]) == 0
-    assert "#ddeeff" in output.read_text()
-
-
 @pytest.mark.parametrize("command", ["validate", "quality-check", "review", "run"])
 def test_helper_model_location_reaches_every_formal_check(domain_project, capsys, tmp_path, command):
     workspace, project = domain_project
@@ -129,7 +100,7 @@ def test_helper_model_location_reaches_every_formal_check(domain_project, capsys
         arguments = [command, "--workspace", str(workspace), "--json"]
     elif command == "review":
         _register_architecture(project)
-        arguments = [command, *_common(workspace, project), "--output", str(tmp_path / "invalid.svg")]
+        arguments = [command, *_common(workspace, project)]
     elif command == "run":
         arguments = [command, *_common(workspace, project), "--input", str(workspace.parent / "input.json"),
                      "--run-root", str(tmp_path / "runs"), "--run-id", "invalid"]

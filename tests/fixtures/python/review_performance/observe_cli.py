@@ -39,8 +39,6 @@ def main():
               "exit_code":code,"error":failure,"seconds":perf_counter()-started,
               **observations.to_dict()}
     args.report.write_text(json.dumps(report,indent=2)+"\n")
-    if observations.mermaid:
-        (args.report.parent/'graph.mmd').write_text('\n'.join(observations.mermaid)+'\n')
     print(json.dumps({"exit_code":code,"report":str(args.report),"seconds":report["seconds"]}))
     return 0 if failure is None else 1
 

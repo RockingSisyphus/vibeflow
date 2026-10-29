@@ -207,8 +207,6 @@ def test_python_review_rejects_javascript_root_before_publishing(
             str(workspace),
             "--config",
             str(config),
-            "--output",
-            str(output),
         ]
     )
 
@@ -500,8 +498,6 @@ def test_missing_workspace_is_rejected_by_neutral_loader_without_target_import(
         "inspect-config",
         "export-mermaid",
         "export-architecture",
-        "export-ascii",
-        "export-svg",
         "review",
     ),
 )
@@ -527,15 +523,3 @@ def test_shared_command_help_needs_no_project_or_target_import(
     assert "--config" in output.out
     assert "PROJECT_TARGET.MISSING" not in output.out
     assert output.err == ""
-
-
-def test_shared_javascript_svg_help_exposes_nodeset_diagnostics(capsys) -> None:
-    assert cli_main(["export-svg", "--help"]) == 0
-
-    output = capsys.readouterr()
-    assert "--expand-nodesets" in output.out
-    assert "--collapse-nodeset_types" in output.out
-    assert "--hide-contract" in output.out
-    assert "--hide-semantics" in output.out
-    assert "--mermaid-layout" in output.out
-    assert "--review-fragment-max-width" in output.out

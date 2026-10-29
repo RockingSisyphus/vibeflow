@@ -6,7 +6,7 @@ Box 从 2 开始加 3；单次 5、条件两次 8、固定四次 14。检查两�
 python sandbox/python/object_addition/run_all.py
 ```
 
-默认使用外部临时目录；`--work-dir /absolute/outside/repository` 保留项目、报告与运行记录。Python 可用 `--renderer-root` 复用 Mermaid/Puppeteer，JavaScript 可用 `--toolchain-root` 复用按 package-lock 安装的 TypeScript/esbuild。
+默认使用外部临时目录；`--work-dir /absolute/outside/repository` 保留项目、报告与运行记录。Python 可用 `--renderer-root` 复用 Puppeteer，JavaScript 可用 `--toolchain-root` 复用按 package-lock 安装的 TypeScript/esbuild。
 
 业务代码在 project，Config 在 project/configs，测试驱动在 run_all.py。所有源码修改仅发生在工作副本中。具体断言见同目录 [run_all.py](run_all.py)，报告由每次运行生成。
 

@@ -246,10 +246,6 @@ def test_target_source_facts_do_not_assemble_default_rules(quality_case, monkeyp
     assert facts.findings == ()
 
 
-
-
-
-
 def test_source_import_resolution_handles_index_reexport_and_package_alias(quality_case) -> None:
     root = quality_case({
         "src/main.ts": (
@@ -371,8 +367,6 @@ def test_quality_warning_text_and_exit_code(quality_case, capsys) -> None:
     assert code == 0
     assert "Project quality: CONCERNS" in output
     assert "QUALITY.FILE.WARN_LINES" in output
-
-
 
 
 def test_mixed_workspace_root_rule_parameters_apply_to_both_targets(tmp_path, capsys):
@@ -701,7 +695,6 @@ def test_review_uses_registered_node_and_nodeset_quality_rules(
     output = tmp_path / "review.svg"
     code = main([
         "review", "--workspace", str(workspace), "--config", str(config),
-        "--output", str(output),
     ])
     payload = json.loads(capsys.readouterr().out)
     assert code == 1 and payload["failed_stage"] == "preflight"

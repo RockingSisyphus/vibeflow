@@ -2,15 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import tempfile
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Mapping
-
-
-_REVIEW_LAYOUT = "flowchart-review-columns"
-_REVIEW_FRAGMENT_CLASS = "review-inline-fragment"
 
 
 def add_review_parser(subparsers: argparse._SubParsersAction) -> None:
@@ -20,8 +13,6 @@ def add_review_parser(subparsers: argparse._SubParsersAction) -> None:
     )
     review.add_argument("--workspace", required=True, help="workspace vibeflow_config.jsonc path")
     review.add_argument("--config", required=True, help="registered executable workflow config path")
-    review.add_argument("--output", help="optional canonical expanded review SVG output path")
-    review.add_argument("--with-svg", action="store_true", help="also render the optional review SVG")
     review.add_argument("--preview-root", help="override offline preview directory")
 
 
@@ -29,9 +20,7 @@ def handle_review(args: argparse.Namespace) -> int:
     runner = _ReviewRunner(
         workspace_path=Path(args.workspace).resolve(),
         config_path=Path(args.config).resolve(),
-        output_path=Path(args.output).resolve() if args.output else None,
         preview_root=getattr(args, "preview_root", None),
-        with_svg=getattr(args, "with_svg", False),
     )
     return_code = runner.run()
     _print_result(runner.result)
@@ -39,15 +28,11 @@ def handle_review(args: argparse.Namespace) -> int:
 
 
 class _ReviewRunner:
-    def __init__(self, *, workspace_path: Path, config_path: Path, output_path: Path | None, preview_root=None, with_svg=False) -> None:
+    def __init__(self, *, workspace_path: Path, config_path: Path, preview_root=None) -> None:
         self.workspace_path = workspace_path
         self.config_path = config_path
-        self.output_path = output_path
-        self.legacy_output = output_path is not None
-        self.with_svg = with_svg or self.legacy_output
-        self.preview_record = None
         self.preview_root = preview_root
-        self.result = _review_result(config_path=config_path, output_path=output_path)
+        self.result = _review_result(config_path=config_path)
         self.preparation = None
         self.governance = None
         self.workspace = None
@@ -60,17 +45,15 @@ class _ReviewRunner:
         self.health = None
         self.presentation = None
         self.validation_status = "ERROR"
-        self.temporary_path: Path | None = None
 
     def run(self) -> int:
         stages = (
             self._load_workspace,
             self._locate_architecture,
-            self._check_output_conflict,
             self._preflight,
             self._regenerate_architecture,
             self._validate,
-            self._render_and_publish,
+            self._publish_preview,
         )
         for stage in stages:
             if not stage():
@@ -93,9 +76,6 @@ class _ReviewRunner:
             self.preparation = ProjectPreparation(self.workspace)
             self.governance = self.preparation.review(write_architecture=True)
             self.result["project_architecture"] = str(self.governance.architecture_path)
-            if self.output_path is None:
-                self.output_path = Path(self.preview_root or self.workspace.root).resolve() / "vibeflow-preview.html"
-                self.result.update(output=str(self.output_path), svg=None)
         except WorkspaceConfigError as exc:
             finding = HealthFinding(
                 rule_id=exc.rule_id,
@@ -155,24 +135,6 @@ class _ReviewRunner:
         self.result["architecture"] = str(self.spec.document_path.resolve())
         return True
 
-    def _check_output_conflict(self) -> bool:
-        protected_paths = {
-            self.workspace_path,
-            self.config_path,
-            self.spec.document_path.resolve(),
-        }
-        if self.output_path not in protected_paths:
-            return True
-        finding = _review_finding(
-            "REVIEW.OUTPUT.CONFLICT",
-            f"review SVG output must not overwrite workspace, workflow, or architecture source: {self.output_path}",
-            object_type="svg",
-            object_id=str(self.output_path),
-            failure_layer="source",
-            details={"protected_paths": [str(path) for path in sorted(protected_paths)]},
-        )
-        self._fail_finding("output", "FAIL", finding)
-        return False
 
     def _preflight(self) -> bool:
         from vibeflow.tooling.application.python.workspace_service import load_workspace_graph_for_export
@@ -273,127 +235,21 @@ class _ReviewRunner:
             return False
         return True
 
-    def _render_and_publish(self) -> bool:
-        if not self._publish_preview():
-            return False
-        if not self.with_svg:
-            return True
-        if not self.legacy_output:
-            self.output_path = self.preview_record.directory / "requested-review.svg"
-        success = False
-        try:
-            if self._create_temporary_output():
-                success = all(stage() for stage in
-                    (self._render_temporary_output,self._check_temporary_output,self._publish_output))
-            if success:
-                from vibeflow.tooling.presentation.preview.exporter import attach_svg
-                attach_svg(self.preview_record,self.output_path)
-                self.preview_record.update("passed")
-                self.result["svg"] = str(self.output_path) if self.legacy_output else str(self.preview_record.directory/"review.svg")
-            else:
-                message=self.result.get("error",{}).get("message","Requested SVG generation failed")
-                self.preview_record.metadata["svg_error"]=message
-                self.preview_record.update("failed",error=message)
-            return success
-        except Exception as exc:
-            self.preview_record.metadata["svg_error"]=str(exc)
-            self.preview_record.update("failed",error=str(exc))
-            self._fail_finding("svg","FAIL",_review_finding("REVIEW.SVG.ATTACH",str(exc),
-                object_type="svg",object_id=str(self.output_path),failure_layer="render"))
-            return False
-        finally:
-            self._cleanup_temporary_output()
-            if not self.legacy_output:
-                self.output_path.unlink(missing_ok=True)
 
     def _publish_preview(self) -> bool:
         from vibeflow.tooling.application.python.presentation.preview import python_preview
         try:
             record = python_preview(self.presentation, config=self.config_path, workspace=self.workspace,
-                                    preview_root=self.preview_root, category="review", status="reviewing" if self.with_svg else "passed", check_status=self.validation_status)
-            self.preview_record = record
+                                    preview_root=self.preview_root, category="review", status="passed", check_status=self.validation_status)
             self.result["preview"] = str(record.root / "vibeflow-preview.html")
+            self.result["output"] = self.result["preview"]
             self.result["preview_id"] = record.metadata["id"]
             return True
         except Exception as exc:
             self._fail_finding("preview", "FAIL", _review_finding("REVIEW.PREVIEW.WRITE", str(exc),
-                object_type="preview", object_id=str(self.output_path), failure_layer="render"))
+                object_type="preview", object_id=str(self.preview_root or self.workspace.root), failure_layer="render"))
             return False
 
-    def _create_temporary_output(self) -> bool:
-        try:
-            self.output_path.parent.mkdir(parents=True, exist_ok=True)
-            with tempfile.NamedTemporaryFile(
-                prefix=f".{self.output_path.name}.",
-                suffix=".tmp",
-                dir=self.output_path.parent,
-                delete=False,
-            ) as handle:
-                self.temporary_path = Path(handle.name)
-        except OSError as exc:
-            finding = _review_finding(
-                "REVIEW.SVG.TEMPORARY_OUTPUT",
-                f"could not create temporary SVG output beside {self.output_path}: {exc}",
-                object_type="svg",
-                object_id=str(self.output_path),
-                failure_layer="source",
-            )
-            self._fail_finding("svg", "ERROR", finding)
-            return False
-        return True
-
-    def _render_temporary_output(self) -> bool:
-        try:
-            _render_canonical_review_svg(
-                self.graph,
-                self.compiled,
-                self.temporary_path,
-                registry=self.registry,
-                resources=self.resources,
-                prepared=self.presentation,
-            )
-        except Exception as exc:
-            finding = _review_finding(
-                "REVIEW.SVG.RENDER",
-                f"could not render canonical expanded review SVG: {exc}",
-                object_type="svg",
-                object_id=str(self.output_path),
-                failure_layer="render",
-            )
-            self._fail_finding("svg", "FAIL", finding)
-            return False
-        return True
-
-    def _check_temporary_output(self) -> bool:
-        finding = _check_canonical_review_svg(self.temporary_path, output_path=self.output_path)
-        if finding is None:
-            return True
-        self._fail_finding("svg_check", "FAIL", finding)
-        return False
-
-    def _publish_output(self) -> bool:
-        try:
-            os.replace(self.temporary_path, self.output_path)
-            self.temporary_path = None
-        except OSError as exc:
-            finding = _review_finding(
-                "REVIEW.SVG.PUBLISH",
-                f"could not publish canonical expanded review SVG to {self.output_path}: {exc}",
-                object_type="svg",
-                object_id=str(self.output_path),
-                failure_layer="source",
-            )
-            self._fail_finding("publish", "ERROR", finding)
-            return False
-        return True
-
-    def _cleanup_temporary_output(self) -> None:
-        if self.temporary_path is None:
-            return
-        try:
-            self.temporary_path.unlink(missing_ok=True)
-        except OSError:
-            pass
 
     def _fail_report(self, stage: str, report: object) -> None:
         self.result["validation"] = report.to_dict()
@@ -410,89 +266,12 @@ class _ReviewRunner:
         )
 
 
-def _render_canonical_review_svg(
-    graph: object, compiled: object, output_path: Path,
-    *,
-    registry: object, resources: object,
-    prepared=None,
-) -> None:
-    from vibeflow.tooling.presentation.mermaid import (
-        EXPANDED_MERMAID_MAX_EDGES,
-        EXPANDED_MERMAID_MAX_TEXT_SIZE,
-    )
-    from vibeflow.tooling.application.python.presentation.mermaid.review_svg import render_review_columns_svg
-
-    render_review_columns_svg(
-        graph,
-        compiled,
-        output_path,
-        registry=registry,
-        resources=resources,
-        expand_nodesets=True,
-        show_contract=True,
-        show_semantics=True,
-        theme="default",
-        background="transparent",
-        max_text_size=EXPANDED_MERMAID_MAX_TEXT_SIZE,
-        max_edges=EXPANDED_MERMAID_MAX_EDGES,
-        prepared=prepared,
-    )
-
-
-def _check_canonical_review_svg(path: Path, *, output_path: Path):
-    try:
-        root = ET.parse(path).getroot()
-    except (OSError, ET.ParseError) as exc:
-        return _review_finding(
-            "REVIEW.SVG.XML",
-            f"rendered review output is not readable SVG XML: {exc}",
-            object_type="svg",
-            object_id=str(output_path),
-            failure_layer="render",
-        )
-    if _xml_local_name(root.tag) != "svg":
-        return _review_finding(
-            "REVIEW.SVG.ROOT",
-            "rendered review output root element is not <svg>",
-            object_type="svg",
-            object_id=str(output_path),
-            failure_layer="render",
-        )
-    if root.attrib.get("aria-roledescription") != _REVIEW_LAYOUT:
-        return _review_finding(
-            "REVIEW.SVG.LAYOUT",
-            f"rendered review output is missing aria-roledescription={_REVIEW_LAYOUT!r}",
-            object_type="svg",
-            object_id=str(output_path),
-            failure_layer="render",
-        )
-    fragments = [
-        element
-        for element in root.iter()
-        if _xml_local_name(element.tag) == "g"
-        and _REVIEW_FRAGMENT_CLASS in element.attrib.get("class", "").split()
-    ]
-    if not any(len(list(fragment)) > 0 for fragment in fragments):
-        return _review_finding(
-            "REVIEW.SVG.FRAGMENT",
-            f"rendered review output has no non-empty {_REVIEW_FRAGMENT_CLASS} group",
-            object_type="svg",
-            object_id=str(output_path),
-            failure_layer="render",
-        )
-    return None
-
-
-def _xml_local_name(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1]
-
-
-def _review_result(*, config_path: Path, output_path: Path | None) -> dict[str, object]:
+def _review_result(*, config_path: Path) -> dict[str, object]:
     return {
         "status": "ERROR", "failed_stage": None,
         "config": str(config_path),
         "architecture": None, "validation": None,
-        "svg": str(output_path) if output_path is not None else None, "published": False,
+        "published": False,
     }
 
 

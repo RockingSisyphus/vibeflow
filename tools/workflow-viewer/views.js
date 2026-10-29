@@ -1,6 +1,6 @@
 /* Flow, resource and declared-workflow views over the common card renderer. */
 "use strict";
-window.VFViews=({getData,getMode,getCurrent,getEntry=()=>"",getVisible,getEdgeFacts,isCurrent,elk,node,layoutBody,factsNodes,empty,showInfo,resourceUrl})=>{
+window.VFViews=({getData,getEntry=()=>"",getVisible,getEdgeFacts,isCurrent,elk,node,layoutBody,factsNodes,empty,showInfo})=>{
   let sequence=0;
   function arrows(group){
     const defs=node("defs"),ids={};
@@ -57,16 +57,8 @@ window.VFViews=({getData,getMode,getCurrent,getEntry=()=>"",getVisible,getEdgeFa
     return group;
   }
   async function drawFlow(descriptor,token) {
-    const data=getData(),mode=getMode();
+    const data=getData();
     const body=data.bodies.workflow;if(!body)throw new Error("缺少流程数据");
-    if(mode==="original"){
-      if(!data.artifacts?.svg)throw new Error("本记录没有原 SVG 附件。使用 review --with-svg 生成对照。");
-      const url=resourceUrl("snapshots/"+encodeURIComponent(getCurrent())+"/"+data.artifacts.svg),picture=new Image();
-      await new Promise((resolve,reject)=>{picture.onload=resolve;picture.onerror=()=>reject(new Error("SVG 附件无法加载"));picture.src=url;});
-      if(!isCurrent(token))return null;
-      const wrapper=node("svg",{width:picture.naturalWidth||1200,height:picture.naturalHeight||800,viewBox:`0 0 ${picture.naturalWidth||1200} ${picture.naturalHeight||800}`});
-      wrapper.append(node("image",{href:url,width:picture.naturalWidth||1200,height:picture.naturalHeight||800,"pointer-events":"none"}));return wrapper;
-    }
     if(!factsNodes(body).length){empty(body.error||"当前 workflow 没有可显示节点。");return null;}
     const key=getEntry()?"entry:"+encodeURIComponent(getEntry()):"workflow";
     const layout=await layoutBody(key);if(!isCurrent(token))return null;return drawBody(layout);
@@ -102,7 +94,7 @@ window.VFViews=({getData,getMode,getCurrent,getEntry=()=>"",getVisible,getEdgeFa
     const layout=await layoutBody("resources","",[],body,"resource");if(!isCurrent(token))return null;return drawBody(layout);
   }
   async function drawLinks(descriptor,token) {
-    const data=getData(),mode=getMode();
+    const data=getData();
     const links=data.links||[],values=new Map();
     for(const link of links) {
       const from=link.from_root+":"+link.from_workflow,to=link.to_root+":"+link.to_workflow;

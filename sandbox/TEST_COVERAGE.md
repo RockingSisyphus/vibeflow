@@ -21,7 +21,7 @@
 | JS/TS 状态回调、Node/browser 运行、日志与生命周期 | sandbox/javascript/runtime_observation/probe.py；Target 回归与完整门禁的浏览器步骤 |
 | 内部上下文身份、只读共享、默认参数和词法身份回归 | tests/core、tests/targets/python，复用 tests/fixtures/python |
 | 历史规则对照与接口组合回归 | tests/fixtures/rule_parity/run_all.py、tests/fixtures/rule_gaps/run_all.py |
-| SVG 实际浏览器、布局、资源区和内部性能断言 | tests/fixtures/python/review_layout、review_performance、两个 Target 的 resource_sections |
+| HTML 交互、资源视图与审查性能 | tests/tooling/test_review_cli.py、test_local_preview.py、review_performance、两个 Target 的 resource_sections |
 | SDK、编译与装配、发布包来源隔离 | tests/fixtures/adaptation_regressions、wheel 和双 profile 发行验收 |
 
 ```bash
@@ -29,7 +29,7 @@ python tools/verify_project.py --full
 python repo_check/test.py
 ```
 
-完整验证按锁文件在临时工作区安装 TypeScript/esbuild 和 Mermaid/Puppeteer，实际执行图形与浏览器检查。未准备渲染器的普通 pytest 中出现的跳过，不能代替完整图形验收。
+完整验证按锁文件在临时工作区安装 TypeScript/esbuild 和 Puppeteer，实际执行图形与浏览器检查。未准备渲染器的普通 pytest 中出现的跳过，不能代替完整图形验收。
 
 用户沙盒继续加载当前工作区源码。完整门禁另有从当前源码构建的 wheel 和两个开发包的隔离验收；这两类证据分别说明源码场景与实际交付物的行为。
 

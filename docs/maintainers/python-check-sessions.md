@@ -22,15 +22,15 @@ compiler 阶段保存一次编译产物：创建、before、after、dispose 各�
 
 ## 最终展示快照
 
-`PreparedPythonPresentation` 保存所选规则完成后的有效 Graph、编译结果、源码资料和只读注册器查询。Architecture、ASCII、Mermaid 与 SVG 共用这一快照。子图按定义及同一编译上下文准备，调用级判断已经在审查阶段完成。
+`PreparedPythonPresentation` 保存所选规则完成后的有效 Graph、编译结果、源码资料和只读注册器查询。Architecture、Mermaid 文本与 HTML 预览 共用这一快照。子图按定义及同一编译上下文准备，调用级判断已经在审查阶段完成。
 
-Mermaid 的 `resources` 参数决定本次调用绘制哪些资源：省略、`None` 或空 mapping 只绘制流程，显式传入时绘制所选资源。共享快照提供编译事实，不替调用者选择展示范围。正式 SVG 的主流程及 Nodeset 分片省略该参数，独立资源目录消费当前 workflow 的资源选择；多个分片继续复用同一快照与子图编译结果。源码归属及导入关系保留在 Architecture JSONC，不作为 SVG 目录的展开输入。
+Mermaid 的 `resources` 参数决定本次调用绘制哪些资源：省略、`None` 或空 mapping 只绘制流程，显式传入时绘制所选资源。共享快照提供编译事实，不替调用者选择展示范围。源码归属及导入关系保留在 Architecture JSONC。
 
 展示只查询声明、静态符号位置和已有绑定。延迟实现可以保留 `not_loaded`；其声明定位仍可进入 Architecture。独立展示 API 在传入 Registry 时准备当前事实，因此旧 `compiled` 不能覆盖 Registry 的最新审查结果。正式入口直接传入最终快照。
 
 Architecture 中的 `load_state` 记录生成快照时的观察：`loaded`、`not_loaded` 或 `unknown`。同一架构可能在审查进程尚未绑定实现，而在运行进程已经加载实现。文件与资源源码记录中这些合法状态的变化不触发文档过期；字段缺失、非法状态及源码、归属、规则、样式或来源变化仍参与完整比较。生成头、JSONC 与规范排版继续校验。
 
-`review` 保留 preflight 的健康报告，写入 Architecture 后检查该文件的内容与规范性，再发布结构化快照并安装独立 HTML 浏览工具，默认不加载 Mermaid。`--with-svg` 或显式 SVG 输出才渲染并原子发布附件；附件失败保留已生成的数据与旧正式 SVG，命令如实返回失败。数据与可选渲染都复用已经完成的检查、编译和展示事实。
+`review` 保留 preflight 的健康报告，写入 Architecture 后检查该文件的内容与规范性，再发布结构化快照并安装独立 HTML 浏览工具，默认不加载 Mermaid。JSON 审查结果写到标准输出；数据发布复用已经完成的检查、编译和展示事实。
 
 ## AST 的内部与公开使用
 
@@ -42,9 +42,8 @@ Architecture 中的 `load_state` 记录生成快照时的观察：`loaded`、`no
 
 `tests/fixtures/python/review_performance/run_all.py` 在新进程中执行正式 CLI，并在内存中计数，结束后写报告。自动验收检查展示阶段的绑定、规则执行和重复编译，检查真实调用次数及逐文件解析次数。时间使用 monotonic 时钟；代表案例重复三次，报告中位数。
 
-完整门禁包含该沙箱、实际浏览器 SVG 检验、旧规则回归和分发安装验收。沙箱使用 VibeFlow 自身固定的 SDK 资源；详见[运行说明](../../tests/fixtures/python/review_performance/README.md)。
+完整门禁包含该沙箱、实际 HTML 浏览器检验、旧规则回归和分发安装验收。沙箱使用 VibeFlow 自身固定的 SDK 资源；详见[运行说明](../../tests/fixtures/python/review_performance/README.md)。
 
-`tests/fixtures/python/review_layout/run_all.py` 验证资源只出现在独立资源面板、各层横竖方向及右侧详情排列，并以正式 CLI 和真实浏览器检查最终 SVG，保留修复前后的观察。
 
 ## Prepared fact views
 

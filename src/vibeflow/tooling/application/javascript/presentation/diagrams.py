@@ -1,35 +1,15 @@
 from __future__ import annotations
 from vibeflow.tooling.presentation.mermaid.style import mermaid_style, mermaid_shape
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
-import tempfile
 from typing import Mapping
 
 from vibeflow.core.constants import FLOW_KIND_DOCUMENT
 from vibeflow.core.flow import GraphConfig, LOOP_DEFINITION_IDS, NodeCallSpec, NodesetTypeSpec, STATUS_PLANNED
 from vibeflow.core.planned import effective_planned_behavior, planned_behavior_label
-from vibeflow.tooling.presentation.mermaid import (
-    DEFAULT_MERMAID_MAX_EDGES,
-    DEFAULT_MERMAID_MAX_TEXT_SIZE,
-    EXPANDED_MERMAID_MAX_EDGES,
-    EXPANDED_MERMAID_MAX_TEXT_SIZE,
-    render_mermaid_svg,
-)
 from vibeflow.tooling.presentation.mermaid.style import MERMAID_MAIN_CLASS_ORDER, mermaid_class_def_lines
 from vibeflow.tooling.presentation.node_presentation import EffectivePresentation, resolve_presentation
-from vibeflow.tooling.presentation.mermaid.layout import (
-    _compose_svg,
-    _validate_review_fragment_max_width,
-    _viewbox_size,
-)
-from vibeflow.tooling.presentation.mermaid.types import (
-    REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH,
-    SvgFragment,
-)
-
-
-ReviewCoverage = tuple[str, str, str]
 
 
 @dataclass(frozen=True)
@@ -76,336 +56,6 @@ def render_mermaid(
             ).rstrip()
         )
     return "\n\n".join(sections) + "\n"
-
-
-def render_ascii(
-    result: object,
-    *,
-    expand_nodesets: bool = False,
-    show_contract: bool = True,
-    show_semantics: bool = True,
-) -> str:
-    lines: list[str] = []
-
-    def append_graph(graph: GraphConfig, compiled: object, *, title: str, indent: str) -> None:
-        lines.append(f"{indent}{title} ({graph.entry_mode})")
-        incoming = {node.id: [] for node in graph.nodes}
-        for edge in compiled.effective_edges:
-            incoming.setdefault(edge.target, []).append(edge.source)
-        for node in graph.nodes:
-            parents = ", ".join(sorted(incoming.get(node.id, ()))) or "entry"
-            flow_kind = compiled.flow_kinds.get(node.id, node.flow_kind)
-            identity = ""
-            semantics = ""
-            if show_semantics:
-                nodeset = _nodeset_for_node(graph, node)
-                planned = node.status == STATUS_PLANNED or nodeset is not None and nodeset.status == STATUS_PLANNED
-                semantics = (
-                    f" flow_kind={flow_kind or 'process'}"
-                    f" effect_scope={'unavailable' if planned else _effect_scope(compiled, node.id, flow_kind)}"
-                )
-            lines.append(
-                f"{indent}- {node.id} [{node.definition_id}]{identity} <- {parents}{semantics}"
-            )
-        if expand_nodesets:
-            for group in _invocation_groups(graph):
-                append_graph(
-                    group.nodeset.graph,
-                    result.compiled_nodeset_types[group.target],
-                    title=f"{group.kind} {group.target}",
-                    indent=indent + "  ",
-                )
-
-    append_graph(result.graph, result.compiled, title=f"workflow {result.plan.workflow_id}", indent="")
-    return "\n".join(lines) + "\n"
-
-
-def write_review_svg(
-    result: object,
-    output: Path,
-    *,
-    expand_nodesets: bool,
-    show_contract: bool = True,
-    show_semantics: bool = True,
-    theme: str = "default",
-    background: str = "transparent",
-    max_text_size: int | None = None,
-    max_edges: int | None = None,
-    review_fragment_max_width: float = REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH,
-    mermaid_layout: str = "default",
-) -> frozenset[ReviewCoverage]:
-    actual_width = _validate_review_fragment_max_width(review_fragment_max_width)
-    actual_text_size = max_text_size or (
-        EXPANDED_MERMAID_MAX_TEXT_SIZE if expand_nodesets else DEFAULT_MERMAID_MAX_TEXT_SIZE
-    )
-    actual_edges = max_edges or (
-        EXPANDED_MERMAID_MAX_EDGES if expand_nodesets else DEFAULT_MERMAID_MAX_EDGES
-    )
-    if not expand_nodesets and mermaid_layout == "default":
-        output.parent.mkdir(parents=True, exist_ok=True)
-        render_mermaid_svg(
-            _graph_mermaid(
-                result,
-                result.graph,
-                result.compiled,
-                direction="TD",
-                show_contract=show_contract,
-                show_semantics=show_semantics,
-            ),
-            output,
-            theme=theme,
-            background=background,
-            max_text_size=actual_text_size,
-            max_edges=actual_edges,
-        )
-        return frozenset()
-    coverage: set[ReviewCoverage] = set()
-    with tempfile.TemporaryDirectory(prefix="vibeflow-javascript-review-") as raw:
-        temp_dir = Path(raw)
-        root_target = result.graph.root_id or result.root.id
-        main = _render_fragment(
-            "main pipeline",
-            _graph_mermaid(
-                result,
-                result.graph,
-                result.compiled,
-                direction="TD",
-                show_contract=show_contract,
-                show_semantics=show_semantics,
-            ),
-            temp_dir,
-            kind="workflow",
-            owner="",
-            target=root_target,
-            theme=theme,
-            background=background,
-            max_text_size=actual_text_size,
-            max_edges=actual_edges,
-        )
-        coverage.add(("workflow", "", root_target))
-        columns: list[list[SvgFragment]] = [[main]]
-        for section in _resource_fragments(result):
-            fragment = _render_fragment(section["title"], section["mermaid"], temp_dir,
-                kind="resource", owner="workflow", target=section["id"], theme=theme, background=background,
-                max_text_size=actual_text_size, max_edges=actual_edges)
-            columns.append([fragment])
-            coverage.add(("resource", "workflow", section["id"]))
-        if expand_nodesets:
-            details: list[SvgFragment] = []
-            for group in _invocation_groups(result.graph):
-                details.append(
-                    _render_group_fragment(
-                        result,
-                        group,
-                        temp_dir,
-                        owner="workflow",
-                        theme=theme,
-                        background=background,
-                        show_contract=show_contract,
-                        show_semantics=show_semantics,
-                        max_text_size=actual_text_size,
-                        max_edges=actual_edges,
-                        review_fragment_max_width=actual_width,
-                        coverage=coverage,
-                        visited=(),
-                    )
-                )
-            if details:
-                columns.append(details)
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(
-            _compose_svg(
-                columns,
-                background=background,
-                review_fragment_max_width=actual_width,
-            ),
-            encoding="utf-8",
-        )
-    return frozenset(coverage)
-
-
-def render_review_svg(result: object) -> str:
-    with tempfile.TemporaryDirectory(prefix="vibeflow-javascript-svg-") as raw:
-        output = Path(raw) / "review.svg"
-        write_review_svg(
-            result,
-            output,
-            expand_nodesets=True,
-            mermaid_layout="review-columns",
-        )
-        return output.read_text(encoding="utf-8")
-
-
-def expected_review_coverage(result: object) -> frozenset[ReviewCoverage]:
-    expected: set[ReviewCoverage] = set()
-    root_target = result.graph.root_id or result.root.id
-    expected.add(("workflow", "", root_target))
-    expected.update(("resource", "workflow", item["id"])
-                    for item in _resource_fragments(result))
-
-    def visit(graph: GraphConfig, *, owner: str, visited: tuple[str, ...]) -> None:
-        for group in _invocation_groups(graph):
-            key = (group.kind, owner, group.target)
-            expected.add(key)
-            if group.target in visited:
-                continue
-            child_owner = f"{owner}/{group.kind}:{group.target}"
-            visit(
-                group.nodeset.graph,
-                owner=child_owner,
-                visited=(*visited, group.target),
-            )
-
-    visit(result.graph, owner="workflow", visited=())
-    return frozenset(expected)
-
-
-def _render_group_fragment(
-    result: object,
-    group: _InvocationGroup,
-    temp_dir: Path,
-    *,
-    owner: str,
-    theme: str,
-    background: str,
-    show_contract: bool,
-    show_semantics: bool,
-    max_text_size: int,
-    max_edges: int,
-    review_fragment_max_width: float,
-    coverage: set[ReviewCoverage],
-    visited: tuple[str, ...],
-) -> SvgFragment:
-    coverage.add((group.kind, owner, group.target))
-    title = _group_title(group)
-    if group.target in visited or not group.nodeset.graph.nodes:
-        mermaid = (
-            "flowchart LR\n"
-            f'  placeholder["{_escape_label(title)}\\n'
-            f'{_escape_label("recursive expansion skipped" if group.target in visited else "nodeset has no concrete pipeline")}"]\n'
-        )
-        return replace(_render_fragment(
-            title,
-            mermaid,
-            temp_dir,
-            kind=group.kind,
-            owner=owner,
-            target=group.target,
-            theme=theme,
-            background=background,
-            max_text_size=max_text_size,
-            max_edges=max_edges,
-        ), planned=group.nodeset.status == STATUS_PLANNED)
-    compiled = result.compiled_nodeset_types[group.target]
-    children = _invocation_groups(group.nodeset.graph)
-    if not children:
-        return replace(_render_fragment(
-            title,
-            _graph_mermaid(
-                result,
-                group.nodeset.graph,
-                compiled,
-                direction=_body_direction(group.nodeset.graph),
-                show_contract=show_contract,
-                show_semantics=show_semantics,
-            ),
-            temp_dir,
-            kind=group.kind,
-            owner=owner,
-            target=group.target,
-            theme=theme,
-            background=background,
-            max_text_size=max_text_size,
-            max_edges=max_edges,
-        ), planned=group.nodeset.status == STATUS_PLANNED)
-    parent = _render_fragment(
-        "parent flow",
-        _graph_mermaid(
-            result,
-            group.nodeset.graph,
-            compiled,
-            direction="TD",
-            show_contract=show_contract,
-            show_semantics=show_semantics,
-        ),
-        temp_dir,
-        kind="body",
-        owner=owner,
-        target=group.target,
-        theme=theme,
-        background=background,
-        max_text_size=max_text_size,
-        max_edges=max_edges,
-    )
-    child_owner = f"{owner}/{group.kind}:{group.target}"
-    child_fragments = [
-        _render_group_fragment(
-            result,
-            child,
-            temp_dir,
-            owner=child_owner,
-            theme=theme,
-            background=background,
-            show_contract=show_contract,
-            show_semantics=show_semantics,
-            max_text_size=max_text_size,
-            max_edges=max_edges,
-            review_fragment_max_width=review_fragment_max_width,
-            coverage=coverage,
-            visited=(*visited, group.target),
-        )
-        for child in children
-    ]
-    nested = _compose_svg(
-        [[parent], child_fragments],
-        background=background,
-        review_fragment_max_width=review_fragment_max_width,
-    )
-    width, height = _viewbox_size(nested)
-    return replace(SvgFragment(
-        title,
-        nested,
-        width,
-        height,
-        review_kind=group.kind,
-        review_owner=owner,
-        review_target=group.target,
-    ), planned=group.nodeset.status == STATUS_PLANNED)
-
-
-def _render_fragment(
-    title: str,
-    mermaid: str,
-    temp_dir: Path,
-    *,
-    kind: str,
-    owner: str,
-    target: str,
-    theme: str,
-    background: str,
-    max_text_size: int,
-    max_edges: int,
-) -> SvgFragment:
-    path = temp_dir / f"fragment_{len(tuple(temp_dir.glob('fragment_*.svg')))}.svg"
-    render_mermaid_svg(
-        mermaid,
-        path,
-        theme=theme,
-        background=background,
-        max_text_size=max_text_size,
-        max_edges=max_edges,
-    )
-    svg_text = path.read_text(encoding="utf-8")
-    width, height = _viewbox_size(svg_text)
-    return SvgFragment(
-        title,
-        svg_text,
-        width,
-        height,
-        review_kind=kind,
-        review_owner=owner,
-        review_target=target,
-    )
 
 
 def _graph_mermaid(
@@ -614,14 +264,6 @@ def _resource_fragments(result: object):
                  for kind, records in _resource_records(result) if records)
 
 
-def _group_title(group: _InvocationGroup) -> str:
-    title = group.nodeset.display_name or group.target
-    calls = [node.id for node in group.nodes[:3]]
-    if len(group.nodes) > 3:
-        calls.append(f"+{len(group.nodes) - 3}")
-    return f"{title} (calls: {len(group.nodes)} [{', '.join(calls)}], type_key: {group.target})"
-
-
 def _resource_records(result: object) -> tuple[tuple[str, tuple[Mapping[str, object], ...]], ...]:
     resources = result.architecture.get("resources", {})
     base_lib = resources.get("base_lib", {}) if isinstance(resources, Mapping) else {}
@@ -647,7 +289,6 @@ def _resource_records(result: object) -> tuple[tuple[str, tuple[Mapping[str, obj
                 lifecycle.append(descriptor.to_dict())
         selected_records.append({**declaration, **dict(record), "_health_status":
             _resource_health_status(result, ("plugin_declaration", "plugin"), (declaration, *lifecycle))})
-
 
 
     return (
@@ -676,7 +317,6 @@ def _resource_health_status(result, kinds, records):
                 and item.get("source_location", {}).get("path") in paths):
             severities.add(item.get("severity"))
     return "healthError" if "error" in severities else "healthWarning" if "warning" in severities else ""
-
 
 def _mapping_records(value: object) -> tuple[Mapping[str, object], ...]:
     if not isinstance(value, Mapping):
@@ -765,11 +405,4 @@ def _lock_text(graph: GraphConfig, node: NodeCallSpec) -> str:
     return ""
 
 
-__all__ = [
-    "ReviewCoverage",
-    "expected_review_coverage",
-    "render_ascii",
-    "render_mermaid",
-    "render_review_svg",
-    "write_review_svg",
-]
+__all__ = ["render_mermaid"]

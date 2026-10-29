@@ -16,7 +16,6 @@ class Observations:
         self.rules = Counter()
         self.compilations = Counter()
         self.parses = Counter()
-        self.mermaid = []
         self._patches = ExitStack()
 
     def wrap(self, owner, name, label=None, *, stage=False):
@@ -30,8 +29,6 @@ class Observations:
                 graph = args[1] if len(args)>1 else kwargs.get("graph")
                 self.compilations[id(graph)] += 1
             started = perf_counter()
-            if label == 'svg_fragment':
-                self.mermaid.append(args[0] if args else kwargs.get('mermaid_text',''))
             if stage:
                 self.stack.append("presentation")
             try:
@@ -61,13 +58,8 @@ class Observations:
         self.wrap(compiler.GraphCompiler, "compile_with_findings", "compile")
         self.wrap(analysis_metrics, "measure_tree", "measure")
         self.wrap(architecture_document, "build_architecture_document", "architecture", stage=True)
-        from vibeflow.tooling.application.python.presentation import ascii_flowchart, mermaid
-        from vibeflow.tooling.application.python.presentation.mermaid import review, review_svg, review_fragments
-        for owner, name in ((ascii_flowchart,'export_ascii_flowchart'),(mermaid,'export_mermaid'),
-                            (review,'render_review_columns'),(review_svg,'render_review_columns_svg')):
-            if hasattr(owner, name):
-                self.wrap(owner, name, name, stage=True)
-        self.wrap(review_fragments, 'render_mermaid_svg', 'svg_fragment')
+        from vibeflow.tooling.application.python.presentation import mermaid
+        self.wrap(mermaid, "export_mermaid", "export_mermaid", stage=True)
         self.wrap(workspace_service, "_environment_or_report", "environment")
         self.wrap(workspace_service, "_prepare_workspace_graph", "prepare")
         self.wrap(workspace_service, "_validate_prepared_workspace_graph", "health")

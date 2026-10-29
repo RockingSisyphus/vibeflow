@@ -8,7 +8,6 @@ VibeFlow 把 AI 参与开发的程序组织成可执行、可检查、可生成�
 terminal start → input I/O → process / nodeset → output I/O → terminal end
 ```
 
-![VibeFlow comprehensive flowchart](docs/assets/comprehensive_flowchart.svg)
 
 ## 主要能力
 
@@ -16,7 +15,7 @@ terminal start → input I/O → process / nodeset → output I/O → terminal e
 - Python 和 JS/TS 插件 SDK，以代码声明 Node、Rule、Ruleset 等资源，由 workflow 显式选择；
 - 可组合的 Rule/Ruleset，以及 Node、Nodeset、Loop、Capability 与显式副作用边界；
 - Node、BaseLib 和 Plugin 的多文件实现、源码归属、逐文件审查和默认图形样式；
-- 确定性 Architecture JSONC、Mermaid、ASCII、展开 SVG，以及[离线预览与历史时间线](distribution/docs/user/local-preview.md)；
+- 确定性 Architecture JSONC、Mermaid 文本，以及[离线 HTML 预览与历史时间线](distribution/docs/user/local-preview.md)；
 - 配置、契约、可达性、控制流、质量、构建与执行证据检查；
 - collaborative 与 autonomous 两种开发协议，共享同一 Core 和机器规则。
 
@@ -60,7 +59,7 @@ node javascript_project/scripts/workflow_execution_probe.mjs
 python tools/verify_project.py --full
 ```
 
-当前分发版本为 `1.4.4`，见[发行说明](docs/maintainers/release.md)。采用 Workflow ABI `vibeflow.workflow.v11`、AOT `vibeflow.aot-build.v5`、协作启动清单 v2 和预览快照 v4。Python 支持原生异步节点；Python、JS 支持官方同步跨 workflow 调用及同进程异步协作，浏览器复用通用 JS 组件。旧启动配置需要迁移，旧 AOT 需要重建。项目至少注册一个独立子目录 root，业务 Node 与 NodeType 分离，Plugin 贡献整包管理，project/root 治理独立配置。Host Extension 已退役，由普通节点显式管理关键生命周期。默认审核交付离线 HTML 快照，SVG 为可选对照。详见[workflow 协作](distribution/docs/user/workflow-coordination.md)、[项目治理](distribution/docs/user/project-governance.md)及[项目准备规范](docs/maintainers/project-preparation.md)。
+当前分发版本为 `1.4.5`，见[发行说明](docs/maintainers/release.md)。采用 Workflow ABI `vibeflow.workflow.v11`、AOT `vibeflow.aot-build.v5`、协作启动清单 v2 和预览快照 v4。Python 支持原生异步节点；Python、JS 支持官方同步跨 workflow 调用及同进程异步协作，浏览器复用通用 JS 组件。旧启动配置需要迁移，旧 AOT 需要重建。项目至少注册一个独立子目录 root，业务 Node 与 NodeType 分离，Plugin 贡献整包管理，project/root 治理独立配置。Host Extension 已退役，由普通节点显式管理关键生命周期。默认审核交付离线 HTML 快照，详见[workflow 协作](distribution/docs/user/workflow-coordination.md)、[项目治理](distribution/docs/user/project-governance.md)及[项目准备规范](docs/maintainers/project-preparation.md)。
 
 质量检查只覆盖当前实际选择的 Rule；不证明业务正确、代码安全、算法确定性或全部无副作用。有限 Python 输入写入规则独立于效果政策，详见[产品检查边界](distribution/docs/user/product-check-boundaries.md)。
 

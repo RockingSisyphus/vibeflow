@@ -10,11 +10,11 @@ from time import monotonic, sleep
 import pytest
 from tests.coordination.test_hosts import node_module
 from vibeflow.coordination import WorkflowClient, WorkflowServer
-from vibeflow.tooling.presentation.mermaid import _find_mmdc, is_mermaid_svg_renderer_available
+from tests.fixtures.support.browser_runtime import browser_runtime_manifest, browser_runtime_available
 
 @async_case
 async def test_browser_generated_workflow_messages_completion_and_cooperative_stop(tmp_path):
-    if not is_mermaid_svg_renderer_available():
+    if not browser_runtime_available():
         pytest.skip('browser dependencies are supplied by the full gate')
     resources = Path(__file__).resolve().parents[2] / 'src/vibeflow/targets/javascript/resources'
     for name in ('workflow_client.mjs', 'workflow_host.mjs'):
@@ -33,7 +33,7 @@ async def test_browser_generated_workflow_messages_completion_and_cooperative_st
     try:
         with WorkflowServer() as server:
             client = await WorkflowClient.open(server.url)
-            process = subprocess.Popen(['node', str(script), str(_find_mmdc().resolve()), f'http://127.0.0.1:{http.server_port}', server.url], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            process = subprocess.Popen(['node', str(script), str(browser_runtime_manifest().resolve()), f'http://127.0.0.1:{http.server_port}', server.url], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             try:
                 for index in range(2):
                     deadline = monotonic() + 20

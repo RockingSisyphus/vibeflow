@@ -2,16 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from pathlib import Path
 import sys
-import tempfile
 from typing import Mapping, Sequence
-from xml.etree import ElementTree
 
 from vibeflow.tooling.application.result_scope import add_result_scope, format_result_scope
 from vibeflow.targets.javascript.build.driver_session import check_scope
-
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -35,8 +31,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         "inspect-config": handle_inspect_config,
         "export-architecture": handle_export_architecture,
         "export-mermaid": handle_export_mermaid,
-        "export-ascii": handle_export_ascii,
-        "export-svg": handle_export_svg,
         "review": handle_review,
         "quality-check": handle_quality_check,
     }
@@ -64,40 +58,30 @@ def add_audit_parsers(subparsers: argparse._SubParsersAction) -> None:
     for name, help_text in (
         ("export-architecture", "export target-neutral Architecture JSONC"),
         ("export-mermaid", "export target-neutral Mermaid"),
-        ("export-ascii", "export target-neutral ASCII"),
-        ("export-svg", "export a deterministic workflow SVG"),
     ):
         command = subparsers.add_parser(name, help=help_text)
         _add_audit_input(command)
         command.add_argument("--output")
         if name == "export-architecture":
             command.add_argument("--check", action="store_true")
-        if name in {"export-mermaid", "export-ascii", "export-svg"}:
+        if name == "export-mermaid":
             command.add_argument("--expand-nodesets", dest="expand_nodesets", action="store_true")
             command.add_argument("--collapse-nodeset_types", dest="expand_nodesets", action="store_false")
             command.add_argument("--hide-contract", action="store_true")
             command.add_argument("--hide-semantics", action="store_true")
             command.set_defaults(expand_nodesets=False)
-        if name in {"export-mermaid", "export-svg"}:
+        if name == "export-mermaid":
             command.add_argument(
                 "--mermaid-layout",
                 choices=("default", "review-columns"),
                 default="default",
             )
-        if name == "export-svg":
-            command.add_argument("--theme", default="default")
-            command.add_argument("--background", default="transparent")
-            command.add_argument("--mermaid-max-text-size", type=int, default=None)
-            command.add_argument("--mermaid-max-edges", type=int, default=None)
-            command.add_argument("--review-fragment-max-width", type=float, default=None)
 
     review = subparsers.add_parser(
         "review",
-        help="refresh registered Architecture and atomically publish review SVG",
+        help="refresh registered Architecture and publish offline preview data",
     )
     _add_audit_input(review)
-    review.add_argument("--output")
-    review.add_argument("--with-svg", action="store_true")
     review.add_argument("--preview-root", help="override offline preview directory")
 
     from vibeflow.tooling.application.project_quality import add_quality_parser
@@ -281,85 +265,16 @@ def handle_export_mermaid(args: argparse.Namespace) -> int:
     )
 
 
-def handle_export_ascii(args: argparse.Namespace) -> int:
-    from vibeflow.tooling.application.javascript.presentation.diagrams import render_ascii
-
-    return _handle_text_export(
-        args,
-        render_ascii,
-        expand_nodesets=bool(args.expand_nodesets),
-        show_contract=not bool(args.hide_contract),
-        show_semantics=not bool(args.hide_semantics),
-    )
-
-
-def handle_export_svg(args: argparse.Namespace) -> int:
-    from vibeflow.tooling.application.javascript.presentation.diagrams import write_review_svg
-    from vibeflow.tooling.presentation.mermaid.types import REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH
-
-    result, error = _audit(args)
-    if error is not None:
-        _print_error(error, as_json=True)
-        return 1
-    assert result is not None
-    output = Path(args.output).resolve() if args.output else None
-    try:
-        if output is not None:
-            write_review_svg(
-                result,
-                output,
-                expand_nodesets=bool(args.expand_nodesets),
-                show_contract=not bool(args.hide_contract),
-                show_semantics=not bool(args.hide_semantics),
-                theme=str(args.theme),
-                background=str(args.background),
-                max_text_size=args.mermaid_max_text_size,
-                max_edges=args.mermaid_max_edges,
-                review_fragment_max_width=(
-                    args.review_fragment_max_width
-                    if args.review_fragment_max_width is not None
-                    else REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH
-                ),
-                mermaid_layout=str(args.mermaid_layout),
-            )
-        else:
-            with tempfile.TemporaryDirectory(prefix="vibeflow-javascript-export-svg-") as raw:
-                temporary = Path(raw) / "graph.svg"
-                write_review_svg(
-                    result,
-                    temporary,
-                    expand_nodesets=bool(args.expand_nodesets),
-                    show_contract=not bool(args.hide_contract),
-                    show_semantics=not bool(args.hide_semantics),
-                    theme=str(args.theme),
-                    background=str(args.background),
-                    max_text_size=args.mermaid_max_text_size,
-                    max_edges=args.mermaid_max_edges,
-                    review_fragment_max_width=(
-                        args.review_fragment_max_width
-                        if args.review_fragment_max_width is not None
-                        else REVIEW_COLUMNS_MAX_FRAGMENT_WIDTH
-                    ),
-                    mermaid_layout=str(args.mermaid_layout),
-                )
-                print(temporary.read_text(encoding="utf-8"), end="")
-    except Exception as exc:
-        _print_error(exc, as_json=True, code="SVG.RENDER")
-        return 1
-    return 0
-
-
 def handle_review(args: argparse.Namespace) -> int:
     from vibeflow.tooling.application.javascript.presentation.architecture import render_architecture
     config_path = Path(args.config).resolve()
-    output = Path(args.output).resolve() if args.output else Path(getattr(args, "preview_root", None) or Path(args.workspace).resolve().parent) / "vibeflow-preview.html"
+    output = Path(getattr(args, "preview_root", None) or Path(args.workspace).resolve().parent) / "vibeflow-preview.html"
     payload: dict[str, object] = {
         "status": "ERROR",
         "failed_stage": None,
         "config": str(config_path),
         "architecture": None,
         "validation": None,
-        "svg": str(output) if args.output else None,
         "output": str(output),
         "project_target": "javascript",
         "published": False,
@@ -401,17 +316,6 @@ def handle_review(args: argparse.Namespace) -> int:
             )
         architecture_path = spec.document_path.resolve()
         payload["architecture"] = str(architecture_path)
-        protected = {workspace.path.resolve(), config_path, architecture_path}
-        if output in protected:
-            return _finish_review_failure(
-                payload,
-                "output",
-                "REVIEW.OUTPUT.CONFLICT",
-                ValueError(
-                    "review output cannot overwrite workspace, workflow, or Architecture source"
-                ),
-                status="FAIL",
-            )
     except Exception as exc:
         return _finish_review_failure(
             payload,
@@ -454,61 +358,17 @@ def handle_review(args: argparse.Namespace) -> int:
 
 def _publish_review_preview(result, args, payload):
     from vibeflow.tooling.application.javascript.presentation.preview import javascript_preview
-    from vibeflow.tooling.presentation.preview.exporter import attach_svg
     record = None
     try:
-        record = javascript_preview(result, preview_root=getattr(args,"preview_root",None),category="review",status="reviewing" if args.output or getattr(args,"with_svg",False) else "passed")
-        payload.update(preview=str(record.root/"vibeflow-preview.html"),preview_id=record.metadata["id"])
+        record = javascript_preview(result, preview_root=getattr(args,"preview_root",None),category="review",status="passed")
+        payload.update(output=str(record.root/"vibeflow-preview.html"),preview=str(record.root/"vibeflow-preview.html"),preview_id=record.metadata["id"])
     except Exception as exc:
         return _finish_review_failure(payload,"preview","REVIEW.PREVIEW.WRITE",exc,status="FAIL")
-    if args.output or getattr(args,"with_svg",False):
-        from vibeflow.tooling.application.javascript.presentation.diagrams import write_review_svg, expected_review_coverage
-        output=Path(args.output).resolve() if args.output else record.directory/"requested-review.svg"
-        temporary=None
-        stage,code="svg","REVIEW.SVG.RENDER"
-        try:
-            output.parent.mkdir(parents=True,exist_ok=True)
-            with tempfile.NamedTemporaryFile(prefix="."+output.name+".",suffix=".tmp",dir=output.parent,delete=False) as handle:
-                temporary=Path(handle.name)
-            write_review_svg(result,temporary,expand_nodesets=True,show_contract=True,show_semantics=True,
-                theme="default",background="transparent",mermaid_layout="review-columns")
-            stage,code="svg_check","REVIEW.SVG.COVERAGE"
-            _validate_review_svg_file(temporary,expected_coverage=expected_review_coverage(result))
-            stage,code="publish","REVIEW.SVG.PUBLISH"
-            os.replace(temporary,output)
-            attach_svg(record,output)
-            record.update("passed")
-            payload["svg"]=str(output if args.output else record.directory/"review.svg")
-        except Exception as exc:
-            record.metadata["svg_error"]=str(exc)
-            record.update("failed",error=str(exc))
-            return _finish_review_failure(payload,stage,getattr(exc,"code",code),exc,status="FAIL")
-        finally:
-            if temporary is not None:temporary.unlink(missing_ok=True)
-            if not args.output:output.unlink(missing_ok=True)
     payload.update(status="CONCERNS" if result.warnings else "PASS",failed_stage=None,published=True,
         **({"warnings":list(result.warnings)} if result.warnings else {}))
     payload=add_result_scope(payload,"vibeflow_review_artifact")
     print(json.dumps(payload,ensure_ascii=False,indent=2))
     return 0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def _diagnostic_text(finding: Mapping[str, object]) -> str:
@@ -528,8 +388,6 @@ def _diagnostic_text(finding: Mapping[str, object]) -> str:
         owner = str(finding.get("object_id", ""))
     owner_text = f" (owner: {owner})" if owner else ""
     return f"  {identity}: {position}{owner_text} {finding.get('message', '')}"
-
-
 
 
 def _audit(args: argparse.Namespace):
@@ -599,73 +457,6 @@ def _write_or_print(text: str, output: Path | None) -> None:
     atomic_write(output, text)
 
 
-class _ReviewSvgValidationError(ValueError):
-    def __init__(self, code: str, message: str) -> None:
-        super().__init__(message)
-        self.code = code
-
-
-def _validate_review_svg_file(
-    path: Path,
-    *,
-    expected_coverage: frozenset[tuple[str, str, str]],
-) -> None:
-    try:
-        root = ElementTree.parse(path).getroot()
-    except (OSError, ElementTree.ParseError) as exc:
-        raise _ReviewSvgValidationError(
-            "REVIEW.SVG.XML",
-            "generated review SVG is not valid XML",
-        ) from exc
-    if not root.tag.endswith("svg"):
-        raise _ReviewSvgValidationError(
-            "REVIEW.SVG.ROOT",
-            "generated review SVG has an invalid root element",
-        )
-    if root.get("aria-roledescription") != "flowchart-review-columns":
-        raise _ReviewSvgValidationError(
-            "REVIEW.SVG.LAYOUT",
-            "generated review SVG has no review layout marker",
-        )
-    fragments = [
-        element
-        for element in root.iter()
-        if element.tag.endswith("g")
-        and "review-inline-fragment" in element.get("class", "").split()
-    ]
-    if not any(len(list(fragment)) > 0 for fragment in fragments):
-        raise _ReviewSvgValidationError(
-            "REVIEW.SVG.FRAGMENT",
-            "generated review SVG has no non-empty review fragment",
-        )
-    actual_items = [
-        (
-            fragment.get("data-review-kind", ""),
-            fragment.get("data-review-owner", ""),
-            fragment.get("data-review-target", ""),
-        )
-        for fragment in fragments
-        if fragment.get("data-review-kind", "") in {
-            "workflow",
-            "resource",
-            "nodeset",
-            "loop_body",
-        }
-    ]
-    actual = frozenset(actual_items)
-    duplicates = sorted(
-        item for item in actual if actual_items.count(item) > 1
-    )
-    missing = sorted(expected_coverage - actual)
-    unexpected = sorted(actual - expected_coverage)
-    if missing or unexpected or duplicates:
-        raise _ReviewSvgValidationError(
-            "REVIEW.SVG.COVERAGE",
-            "generated review SVG coverage mismatch: "
-            f"missing={missing}, unexpected={unexpected}, duplicates={duplicates}",
-        )
-
-
 def _finish_review_failure(
     payload: dict[str, object],
     stage: str,
@@ -697,10 +488,6 @@ def _finish_review_failure(
             payload[field] = diagnostics[field]
     print(json.dumps(add_result_scope(payload, "vibeflow_review_artifact", checked_ids=()), ensure_ascii=False, indent=2))
     return 1
-
-
-
-
 
 
 def _error_payload(error: Exception, *, config: Path | None = None,
