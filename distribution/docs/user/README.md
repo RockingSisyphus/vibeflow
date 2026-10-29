@@ -10,5 +10,3 @@
 - 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
 
 完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。
-
-普通节点的并发分发、显式汇合、取消与实际收尾合同见[普通图并发](graph-concurrency.md)。

@@ -1,36 +1,54 @@
-# 当前配置与接口迁移
+# 配置与接口迁移
 
-当前公开契约为 Workflow ABI v11、Plugin ABI v4、Rule ABI v3、AOT v5，预览快照 v4。旧源码按以下职责重新组织，旧 AOT 必须重新构建；不提供自动转换、兼容别名或双执行路径。
+当前格式如下。升级时迁移源码与配置，再重新生成计划、AOT 和预览快照；架构资料按[架构指南](architecture.md)更新。
 
-| 旧机制 | 当前方式 |
+| 接口／产物 | 当前版本 |
 | --- | --- |
-| 无项目、单层 root 或 root path 为点目录 | 项目注册至少一个独立子目录 root |
-| 项目 policy、quality_enabled、quality_structure | project_rules.jsonc 与 root_rules.jsonc 中选择 Rule/Ruleset 和参数 |
-| Plugin 导出业务 Node | Plugin 导出 NodeType；业务 Node 从 nodes/ 发现，使用 id 和 node_type |
-| workflow Node 的 type_used | definition_id 引用业务 Node；调用具有自己的 id 和完整路径 |
-| Nodeset 定义与调用混用 | NodesetType 是可复用子图，Nodeset 是一次调用 |
-| Plugin 实现分散在 root 各目录 | 所有贡献及其支持代码放在 plugins/包名/ 内，整包选择或移除 |
-| 跨 root 引用私有实现 | 提取为项目共享 Node、BaseLib 或 Plugin，并满足共享用途规则 |
-| Host Extension、createWorkflowHost | 普通 Node 显式执行打开、接收、关闭；宿主注入 Capability API |
-| 原生 io 字段及专属执行路径 | 普通 SDK Node，通过授权的 vibeflow.port Capability 收发 |
-| SVG 作为主审核材料 | review 结构化快照与 HTML 定位链接；SVG 为可选附件 |
+| Workflow ABI | `vibeflow.workflow.v11` |
+| Plugin ABI | `vibeflow.plugin.v4` |
+| Rule ABI | `vibeflow.rule.v3` |
+| AOT manifest | `vibeflow.aot-build.v5` |
+| Workflow 启动清单 | `vibeflow.workflow-launches.v2` |
+| 预览快照 | v4 |
 
-## 迁移顺序
+旧计划、manifest、启动清单和预览格式通过重新生成升级；当前工具读取当前格式。业务输出、日志、trace 和发布归档按原用途保留。
 
-先建立项目和独立 root，登记 root 的用途、Target 与工具链。把资源分到对应所有者的标准目录，Plugin 内部保持完整，再更新业务 Node 的类型引用与 workflow 的 definition_id。项目共享独立 Node/BaseLib 按真实 workflow 引用统计，不能为了规避检查复制假引用。
+## 项目与资源
 
-将旧质量配置拆入两级治理文件。project/root Rule 使用真正对应的信息视图；graph/node Rule 保留各自检查对象。缺失选择使用默认值，显式列表替换本层默认，[] 仅取消本层可选规则。所有权、可见性与 Plugin 包边界属于加载契约，不受可选规则开关影响。
+| 旧机制 | 迁移操作 |
+| --- | --- |
+| 无项目、单层 root 或 root path 为点目录 | 在项目配置中注册独立子目录 root |
+| `policy`、`quality_enabled`、`quality_structure` | 在 `project_rules.jsonc` / `root_rules.jsonc` 中选择规则及参数 |
+| `structure_roles` / `enforce_role_imports` | 用资源引用 Rule 配置源码依赖政策 |
+| 独立扫描、`--exclude-dir` / `--exclude-path` 与全局质量阈值 | 按对应 layout／源码 Rule 设置目录用途与质量参数 |
+| Plugin 导出业务 Node | Node 移入 `nodes/`，以 `id` 声明、`node_type` 引用类型；Plugin 提供 NodeType |
+| 调用点 `type_used` | 使用 `definition_id` 引用业务定义，保留调用自身的 `id` |
+| Nodeset 定义与调用混用 | 用 `type_key` 标识 NodesetType，调用通过 `definition_id` 引用 |
+| Plugin 实现分散 | 将入口、贡献和支撑源码放入 `plugins/<包名>/`，按整包选择 |
+| 跨 root 私有实现复用 | 提取为项目共享资源，或按明确用途配置对应跨 root 规则 |
+| 隐式独立库引入 | 在 workflow 的 `base_lib.modules` 中列全直接与间接依赖；Plugin 私有库随整包选择 |
 
-将宿主关键生命周期画进 workflow，覆盖正常、错误及取消的清理路径。环境 API 的构造不隐式启动业务监听。跨进程生命周期与收发使用 workflow 协同接口，作者负责后台实例清理。
+先建立 root 并登记用途、Target 与工具链，再整理资源归属，最后更新类型、调用和规则选择。配置示例见[项目治理](project-governance.md)，规则数据接口见[Rule 与 Node](rules-and-nodes.md)。
 
-完成源码检查后重新 build。AOT 执行只使用准备好的执行计划与授权结果，不扫描项目、不审图、不生成预览。
+## 输入与宿主边界
 
-## 规则与数据契约
+- 每个 `pipeline.inputs` 项补齐布尔 `required`；必需输入为 `true`，可省略输入为 `false`。Nodeset、Loop body 与命名入口使用相同格式，详见[Workflow 与 Config](workflow-and-config.md#最小-pipeline)。
+- Host Extension / `createWorkflowHost` 改为宿主注入 Capability API，普通 Node 显式打开、接收和关闭。compiler/runtime Plugin 保留各自框架扩展用途。
+- 原生 `definition_id: "vibeflow.io"` / `io` 字段改为普通 SDK 端口 Node；旧字段报告 `GRAPH.IO.MIGRATION`。补齐端口 Capability、Schema、授权规则及真实 start/end terminal。`vibeflow.io` Ruleset 继续用于终端效果检查。
+- 独立 Self Node 和 Capability 的 `self` 操作改为 Node 上下文的 `context.workflow.self()`。
 
-Rule 声明 level 为 project/root/graph/node，scope 仍表示既有调用或源码资料范围，两者不能互相代替。RuleImplementationDescriptor 指定 language 与 source。RuleResult 的 state 必须是 completed/failed/unavailable；finding 的 severity 为 error/warning/info。有效 error finding 不取消有效 records，损坏的结果使依赖它的 consumer 不执行。
+端口与宿主接入代码见[Workflow 协同](workflow-coordination.md)。
 
-JS records 必须是真实 JSON 数据；Map、Date、undefined、非有限数及循环对象不属于合法结果。Python/JS 公共上下文只读，同次检查复用 Target 源码事实。类型检查和业务测试仍由项目自己的工具完成。
+## 并发与异步
 
-所有 pipeline、NodesetType、Loop 及 SDK 契约输入明确声明布尔 required。运行时拒绝未声明键、检查必需键，null 仍表示该键存在。节点输出与路由继续由声明、编译和运行时共同检查，不做业务返回值的静态证明。
+旧 `task_manager`、`vibeflow.task_manager`、`task_targets`、TaskRef/TaskController/TaskOutcome、`context.tasks` 和 `async_max_workers` 改为普通图并发：将工作节点放入 `pipeline.nodes`，补齐“分发 → 工作 → all 汇合 → 结束”的调度边，以分发调用的 `config.max_concurrency` 配置额度。节点内部保留本节点业务任务的清理，其他节点的启动与等待由图表达。运行配置见[普通图并发](graph-concurrency.md)。
 
-详细配置见[项目治理](project-governance.md)、[规则与 Node](rules-and-nodes.md)、[插件](plugins-and-integrations.md)及[workflow 协同](workflow-coordination.md)。
+等待消息、等待独立实例的 Python workflow 声明 `entry_mode: "async"`；等待 Node 改为 `async def run_pure` 并 await，SDK 使用 `run_async()`。普通值立即返回的计算流程保持 sync，跨 workflow 同步调用使用 InvokeSync。
+
+进程启动配置使用 `launch.kind: "process"`；同进程使用 `"in_process"` 并显式绑定目标描述与执行方法。底层 Python HTTP Client 使用 `await WorkflowClient.open(...)` 或 `await WorkflowClient.from_environment(...)`；call/wait/receive/kill/flush/finish 均 await，send 立即交接，再由 flush/finish 等待完成。
+
+`runtime_dispatch` 推断字段及展示已退役；执行锁、调度、异步所有权与清理继续使用各自接口。
+
+## 重新构建与审阅
+
+迁移后执行适用的 validate、quality 和 build，并运行工作流执行探针。审核材料使用 review 的 HTML 快照，交付方式见[本地预览](local-preview.md#生成与交付审核材料)。

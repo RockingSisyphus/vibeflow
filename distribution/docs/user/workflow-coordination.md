@@ -1,6 +1,6 @@
 # 命名入口与独立 Workflow 通信
 
-入口、接口和 Rule 分别负责选择执行范围、提供功能和授予调用权限。Node 的名称、形状、颜色及 `flow_kind` 不授予通信功能。
+命名入口选择一次运行的执行范围；独立 workflow 通过显式 Capability 操作调用和通信。
 
 ## 一个图的多个入口
 
@@ -25,6 +25,12 @@ python build/main/run.py run --entry gui --input input.json
 ```
 
 Python SDK 使用 `PipelineRuntime(..., entry="gui")`、`bundle.create_runtime(entry="gui")` 或 `bundle.run(..., entry="gui")`。JavaScript 使用 `runWorkflow(inputs, {entry:"gui"})` 或异步版本 `runWorkflowAsync`；生成的类型声明包含各入口的契约。AOT 在构建时保存入口范围，运行时不重新编译或检查图。
+
+## 多入口与业务语义
+
+若 CLI、浏览器事件或其他入口承诺相同业务判断，让它们的实际调用路径汇入同一套 Node/Nodeset。入口边界负责读取和格式适配，业务分类、合并和领域校验由拥有该职责的节点处理；输出边界适配节点产生的结果。
+
+边界适配保留未知字段、字段缺失与错误类别，交给负责判断的节点处理。入口可以识别自身的词法错误，并保留该错误身份。辅助数据通过 `data bypass` 到达需要它的调用，业务主线仍经过共享处理节点；这些关系由实际 edge 和调用点表达。
 
 ## Capability 与显式规则
 
@@ -60,7 +66,7 @@ SDK 声明也可直接选择这些 Rule，调用配置可以覆盖其规则选�
 
 `actions` 是作者对操作和等待方式的显式声明，用于图审查和展示；框架不分析任意业务代码来证明声明。目标、入口和启动方式统一在节点 `config` 中维护。调整实现或等待方式时同步更新 actions，调整目标时更新 config。Send/Receive 未声明 `expected_workflows` 时，页面保留操作说明而不虚构对端。未提供 actions 时，规则根据明确声明的 operations 输出基本操作说明。
 
-`workflow-io` 是流程分类，不是限制任意函数调用的执行沙箱。本节的授权、目标检查和关联提取作用于已声明的 `vibeflow.workflow` 操作。应用直接调用 AOT 导出的 `runWorkflow`/`runWorkflowAsync`、把另一个 workflow 接成自定义 Capability，或者通过输入对象注入调度函数，都不会自动成为该协议的 Call。现有规则检查声明的 Capability 权限、数据契约和源码依赖等，不证明所有间接调用均已登记为 workflow 关联。普通 `vibeflow.port` 也只声明宿主端口边界，不说明端口背后接的是哪个 workflow。
+`workflow-io` 标记流程分类。授权、目标检查和关联提取处理已声明的 `vibeflow.workflow` 操作；应用直接调用 AOT 入口、自定义 Capability 或注入的调度函数，由应用维护调用关系。`vibeflow.port` 描述宿主端口边界，对端 workflow 可用 `expected_workflows` 补充展示关联。
 
 ## 接口约定
 
@@ -75,15 +81,11 @@ Node 通过 `context.capabilities["vibeflow.workflow"]` 使用接口。Python �
 | `receive` | `{port?, timeout?}` | 默认等待消息，返回 `{sender, port, payload}` |
 | `kill` | `{id, workflow, timeout?}` | 请求宿主停止该实例，等待真实终态；不支持时明确失败 |
 
-主要的跨实例动作是 Call、Send、Receive、Kill；`wait` 等待指定实例的真实终态，CallAndWait 是 Call 后接 Wait 的组合。InvokeSync、Wait 与这四类主要操作默认共用缺角卡片形状 `notch-rect`，分别使用金色、浅蓝、深蓝、红色；节点卡片直接突出显示操作名。附带 `wait` 不改变主要操作配色；真正同时执行多个主要操作时显示各操作名，采用组合操作样式。作者显式声明的外观仍可覆盖默认值。
-
 ### 当前实例身份：所有 Node 均可读取
 
 任意 Node 都可以通过 `context.workflow.self()` 取得 `{id}`：Python 读取 `context.workflow.self()["id"]`，JavaScript/TypeScript 读取 `context.workflow.self().id`。不需要声明 Capability、选择授权 Rule 或增加独立 Self 节点。例如普通“准备请求”节点可以把当前 ID 写入请求的回信地址。
 
 ID 属于一次 workflow 根调用，进入 Nodeset/Loop 不变，另一独立调用得到新的 ID；它不是配置文件名或日志目录名。标准连接宿主将此 ID 绑定到通信服务登记的实例 ID。不连接通信服务时也能读取本地实例 ID，但读取身份本身不创建邮箱或启动服务。自定义宿主可通过 Python 的 `workflow_instance_id` 或 JavaScript 的运行选项 `workflowInstanceId` 传入其登记的 ID。
-
-旧模板中的独立 Self 节点和 `vibeflow.workflow` Capability 的 `self` 操作已移除；读取身份统一使用上述上下文接口。
 
 默认端口是 `default`，超时以秒计。取消等待只结束当前等待，不自动停止对端。两端的等待操作均使用原生异步 completion，并接入 Node 取消信号。普通退出先完成本地待发交接，强制退出不保证尚未交接的消息。第一版只支持本机、内存中的普通 JSON；大于跨语言安全整数范围的整数须编码为字符串。
 
@@ -112,7 +114,7 @@ ID 属于一次 workflow 根调用，进入 Nodeset/Loop 不变，另一独立�
 
 Kill 节点也必须在 `config.workflow` 声明目标，并从输入取得实例 ID；同一 workflow 运行多份时只停止所选实例。实例归属不匹配会返回 `VF_WORKFLOW_MISMATCH`。Send/Receive 可在 `config.expected_workflows` 中填写上述 workflow 引用列表；它仅描述预期交互，不限制实际通信。
 
-标准节点的流程分类是 `workflow-io`。操作及配置共同生成 Architecture 关联和右键跳转；Rule action 只描述操作和等待行为，不重复声明目标、入口或启动方式。
+标准节点的流程分类是 `workflow-io`。Rule action 只描述操作和等待行为，不重复声明目标、入口或启动方式。
 
 planned Call 保留设计意图供审查，启动清单只收集已实现调用。未来节点的启动配置尚未补齐时，也不会阻止收集已实现调用；其目标不会因此获得启动资格。
 
@@ -173,11 +175,11 @@ node kernel/javascript/workflow_node.mjs build/worker/workflow.js
 
 ## 可复制的普通节点模板
 
-发行包 `kernel/templates/workflow_nodes` 包含 call、call 后等待、wait、send、receive、kill 和普通端口收发的 Python / JS 示例。它们是固定 SDK 声明，需由项目 Plugin 显式贡献；可以更改外观、名称和业务契约。JS 的 `interfaces.mjs` 在打包时从公开 Core 契约生成，不维护另一套协议。详见同目录 README。
+发行包 `kernel/templates/workflow_nodes` 包含 call、call 后等待、wait、send、receive、kill 和普通端口收发的 Python / JS 示例。Node 模板复制到 `nodes/`，协议声明由独立 Plugin 提供；可以更改外观、名称和业务契约。JS 的 `interfaces.mjs` 在打包时从公开 Core 契约生成，不维护另一套协议。详见同目录 README。
 
-## 普通端口节点与迁移
+## 普通端口节点
 
-原生 `definition_id:"vibeflow.io"` 和 `io` 字段已移除，旧配置收到 `GRAPH.IO.MIGRATION`。把 receive/send 实现写成普通 SDK Node，在 Plugin 中声明具体输入输出契约、端口 Capability 和 Schema，并显式选择端口授权规则。`vibeflow.io` Ruleset 仍保留终端 IO 检查用途。
+端口收发由普通 SDK Node 实现：Node 声明具体输入输出契约，Plugin 提供端口 Capability 和 Schema，调用点选择端口授权规则。`vibeflow.io` Ruleset 用于终端 IO 效果检查。
 
 Python 的核心实现可以直接是：
 
@@ -190,25 +192,17 @@ async def run_pure(self, inputs, params, context):
 
 发送节点调用 send 后返回 `{}`，不声明业务输出。JS 使用同样的对象请求；receive 声明 `completion:"suspend"`，send 声明 immediate。接收取得值、发送无业务输出的语义保持一致。
 
-旧 IO 隐式充当起点或终点的位置需要增加真实 terminal；一次接收—处理—发送流程因此通常增加两步。普通 IO 不自动取得图边界身份，也不按名称补入资源。Workflow ABI 现为 v11，旧 AOT 必须重建；旧预览 v2 历史继续可读，业务日志、trace 和输出不迁移。
+接收—处理—发送流程使用真实 terminal 作为起点和终点，端口 Node 位于二者之间。
 
-## HTML 审查
+源码运行只检查所选入口及其实际引用的定义；其他入口的 planned 内容不会阻止已实现入口运行。review/build 仍检查完整工作流，包括任何入口都无法到达的孤立节点。模块装载、源码绑定或编译错误仍会报告。
 
-页面支持全部入口或指定入口查看，卡片和侧栏显示操作、目标及是否等待。InvokeSync/Call/Kill 通过右键菜单跳转至目标 workflow；Send/Receive 按预期交互列表提供多个跳转按钮，跳转后可返回。Call 的目标入口会被选中。只有 Nodeset 提供原地展开/收起；workflow 之间不原地展开。历史快照优先使用当次准备的目标事实，不静默换用最新快照。
+## 等待与同步调用
 
-快照只携带本次准备的目标架构事实。缺失目标、入口或资源时局部显示原因，不拿历史快照冒充目标。原 SVG 仍仅作可选对照附件。
-
-源码运行只检查所选入口及其实际引用的定义；其他入口的 planned 内容不会阻止已实现入口运行。review/build 仍检查完整工作流，包括任何入口都无法到达的孤立节点。模块装载、源码绑定或编译错误仍会报告。运行历史保存实际入口，首次打开该记录时默认选择此入口。
-
-## 同步调用与原生异步
-
-`pipeline.entry_mode` 是整个 workflow 的执行合同，缺省为 `sync`。命名入口共用该模式。Python 同步入口使用 `PipelineRuntime.run()`、`PythonBundle.run()` 或 `run_workspace_checked()`；异步入口使用对应的 `run_async()` / `run_workspace_checked_async()`。JS 使用 `runWorkflow()` / `runWorkflowAsync()`。两端不会把同步入口悄悄改成异步。
-
-Python 的异步图可以混合同步节点与 `async def run_pure` 节点。协程在宿主已有事件循环执行；同步节点由框架持有的线程执行。节点、Nodeset、Loop 以及 plan/block/compiled 使用相同的依赖、分发额度与实际完成边界。同步图在当前调用内执行，不在后台执行分支。只有顶层 CLI 根据图的声明创建事件循环；SDK 与节点内部不调用 `asyncio.run()`。
+call/wait/receive/kill 等待操作要求 workflow 使用 `entry_mode: "async"`。Python 等待 Node 使用 `async def run_pure` 并 await，JS 等待 Node 声明 `completion: "suspend"`。同步计算可通过 InvokeSync 调用同语言、同进程目标。
 
 通过宿主提供的 `operations()` 绑定执行官方节点时，Python 同进程组件与 HTTP 客户端共用即时操作的线程转交逻辑：普通同步节点中的 Send 在宿主事件循环交接消息，节点仍直接返回；HTTP 发送的实际交付由 `flush()` / `finish()` 等待。直接使用底层 Client 方法的应用应在所属事件循环调用它们。
 
-同步图拒绝已知的挂起实现、挂起 Capability 与异步生命周期。运行时也拒绝错误声明的 Promise、coroutine、Future 等等待完成对象。异步图的 Python 节点应直接 await 等待操作：
+Python 的调用并等待示例：
 
 ```python
 async def run_pure(self, inputs, params, context):
@@ -271,15 +265,12 @@ await scope.close();
 
 异步实例的终态可以重复读取。宿主确认不再需要后调用 Python `scope.release(id)` 或 JS `scope.release(id)`；运行中实例不可释放。关闭同进程作用域会取消并等待其拥有的运行和真实清理，然后释放记录。普通调用方结束不会自动停止独立子 workflow。关闭 HTTP 服务仍不杀死独立进程。
 
-同进程与 HTTP 宿主使用相同的错误报告合同。终态 `error` 保留 `code`、`message`，并在存在时携带 `cause`、`cleanup_errors`；错误组的子错误位于 `errors`。循环原因链以 `recursive:true` 标记重复位置。清理或发送失败会补充到原始运行错误中。同步调用仍抛出原始异常对象；跨实例读取的是普通 JSON 错误数据。Python 的取消会等待所属清理与客户端完成交接，清理本身失败时同时保留取消和清理错误。
+同进程与 HTTP 宿主使用相同的错误报告合同。终态 `error` 保留 `code`、`message`，并在存在时携带 `cause`、`cleanup_errors`；错误组及其他并发执行错误位于 `errors`。Python 没有显式原因且未抑制的隐式异常上下文位于 `context`。循环原因链以 `recursive:true` 标记重复位置。清理或发送失败会补充到原始运行错误中。同步调用仍抛出原始异常对象；跨实例读取的是普通 JSON 错误数据。Python 的取消会等待所属清理与客户端完成交接，清理本身失败时同时保留取消和清理错误。业务失败引发的内部取消不会把失败改报为取消；曾请求停止也不单独决定实例终态。
 
-## 本轮升级
+正常 CLI 退出后的资源清理如果失败，框架报告清理异常，并以 `business_exit` 保留原退出码和来源；清理成功时仍正常返回退出码。
 
-Workflow ABI 为 `vibeflow.workflow.v11`，AOT manifest 为 `vibeflow.aot-build.v5`，启动清单为 `vibeflow.workflow-launches.v2`。Plugin ABI v4、Rule ABI v3 保持不变。旧 AOT 需要重新构建，旧启动格式没有执行回退。
+## 相关文档
 
-1. 给进程启动配置加 `kind:"process"`；同进程使用 `kind:"in_process"` 并显式绑定目标，删除假命令别名。
-2. 等待消息、等待独立实例及依赖并发的 Python workflow 声明 `entry_mode:"async"`，等待节点改成 `async def run_pure` 并 await；SDK 调用迁为 `run_async()`。
-3. 底层 Python HTTP Client 使用 `await WorkflowClient.open(...)` 或 `await WorkflowClient.from_environment(...)`。call/wait/receive/kill/flush/finish 均 await；send 为立即交接接口，顺序发送并由 flush/finish 等待交接完成。
-4. 保留普通值立即返回的计算流程为 sync，跨 workflow 使用官方 InvokeSync。重新构建产物并生成预览；无需手写 workflow_links。
-
-这些组件不构成 ERA 酒馆生产迁移或刷新恢复验收。
+- [本地预览](local-preview.md)：入口筛选、操作样式与跨 workflow 跳转。
+- [普通图并发](graph-concurrency.md)：分支调度与实际收尾。
+- [迁移说明](rule-system-migration.md)：旧 IO、同步/异步接口和启动配置升级。

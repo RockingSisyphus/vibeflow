@@ -15,7 +15,7 @@ from vibeflow.core.flow import EdgeSpec, GraphConfig, JOIN_POLICY_ALL, JOIN_POLI
 from vibeflow.targets.python.project.plugins import PluginRegistry
 from vibeflow.targets.python.project.registry import NodeRegistry
 from vibeflow.targets.python.runtime.compiled import run_compiled_steps
-from vibeflow.targets.python.runtime.errors import DelegateCliExit, PipelineRuntimeError
+from vibeflow.targets.python.runtime.errors import DelegateCliExit, PipelineRuntimeError, preserve_failure
 from vibeflow.targets.python.runtime.helpers import condition_matches
 from vibeflow.targets.python.runtime.options import RuntimeOptions, runtime_hook_plan, runtime_options as normalize_runtime_options
 from vibeflow.targets.python.runtime.trace import RuntimeTrace, RuntimeTraceSink
@@ -84,7 +84,7 @@ class PipelineRuntime(AsyncPipelineRuntime, AsyncRuntimeNodeMixin, AsyncRuntimeN
         )
         self.graph, self.compiled = self._plan.graph, self._plan.compiled
         graph = self.graph
-        self.trace = RuntimeTrace()
+        self.trace = RuntimeTrace(retain_details=self.runtime_options.trace != "off")
         self._node_runs: dict[str, int] = {node.id: 0 for node in graph.nodes}
         self._frames = self._plan.frames
         self._nodeset_runtimes: dict[str, PipelineRuntime] = {}
@@ -111,7 +111,7 @@ class PipelineRuntime(AsyncPipelineRuntime, AsyncRuntimeNodeMixin, AsyncRuntimeN
         runtime._hook_plan = parent._hook_plan
         runtime.compiled = plan.compiled
         runtime._plan = plan
-        runtime.trace = RuntimeTrace()
+        runtime.trace = RuntimeTrace(retain_details=parent.runtime_options.trace != "off")
         runtime._node_runs = {name: 0 for name in plan.order}
         runtime._frames = plan.frames
         runtime._nodeset_runtimes = {}
@@ -204,6 +204,7 @@ class PipelineRuntime(AsyncPipelineRuntime, AsyncRuntimeNodeMixin, AsyncRuntimeN
                 self._call_runtime_plugins("after_run", state.result.to_dict(), self.trace.to_dict())
         except DelegateCliExit as exc:
             try:
+                self._signal.record_error(exc)
                 self._signal.request_stop("business exit")
             except BaseException as cleanup:
                 primary_error = cleanup
@@ -220,31 +221,13 @@ class PipelineRuntime(AsyncPipelineRuntime, AsyncRuntimeNodeMixin, AsyncRuntimeN
                 value=exc.exit_code, source_node=exc.source).to_input())
             self._write_trace(state.result)
         except BaseException as exc:
-            primary_error = exc
-            self._signal.request_stop("workflow failed")
-            self._record_runtime_failure(state, exc)
-            raise
+            primary_error = self._signal.fail(exc)
+            with preserve_failure(primary_error):
+                self._record_runtime_failure(state, primary_error)
+            raise primary_error
         finally:
-            try:
-                if self.trace.exception:
-                    self._record_global_state_change_warning(self.trace.exception)
-            finally:
-                try:
-                    if lease_started:
-                        self._end_execution_lease()
-                        self._write_trace(state.result)
-                except BaseException as cleanup:
-                    if primary_error is None:
-                        raise
-                    primary_error.add_note(str(cleanup))
-                    primary_error.cleanup_errors = [*getattr(primary_error, "cleanup_errors", ()), cleanup]
-                finally:
-                    if owns_trace_sink and self._trace_sink is not None:
-                        try:
-                            self._trace_sink.write_summary(self.trace)
-                        finally:
-                            self._trace_sink.close()
-                            self._trace_sink = None
+            self._finish_run(state, lease_started=lease_started,
+                             owns_trace_sink=owns_trace_sink, primary=primary_error)
         return state.result
 
     def _assert_entry_mode(self, mode):
@@ -281,14 +264,13 @@ class PipelineRuntime(AsyncPipelineRuntime, AsyncRuntimeNodeMixin, AsyncRuntimeN
         else:
             self.trace.stop_reason = self.trace.stop_reason or "node_failed"
         self.trace.exception = str(exc)
-        self._record_global_state_change_warning(str(exc))
-        self._write_trace(state.result)
+        with preserve_failure(exc):
+            self._record_global_state_change_warning(str(exc))
+        with preserve_failure(exc):
+            self._write_trace(state.result)
         if self._owns_run:
-            try:
-                self._call_runtime_plugins("run_failed", state.result.to_dict(), self.trace.to_dict(), str(exc))
-            except BaseException as cleanup:
-                exc.add_note(str(cleanup))
-                exc.cleanup_errors = [*getattr(exc, "cleanup_errors", ()), cleanup]
+            self._call_runtime_plugins('run_failed', state.result.to_dict(), self.trace.to_dict(), str(exc), primary=exc)
+
 
     def _record_global_state_change_warning(self, failure: str) -> None:
         lease = self._lease
@@ -318,7 +300,7 @@ class PipelineRuntime(AsyncPipelineRuntime, AsyncRuntimeNodeMixin, AsyncRuntimeN
                 lease.state_change_reported = True
 
     def _reset_run_state(self) -> None:
-        self.trace = RuntimeTrace(trace_path=str(self._trace_file_path()))
+        self.trace = RuntimeTrace(trace_path=str(self._trace_file_path()), retain_details=self.runtime_options.trace != "off")
         self._node_runs = {name: 0 for name in self._plan.order}
         self._global_state_started = False
         self._global_state_nodes = []

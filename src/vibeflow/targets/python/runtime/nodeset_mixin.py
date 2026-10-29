@@ -30,8 +30,8 @@ class RuntimeNodesetMixin:
             self._call_runtime_plugins("after_nodeset", frame.id, frame.definition_id)
             return outputs
         except Exception as exc:
-            self._record_runtime_event("nodeset_failed", frame.id, frame.definition_id, failure=str(exc), elapsed_ms=elapsed_ms(started))
-            self._call_runtime_plugins("nodeset_failed", frame.id, frame.definition_id, str(exc))
+            self._record_failure_event("nodeset_failed", frame.id, frame.definition_id, failure=str(exc), elapsed_ms=elapsed_ms(started), error=exc)
+            self._call_runtime_plugins("nodeset_failed", frame.id, frame.definition_id, str(exc), primary=exc)
             raise
 
     def _run_nodeset_node(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
@@ -45,8 +45,8 @@ class RuntimeNodesetMixin:
             self._call_runtime_plugins("after_nodeset", frame.id, frame.definition_id)
             return outputs
         except Exception as exc:
-            self._record_runtime_event("nodeset_failed", frame.id, frame.definition_id, failure=str(exc), elapsed_ms=elapsed_ms(started))
-            self._call_runtime_plugins("nodeset_failed", frame.id, frame.definition_id, str(exc))
+            self._record_failure_event("nodeset_failed", frame.id, frame.definition_id, failure=str(exc), elapsed_ms=elapsed_ms(started), error=exc)
+            self._call_runtime_plugins("nodeset_failed", frame.id, frame.definition_id, str(exc), primary=exc)
             raise
 
     def _run_nodeset_outputs(self, frame: NodeFrame, inputs: Mapping[str, object], *, cached: bool = False) -> Mapping[str, object]:

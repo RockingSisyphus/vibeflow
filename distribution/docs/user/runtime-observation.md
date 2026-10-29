@@ -38,7 +38,7 @@ Python 文件默认位于 `runs/<run_id>/`。Node.js AOT 每次调用在当前�
 
 对象内可嵌套数组和对象，值使用字符串、有限数值、布尔或 `null`。Python 使用原生 `list/dict/int/float` 等 JSON 类型；训练中的 Tensor 或 NumPy 标量先转换成对应的原生标量，例如标量的 `.item()`。JS/TS 使用普通对象和数组。`NaN`、无穷值、循环引用、函数和其他非 JSON 对象不能作为监控资料。
 
-此接口在实际运行的 Node 内使用。Node 照常返回契约规定的业务输出；监控信息通过缓存另行发布。Python 使用示例和插件登记见[Python SDK](python-development.md#在业务-node-中更新进度)，JS/TS 见[JS/TS SDK](javascript-development.md#在业务-node-中更新进度)。
+接口在 Node 的实际执行路径中使用。Node 按契约返回业务输出，监控信息通过状态缓存另行发布。
 
 ## Python
 
@@ -49,7 +49,7 @@ python run.py run --config python_project/configs/main.jsonc \
 
 `delegate-cli` 支持相同选项。非零业务退出码写为 `failed`。`--status-file` 为监控提供固定读取位置；相对路径以启动工作目录为基准。多个并发运行应使用不同状态路径。
 
-以下示例展示训练进度 Node 的方法体：声明 `training.metrics` 输入和 `metrics` 输出后，把该 Node 放入选中的插件。输入对象包含本轮的 `epoch/loss/accuracy`，每次被工作流调用时更新监控，并照常传递指标：
+以下示例展示训练进度 Node 的方法体：在 `nodes/` 中用 SDK 为该类声明 `training.metrics` 输入和 `metrics` 输出。输入对象包含本轮的 `epoch/loss/accuracy`，每次被工作流调用时更新监控，并照常传递指标：
 
 ```python
 from vibeflow.targets.python.sdk import update_run_info
@@ -83,7 +83,7 @@ const result = runWorkflow(inputs, {
 });
 ```
 
-异步入口 `runWorkflowAsync` 使用相同选项。每次 workflow 调用独立记录 `starting`、`running` 和真实终态，信息缓存不跨调用共享。宿主将普通 Capability API 和取消信号传入调用；建立监听、接收消息和关闭资源由图中的显式 Node 完成。
+异步入口 `runWorkflowAsync` 使用相同选项。每次 workflow 调用独立记录 `starting`、`running` 和真实终态，信息缓存不跨调用共享。
 
 SDK Node 的 `run(inputs, params, context)` 使用运行器提供的第三个参数；把下面的方法放入声明了相同输入输出的 `defineNode` 对象：
 
@@ -107,6 +107,4 @@ Node.js 构建自动写入文件，并通过独立线程维持文件更新时间
 
 独立工作流正常结束写为 `succeeded`；执行异常、取消或非零委托退出写为 `failed`。Node、Plugin 或显式清理抛出的异常按本次 workflow 的实际结果记录。`info` 只描述业务进度，不改变内核状态。进程被强制终止、机器断电或存储不可写时，最后文件可能仍是 `running`；监控程序可结合更新时间和自身进程检查判断是否失联。
 
-普通节点的并发分发、显式汇合、取消与实际收尾合同见[普通图并发](graph-concurrency.md)。
-
-`stopping` 表示停止已请求但所属执行或资源仍在收尾。并发分支、节点清理、插件释放和执行锁均以实际收尾完成为结束边界；取消对等待的关注不会冒充退出。
+`stopping` 表示停止已请求但所属执行或资源仍在收尾。并发分支、节点清理、插件释放和执行锁均以实际收尾完成为结束边界。

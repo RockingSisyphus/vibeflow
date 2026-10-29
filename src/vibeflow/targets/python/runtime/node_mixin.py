@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from vibeflow.targets.python.runtime.errors import attach_error
 from pathlib import Path
 from typing import Mapping
 
@@ -69,19 +70,19 @@ class RuntimeNodeMixin:
                 failure = PipelineRuntimeError(
                     f"planned python_stub node '{frame.id}' attempted SystemExit outside delegate CLI mode"
                 )
-            self._record_runtime_event(
+            self._record_failure_event(
                 "node_failed",
                 frame.id,
                 frame.definition_id,
                 input_summary=summarize_mapping(inputs),
                 failure=str(failure),
                 elapsed_ms=elapsed_ms(started),
-            )
-            self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(failure))
+            error=failure)
+            self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(failure), primary=failure)
             raise failure from exc
         except Exception as exc:
-            self._record_runtime_event("node_failed", frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started))
-            self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(exc))
+            self._record_failure_event("node_failed", frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started), error=exc)
+            self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(exc), primary=exc)
             raise
 
     def _run_pure_node(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
@@ -101,40 +102,40 @@ class RuntimeNodeMixin:
                 failure = PipelineRuntimeError(
                     f"node '{frame.id}' attempted SystemExit outside delegate CLI mode"
                 )
-                self._record_runtime_event(
+                self._record_failure_event(
                     "node_failed",
                     frame.id,
                     frame.definition_id,
                     input_summary=summarize_mapping(inputs),
                     failure=str(failure),
                     elapsed_ms=elapsed_ms(started),
-                )
-                self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(failure))
+                error=failure)
+                self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(failure), primary=failure)
                 raise failure from exc
             try:
                 exit_signal = normalize_delegate_cli_system_exit(
                     exc, source=frame.id, effect_scope=frame.effect_scope
                 )
             except PipelineRuntimeError as failure:
-                self._record_runtime_event(
+                self._record_failure_event(
                     "node_failed",
                     frame.id,
                     frame.definition_id,
                     input_summary=summarize_mapping(inputs),
                     failure=str(failure),
                     elapsed_ms=elapsed_ms(started),
-                )
-                self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(failure))
+                error=failure)
+                self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(failure), primary=failure)
                 raise failure from exc
             raise exit_signal from exc
         except NodeRegistryError as exc:
             failure = PipelineRuntimeError(str(exc))
-            self._record_runtime_event("node_failed", frame.id, frame.definition_id, failure=str(failure), elapsed_ms=elapsed_ms(started))
-            self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(failure))
+            self._record_failure_event("node_failed", frame.id, frame.definition_id, failure=str(failure), elapsed_ms=elapsed_ms(started), error=failure)
+            self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(failure), primary=failure)
             raise failure from exc
         except Exception as exc:
-            self._record_runtime_event("node_failed", frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started))
-            self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(exc))
+            self._record_failure_event("node_failed", frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started), error=exc)
+            self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(exc), primary=exc)
             raise
 
     def _execute_pure_outputs(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
@@ -156,6 +157,7 @@ class RuntimeNodeMixin:
             outputs = immediate(outputs)
         except BaseException as exc:
             primary = exc
+            self._signal.fail(exc)
             raise
         finally:
             if context:
@@ -165,7 +167,7 @@ class RuntimeNodeMixin:
                     if primary is None:
                         raise
                     primary.add_note(str(cleanup))
-                    primary.cleanup_errors = [*getattr(primary, 'cleanup_errors', ()), cleanup]
+                    attach_error(primary, cleanup)
         self._signal.throw_if_aborted()
         return self._validate_outputs(frame, outputs)
 

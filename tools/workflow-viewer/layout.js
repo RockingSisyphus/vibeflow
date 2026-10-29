@@ -1,6 +1,40 @@
 /* Hierarchical placement of data-driven cards with bundled ELK. */
 "use strict";
-window.VFLayout={async body(context,key,prefix="",ancestors=[],override=null,entity="call",localPrefix=[]){
+window.VFLayout=(()=>{
+  async function flowLayout(elk,graph){
+    // Lay out disconnected branches independently, then preserve their source order.
+    // Size-based component packing otherwise swaps entries when a Nodeset grows.
+    const adjacent=new Map(graph.children.map(n=>[n.id,new Set()]));
+    for(const edge of graph.edges){
+      const from=edge.sources[0],to=edge.targets[0];
+      adjacent.get(from).add(to);adjacent.get(to).add(from);
+    }
+    const remaining=new Set(adjacent.keys()),components=[];
+    for(const node of graph.children){
+      if(!remaining.delete(node.id))continue;
+      const ids=new Set([node.id]),queue=[node.id];
+      for(const id of queue)for(const next of adjacent.get(id))if(remaining.delete(next)){ids.add(next);queue.push(next);}
+      components.push({children:graph.children.filter(n=>ids.has(n.id)),edges:graph.edges.filter(e=>ids.has(e.sources[0]))});
+    }
+    if(components.length<2)return elk.layout(graph);
+    const parts=await Promise.all(components.map((component,i)=>elk.layout({...graph,id:graph.id+"-"+i,...component})));
+    const horizontal=["DOWN","UP"].includes(graph.layoutOptions["elk.direction"]),gap=48;
+    const result={children:[],edges:[],width:0,height:0};let offset=0;
+    for(const part of parts){
+      const x=horizontal?offset:0,y=horizontal?0:offset;
+      const shift=point=>{point.x+=x;point.y+=y;};
+      for(const node of part.children){shift(node);result.children.push(node);}
+      for(const edge of part.edges||[]){
+        for(const section of edge.sections||[]){shift(section.startPoint);shift(section.endPoint);for(const point of section.bendPoints||[])shift(point);}
+        for(const label of edge.labels||[])shift(label);
+        result.edges.push(edge);
+      }
+      result.width=Math.max(result.width,x+part.width);result.height=Math.max(result.height,y+part.height);
+      offset+=(horizontal?part.width:part.height)+gap;
+    }
+    return result;
+  }
+  return {async body(context,key,prefix="",ancestors=[],override=null,entity="call",localPrefix=[]){
   const {data,state,elk}=context;
   if(!elk)throw new Error("离线 ELK 布局资源缺失。");
   const body=override||data.bodies[key];if(!body)throw new Error("缺少图定义 "+key);
@@ -37,9 +71,10 @@ window.VFLayout={async body(context,key,prefix="",ancestors=[],override=null,ent
     const label=info.labelLines.join("\n"),facts=info.facts;
     return {id:"edge"+i,sources:[facts.from],targets:[facts.to],...(label?{labels:[{id:"label"+i,text:label,width:Math.max(...info.labelLines.map(t=>VFShapes.width(t)))+16,height:info.labelLines.length*18+12}]}:{})};
   });
-  const graph=await elk.layout({id:"root",layoutOptions:{"elk.algorithm":"layered","elk.direction":body.direction||"DOWN",
+  const specification={id:"root",layoutOptions:{"elk.algorithm":"layered","elk.direction":body.direction||"DOWN",
     "elk.edgeRouting":"ORTHOGONAL","elk.spacing.nodeNode":"48","elk.layered.spacing.nodeNodeBetweenLayers":"82",
-    "elk.spacing.edgeNode":"24","elk.padding":"[top=24,left=24,bottom=24,right=24]"},children:values.map(v=>({id:v.id,width:v.width,height:v.height})),edges});
+    "elk.spacing.edgeNode":"24","elk.padding":"[top=24,left=24,bottom=24,right=24]"},children:values.map(v=>({id:v.id,width:v.width,height:v.height})),edges};
+  const graph=await (entity==="resource"?elk.layout(specification):flowLayout(elk,specification));
   return {width:graph.width||40,height:graph.height||40,values:values.map(v=>Object.assign(v,graph.children.find(n=>n.id===v.id))),
     edges:graph.edges||[],facts:body.facts.edges||[],edgeInfo,entity};
-}};
+}};})();

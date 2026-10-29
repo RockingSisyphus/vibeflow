@@ -1,25 +1,29 @@
 # 用户文档原稿
 
-这些手册随发行构建进入 kernel/docs。仓库开发资料见 [开发文档](../../docs/README.md)。
+这些手册随发行构建进入 `kernel/docs`。每份手册集中说明一个主题；关联文档通过定位链接导航。仓库开发资料见[开发文档](../../docs/README.md)。
 
-- [overview](overview.md)
-- [quickstart](user/quickstart.md)
-- [命名入口与 Workflow 通信](user/workflow-coordination.md)：接口、授权、宿主、消息、目标展开和原生 IO 迁移。
-- [workflow-and-config](user/workflow-and-config.md)
-- [python-development](user/python-development.md)
-- [javascript-development](user/javascript-development.md)
-- [普通图并发](user/graph-concurrency.md)：1.0.1 的局部额度、排队补位、独立汇合、断路错误和旧配置迁移。
-- [NodesetType、Nodeset 与 Loop](user/nodeset-types-and-loops.md)
-- [plugins-and-integrations](user/plugins-and-integrations.md)
-- [multifile-resources](user/multifile-resources.md)
-- [Rule、Ruleset 与 Node](user/rules-and-nodes.md)：四级检查、默认替换，以及 Python/TypeScript 插件定义与接入。
-- [rule-system-migration](user/rule-system-migration.md)
-- [runtime-observation](user/runtime-observation.md)
-- [本地预览与历史](user/local-preview.md)：离线页面、结构化展开、分类时间线和跨 workflow 关联。
-- [commands-and-results](user/commands-and-results.md)
-- [product-check-boundaries](user/product-check-boundaries.md)
-- [collaborative](user/profiles/collaborative.md)
-- [autonomous](user/profiles/autonomous.md)
+| 目标 | 主要文档 |
+| --- | --- |
+| 了解 VibeFlow 的模型和能力 | [项目概览](overview.md) |
+| 优先了解项目、root 与 workflow 的架构 | [架构阅读与维护](user/architecture.md) |
+| 运行发行包中的示例项目 | [快速开始](user/quickstart.md) |
+| 组织 root、目录、共享资源与治理配置 | [项目治理](user/project-governance.md) |
+| 编写调用、公共契约与控制／数据连边 | [Workflow 与 Config](user/workflow-and-config.md) |
+| 编写 Python 实现、异步生命周期与 AOT 部署 | [Python 开发](user/python-development.md) |
+| 编写 JS/TS 实现、配置工具链与 AOT 构建 | [JavaScript 开发](user/javascript-development.md) |
+| 定义可复用子图与循环 | [Nodeset 与 Loop](user/nodeset-types-and-loops.md) |
+| 定义、组合、选择规则及效果政策 | [Rule 与 Node](user/rules-and-nodes.md) |
+| 声明 Plugin、生命周期与宿主 API | [Plugin 与集成](user/plugins-and-integrations.md) |
+| 登记实现文件、库依赖与样式 | [多文件资源](user/multifile-resources.md) |
+| 配置分发、汇合、额度、取消与执行锁 | [普通图并发](user/graph-concurrency.md) |
+| 配置命名入口、实例身份、调用与通信 | [Workflow 协同](user/workflow-coordination.md) |
+| 读取日志、状态，提交业务进度 | [运行观测](user/runtime-observation.md) |
+| 交付审核快照、浏览流程及历史 | [本地预览](user/local-preview.md) |
+| 选择命令并解释检查和执行结果 | [命令与结果](user/commands-and-results.md) |
+| 了解源码分析覆盖与工具链检查范围 | [产品检查范围](user/product-check-boundaries.md) |
+| 迁移旧配置、接口与产物格式 | [迁移说明](user/rule-system-migration.md) |
+| 采用实现前人工审阅 | [人机协同协议](user/profiles/collaborative.md) |
+| 自主完成授权范围内的开发 | [无人值守协议](user/profiles/autonomous.md) |
 
 ## 目录用途与边界
 

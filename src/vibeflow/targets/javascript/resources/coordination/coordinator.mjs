@@ -92,7 +92,7 @@ export class Coordinator {
         item.outputs = portable(await result);
         item.state = 'succeeded';
       } catch (error) {
-        item.state = item.controller.signal.aborted || error?.code === 'VF_ABORTED' || error?.name === 'AbortError' ? 'cancelled' : 'failed';
+        item.state = error?.code === 'VF_ABORTED' || error?.name === 'AbortError' ? 'cancelled' : 'failed';
         item.error = errorRecord(error);
       } finally {this.notify(item);}
     });

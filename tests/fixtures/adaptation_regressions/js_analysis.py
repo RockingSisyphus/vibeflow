@@ -47,12 +47,13 @@ else:
     helper=copied/"analysis_program.mjs"
     if not helper.is_file():raise RuntimeError("analysis instrumentation lost Program owner module")
     helper_code=helper.read_text()
-    helper_marker='  const cached=session?.programs.get(key);'
+    helper_marker='  const cached=session?.current;'
     if helper_marker not in helper_code:raise RuntimeError("analysis instrumentation lost Program cache marker")
     helper_code=helper_code.replace(helper_marker,injected.split('  let program;')[0]+helper_marker)
     for constructor,backend in (('snapshot=api.updateSnapshot({openProjects:[configPath]});','native'),('program=ts.createProgram({rootNames:files,options,host});','classic')):
         if constructor not in helper_code:raise RuntimeError("analysis instrumentation lost "+backend+" constructor")
         helper_code=helper_code.replace(constructor,'__event({event:"program",key:__programKey,backend:'+json.dumps(backend)+'});'+constructor)
+    helper_code=helper_code.replace('const release=async()=>{','const release=async()=>{__event({event:"program-release"});')
     helper.write_text(prefix.replace('__event({event:"driver-loaded"});','')+helper_code)
 for before,after in (
  ('function collectQualityFacts(ts, program, checker, project, sourceFiles, request) {','function collectQualityFacts(ts, program, checker, project, sourceFiles, request) { __event({event:"quality-facts",key:__programKey});'),
@@ -74,10 +75,15 @@ except ValueError:payload={}
 events=[json.loads(line) for line in events_path.read_text().splitlines()] if events_path.exists() else []
 totals=Counter(item["event"] for item in events)
 duplicate=lambda event:sum(value-1 for value in Counter(item["key"] for item in events if item["event"]==event).values())
+active=peak=0
+for event in events:
+    active += 1 if event["event"]=="program" else -1 if event["event"]=="program-release" else 0
+    peak=max(peak,active)
 print(json.dumps({"exit_code":exit_code,"status":payload.get("status"),"diagnostics":payload.get("diagnostics",[]),"formal_payload":payload,
   "rule_session_instances":len(sessions),"driver_processes":len({item["pid"] for item in events if item["event"]=="driver-loaded"}),
   "program_constructions":totals["program"],"distinct_program_keys":len({item["key"] for item in events if item["event"]=="program"}),
   "duplicate_program_constructions":duplicate("program"),"quality_fact_extractions":totals["quality-facts"],
+  "peak_active_programs":peak,"active_programs_after":active,
   "function_metric_extractions":totals["functions"],"duplicate_function_metrics":duplicate("functions"),
   "call_graph_extractions":totals["call-graph"],"duplicate_call_graphs":duplicate("call-graph"),"events":events,
   "boundary":"Explicit Target createProgram/native updateSnapshot and metric function entries; not TypeScript backend internal parser counts. No timing claim."}))
@@ -94,12 +100,14 @@ def counted_case(work,kernel,toolchain,command="validate"):
         failures.append("counted formal check must complete with its original healthy semantic result")
     if not observed.get("program_constructions") or not observed.get("function_metric_extractions"):
         failures.append("instrumentation must observe actual Program and file metric constructors")
-    for field in ("duplicate_program_constructions","duplicate_function_metrics","duplicate_call_graphs"):
+    for field in ("duplicate_function_metrics","duplicate_call_graphs"):
         if observed.get(field)!=0:failures.append(f"same immutable analysis identity must be reused: {field}={observed.get(field)}")
+    if observed.get("peak_active_programs")!=1 or observed.get("active_programs_after")!=0:
+        failures.append("one current Program must replace and release prior environments")
     if observed.get("driver_processes")!=1:failures.append("one formal check must use one persistent analysis driver")
     if observed.get("rule_session_instances")!=1:failures.append("one formal check must share one Rule session across its phases")
     return row(identifier,"S02","Share syntax and metrics across topics without skipping Rule decisions",
-        {"exit_code":0,"rule_session_instances":1,"driver_processes":1,"duplicate_program_constructions":0,"duplicate_function_metrics":0,"duplicate_call_graphs":0},observed,failures,root)
+        {"exit_code":0,"rule_session_instances":1,"driver_processes":1,"peak_active_programs":1,"active_programs_after":0,"duplicate_function_metrics":0,"duplicate_call_graphs":0},observed,failures,root)
 
 
 def observe(work:Path,kernel:Path,toolchain:Path|None,renderer:Path|None):

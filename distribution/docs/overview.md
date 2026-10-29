@@ -1,6 +1,6 @@
 # VibeFlow 项目概览
 
-VibeFlow 把 AI 参与开发的程序组织成一张可执行、可检查、可生成架构视图的显式流程图。业务逻辑位于小型 Node 中，Config 声明控制流，端口契约声明数据流，Core 在运行或构建前验证结构。
+VibeFlow 把 AI 参与开发的程序组织成可执行、可检查、可审阅的显式流程图。小型 Node 承载业务职责，Config 声明控制流，端口契约表达数据流。
 
 ## 核心模型
 
@@ -8,34 +8,26 @@ VibeFlow 把 AI 参与开发的程序组织成一张可执行、可检查、可�
 terminal start → input I/O → process / nodeset → output I/O → terminal end
 ```
 
-- **Node**：具有明确职责和端口契约的原子处理单元。
-- **Nodeset**：由 Node、其他 Nodeset 或 Loop 组成的可复用流程块。
-- **Config**：声明调用实例、显式 edge、公共输入输出和资源选择。
-- **Rule / Ruleset**：用普通代码定义检查逻辑，用规则图组合依赖与覆盖关系；资源选择自己的审查规则。
-- **Plugin**：以 Python 或 JS/TS 代码声明固定资源，由 workflow 显式启用；也可提供编译与运行生命周期。
-- **BaseLib / Capability**：辅助库提供复用实现，宿主注入必要 API；监听与关闭由普通 Node 在图中显式执行。
-- **Architecture**：从真实 Config、资源声明及源码依赖生成的审查视图。
-- **Target**：执行或生成工作流的语言后端。当前正式 Target 为 Python Runtime/AOT 和 JavaScript AOT。
+| 概念 | 职责 |
+| --- | --- |
+| NodeType | 可复用的节点外观与默认局部规则 |
+| Node | 具有明确职责和端口契约的原子处理单元 |
+| NodesetType / Nodeset | 可复用子图的定义及其一次调用 |
+| Config | 调用实例、显式连边、公共输入输出和资源选择 |
+| Rule / Ruleset | 普通代码实现的检查及其组合关系 |
+| Plugin | 提供类型、规则、Schema、Capability 和生命周期扩展的资源包 |
+| BaseLib | 多个资源复用的辅助实现 |
+| Capability | 宿主提供给工作流的显式 API |
+| [架构资料](user/architecture.md) | 项目与工作流的阅读入口 |
+| Target | 执行或生成工作流的语言后端：Python Runtime/AOT、JavaScript AOT |
 
-Node 类型信息是端口契约和语义的来源；Config 中的 `display_name` 与 `description` 说明一次调用在当前工作流中的用途。已实现 Node 和 Nodeset 调用从类型定义取得契约，planned 与系统调用在 Config 中显式声明必要结构。
+## 开发闭环
 
-## VibeFlow 提供什么
+1. 在真实 Config 和资源源码中表达职责、契约、执行关系及依赖。
+2. 按[架构指南](user/architecture.md)维护开发资料，使用 HTML 查看流程与审查结果。
+3. 执行结构与源码检查，再运行或构建指定 Target 的程序。
+4. 用执行报告、业务测试和真实环境验收确认结果。
 
-- 配置、登记与契约形状检查；
-- 显式控制流、数据可达性和合流检查；
-- 可组合的源码、架构和领域 Ruleset；
-- Node、BaseLib、Plugin 的多文件实现、源码归属和逐文件质量检查；
-- Python 运行时与目录 AOT、JavaScript/TypeScript AOT 构建；
-- 保存规则及样式来源的 Architecture JSONC，以及带历史、可展开调用与资源视图的离线 HTML 预览；SVG 按需生成对照；
-- 可追踪的运行产物与工作流执行探针。
+两种开发 profile 共用内核、项目模板与执行契约。collaborative 在实现前安排人类审阅；autonomous 在任务授权内自动完成开发闭环。发行包只携带所选 profile 的协议。
 
-VibeFlow 检查工程结构、源码健康度与所选领域约束。项目测试与真实环境验证负责业务结果、需求符合性和外部接口行为。
-
-## 两个开发 profile
-
-- **collaborative**：使用变更清单、planned 架构审核、HTML 审查快照和人工批准门。
-- **autonomous**：AI 直接维护真实 source，自动更新架构并完成适用门禁。
-
-两个 profile 使用同一 Core、quality policy、项目模板和 Workflow ABI `vibeflow.workflow.v11`。profile 只改变开发协议、提示词和随包文档选择。
-
-当前项目采用独立 root、NodeType/业务 Node 分层及四级规则治理。旧配置与 AOT 需重新迁移和构建；旧预览不兼容，重新生成 v4 快照。详见[项目治理](user/project-governance.md)与[迁移说明](user/rule-system-migration.md)。
+首次使用见[快速开始](user/quickstart.md)，完整导航见[用户手册](README.md)。

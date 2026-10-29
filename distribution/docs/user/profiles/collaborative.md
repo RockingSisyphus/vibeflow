@@ -1,25 +1,24 @@
 # 人机协同开发协议
 
-collaborative profile 适合需要人类在实现前审阅架构变化的任务。
+collaborative profile 将架构审阅和人工批准安排在实现之前。
 
-1. 阅读已登记 Architecture 并定位真实 source。
+## 工作顺序
+
+1. 按[架构阅读指南](../architecture.md)了解项目、目标 root 与相关 workflow，再定位源码。
 2. 列出复用、修改、删除、新增四类变更清单。
-3. 修改现有流程时，在其真实 Config 的实际位置标记或新增 planned Node、Nodeset，保留原流程上下游。
-4. 对受影响的完整工作流运行 `review`，生成正式 HTML 预览与结构化快照；交付 `preview` 完整路径、`preview_id` 和定位链接（`#snapshot=<preview_id>&view=flow`），说明对应 Config 及变更位置，请人类查看该快照的 workflow。
+3. 在受影响工作流的真实位置表达 planned Node 或 Nodeset，保留上下游关系。
+4. 对受影响的完整工作流运行 `review`，按[本地预览的交付要求](../local-preview.md#生成与交付审核材料)提供当次 HTML 快照，请人类查看变化及依赖。
 5. 等待人类在后续消息中明确批准。
-6. 实现获批内容，更新 Architecture，并运行适用的 validate、quality、build 和工作流执行探针。
+6. 实现获批内容，按架构指南更新资料，完成适用的 validate、quality、build 和工作流执行探针。
 
-机器检查结论与人工批准分别报告。此 profile 使用与 autonomous 相同的 Core、原生契约和所选 Ruleset。
+机器检查结果与人工批准分别报告。
 
-## 正式 HTML 审核与真实流程
+审核使用 HTML。禁止 AI 自行打开、查看或渲染生成的 SVG；只有用户明确要求查看 SVG 时才按该次要求处理。SVG 的生成条件与方法见[预览指南末节](../local-preview.md#svg-附件仅在用户主动要求时生成)。
 
-正式材料围绕实际构建和执行的 Config 组织，提供以下内容：
+## 审阅内容
 
-- 由 `review` 生成的 HTML 预览、结构化快照及对应的 Architecture JSONC；在流程视图按需展开受影响调用，资源视图核对依赖。需要静态对照时使用 `review --with-svg` 或显式 `--output FILE.svg`，SVG 不作为默认必需材料。
-- 既有工作流的真实入口、Nodeset、变更调用点和未修改部分。跨多个工作流时，分别提供各自完整图。
-- planned 变化的输入输出、控制流、资源依赖和预期实现位置，并分别标明规划、实现和执行状态。
-- 新增独立工作流的用途、现有流程难以承载的原因、真实调用方、接入关系及构建执行路径。既有环节的变化仍在原流程位置审核。
-- 业务 Node、BaseLib 与 Plugin 的真实声明和源码依赖。多文件入口和支撑文件通过 HTML 资源视图及 JSONC 来源定位。
-- 当次 `review` / `validate` 结果与生产调用依据；实现后的执行探针和业务验收分别记录。
-
-人类依据这些材料作出明确批准，再进入获批内容的实现。
+- 现有流程的入口、变更位置、上下游及未修改部分；涉及多个 workflow 时分别提供完整图。
+- planned 变化的契约、控制流、资源依赖和预期实现位置，区分规划、实现与执行状态。
+- 业务 Node、BaseLib、Plugin 的真实声明及源码依赖。
+- 新增独立 workflow 的用途、现有流程难以承载的原因、实际调用方、接入关系和构建执行路径。
+- 当次 review/validate 结果，以及实现后的执行与业务验收证据。

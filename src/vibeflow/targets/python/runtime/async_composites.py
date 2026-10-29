@@ -28,8 +28,8 @@ class AsyncRuntimeNodesetMixin:
             await self._call_runtime_plugins_async('after_nodeset', frame.id, frame.definition_id)
             return outputs
         except Exception as exc:
-            self._record_runtime_event('nodeset_failed', frame.id, frame.definition_id, failure=str(exc), elapsed_ms=elapsed_ms(started))
-            await self._call_runtime_plugins_async('nodeset_failed', frame.id, frame.definition_id, str(exc))
+            self._record_failure_event('nodeset_failed', frame.id, frame.definition_id, failure=str(exc), elapsed_ms=elapsed_ms(started), error=exc)
+            await self._call_runtime_plugins_async('nodeset_failed', frame.id, frame.definition_id, str(exc), primary=exc)
             raise
 
     async def _run_nodeset_node_async(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
@@ -43,8 +43,8 @@ class AsyncRuntimeNodesetMixin:
             await self._call_runtime_plugins_async('after_nodeset', frame.id, frame.definition_id)
             return outputs
         except Exception as exc:
-            self._record_runtime_event('nodeset_failed', frame.id, frame.definition_id, failure=str(exc), elapsed_ms=elapsed_ms(started))
-            await self._call_runtime_plugins_async('nodeset_failed', frame.id, frame.definition_id, str(exc))
+            self._record_failure_event('nodeset_failed', frame.id, frame.definition_id, failure=str(exc), elapsed_ms=elapsed_ms(started), error=exc)
+            await self._call_runtime_plugins_async('nodeset_failed', frame.id, frame.definition_id, str(exc), primary=exc)
             raise
 
     async def _run_nodeset_outputs_async(self, frame: NodeFrame, inputs: Mapping[str, object], *, cached: bool=False) -> Mapping[str, object]:

@@ -4,7 +4,7 @@ from threading import Event, Lock
 from types import MappingProxyType
 from typing import Mapping
 
-from .errors import PipelineRuntimeError
+from .errors import PipelineRuntimeError, merge_execution_error
 
 
 class NodeContractError(PipelineRuntimeError):
@@ -27,7 +27,26 @@ class CancellationSignal:
         self._callback_errors = []
         self._pending = []
         self.reason = None
+        self.error = None
         self._loop = async_loop
+
+    def record_error(self, error, *, cleanup=False):
+        """Keep one causal outcome per run, before observers/cleanup can suspend."""
+        with self._lock:
+            self.error = merge_execution_error(self.error, error, cleanup=cleanup)
+            return self.error if self.error is not None else error
+
+    def fail(self, error, *, cleanup=False):
+        primary = self.record_error(error, cleanup=cleanup)
+        if not isinstance(error, SystemExit):
+            self.request_stop('workflow failed or cancelled')
+        return primary
+
+    def raise_callback_errors(self):
+        with self._lock:
+            errors, self._callback_errors = self._callback_errors, []
+        if errors:
+            raise BaseExceptionGroup('Node cancellation cleanup failed', errors)
 
     def _own(self, result):
         import asyncio
@@ -60,6 +79,8 @@ class CancellationSignal:
             if self.aborted:
                 return
             self.reason = reason
+            if self.error is None:
+                self.error = NodeCancelled('VF_ABORTED: workflow stop requested')
             self._event.set()
             listeners = tuple(self._listeners)
             self._listeners.clear()
@@ -138,10 +159,7 @@ class NodeRunContext:
                     immediate(operation)
                 except BaseException as error:
                     self.signal._callback_errors.append(error)
-            if self.signal._callback_errors:
-                raise ExceptionGroup(
-                    "Node cancellation cleanup failed", self.signal._callback_errors
-                )
+            self.signal.raise_callback_errors()
         finally:
             self._unsubscribe()
 
@@ -157,8 +175,7 @@ class NodeRunContext:
                         await asyncio.wrap_future(operation) if isinstance(operation, Future) else await operation
                     except BaseException as error:
                         self.signal._callback_errors.append(error)
-            if self.signal._callback_errors:
-                raise BaseExceptionGroup("Node cancellation cleanup failed", self.signal._callback_errors)
+            self.signal.raise_callback_errors()
         finally:
             self._unsubscribe()
 

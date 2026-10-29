@@ -1,9 +1,6 @@
 # JavaScript/TypeScript 资源与 AOT
 
-用户资源从 `@vibeflow/plugin` 的 SDK 定义。业务声明与执行代码可以放在一起，置于 nodes/；Plugin 提供类型、规则、Schema 或 Capability，须位于独立包内。JS/TS 属于同一执行族，生成物继续是普通 ESM，使用原生 Workflow ABI v11。
-
-
-任何 Node 的 `run(inputs, params, context)` 都可通过 `context.workflow.self().id` 读取当前 workflow 实例 ID，无需声明 Capability 或授权 Rule。Nodeset 和 Loop 内部共享该身份；每次独立调用生成新 ID，协同宿主使用服务注册 ID。宿主可通过 `WorkflowRunOptions.workflowInstanceId` 传入自身管理的 ID。该接口只读取身份，详见 [workflow 协同](workflow-coordination.md)。
+用户资源从 `@vibeflow/plugin` 的 SDK 定义。业务声明与执行代码可以放在一起，置于 nodes/；Plugin 提供类型、规则、Schema 或 Capability，须位于独立包内。JS/TS 属于同一执行族，生成物是普通 ESM。
 
 ## 业务 Node 与类型
 
@@ -24,10 +21,6 @@ export const normalize = defineNode({
   },
   run(inputs, params, context) {
     const normalizedText = inputs["text.raw"].value.trim().replace(/\s+/g, " ");
-    context.updateInfo([{
-      id: "normalize", characters: normalizedText.length,
-      message: "文本规范化完成",
-    }]);
     return {normalized_text: normalizedText};
   },
 });
@@ -49,17 +42,11 @@ workflow 显式启用：
 {"plugins": [{"source": {"kind": "file", "ref": "plugins/schemas/plugin.ts"}}], "pipeline": { /* definition_id 引用 nodes/ 中的业务定义 */ }}
 ```
 
-支持已安装模块/包、显式导出和已登记的 workspace `root`。Node 自己选择 `rulesets` 和默认 `presentation`；类型声明提供默认；调用 Config 的缺省继承该默认，显式列表替代，`[]` 取消局部规则。DataSchema 由选中插件贡献，供公共输入输出、Node 和 Capability 查找。
-
-## 多文件资源
-
-`defineNode`、`defineBaseLib` 和 `definePlugin` 接受 `implementation_files`，逐一登记支撑文件；路径相对调用 SDK 的声明模块。支撑文件可以包含运行实现、纯工具或类型。共享库使用 BaseLib，并由使用它的资源明确填写 `base_libs`。
-
-`presentation` 为四类资源设置颜色、形状和图标，正式 Architecture 与 SVG 保存有效值及来源。默认可维护性规则逐文件检查 500 行上限。Plugin 的类型、规则及私有支持文件均留在自身包内；业务 Node 和独立 BaseLib 从各自标准目录发现。type-only 导入、生命周期分文件及使用处颜色覆盖见[多文件资源](multifile-resources.md)。
+DataSchema 由选中插件贡献，供公共输入输出、Node 和 Capability 查找。
 
 ## SDK 解析与运行协议
 
-发行包和 wheel 包含 SDK 运行文件及类型声明。VibeFlow worker、分析器和构建器统一解析 `@vibeflow/plugin`。发行模板的 `tsconfig.json` 将 TypeScript 的 `paths["@vibeflow/plugin"]` 指向 `../kernel/javascript/sdk.d.ts`。这些文件由内核的同一 SDK 复制生成，受到发行清单保护。源码沙箱的 tsconfig 直接引用内核资源目录；wheel 用户可以通过 `importlib.resources.files("vibeflow.targets.javascript.resources")` 定位同一文件。无需另装一个同名 npm SDK。
+发行包和 wheel 包含 SDK 运行文件及类型声明。VibeFlow worker、分析器和构建器统一解析 `@vibeflow/plugin`。发行模板的 `tsconfig.json` 将 TypeScript 的 `paths["@vibeflow/plugin"]` 指向 `../kernel/javascript/sdk.d.ts`。这些文件由内核的同一 SDK 复制生成，受到发行清单保护。wheel 用户可以通过 `importlib.resources.files("vibeflow.targets.javascript.resources")` 定位同一文件。无需另装一个同名 npm SDK。
 
 Node 返回普通对象，key 对应 `provides`。`completion: "immediate"` 使用同步返回；`"suspend"` 返回 Promise，并要求 workflow 的 `pipeline.entry_mode: "async"`。并发使用普通节点、显式分支边和独立的 all 汇合节点，见[普通图并发](graph-concurrency.md)。
 
@@ -80,10 +67,9 @@ Browser/Node 平台由 `build --target` 选择。Rule 始终在 Node worker 环�
 
 项目的 TypeScript、ESLint 和业务测试分别验证类型、编码约定和业务结果。插件入口的初始化与延迟实现的检查时机见[加载与检查](plugins-and-integrations.md#原生加载与生命周期)。
 
-## 在业务 Node 中更新进度
+## 相关文档
 
-上例使用运行器提供的第三个参数 `context`，通过 `context.updateInfo` 提交信息，并照常返回 Node 输出。异步 Node 在 `await` 业务操作后使用同一接口；训练循环可逐轮更新。Node 的规则选择与原生执行协议沿用已有声明。
-
-传入普通 JSON 对象数组，每次调用替换全部 `info`；`[]` 清空信息。缓存会在下次刷新、状态变化或结束时发布，默认间隔为 60000 毫秒，运行选项 `statusIntervalMs` 可调整。Node.js 写入状态文件，浏览器通过 `onStatus` 向宿主提供快照。文件路径及完整格式见[运行日志与状态接口](runtime-observation.md)。
-
-普通节点的并发分发、显式汇合、取消与实际收尾合同见[普通图并发](graph-concurrency.md)。
+- [Rule 与 Node](rules-and-nodes.md)：规则选择与自定义检查。
+- [多文件资源](multifile-resources.md)：支撑文件、库依赖和样式。
+- [运行观测](runtime-observation.md)：业务进度更新与日志。
+- [Workflow 协同](workflow-coordination.md)：实例身份与跨工作流调用。

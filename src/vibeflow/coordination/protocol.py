@@ -39,12 +39,19 @@ def error_record(error, _ancestors=frozenset()):
     if id(error) in _ancestors:
         return {**result, 'recursive':True}
     ancestors = _ancestors | {id(error)}
+    if getattr(error, 'business_exit', None):
+        result['business_exit'] = error.business_exit
     if getattr(error, 'workflow_calls', None):
         result['workflow_calls'] = error.workflow_calls
     if error.__cause__ is not None:
         result['cause'] = error_record(error.__cause__, ancestors)
+    elif error.__context__ is not None and not error.__suppress_context__:
+        result['context'] = error_record(error.__context__, ancestors)
     if isinstance(error, BaseExceptionGroup):
         result['errors'] = [error_record(item, ancestors) for item in error.exceptions]
+    if getattr(error, 'execution_errors', None):
+        result['errors'] = [*result.get('errors', ()),
+                            *(error_record(item, ancestors) for item in error.execution_errors)]
     if getattr(error, 'cleanup_errors', None):
         result['cleanup_errors'] = [error_record(item, ancestors) for item in error.cleanup_errors]
     return result

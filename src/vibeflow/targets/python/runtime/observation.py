@@ -12,6 +12,7 @@ from tempfile import NamedTemporaryFile
 from threading import Event, RLock, Thread
 
 from vibeflow.core.run_status import run_status_record, snapshot_info
+from .errors import finish_actions, preserve_failure
 
 
 _CURRENT = ContextVar("vibeflow_run_observation", default=None)
@@ -190,30 +191,34 @@ class RunObservation:
             self._thread.join()
         with self._lock:
             self._closed = True
-            for stream in (self._business, self._kernel):
-                if stream is not None:
-                    stream.close()
+            finish_actions(stream.close for stream in (self._business, self._kernel) if stream is not None)
 
     @contextmanager
     def scope(self):
         self.open()
         token = _CURRENT.set(self)
+        primary = None
         try:
             with _console_streams():
                 yield self
         except BaseException as exc:
-            try:
+            primary = exc
+            with preserve_failure(exc):
                 self.write_kernel("".join(traceback.format_exception(exc)))
+            with preserve_failure(exc):
                 self.transition("failed", str(exc) or type(exc).__name__)
-            except OSError:
-                pass  # Preserve the execution error if the output device also fails.
             raise
         else:
-            if self._state != "failed":
-                self.transition("succeeded")
+            try:
+                if self._state != "failed":
+                    self.transition("succeeded")
+            except BaseException as exc:
+                primary = exc
+                raise
         finally:
             _CURRENT.reset(token)
-            self.close()
+            with preserve_failure(primary):
+                self.close()
 
 
 @contextmanager

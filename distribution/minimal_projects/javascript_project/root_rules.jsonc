@@ -1,0 +1,12 @@
+{
+  "rule_params": {
+    "vibeflow.root.layout": {
+      "directories": [
+        {
+          "path": "run_artifacts",
+          "purpose": "Workflow execution probe reports"
+        }
+      ]
+    }
+  }
+}

@@ -9,6 +9,7 @@ from __future__ import annotations
 from vibeflow.core.rules.selection import selection_data
 
 
+from vibeflow.targets.python.runtime.errors import attach_error
 from contextlib import contextmanager
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -182,7 +183,8 @@ def dispose_instances(instances, *, primary=None):
         for error in errors:
             primary.add_note(f"plugin disposal failed: {error}")
         if errors:
-            primary.cleanup_errors = [*getattr(primary, "cleanup_errors", ()), *errors]
+            for error in errors:
+                attach_error(primary, error)
     elif errors:
         if len(errors) == 1:
             raise errors[0]
@@ -275,7 +277,8 @@ async def dispose_instances_async(instances, *, primary=None, completion_for=Non
             except BaseException as error:
                 errors.append(error)
     if primary is not None:
-        primary.cleanup_errors = [*getattr(primary, "cleanup_errors", ()), *errors]
+        for error in errors:
+            attach_error(primary, error)
     elif cancelled is not None:
         cancelled.cleanup_errors = errors
         raise cancelled

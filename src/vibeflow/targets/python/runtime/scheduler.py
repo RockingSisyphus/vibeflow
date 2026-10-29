@@ -4,7 +4,7 @@ from vibeflow.coordination.async_support import cancel_once
 from dataclasses import dataclass
 
 from vibeflow.core.flow import JOIN_POLICY_ALL
-from .errors import DelegateCliExit, PipelineRuntimeError
+from .errors import PipelineRuntimeError
 
 
 @dataclass(eq=False)
@@ -116,13 +116,7 @@ async def run_graph_async(runtime, state):
                 runtime.trace.current_node = name
                 schedule.complete(name, task.result())
     except BaseException as error:
-        if isinstance(error, asyncio.CancelledError) and runtime._signal.aborted:
-            from .lifecycle import NodeCancelled
-            stopped = NodeCancelled('VF_ABORTED: workflow stop requested')
-            stopped.cleanup_errors = getattr(error, 'cleanup_errors', [])
-            error = stopped
-        failure = error
-        runtime._signal.request_stop("workflow failed or cancelled")
+        failure = runtime._signal.fail(error)
     finally:
         unsubscribe()
         for task in running.values():
@@ -133,25 +127,10 @@ async def run_graph_async(runtime, state):
                 await asyncio.shield(outcomes)
             except asyncio.CancelledError:
                 continue
-        errors = []
         for outcome in outcomes.result():
-            if not isinstance(outcome, BaseException):
-                continue
-            if isinstance(outcome, asyncio.CancelledError) or getattr(outcome, 'code', '') == 'VF_ABORTED':
-                errors.extend(getattr(outcome, 'cleanup_errors', ()))
-            else:
-                errors.append(outcome)
-        if failure is not None and errors:
-            if isinstance(failure, DelegateCliExit):
-                framework = next((error for error in errors if not isinstance(error, DelegateCliExit)), None)
-                if framework is not None:
-                    failure, errors = framework, [error for error in errors if error is not framework]
-                else:
-                    failure = PipelineRuntimeError('multiple business exits in concurrent graph branches')
-            failure.cleanup_errors = [*getattr(failure, "cleanup_errors", ()), *errors]
-        elif errors:
-            failure = errors[0]
+            if isinstance(outcome, BaseException):
+                runtime._signal.record_error(outcome)
     if failure is not None:
-        raise failure
+        raise runtime._signal.error
     runtime.trace.stop_reason = runtime.trace.stop_reason or "no_ready_nodes"
     return schedule.last

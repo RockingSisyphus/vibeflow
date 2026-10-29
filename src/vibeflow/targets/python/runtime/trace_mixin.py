@@ -5,6 +5,7 @@ import json
 
 from vibeflow.core.contracts import DataEnvelope, DataRequirement, RunResult
 from vibeflow.targets.python.runtime.errors import PipelineRuntimeError, normalize_delegate_cli_system_exit
+from .errors import finish_actions, preserve_failure
 from vibeflow.targets.python.runtime.trace import RuntimeTrace
 
 class RuntimeTraceMixin:
@@ -40,26 +41,53 @@ class RuntimeTraceMixin:
         result.set("runtime.trace_path", payload["trace_path"])
         result.set("runtime.events_streamed", payload["events_streamed"])
 
-    def _call_runtime_plugins(self, hook: str, *args) -> None:
+    def _call_runtime_plugins(self, hook: str, *args, primary=None) -> None:
         methods = self._hook_plan.for_hook(hook)
         if not methods:
             return
         for plugin_name, method in methods:
-            try:
-                from .completion import immediate
-                immediate(method(*args))
-            except SystemExit as exc:
-                if not self.delegate_cli:
-                    raise PipelineRuntimeError(
-                        f"runtime plugin '{plugin_name}' {hook} attempted SystemExit outside delegate CLI mode"
-                    ) from exc
-                if hook.endswith("_failed"):
-                    raise PipelineRuntimeError(
-                        f"runtime plugin '{plugin_name}' {hook} cannot replace an existing runtime failure with SystemExit"
-                    ) from exc
-                raise normalize_delegate_cli_system_exit(exc, source=f"plugin:{plugin_name}") from exc
-            except Exception as exc:
-                raise PipelineRuntimeError(f"runtime plugin '{plugin_name}' {hook} failed: {exc}") from exc
+            with preserve_failure(primary):
+                self._call_runtime_plugin(plugin_name, method, hook, args)
+
+    def _call_runtime_plugin(self, plugin_name, method, hook, args):
+        try:
+            from .completion import immediate
+            immediate(method(*args))
+        except SystemExit as exc:
+            if not self.delegate_cli:
+                raise PipelineRuntimeError(
+                    f"runtime plugin '{plugin_name}' {hook} attempted SystemExit outside delegate CLI mode"
+                ) from exc
+            if hook.endswith("_failed"):
+                raise PipelineRuntimeError(
+                    f"runtime plugin '{plugin_name}' {hook} cannot replace an existing runtime failure with SystemExit"
+                ) from exc
+            raise normalize_delegate_cli_system_exit(exc, source=f"plugin:{plugin_name}") from exc
+        except Exception as exc:
+            raise PipelineRuntimeError(f"runtime plugin '{plugin_name}' {hook} failed: {exc}") from exc
+
+    def _record_failure_event(self, kind, node_name, definition_id, *, error, **details):
+        self._signal.fail(error)
+        with preserve_failure(error):
+            self._record_runtime_event(kind, node_name, definition_id, **details)
+
+    def _finish_run(self, state, *, lease_started, owns_trace_sink, primary):
+        """All finalizers run, including after an earlier finalizer fails."""
+        actions = []
+        if self.trace.exception:
+            actions.append(lambda: self._record_global_state_change_warning(self.trace.exception))
+        if lease_started:
+            actions.extend((self._end_execution_lease, lambda: self._write_trace(state.result)))
+        if self._owns_run:
+            actions.append(self._signal.raise_callback_errors)
+        if owns_trace_sink and self._trace_sink is not None:
+            sink = self._trace_sink
+            actions.extend((lambda: sink.write_summary(self.trace), sink.close))
+        try:
+            finish_actions(actions, primary=primary)
+        finally:
+            if owns_trace_sink:
+                self._trace_sink = None
 
     def _record_runtime_event(
         self,

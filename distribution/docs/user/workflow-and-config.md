@@ -2,18 +2,6 @@
 
 Config 描述工作流中的调用实例、公共输入输出、资源选择和显式连接。业务 Node 或 NodesetType 定义提供已实现调用的端口契约。
 
-## Config 与正式 HTML 审核
-
-Config 提供实际构建和执行的工作流结构。修改已有环节时，沿已登记 Architecture 的 source 在原工作流的实际位置表达 planned Node 或 Nodeset，再对保留上下游关系的完整工作流运行 `review`，交付当次 HTML 快照定位链接，供用户查看 workflow 及其依赖。
-
-协同模式对新增独立工作流、共享资源变更，以及 planned 与已执行状态的具体要求见其 profile 文档。
-
-## 多入口与业务语义
-
-若 CLI、浏览器事件或其他入口承诺相同业务判断，让它们的实际调用路径汇入同一套 Node/Nodeset。入口边界负责读取和格式适配，业务分类、合并和领域校验由拥有该职责的节点处理；输出边界适配节点产生的结果。
-
-边界适配保留未知字段、字段缺失与错误类别，交给负责判断的节点处理。入口可以识别自身的词法错误，并保留该错误身份。辅助数据通过 `data bypass` 到达需要它的调用，业务主线仍经过共享处理节点；这些关系由实际 edge 和调用点表达。
-
 ## 最小 pipeline
 
 ```jsonc
@@ -56,6 +44,12 @@ Config 提供实际构建和执行的工作流结构。修改已有环节时，�
 
 Python Runtime 与 JavaScript/TypeScript AOT 使用同一公共输入契约。每个 `pipeline.inputs` 项都必须显式写布尔值 `required`：`true` 要求调用时提供该 key，`false` 允许省略；两者都拒绝未声明的输入 key。省略 `inputs` 或声明空列表时，调用输入只能是 `{}`。`required` 不能省略或写成 `null`。
 
+## 执行模式
+
+`pipeline.entry_mode` 为 `sync` 或 `async`，缺省为 `sync`，命名入口共用整图模式。同步入口直接返回普通输出；需要挂起的 Node、Capability 或运行生命周期使用异步模式，并通过 Target 的异步入口调用。
+
+同步图在准备阶段拒绝已知挂起实现，运行时也拒绝与声明不符的 Promise、coroutine 或 Future。Node 的 completion 声明应与实际实现一致。
+
 ## 控制与数据
 
 `pipeline.edges` 是控制流的唯一来源。数组 edge 同时调度目标并传递匹配的 envelope：
@@ -73,7 +67,7 @@ Python Runtime 与 JavaScript/TypeScript AOT 使用同一公共输入契约。�
 
 `schedule: false` 只传数据，`transfer: false` 只调度；两者不能同时为 `false`。同步并行分支需要等待全部分支时，在汇合调用写 `join_policy: "all"`。互斥 decision 分支通常使用默认 safe-OR 合流。
 
-分发调用可以设置 `"config": {"max_concurrency": 4}`；未配置时默认 8。该字段是框架保留的正整数配置，不加入业务 `params_schema`，也不传给业务 `params`。完整的局部额度、排队补位、独立收集及断路规则见[普通图并发](graph-concurrency.md)。
+分支并发额度与汇合方式见[普通图并发](graph-concurrency.md)。
 
 只有起点、终点、`when`、`schedule`、`transfer` 全部相同的重复声明会合并。未填写的角色设置与显式填写的设置保持为不同声明，不推断条件是否等价。同一对节点可以声明多条不同条件的路线，每条路线分别按自己的条件和角色生效；同一次输出不会因为多条路线匹配而重复执行目标或重复接收同一份 envelope。
 
@@ -86,17 +80,6 @@ Decision Node 使用 `flow_kind="decision"`，提供 route-like 输出，例如 
 ```
 
 分支值由业务实现与项目测试负责；VibeFlow 检查条件语法、分支拓扑和可达性。
-
-## I/O 与副作用边界
-
-| 选择的 Ruleset | 副作用约束 |
-| --- | --- |
-| `vibeflow.process` Ruleset | 默认禁止副作用 |
-| `vibeflow.io` Ruleset | 允许真实终端输入输出 |
-| `vibeflow.document` / `vibeflow.data_store` Ruleset | 允许文件、网络、数据库等 Python I/O |
-| `vibeflow.global_state` Ruleset | 允许有限效果检查所识别的共享／模块状态操作，仍执行其他所选检查 |
-
-业务 Node 从标准目录发现，引用 NodeType。类型默认规则可由 Node 替换，调用再替换；NodeType 声明中的列表提供默认，调用 Config 的缺省使用默认、非空完整替代、空列表取消局部选择；报告中的 `effect_scope` 来自有效规则记录。`flow_kind` 描述执行身份，`external` 标记外部边界，副作用权限由规则表达。详见[Rule 与 Node](rules-and-nodes.md)。需要协调 `global_state` 冲突资源时使用静态命名 `execution_lock`；相同 key 互斥，不同 key 可并行。
 
 ## 可执行结构示例
 
@@ -160,32 +143,17 @@ Decision Node 使用 `flow_kind="decision"`，提供 route-like 输出，例如 
 }
 ```
 
-## 项目配置
-
-workspace 根的 `vibeflow_config.jsonc` 登记项目 root。每个 root 的 `vibeflow_project.jsonc` 声明 `project_target: "python" | "javascript"`、Target 配置及 Architecture 文档：
-
-```jsonc
-{
-  "project_target": "python",
-  "architecture": {
-    "documents": [{"workflow": "configs/main.jsonc", "document": "ARCHITECTURE.jsonc"}]
-  }
-}
-```
-
-自定义资源由各 workflow 的 `plugins` 选择固定代码插件。插件 source 相对所属 root；资源的 `implementation_files` 相对 SDK 声明模块。节点调用引用业务 Node 或 NodesetType，BaseLib 引用使用可见资源的 ID。插件选择见[插件与宿主集成](plugins-and-integrations.md#声明与选择)，支撑文件及使用处样式见[多文件资源](multifile-resources.md)。
-
-验证修改：
+## 更新配置后验证
 
 ```bash
-python run.py architecture --config <root>/configs/main.jsonc --output <root>/ARCHITECTURE.jsonc
 python run.py validate --config <root>/configs/main.jsonc
 ```
 
-## Workflow 的规则选择
+## 相关文档
 
-Workflow 顶层的 `rulesets` 未填写时，使用内置及所选 Plugin 的 Workflow 默认；非空列表替代全部默认，`[]` 取消根图规则。Node 调用自身的 `rulesets` 独立控制局部规则，不解除图级约束。需要同时保留内置 Workflow 审查与自定义图规则时，应显式列出 `["vibeflow.workflow", "example.graph"]`。定义和接入方法见 [规则选择与插件示例](rules-and-nodes.md)。
-
-普通节点的并发分发、显式汇合、取消与实际收尾合同见[普通图并发](graph-concurrency.md)。
-
-命名入口、独立 workflow 调用与消息、普通端口节点迁移见[多入口与通信](workflow-coordination.md)。旧原生 `vibeflow.io` / `io` 配置不再执行；`vibeflow.io` Ruleset 继续保留。
+- [架构阅读与维护](architecture.md)：架构资料的阅读与更新。
+- [项目治理](project-governance.md)：root 配置和资源选择。
+- [Rule 与 Node](rules-and-nodes.md)：局部与图级规则、效果范围。
+- [Nodeset 与 Loop](nodeset-types-and-loops.md)：子图导入和循环调用。
+- [Workflow 协同](workflow-coordination.md)：命名入口与多入口设计。
+- [本地预览](local-preview.md)：生成和查看审核快照。
