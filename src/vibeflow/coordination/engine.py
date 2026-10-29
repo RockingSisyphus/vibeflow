@@ -202,7 +202,7 @@ class Coordinator:
             except asyncio.CancelledError as error:
                 self.complete(item,'cancelled',error=self._error(error))
             except BaseException as error:
-                self.complete(item,'cancelled' if item['stop_requested'] or getattr(error,'code','')=='VF_ABORTED' else 'failed',
+                self.complete(item,'cancelled' if getattr(error,'code','')=='VF_ABORTED' else 'failed',
                               error=self._error(error))
         from contextvars import Context
         item['task'] = asyncio.create_task(execute(),context=Context())

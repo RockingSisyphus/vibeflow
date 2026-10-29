@@ -11,6 +11,7 @@ from vibeflow.targets.python.runtime.observation import observe_run
 from vibeflow.targets.python.project.plugins import plugin_lifetime_async
 from .compiled import run_compiled_steps_async
 from .completion import suspended
+from .errors import preserve_failure
 
 class AsyncPipelineRuntime:
 
@@ -47,17 +48,21 @@ class AsyncPipelineRuntime:
             raise PipelineRuntimeError('block execution requires a compiled graph block')
         await suspended(block.callable(self, state))
 
-    async def _call_runtime_plugins_async(self, hook, *args):
+    async def _call_runtime_plugins_async(self, hook, *args, primary=None):
         for name, method in self._hook_plan.for_hook(hook):
-            try:
-                value = method(*args)
-                if self._plugin_registry.completion(next(plugin for plugin in self._runtime_plugins if plugin.name == name)) == 'immediate':
-                    from .completion import immediate
-                    immediate(value)
-                else:
-                    await suspended(value)
-            except Exception as cause:
-                raise PipelineRuntimeError(f"runtime plugin '{name}' {hook} failed: {cause}") from cause
+            with preserve_failure(primary):
+                await self._call_runtime_plugin_async(name, method, hook, args)
+
+    async def _call_runtime_plugin_async(self, name, method, hook, args):
+        try:
+            value = method(*args)
+            if self._plugin_registry.completion(next(plugin for plugin in self._runtime_plugins if plugin.name == name)) == 'immediate':
+                from .completion import immediate
+                immediate(value)
+            else:
+                await suspended(value)
+        except Exception as cause:
+            raise PipelineRuntimeError(f"runtime plugin '{name}' {hook} failed: {cause}") from cause
 
     async def _run_with_observation_async(self, initial: Mapping[str, Any] | None=None) -> RunResult:
         if not self._owns_run:
@@ -108,6 +113,7 @@ class AsyncPipelineRuntime:
                 await self._call_runtime_plugins_async('after_run', state.result.to_dict(), self.trace.to_dict())
         except DelegateCliExit as exc:
             try:
+                self._signal.record_error(exc)
                 self._signal.request_stop('business exit')
             except BaseException as cleanup:
                 primary_error = cleanup
@@ -122,31 +128,13 @@ class AsyncPipelineRuntime:
             state.result.set('cli.exit_code', DataEnvelope(key='cli.exit_code', type='cli.exit_code', value=exc.exit_code, source_node=exc.source).to_input())
             self._write_trace(state.result)
         except BaseException as exc:
-            primary_error = exc
-            self._signal.request_stop('workflow failed')
-            await self._record_runtime_failure_async(state, exc)
-            raise
+            primary_error = self._signal.fail(exc)
+            with preserve_failure(primary_error):
+                await self._record_runtime_failure_async(state, primary_error)
+            raise primary_error
         finally:
-            try:
-                if self.trace.exception:
-                    self._record_global_state_change_warning(self.trace.exception)
-            finally:
-                try:
-                    if lease_started:
-                        self._end_execution_lease()
-                        self._write_trace(state.result)
-                except BaseException as cleanup:
-                    if primary_error is None:
-                        raise
-                    primary_error.add_note(str(cleanup))
-                    primary_error.cleanup_errors = [*getattr(primary_error, 'cleanup_errors', ()), cleanup]
-                finally:
-                    if owns_trace_sink and self._trace_sink is not None:
-                        try:
-                            self._trace_sink.write_summary(self.trace)
-                        finally:
-                            self._trace_sink.close()
-                            self._trace_sink = None
+            self._finish_run(state, lease_started=lease_started,
+                             owns_trace_sink=owns_trace_sink, primary=primary_error)
         return state.result
 
     async def _record_runtime_failure_async(self, state: _RuntimeState, exc: BaseException, *, force_node_failed: bool=False) -> None:
@@ -155,11 +143,9 @@ class AsyncPipelineRuntime:
         else:
             self.trace.stop_reason = self.trace.stop_reason or 'node_failed'
         self.trace.exception = str(exc)
-        self._record_global_state_change_warning(str(exc))
-        self._write_trace(state.result)
+        with preserve_failure(exc):
+            self._record_global_state_change_warning(str(exc))
+        with preserve_failure(exc):
+            self._write_trace(state.result)
         if self._owns_run:
-            try:
-                await self._call_runtime_plugins_async('run_failed', state.result.to_dict(), self.trace.to_dict(), str(exc))
-            except BaseException as cleanup:
-                exc.add_note(str(cleanup))
-                exc.cleanup_errors = [*getattr(exc, 'cleanup_errors', ()), cleanup]
+            await self._call_runtime_plugins_async('run_failed', state.result.to_dict(), self.trace.to_dict(), str(exc), primary=exc)

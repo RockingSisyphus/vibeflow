@@ -29,8 +29,8 @@ class RuntimeLoopMixin:
             self._call_runtime_plugins("after_node", frame.id, frame.definition_id, summarize_mapping(outputs))
             return outputs
         except Exception as exc:
-            self._record_runtime_event("loop_failed", frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started))
-            self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(exc))
+            self._record_failure_event("loop_failed", frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started), error=exc)
+            self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(exc), primary=exc)
             raise
 
     def _run_loop_block_node(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
@@ -50,8 +50,8 @@ class RuntimeLoopMixin:
             self._call_runtime_plugins("after_node", frame.id, frame.definition_id, summarize_mapping(outputs))
             return outputs
         except Exception as exc:
-            self._record_runtime_event("loop_failed", frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started))
-            self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(exc))
+            self._record_failure_event("loop_failed", frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started), error=exc)
+            self._call_runtime_plugins("node_failed", frame.id, frame.definition_id, str(exc), primary=exc)
             raise
 
     def _run_loop_outputs(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:

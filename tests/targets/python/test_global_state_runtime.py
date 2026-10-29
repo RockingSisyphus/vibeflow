@@ -958,8 +958,10 @@ def test_state_change_warning_trace_failure_still_releases_domains(
         return original_record(kind, node_name, node_type, **kwargs)
 
     failing._record_runtime_event = fail_warning
-    with pytest.raises(OSError, match="state warning trace failed"):
+    with pytest.raises(RuntimeError, match="global boom") as caught:
         failing.run()
+    assert any(isinstance(error, OSError) and 'state warning trace failed' in str(error)
+               for error in caught.value.cleanup_errors)
 
     assert failing._execution_scope_is_protected() is False
     recovered = _runtime(

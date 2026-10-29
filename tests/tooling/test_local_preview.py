@@ -15,6 +15,47 @@ from vibeflow.tooling.project.preview_options import validate_preview_options
 from vibeflow.tooling.project.architecture_types import WorkspaceConfigError
 
 
+def test_expanding_repeated_nodesets_preserves_entrance_and_nested_branch_order(tmp_path):
+    from functools import partial
+    from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+    from vibeflow.tooling.presentation.mermaid import _find_mmdc, is_mermaid_svg_renderer_available
+    from vibeflow.tooling.presentation.preview.exporter import publish_preview
+
+    if not is_mermaid_svg_renderer_available():
+        pytest.skip("locked browser toolchain supplied by the full gate")
+    renderer = _find_mmdc().resolve()
+    install_page(tmp_path)
+    def call(identifier, target=None):
+        return {"id":identifier, "definition_id":"fixture.node", "flow_kind":"process",
+                **({"invokes":{"target":target}} if target else {})}
+    def chain(prefix):
+        return [call(prefix+"__start"),call(prefix+"__boundary","shared"),call(prefix+"__end")]
+    def edges(nodes):
+        return [{"from":a["id"],"to":b["id"],"roles":["mainline"],"when":"ready"}
+                for a,b in zip(nodes,nodes[1:])]
+    request,event=chain("request"),chain("event")
+    leaf=[call("start"),call("work"),call("end")]
+    architecture={"workflow":{"nodes":request+event,"edges":edges(request)+edges(event)},
+                  "nodeset_types":{"shared":{"body":{"nodes":[call("first","leaf"),call("second","leaf")],"edges":[]}},
+                                   "leaf":{"body":{"nodes":leaf,"edges":edges(leaf)}}}}
+    workflow={"id":"fixture:api.jsonc","root_id":"fixture","path":"api.jsonc","name":"API","target":"python"}
+    publish_preview(root=tmp_path,workflow=workflow,architecture=architecture,category="build",status="succeeded")
+    class QuietHandler(SimpleHTTPRequestHandler):
+        def log_message(self, *_args):
+            pass
+    server=ThreadingHTTPServer(("127.0.0.1",0),partial(QuietHandler,directory=str(tmp_path)))
+    thread=Thread(target=server.serve_forever,daemon=True);thread.start()
+    try:
+        script=Path(__file__).resolve().parents[1]/"fixtures/preview/branch_order.cjs"
+        result=subprocess.run(["node",str(script),str(renderer),
+                               f"http://127.0.0.1:{server.server_port}/vibeflow-preview.html"],
+                              capture_output=True,text=True,timeout=90)
+        assert result.returncode==0,result.stdout+result.stderr
+    finally:
+        server.shutdown();server.server_close();thread.join()
+
+
 def test_installer_discovers_entry_asset_references_and_preserves_configuration(tmp_path,monkeypatch):
     from vibeflow.tooling.presentation import viewer
     assets=tmp_path/"tool";assets.mkdir()

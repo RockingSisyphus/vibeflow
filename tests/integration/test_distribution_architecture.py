@@ -56,6 +56,19 @@ def test_javascript_architecture_immediate_check_passes(distribution):
     _architecture(distribution, check=True)
 
 
+def test_javascript_execution_probe_outputs_remain_reviewable(distribution):
+    _command(distribution, [sys.executable, "-I", "run.py", "build",
+        "--config", "javascript_project/configs/main.jsonc", "--target", "node",
+        "--profile", "esm-module", "--out-dir", "javascript_project/build/node"])
+    _command(distribution, ["node", "javascript_project/scripts/workflow_execution_probe.mjs"])
+    assert (distribution / "javascript_project/run_artifacts/workflow_execution_report.json").is_file()
+    completed = _command(distribution, [sys.executable, "-I", "run.py", "review",
+        "--config", "javascript_project/configs/main.jsonc"])
+    payload = json.loads(completed.stdout)
+    assert payload["published"] is True
+    assert payload["status"] in {"PASS", "CONCERNS"}
+
+
 def test_javascript_architecture_repeated_exports_are_identical(distribution):
     output = distribution / "javascript_project/ARCHITECTURE.jsonc"
     _architecture(distribution)

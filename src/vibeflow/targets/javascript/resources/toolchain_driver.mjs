@@ -2390,10 +2390,10 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
   };
   const state=await analysisProgram(ts,request,files,jsonCompilerOptions,analysisSession);
   const {program,checker,project,sourceFiles}=state;
-  const diagnostics=checkDiagnostics?sourceFiles.filter(item=>contractFiles.has(path.resolve(item.fileName)))
-    .flatMap(item=>ts.__native?[...program.getSyntacticDiagnostics(item.fileName),...program.getBindDiagnostics(item.fileName),...program.getSemanticDiagnostics(item.fileName)]
-      :ts.getPreEmitDiagnostics(program,item)).map(item=>diagnosticText(ts,item)):[];
   try {
+    const diagnostics=checkDiagnostics?sourceFiles.filter(item=>contractFiles.has(path.resolve(item.fileName)))
+      .flatMap(item=>ts.__native?[...program.getSyntacticDiagnostics(item.fileName),...program.getBindDiagnostics(item.fileName),...program.getSemanticDiagnostics(item.fileName)]
+        :ts.getPreEmitDiagnostics(program,item)).map(item=>diagnosticText(ts,item)):[];
     if (qualityOnly) {
       return collectQualityFacts(ts, program, checker, project, sourceFiles, request);
     }

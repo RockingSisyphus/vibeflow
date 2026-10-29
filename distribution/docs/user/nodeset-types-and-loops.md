@@ -63,23 +63,9 @@ Nodeset 内部的 `pipeline.inputs` 同样显式声明 `required`。这里原始
 "node_configs": {"normalize": {"collapse_newlines": false}}
 ```
 
-## 架构图展开选择
-
-NodesetType 定义的 `expand` 控制展开视图是否显示内部流程。省略时默认为 `true`；设置为 `false` 后，图中保留该 Nodeset 的调用框和对外连边，其内部 Node、连边及嵌套 Nodeset 的内容不再展开。
-
-例如，在上面的 `example.prepare_text` 定义中，将该字段改为：
-
-```jsonc
-"expand": false
-```
-
-`expand` 与 `type_key`、`requires`、`provides` 放在同一层，取值只能是 JSON 布尔值 `true` 或 `false`。同一 NodesetType 定义的多个调用共用这个设置；从独立文件导入的定义和 Loop 的 `body` 引用也遵循它。展开视图在折叠的调用处停止递归，因此内部子 Nodeset 即使选择了 `expand: true`，也不会通过这个调用展示。
-
-检查和运行继续使用完整流程，包括内部源码健康规则、契约、递归与深度检查以及原生执行。`ARCHITECTURE.jsonc` 记录 `expand` 的实际值，并保存完整的内部定义、契约、来源及规则资料，供审查工具读取。
-
 ## Planned Nodeset
 
-planned Nodeset 保留 `type_key`、名称、说明和契约，可以暂时省略 `pipeline`，也可以带 planned body 进入 Architecture 与静态检查。implemented Nodeset 必须有完整 pipeline。
+planned Nodeset 保留 `type_key`、名称、说明和契约，可以暂时省略 `pipeline`，也可以带 planned body 进入静态审查。implemented Nodeset 必须有完整 pipeline。
 
 ## While Loop
 
@@ -109,21 +95,17 @@ planned Nodeset 保留 `type_key`、名称、说明和契约，可以暂时省�
 
 普通 graph 和 Nodeset body 保持无环；重复执行由 Loop 表达。Nodeset 调用和 `loop.body` 都参与递归与最大嵌套深度检查。
 
-Workflow 的静态默认包含 `vibeflow.workflow`；Nodeset 缺省继承上级有效选择。该 Ruleset 使用整体范围，其中深度上限为 4、宽度警告阈值为 10。顶层 pipeline 为 0 层，循环迭代不增加层数；深度超限报错，宽度超限产生 `NODESET.SMELL.TOO_WIDE` 警告及 `CONCERNS` 状态。Ruleset 参数与局部覆盖可以调整这些值；显式空选择取消相应审查，原生解析与执行计划仍照常生成。
-
-嵌套深度仅由所选 Rule 的 `nodeset_max_depth` 正整数参数控制，内置默认值为 4。通过自定义 Ruleset 包含 `vibeflow.workflow`，再以 `overrides` 覆盖 `base/nodeset_types`；也可在独立的 NodesetType 规则选择中使用该集合。项目 runtime／javascript 配置不再承载质量参数。深度诊断包含实际深度和完整 `call_path`；循环体按静态调用结构计数，显式子选择划定新的负责范围。规则组合见[Ruleset 与局部覆盖](rules-and-nodes.md#ruleset-与局部覆盖)。
-
-验证：
+## 验证
 
 ```bash
 python run.py validate --config <root>/configs/main.jsonc
 python run.py review --config <root>/configs/main.jsonc
 ```
 
-打开命令返回的 HTML 入口，并使用当次 `preview_id` 定位快照。planned Nodeset 有内部定义时可右键展开；尚无内部定义时只显示声明、契约和计划行为，不生成虚构子图。静态 SVG 对照按需使用 `review --with-svg`。
+## 子图规则
 
-## NodesetType 的规则接管
+NodesetType 的图级 `rulesets` 与 `pipeline` 并列；调用点上的 `rulesets` 控制调用局部规则。内置 `vibeflow.workflow` 按整体范围检查子图：默认深度上限 4，宽度警告阈值 10；顶层为 0 层，循环迭代不增加层数。深度超限报错，宽度超限产生 `NODESET.SMELL.TOO_WIDE` 与 `CONCERNS`。
 
-图级 `rulesets` 写在 NodesetType 定义文件顶层，与 `pipeline` 并列。未填写则继承上级；显式列表替代继承规则、接管内部；`[]` 停止内部继承。上级仍可检查该 Nodeset 调用的外部连接，内部 Node 自己的局部规则继续执行。Node 调用上的 `rulesets` 是局部选择，不能代替 NodesetType 定义上的图级选择。选择格式见[规则选择](rules-and-nodes.md#规则如何选择)；这里的选择作用于子图，而非单个 Node 调用。
+通过 Ruleset 的 `overrides` 覆盖 `base/nodeset_types` 的 `nodeset_max_depth` 正整数参数。诊断提供实际深度与 `call_path`。完整选择和覆盖格式见[Rule 与 Node](rules-and-nodes.md)。
 
-普通节点的并发分发、显式汇合、取消与实际收尾合同见[普通图并发](graph-concurrency.md)。
+展示选项与调用展开方式见[本地预览](local-preview.md)。

@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import time
 
 import pytest
 
@@ -55,6 +56,42 @@ def test_program_cache_keeps_snapshot_changes_real(package):
             result=run_rule_check_driver({"typecheckFiles":[str(source)],"ruleTopics":[],
                 "sourceSnapshots":[{"path":str(source),"text":text}]},package_root=package)
             assert next(item["text"] for item in result.sources if item["path"]==str(source))==text
+
+
+@pytest.mark.skipif(not Path("/proc/self/task").is_dir(), reason="requires Linux process observations")
+def test_driver_reuses_current_compiler_and_releases_it_when_sources_change(package):
+    """Real requests retain one compiler, rather than one compiler per file."""
+    def compilers(driver):
+        children = Path(f"/proc/{driver.process.pid}/task/{driver.process.pid}/children")
+        found = set()
+        for pid in children.read_text().split():
+            try:
+                command = Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
+            except FileNotFoundError:
+                continue
+            if b"--api" in command:
+                found.add(int(pid))
+        return found
+
+    previous = None
+    with DriverScope() as scope:
+        for index, version in [(0, 1), (0, 1), (0, 2), *[(i, 1) for i in range(1, 8)], (0, 1)]:
+            source = package / f"node{index}.ts"
+            source.touch()
+            text = f"export const value={version};\n"
+            result = run_rule_check_driver({"typecheckFiles": [str(source)], "ruleTopics": [],
+                "sourceSnapshots": [{"path": str(source), "text": text}]}, package_root=package)
+            assert next(item["text"] for item in result.sources if item["path"] == str(source)) == text
+            driver = next(iter(scope.drivers.values()))
+            deadline = time.monotonic() + 2
+            while len(active := compilers(driver)) > 1 and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert len(active) == 1
+            identity = index, version
+            if previous is not None:
+                old_identity, old_processes = previous
+                assert (active == old_processes) == (identity == old_identity)
+            previous = identity, active
 
 
 def test_program_sharing_does_not_share_base_lib_permissions(package):

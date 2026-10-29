@@ -1,12 +1,11 @@
 # 无人值守开发协议
 
-autonomous profile 适合在任务授权和运行环境允许的范围内自动完成开发闭环。
+autonomous profile 在任务授权与运行环境允许的范围内自动完成开发闭环。
 
-1. 阅读已登记 Architecture 并定位真实 source。
-2. 根据任务选择 Python Runtime 或 JavaScript AOT root。
-3. 修改代码插件声明及实际实现，在 workflow 中选择资源，并更新 Architecture。
-4. 运行适用的 validate、quality 和 build。
-5. 对每个可运行的已修改项目执行工作流执行探针。
-6. 按命令的 `checked`、`not_checked` 和运行证据报告结果。
+1. 按[架构阅读指南](../architecture.md)了解项目、root 与相关 workflow，定位真实源码。
+2. 直接维护真实 source，更新相关调用与资源声明。
+3. 按架构指南更新资料，执行适用的 validate、quality 和 build。
+4. 对可运行的已修改项目执行工作流执行探针，按任务完成业务验收。
+5. 根据命令的 `checked`、`not_checked` 与运行证据报告结果。
 
-外部副作用 workflow 按任务授权和运行环境执行。此 profile 与 collaborative 使用相同的 Core、原生契约及资源所选 Ruleset。
+涉及外部副作用的执行遵循任务授权。

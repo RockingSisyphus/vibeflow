@@ -40,9 +40,9 @@ ROOT_ORDER = {
 }
 
 
-def check_summary(summary, name):
+def check_summary(summary, name, *, retain_details=True):
     order = ROOT_ORDER[name]
-    assert summary["exec_order"] == order, summary
+    assert summary["exec_order"] == (order if retain_details else []), summary
     assert summary["current_node"] == "end", summary
     assert summary["step_count"] == len(order), summary
     assert summary["node_runs"] == {node: 1 for node in order}, summary
@@ -54,8 +54,12 @@ def check(context, trace, row):
     for key, expected in row["expected_outputs"].items():
         assert value(context, key) == expected, (key, value(context, key), expected)
     summary = trace[-1]
-    check_summary(summary, row["config"])
-    assert list(value(context, "runtime.exec_order")) == ROOT_ORDER[row["config"]]
+    retain_details = row.get('runtime_options', {}).get('trace', 'full') != 'off'
+    check_summary(summary, row["config"], retain_details=retain_details)
+    assert list(value(context, "runtime.exec_order")) == (ROOT_ORDER[row["config"]] if retain_details else [])
+    if not retain_details:
+        assert summary['qualified_exec_order'] == []
+        assert summary['qualified_node_runs'] == summary['qualified_edge_executions'] == {}
     assert summary["stop_reason"] == "completed" and not summary["exception"], summary
     for key, expected in row.get("expected_trace_summary", {}).items():
         if key == "edge_executions":

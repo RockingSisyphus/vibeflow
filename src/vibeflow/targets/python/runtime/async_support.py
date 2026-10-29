@@ -1,10 +1,11 @@
 """Await actual owned work through cancellation, without a global executor."""
 import asyncio
+from vibeflow.targets.python.runtime.errors import attach_error
 from contextvars import copy_context
 from threading import Thread
 from vibeflow.coordination.async_support import finish_cleanup
 
-async def owned_thread(callback, signal, *, name="vibeflow-node"):
+async def owned_thread(callback, signal, *, name="vibeflow-node", on_error=None):
     loop = asyncio.get_running_loop()
     future = loop.create_future()
     context = copy_context()
@@ -35,11 +36,12 @@ async def owned_thread(callback, signal, *, name="vibeflow-node"):
             except BaseException as cleanup:
                 if not isinstance(cleanup, asyncio.CancelledError) and getattr(cleanup, 'code', '') != 'VF_ABORTED':
                     raise cleanup from cancelled
-                cancelled.cleanup_errors = [*getattr(cancelled, 'cleanup_errors', ()),
-                                            *getattr(cleanup, 'cleanup_errors', ())]
+                attach_error(cancelled, cleanup)
             raise
     except BaseException as error:
         primary = error
+        if on_error is not None:
+            on_error(error, cleanup=bool(asyncio.current_task().cancelling()))
         raise
     finally:
         async def join():
@@ -53,4 +55,4 @@ async def owned_thread(callback, signal, *, name="vibeflow-node"):
         except BaseException as cleanup:
             if primary is None:
                 raise
-            primary.cleanup_errors = [*getattr(primary, 'cleanup_errors', ()), cleanup]
+            attach_error(primary, cleanup)

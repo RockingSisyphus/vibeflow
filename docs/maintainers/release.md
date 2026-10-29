@@ -1,12 +1,38 @@
 # 发行与文档装配
 
-当前分发版本为 1.4.1，Workflow ABI 为 v11、共享 AOT 为 v5、协作启动清单为 v2；Plugin ABI v4、Rule ABI v3、预览快照 v4 保持不变。
+当前分发版本为 1.4.4，Workflow ABI 为 v11、共享 AOT 为 v5、协作启动清单为 v2；Plugin ABI v4、Rule ABI v3、预览快照 v4 保持不变。
 
 1.3.5 修复 JavaScript 核心 SDK 解压到 workspace 内时被误认成业务资源的问题：Target 按既有资源清单识别准确文件，在形成业务引用与插件源码闭包时排除核心内部依赖；原始分析保留，用户贡献声明及共享 Rule 政策不变。1.3.4 统一资源使用 Rule 与 `vibeflow.resource_use.v1` 结果：独立 BaseLib（包括间接依赖）必须显式声明，Plugin 贡献资源整包引入并禁止重复声明，贡献代码实际路径必须位于所属 Plugin 目录。Python、JavaScript 的验证、构建、运行准备和展示共同消费规则结果；旧选择器及重复许可检查已删除。Python AOT 按实际引用收集实现，未引用的可用库不随包加载或复制。预览最新快照覆盖各注册 root 当前仍存在的 workflow，继续隐藏 Plugin 贡献资源。1.3.3 的 global_state 环境变量能力保留。
 
 既有版本 ZIP 保留原始字节。两个 profile 使用下述工具构建；正式发布需验证解压运行、wheel、sdist 与完整门禁，禁止同名覆盖既有 ZIP。
 
-## 1.4.1 构建内容
+## 1.4.4 构建内容
+
+用户文档按主题归位，AGENTS 只保留核心目标、通用开发规范与任务导航。新增项目、root 和 workflow 的统一架构阅读与维护指南，明确 AI 优先阅读项目总览、目标 root 条目及相关 workflow，再定位真实源码；架构登记、字段及更新命令集中维护。
+
+协同审核使用 HTML，AI 只有在用户明确要求查看时才打开或渲染 SVG；SVG 生成说明位于预览手册末节，只有用户主动要求时才生成。两个 profile 均携带新的架构指南和文档路由。ABI、AOT 和预览格式保持不变。
+
+HTML 查看器的互不连通分支改为独立布局后按快照节点的首次出现顺序排列，展开或收起 Nodeset 不再因尺寸变化交换入口位置；嵌套子图沿用同一规则，资源视图继续紧凑排版。真实鼠标回归能在旧布局上复现入口换位，在新布局上通过；相关定向验证为 29 passed。
+
+本地 collaborative / autonomous 两个 1.4.4 ZIP 已重新构建并包含上述查看器修复。构建器的仓库检查通过（0 error、0 warning）；从最终 ZIP 分别解压，通过内核校验、Python 模板验证及 AOT 构建运行、JavaScript 构建、Node 执行探针及执行后的 HTML review 命令检查。两包内核字节一致，包内独立查看器和内核 ZIP 中的布局文件均与当前源码一致。此前仅文档重整的 1.4.4 构建内核与 1.4.3 相同，本次已因查看器修复变化；旧 ZIP 和校验文件保留原始字节归档，当前两个 ZIP 与 SHA256SUMS 位于 dist。本轮没有生成或查看 SVG，未重跑完整仓库功能门禁、wheel/sdist 验证或远端 CI。
+
+## 1.4.3 历史构建内容
+
+修复 JavaScript Target 使用 TypeScript 7 时，构建、审查与源码检查按不同文件集合保留完整编译服务而产生的内存倍增。分析会话只保留当前编译环境，连续相同上下文继续复用；切换上下文或源码变化时先释放旧环境，结束时关闭最后一个环境。函数指标、调用图和已完成的规则结果仍复用，各节点的权限与审查范围保持独立。ABI 与配置格式不变。
+
+JavaScript 最小模板为执行探针生成的 `run_artifacts/` 显式声明目录用途，避免正常执行探针后被根目录布局规则拒绝 review；其他默认治理规则保持有效。
+
+本轮 JavaScript 相关 pytest 为 1188 passed、0 failed、0 skipped；当前锁定图形环境（Mermaid 11.17.2）的补验为 147 passed、0 failed、0 skipped；含 Node 与真实 Chromium 的 JS integration 为 51 passed、0 failed、0 skipped。解压后的连续操作验收暴露上述模板目录问题后，补丁通过发行架构、两个 profile 与确定性相关的 34 项定向回归（0 failed、0 skipped）。补验包含重叠用例，不将各组 pytest 数量相加解释为独立覆盖数。本轮未重跑完整仓库门禁或远端 CI。内存测量与其他行为验证边界见 [JS 检查会话](javascript-check-sessions.md)。
+
+本地 collaborative / autonomous 两个 1.4.3 ZIP 已构建，从最终 ZIP 解压后通过内核检查、Python 模板验证、JS 构建、Node 执行探针及执行后的 review（PASS、预览已发布）。两个 profile 的内核字节一致，确认从包内 ZIP 导入；与现有 1.4.2 相比，内核内容仅两个 JS 分析文件变化，另有上述 JS 模板目录声明修复。包内 8 节点 / 8 文件空图 review 的 `tsc --api` 峰值为 1、RSS 合计峰值 252.9 MiB，退出后未发现编译服务残留。1.4.2 ZIP 和校验文件已保留原始字节归档；当前 ZIP 与 SHA256SUMS 位于 `dist`。这表示本地包验证完成，未上传 GitHub、打标签或部署业务。
+
+## 1.4.2 历史构建内容
+
+修复 Python 嵌套 Nodeset / Loop、并发分支及取消收尾可能掩盖原始业务异常的问题。运行时保留最先确认的失败，后续执行错误、清理错误和失败观察错误作为附加信息保留；真正的外部取消仍按取消处理，等待实际协程、线程及释放完成。Python 与 JavaScript 协作终态按实际执行结果确定，停止请求本身不覆盖已经发生的失败。跨进程错误记录保留异常原因、上下文及附加错误。
+
+关闭详细 trace 时不再累积逐次执行顺序和完整嵌套路径，仍保留静态节点计数。依赖详细路径进行业务统计的宿主需要启用详细 trace 或改用相应观察接口。既有 ABI 和 AOT 格式保持不变；已有 AOT 需重建、重新部署才能包含本次运行时修复。完整功能验收与外部项目验证边界见[决策记录](../goal-decisions.md)。
+
+## 1.4.1 历史构建内容
 
 修复 Python 普通同步节点通过 HTTP 协作宿主执行 Send 时的事件循环转交，并修复嵌套取消可能打断真实异步清理的边界。已中止的接收操作不会消费排队消息。协作实例、同步调用和异步生命周期合同不变。 JS 同进程回归和数学沙箱通过 esbuild 的正式 JavaScript API 打包，避免 Windows 将 Unix 包装脚本当作可执行文件；测试仍执行真实 AOT，不跳过协作断言。 Python 数学沙箱为源码批量审核按父调用分配时间预算，避免慢速 CI 将审核耗时误判为协作挂起；AOT 仍保留执行阶段的原有超时，业务与清理断言不变。
 
@@ -79,7 +105,7 @@ python distribution/build.py --profile autonomous --output-dir /tmp/vf-autonomou
 
 更新公共接口时，同时核对使用手册、AI 阅读路由、最小项目 README 和当前设计说明。详细 API 放在主题手册，提示词保留导航与执行协议。多文件资源和 Rule/Ruleset 均有公共文档入口。
 
-运行观测接口的业务用法集中在 `distribution/docs/user/runtime-observation.md`，Python 与 JS/TS 开发手册在完整 Node 示例中展示更新调用。公共提示词交代调用位置、完整数组替换和发布时机，两个 profile 共用该片段。修订后从生成 ZIP 解压包运行这些示例，确认公开 SDK、业务输出与最终状态资料一致；结果保留在对应开发验收记录。
+运行观测接口的业务用法和双语言更新示例集中在 `distribution/docs/user/runtime-observation.md`；开发手册与公共提示词通过文档路由定位。架构阅读、登记及更新集中在 `distribution/docs/user/architecture.md`。审核页面与 SVG 附件说明集中在 `distribution/docs/user/local-preview.md`。从最终 ZIP 解压包验证随包文档、公开 SDK、业务输出与状态资料，按实际覆盖范围记录结果。
 
 修改 canonical 文档及 prompt fragments 后重新构建两个 profile，发布目录和 ZIP 中的文档、AGENTS 与清单随构建更新。验收报告中的归档哈希对应当次构建；后续文档修订产生新的归档哈希，历史字节保存在版本 ZIP 中，代码和文档变化由 Git 追溯。
 

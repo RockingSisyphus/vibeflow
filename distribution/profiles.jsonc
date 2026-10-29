@@ -3,6 +3,7 @@
   "document_sets": {
     "common": [
       "distribution/docs/overview.md",
+      "distribution/docs/user/architecture.md",
       "distribution/docs/user/quickstart.md",
       "distribution/docs/user/workflow-and-config.md",
       "distribution/docs/user/project-governance.md",

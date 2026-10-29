@@ -1,39 +1,6 @@
 # Rule、Ruleset 与业务 Node
 
-NodeType 定义外观与局部默认规则；业务 Node 定义契约和实现；workflow 中的调用定义路径、参数和覆盖。Node 的功能来自普通实现、Capability 与显式 Rule 授权，不由形状、颜色或名称赋予。
-
-## 声明业务 Node
-
-Python 在所属 `nodes/` 中导出 `@node` 类，JavaScript/TypeScript 导出 `defineNode` 声明。准备层自动发现这些声明，不另写源码登记表。
-
-```python
-# nodes/add.py
-from vibeflow.targets.python.sdk import node
-
-@node(
-    id="app.add",
-    node_type="vibeflow.node",
-    rulesets=["vibeflow.process"],
-    contract={
-        "requires": [{"type": "number", "cardinality": "exactly_one", "display_name": "输入"}],
-        "provides": [{"key": "answer", "type": "number", "display_name": "结果"}],
-        "input_semantics": {"number": ["待计算数值"]},
-        "output_semantics": {"answer": ["输入加一"]},
-    },
-)
-class Add:
-    def run_pure(self, inputs, params):
-        return {"answer": inputs["number"]["value"] + 1}
-```
-
-业务标识使用 `id`；`node_type` 指向已激活的 NodeType。内置 `vibeflow.node` 可用于普通业务声明。自定义外观和默认规则通过 Plugin 贡献的 NodeType 复用，见 [Plugin](plugins-and-integrations.md)。
-
-```jsonc
-{"id": "first_add", "definition_id": "app.add", "display_name": "加一",
- "description": "准备下一步的数值", "style": {"shape": "diamond", "fill": "#f2e6c5"}}
-```
-
-这是一次调用，同一个 `app.add` 可以有多个调用点。可在调用中配置参数、样式、规则及执行选项。`definition_id` 也可引用所属 root 导入的 NodesetType；Nodeset 调用独立展开，详见 [NodesetType 与 Loop](nodeset-types-and-loops.md)。
+NodeType 提供默认局部规则，业务 Node 与调用点可以分别选择适合自身的规则。Rule 定义检查逻辑，Ruleset 将检查组织成可复用的规则图。
 
 ## 规则如何选择
 
@@ -49,15 +16,28 @@ class Add:
 }
 ```
 
-字符串选择 Ruleset；对象通过 `rule_id` 选择单个 Rule 并提供参数。贡献一个 Rule/Ruleset 不会自动执行它；Ruleset 可通过 `workflow_default` 声明图级默认。显式图级列表替换本图默认。
+字符串选择 Ruleset；对象通过 `rule_id` 选择单个 Rule 并提供参数。Plugin 贡献使规则可供选择，Ruleset 的 `workflow_default` 可加入图级默认。
+
+Workflow 顶层 `rulesets` 省略时使用内置及所选 Plugin 的图级默认，显式列表替换默认，`[]` 取消本图选择。要同时使用内置与自定义图规则，可写 `["vibeflow.workflow", "example.graph"]`。NodesetType 在定义文件顶层选择内部图规则：省略时继承上级，显式列表接管内部选择，`[]` 停止继承；上级仍检查该调用的外部连接。
+
+## 效果范围
+
+| Ruleset | 默认效果范围 |
+| --- | --- |
+| `vibeflow.process` | 纯处理 |
+| `vibeflow.io` | 终端输入输出 |
+| `vibeflow.document` / `vibeflow.data_store` | 文件、网络、数据库等 Python I/O |
+| `vibeflow.global_state` | 有限效果检查识别的共享／模块状态操作 |
+
+有效规则记录中的 `effect_scope` 表达所选源码效果政策。`flow_kind` 描述执行身份，`external` 标记外部边界；Capability 操作由其声明及有效授权 Rule 控制。
 
 ## Python 进程环境变量
 
 `vibeflow.global_state` Ruleset 使用 `vibeflow.no_side_effects` 的 `effect_scope="global_state"`，允许在运行时通过 `os.environ` / `os.environb` 读取、设置、删除环境键和调用其方法，也允许 `os.getenv` / `os.getenvb`、`os.putenv`、`os.unsetenv`。环境键名不受白名单限制；显式 import policy 和导入时执行检查仍生效。Node、BaseLib 和运行插件使用相同效果检查，流程类别名称本身不授予权限。
 
-Node 可显式选择 `rulesets=["vibeflow.global_state"]`。运行插件可保留 `vibeflow.plugin` 集合，并通过自定义 Ruleset 的 `overrides` 把 `base/effects` 调用的 `effect_scope` 设为 `global_state`，完整写法见下文“Ruleset 与局部覆盖”。这不需要关闭源码检查或修改 imports 调用。
+Node 可显式选择 `rulesets=["vibeflow.global_state"]`。运行插件可保留 `vibeflow.plugin` 集合，并通过自定义 Ruleset 的 `overrides` 把 `base/effects` 调用的 `effect_scope` 设为 `global_state`，覆盖调用路径的写法见 [Ruleset 与局部覆盖](#ruleset-与局部覆盖)。
 
-该范围不会自动保存或恢复原值，需在运行生命周期清理中恢复；需要排他访问时显式配置同域 `execution_lock`。它不放开替换 `os.environ` 对象、修改 `sys.path` 等导入状态，也不授予文件、网络、线程或子进程效果。`process`、`io`、`python_io`、`data_store` 默认行为保持不变。
+原值由运行生命周期保存和恢复；排他访问通过同域 `execution_lock` 协调。替换 `os.environ` 对象、修改 `sys.path`、文件、网络、线程及子进程操作继续按各自效果政策检查。
 
 ## 四种检查对象
 
@@ -94,7 +74,9 @@ plugin = Plugin(id="conventions", resources=[count, checks])
 
 Ruleset 把 Rule 调用组织为有明确 ID 的检查图。`requires` 关系把提供方的类型化 Record 绑定到消费方输入；`includes` 组合集合；`overrides` 在明确目标上替换参数或实现。消费方不能把缺失、类型不匹配或不可用的 Record 当作有效数据。报告保存计划、调用、执行状态与 Record，业务 workflow 不消费这些审查结果来调度。
 
-Python 返回 `RuleResult` / `RuleRecord`，JS 返回等价 JSON 对象。Rule 运行在对应语言的宿主中；规则语言与业务 Target 可以不同。源码分析仍由各 Target 提供，不通过共享治理层重新解释业务源码。
+Python 返回 `RuleResult` / `RuleRecord`，JS 返回等价 JSON 对象。Rule 运行在对应语言宿主中，规则语言可以与业务 Target 不同；源码事实由各 Target 提供。
+
+`RuleResult.state` 为 `completed`、`failed` 或 `unavailable`，finding 的 `severity` 为 `error`、`warning` 或 `info`。有效 error finding 保留有效 records；损坏的结果使依赖它的 consumer 停止执行。JS records 使用普通 JSON：Map、Date、undefined、非有限数和循环对象需先转换。Python/JS 的公共规则上下文只读，同次检查复用 Target 源码事实。显式源码声明使用 `RuleImplementationDescriptor` 的 `language` 与 `source`。
 
 ## Ruleset 与局部覆盖
 
@@ -114,10 +96,9 @@ plugin = Plugin(id="conventions", resources=[workflow_checks])
 
 在 workflow 或 NodesetType 顶层选择 `"rulesets": ["example.workflow"]`。该集合已包含内置检查，不必再并列选择 `vibeflow.workflow`。覆盖只影响当前集合中的指定路径；其他调用保留自己的默认值。`review-rules` 可核对展开后的路径、有效参数和来源。
 
-## Capability 与效果检查
+## 相关文档
 
-Node 声明所需 Capability 操作，有效 Rule 策略按完整调用路径授权。同一业务定义的两个调用点不能互借授权。标准 workflow 协同模板显式选择限制和允许规则；`effect_scope` 描述所选源码效果策略，不是通用权限字段。
-
-源码检查按显式选择的 import/static/run 入口执行。它覆盖约定的结构、接口、输入写入及效果模式，不证明任意业务正确性或操作系统安全性。普通算法、局部对象与本机运行环境由作者负责。
-
-旧原生 `io` 配置、类元数据登记、项目 `policy` 合并和 Host Extension 均不属于当前配置。旧源码需按当前 SDK 与治理配置迁移，旧 AOT 重新构建，不保留双轨执行。
+- [Python 开发](python-development.md)、[JavaScript 开发](javascript-development.md)：业务 Node 和 SDK 实现。
+- [项目治理](project-governance.md)：project/root 的规则配置。
+- [Workflow 协同](workflow-coordination.md#capability-与显式规则)：Capability 操作授权。
+- [产品检查边界](product-check-boundaries.md)：源码检查的实际覆盖。

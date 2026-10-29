@@ -79,8 +79,7 @@ def package_cases(distribution, kernel, metadata, archive, work):
         rows.append(row("release.launcher."+command, "release", "Original complete-package launcher: "+command,
             {"exit_code":0},raw,project=distribution))
     for relative, language in (("kernel/docs/user/python-development.md","python"),
-                               ("kernel/docs/user/javascript-development.md","javascript"),
-                               ("AGENTS.md","prompt")):
+                               ("kernel/docs/user/javascript-development.md","javascript")):
         path = distribution / relative
         text = path.read_text(encoding="utf-8")
         code = "RESOURCE.IMPLEMENTATION.CONFLICT"
@@ -91,9 +90,17 @@ def package_cases(distribution, kernel, metadata, archive, work):
                       and any(term in section for term in ("同源","同一","一致","相同")),
                   "explicit_source_documented":"显式" in section,
                   "path":str(path),"sha256":hashlib.sha256(path.read_bytes()).hexdigest(),"excerpt":section}
-        rows.append(row("release.docs."+language, "release", "Packaged manual/prompt explains legitimate source assertions",
+        rows.append(row("release.docs."+language, "release", "Packaged target manual explains legitimate source assertions",
             {"conflict_diagnostic_documented":True,"same_actual_source_documented":True,"explicit_source_documented":True},
             actual,project=distribution))
+    prompt = (distribution / "AGENTS.md").read_text(encoding="utf-8")
+    manual_links = ["kernel/docs/user/python-development.md", "kernel/docs/user/javascript-development.md"]
+    rows.append(row("release.docs.prompt", "release", "Agent guidance routes source assertions to the target manuals",
+        {"target_manuals_linked":True,"target_manuals_present":True,"implementation_details_omitted_from_prompt":True},
+        {"target_manuals_linked":all("]("+link+")" in prompt for link in manual_links),
+         "target_manuals_present":all((distribution/link).is_file() for link in manual_links),
+         "implementation_details_omitted_from_prompt":"RESOURCE.IMPLEMENTATION.CONFLICT" not in prompt},
+        project=distribution))
     return rows
 
 

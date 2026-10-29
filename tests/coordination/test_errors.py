@@ -13,6 +13,74 @@ from vibeflow.coordination import Coordinator
 from vibeflow.coordination.client import WorkflowClient
 from vibeflow.coordination.host import run_host
 from vibeflow.coordination.server import WorkflowServer
+from vibeflow.coordination.protocol import error_record
+
+
+@pytest.mark.parametrize('suppressed', [False, True])
+def test_implicit_exception_context_is_transported_only_when_not_suppressed(suppressed):
+    try:
+        try:
+            raise ValueError('original input error')
+        except ValueError:
+            if suppressed:
+                raise OSError('observer failed') from None
+            raise OSError('observer failed')
+    except OSError as error:
+        record = error_record(error)
+    assert record['code'] == 'OSError'
+    if suppressed:
+        assert 'context' not in record
+    else:
+        assert record['context']['code'] == 'ValueError'
+
+
+@pytest.mark.parametrize('language', ['python', 'javascript'])
+@async_case
+async def test_stop_requested_during_failure_cleanup_does_not_reclassify_failure(language):
+    if language == 'python':
+        target = descriptor('worker', 'async')
+        scope = Coordinator(launches=[{'workflow':target['workflow'], 'launch':{'kind':'in_process'}}])
+        entered = asyncio.Event()
+        original = ValueError('business already failed')
+        async def execute(inputs, options):
+            try:
+                raise original
+            except ValueError:
+                entered.set()
+                try:
+                    await asyncio.Event().wait()
+                except asyncio.CancelledError:
+                    raise original
+        scope.bind(target, execute)
+        owner = scope.register({'workflow':{'root':'test', 'path':'application'}})
+        api = scope.operations(owner['id'])
+        child = await api['call']({'workflow':target['workflow'], 'launch':{'kind':'in_process'}})
+        await entered.wait()
+        ended = await api['kill']({'id':child['id'], 'workflow':target['workflow']})
+        assert ended['state'] == 'failed' and ended['error']['code'] == 'ValueError'
+        await scope.aclose()
+        return
+    resources = Path(__file__).resolve().parents[2] / 'src/vibeflow/targets/javascript/resources/coordination'
+    script = '''
+import {Coordinator} from COORDINATOR;
+const scope=new Coordinator(),ref={root:'test',path:'worker'};
+let entered;
+const started=new Promise(resolve=>entered=resolve);
+scope.bind({workflow:ref,entry_mode:'async',entries:{},calls:[]},async(inputs,options)=>{
+  const original=Object.assign(new Error('business already failed'),{code:'BUSINESS'});
+  try{throw original;}catch(error){
+    entered();await new Promise(resolve=>options.signal.addEventListener('abort',resolve,{once:true}));throw error;
+  }
+});
+const owner=scope.register({root:'test',path:'application'}),api=scope.operations(owner.id);
+const child=await api.call({workflow:ref,launch:{kind:'in_process'}});await started;
+const ended=await api.kill({id:child.id,workflow:ref});
+if(ended.state!=='failed'||ended.error.code!=='BUSINESS')throw Error(JSON.stringify(ended));
+await scope.close();
+'''.replace('COORDINATOR', json.dumps((resources/'coordinator.mjs').as_uri()))
+    result = await asyncio.to_thread(subprocess.run, ['node','--input-type=module','-e',script],
+                                     capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def failure():

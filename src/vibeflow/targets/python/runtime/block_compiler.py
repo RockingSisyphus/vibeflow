@@ -181,11 +181,8 @@ def run_graph_block(runtime, state, name, nodes):
     except DelegateCliExit:
         raise
     except BaseException as error:
-        runtime._record_runtime_event("block_failed", name, "block", failure=str(error), elapsed_ms=elapsed_ms(started))
-        try:
-            runtime._call_runtime_plugins("block_failed", name, nodes, str(error))
-        except BaseException as cleanup:
-            error.cleanup_errors = [*getattr(error,"cleanup_errors",()),cleanup]
+        runtime._record_failure_event("block_failed", name, "block", failure=str(error), elapsed_ms=elapsed_ms(started), error=error)
+        runtime._call_runtime_plugins("block_failed", name, nodes, str(error), primary=error)
         raise
 
 
@@ -364,9 +361,6 @@ async def run_graph_block_async(runtime, state, name, nodes):
     except DelegateCliExit:
         raise
     except BaseException as error:
-        runtime._record_runtime_event('block_failed', name, 'block', failure=str(error), elapsed_ms=elapsed_ms(started))
-        try:
-            await runtime._call_runtime_plugins_async('block_failed', name, nodes, str(error))
-        except BaseException as cleanup:
-            error.cleanup_errors = [*getattr(error, 'cleanup_errors', ()), cleanup]
+        runtime._record_failure_event('block_failed', name, 'block', failure=str(error), elapsed_ms=elapsed_ms(started), error=error)
+        await runtime._call_runtime_plugins_async('block_failed', name, nodes, str(error), primary=error)
         raise

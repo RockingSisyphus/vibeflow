@@ -1,6 +1,7 @@
 """Native asynchronous node mixin."""
 from __future__ import annotations
 import time
+from vibeflow.targets.python.runtime.errors import attach_error
 from typing import Mapping
 from vibeflow.targets.python.runtime.block_compiler import loop_block, nodeset_block
 from vibeflow.targets.python.project.registry import NodeRegistryError
@@ -48,12 +49,12 @@ class AsyncRuntimeNodeMixin:
                     raise exit_signal from exc
             else:
                 failure = PipelineRuntimeError(f"planned python_stub node '{frame.id}' attempted SystemExit outside delegate CLI mode")
-            self._record_runtime_event('node_failed', frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(failure), elapsed_ms=elapsed_ms(started))
-            await self._call_runtime_plugins_async('node_failed', frame.id, frame.definition_id, str(failure))
+            self._record_failure_event('node_failed', frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(failure), elapsed_ms=elapsed_ms(started), error=failure)
+            await self._call_runtime_plugins_async('node_failed', frame.id, frame.definition_id, str(failure), primary=failure)
             raise failure from exc
         except Exception as exc:
-            self._record_runtime_event('node_failed', frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started))
-            await self._call_runtime_plugins_async('node_failed', frame.id, frame.definition_id, str(exc))
+            self._record_failure_event('node_failed', frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started), error=exc)
+            await self._call_runtime_plugins_async('node_failed', frame.id, frame.definition_id, str(exc), primary=exc)
             raise
 
     async def _run_pure_node_async(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
@@ -71,24 +72,24 @@ class AsyncRuntimeNodeMixin:
         except SystemExit as exc:
             if not self.delegate_cli:
                 failure = PipelineRuntimeError(f"node '{frame.id}' attempted SystemExit outside delegate CLI mode")
-                self._record_runtime_event('node_failed', frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(failure), elapsed_ms=elapsed_ms(started))
-                await self._call_runtime_plugins_async('node_failed', frame.id, frame.definition_id, str(failure))
+                self._record_failure_event('node_failed', frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(failure), elapsed_ms=elapsed_ms(started), error=failure)
+                await self._call_runtime_plugins_async('node_failed', frame.id, frame.definition_id, str(failure), primary=failure)
                 raise failure from exc
             try:
                 exit_signal = normalize_delegate_cli_system_exit(exc, source=frame.id, effect_scope=frame.effect_scope)
             except PipelineRuntimeError as failure:
-                self._record_runtime_event('node_failed', frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(failure), elapsed_ms=elapsed_ms(started))
-                await self._call_runtime_plugins_async('node_failed', frame.id, frame.definition_id, str(failure))
+                self._record_failure_event('node_failed', frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(failure), elapsed_ms=elapsed_ms(started), error=failure)
+                await self._call_runtime_plugins_async('node_failed', frame.id, frame.definition_id, str(failure), primary=failure)
                 raise failure from exc
             raise exit_signal from exc
         except NodeRegistryError as exc:
             failure = PipelineRuntimeError(str(exc))
-            self._record_runtime_event('node_failed', frame.id, frame.definition_id, failure=str(failure), elapsed_ms=elapsed_ms(started))
-            await self._call_runtime_plugins_async('node_failed', frame.id, frame.definition_id, str(failure))
+            self._record_failure_event('node_failed', frame.id, frame.definition_id, failure=str(failure), elapsed_ms=elapsed_ms(started), error=failure)
+            await self._call_runtime_plugins_async('node_failed', frame.id, frame.definition_id, str(failure), primary=failure)
             raise failure from exc
         except Exception as exc:
-            self._record_runtime_event('node_failed', frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started))
-            await self._call_runtime_plugins_async('node_failed', frame.id, frame.definition_id, str(exc))
+            self._record_failure_event('node_failed', frame.id, frame.definition_id, input_summary=summarize_mapping(inputs), failure=str(exc), elapsed_ms=elapsed_ms(started), error=exc)
+            await self._call_runtime_plugins_async('node_failed', frame.id, frame.definition_id, str(exc), primary=exc)
             raise
 
     async def _execute_pure_outputs_async(self, frame, inputs):
@@ -107,11 +108,14 @@ class AsyncRuntimeNodeMixin:
             if frame.completion == 'suspend':
                 outputs = await invoke()
             else:
-                outputs = immediate(await owned_thread(invoke, context.signal if context else self._signal, name=f"vibeflow-node:{frame.id}"))
+                outputs = immediate(await owned_thread(invoke, context.signal if context else self._signal,
+                                                      name=f"vibeflow-node:{frame.id}", on_error=self._signal.fail))
             self._signal.throw_if_aborted()
             return self._validate_outputs(frame, outputs)
         except BaseException as error:
             primary = error
+            import asyncio
+            self._signal.fail(error, cleanup=bool(asyncio.current_task().cancelling()))
             raise
         finally:
             if context:
@@ -120,4 +124,4 @@ class AsyncRuntimeNodeMixin:
                 except BaseException as cleanup:
                     if primary is None:
                         raise
-                    primary.cleanup_errors = [*getattr(primary, 'cleanup_errors', ()), cleanup]
+                    attach_error(primary, cleanup)

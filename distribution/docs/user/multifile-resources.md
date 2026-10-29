@@ -1,33 +1,39 @@
-# 多文件资源与所有权
+# 多文件实现、库依赖与样式
 
-资源的目录位置决定所有者，显式引用决定依赖。项目共享资源位于项目的 `nodes/`、`base_lib/`、`plugins/`，私有资源位于所属 root 的同名目录；其他 root 的私有文件不能被借用。完整布局见[项目治理](project-governance.md)。
+一个资源可以由入口和多个支撑文件组成；多个资源复用的实现用 BaseLib 表达。本节说明文件登记、源码依赖与展示样式。
 
-## 业务 Node 与 BaseLib
+## 登记支撑文件
 
-业务 Node 的 SDK 声明放在 `nodes/`，引用 NodeType，并声明自己的契约与实现。可以将实现拆成多个文件，通过 `implementation_files` 登记支持文件，路径相对声明模块。Node 使用独立 BaseLib 时通过 `base_libs` 引用；BaseLib 之间通过 `dependencies` 引用。不要把业务 Node 加进 Plugin 的资源列表。
+Python 的 `@node`、`@base_lib` 及生命周期声明，JS/TS 的 `defineNode`、`defineBaseLib` 和 `definePlugin` 均可用 `implementation_files` 列出支撑源码。路径相对 SDK 声明模块，传递依赖中的支撑源码也逐一登记。
 
-同一个文件可以声明多个业务 Node；每个声明具有独立 `id`，workflow 调用以 `definition_id` 引用该业务定义。NodeType 只定义外观和默认规则，不承载业务实现。Node 可以替换类型默认规则，调用可以再替换 Node 的规则，显式 `[]` 取消该层可替换默认规则。project/root 治理分别执行。
+```python
+implementation_files=["support.py", "formatting.py"]
+```
 
-独立共享 Node 和 BaseLib 必须被至少两个不同 root 的现存 workflow 实际引用。若只服务一个 root，请移入该 root，而不是增加虚假的资源引用。
+```ts
+implementation_files: ["support.ts", "types.ts"]
+```
 
-## Plugin 包
+同一文件可声明多个 Node，各自使用独立 ID。跨文件父类、helper 和 type-only 导入按实际资源归属登记。Plugin 的入口、贡献和支撑文件均位于自身包内。
 
-每个 Plugin 在 `plugins/<package>/` 中维护入口、类型、规则、私有库和支持文件。入口使用 `Plugin` 或 `definePlugin` 将贡献作为一个整体导出。所有本地依赖都必须留在包内，标准库、第三方依赖及公开 SDK 除外。不能把 Plugin 的 Rule 放在 root 的其他目录，再单独加载。
+## 声明库依赖
 
-Plugin 内部文件可以使用包内相对导入；需要登记的实现入口与支持文件仍明确声明。Plugin 的私有库不属于独立共享 BaseLib，不逐项要求跨 root 使用。Plugin 按整包采用情况统计；治理专用 Plugin 按治理用途判断。
+Node 或生命周期通过 `base_libs` 引用库，BaseLib 通过 `dependencies` 引用其他库：
 
-workflow 显式选择 project 或本 root 的 Plugin。治理配置加载 Plugin 不会自动激活到业务 workflow。移除 Plugin 后，业务 Node 文件保留；若它引用该 Plugin 的类型，会得到缺失类型诊断。加载契约中的所有权、可见性和包边界不能通过关闭质量规则绕过。
+```python
+base_libs=["example.text_tools"]
+```
 
-## 生命周期与环境 API
+这些声明记录源码依赖。workflow 的 `base_lib.modules` 选择本次使用的独立库，Plugin 私有库随整包选择。
 
-compiler/runtime 扩展仍使用 Plugin 的相应生命周期声明。关键业务行为在 workflow 中由普通 Node 表达：例如打开监听、等待消息和关闭资源。宿主只注入 Capability API，不在 API 构造时自动启动业务监听；取消与错误路径也应走显式清理。Host Extension 和 `createWorkflowHost` 已删除。
+## 资源与调用样式
 
-浏览器或 Node.js 宿主直接调用生成模块的 `runWorkflow` 或 `runWorkflowAsync`，传入 Capability 及取消信号。跨程序启动、收发和实例身份见[workflow 协同](workflow-coordination.md)。
+Node、BaseLib、Plugin 及生命周期声明可用 `presentation` 设置颜色、形状和图标。NodeType 提供默认外观，业务 Node 可覆盖默认，调用点通过 `style` 设置本次展示。业务 Node 还可通过 `tags` / `metadata` 声明标签和自定义资料。
 
-## 审查与交付
+各资源使用自己的 Ruleset：Node 可选 `vibeflow.process`，独立库可选 `vibeflow.base_lib`，生命周期可选 `vibeflow.plugin`，插件声明通过 `declaration_rulesets` 选择声明检查。默认可维护性规则逐文件检查 500 行上限。
 
-`review` 输出结构化快照及 HTML 定位链接，并更新已登记的 workflow 架构文档；完整项目审查另生成 `PROJECT_ARCHITECTURE.jsonc`。`review-rules --json` 查看有效规则与参数，`inspect-resources --json` 查看资源及所有者。HTML 的 Plugin 视图每包一张卡片，BaseLib 视图仅显示独立库及其依赖；完整事实保留在快照详情中。
+## 相关文档
 
-SVG 仅作可选对照，通过 `review --with-svg` 或独立 `export-svg` 生成。HTML 自主绘图，支持节点可变形状、颜色、调用级覆盖和按调用展开，不依赖 SVG 片段。
-
-AOT 包含实际执行所需代码，Rule 和 compiler 专用依赖留在检查与编译环境。当前格式不读取旧配置或旧 AOT；修改版本后重新构建，不使用兼容转换层。
+- [项目治理](project-governance.md)：资源目录、跨 root 可见性和 workflow 的库选择。
+- [Plugin 与集成](plugins-and-integrations.md)：包声明和生命周期。
+- [本地预览](local-preview.md)：查看源码来源、资源关系及样式。
