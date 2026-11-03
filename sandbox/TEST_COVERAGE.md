@@ -58,9 +58,46 @@ python tools/verify_project.py --full --workers 4
 
 批次结束后集中修复。三个相关测试文件的 53 项定向验证通过，父环境设为 cp1252；它用于复现驱动编码问题，不替代真实 Windows 验收。仅导出已入快照的源码、不带本机 ZIP，仓库 all 检查为零错误，四项 wheel/sdist/两 profile 交付测试通过（71.79 秒）。
 
-二次代码审查另发现测试入口会将 `-k tools` 等选项值误当作现有目录改写。现在交由 pytest 解析，仅固定已解析的测试目标；通过真实测试入口，验证串行与并行选择结果，以及测试模块导入和执行时的隔离目录。浏览器依赖链的 [Zod 已知问题](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)随 Puppeteer 正常升级至 25.16.0 解决，不添加依赖覆盖；锁文件安装审计为零已知漏洞；升级后八项真实浏览器交互测试通过（16.25 秒）。[修复后第二轮 CI](https://github.com/RockingSisyphus/vibeflow/actions/runs/41572114454) 对应源码 `d1d4e0907afa0fcf124b6e53cd304f5f91615c79`，三个 job 全部成功：Linux Node 22 为 670 passed、2 subtests passed（328.24 秒），Node 24 为 670 passed、2 subtests passed（347.49 秒），Windows 为 131 passed（249.16 秒）。两个 Linux job 的五个阶段均通过，没有失败、准备错误或跳过。Windows 保持原宿主/协作/命名入口覆盖，并增加两项测试入口回归；它不代表 Windows 上运行了完整 Linux 浏览器和交付集合。
+二次代码审查另发现测试入口会将 `-k tools` 等选项值误当作现有目录改写。现在交由 pytest 解析，仅固定已解析的测试目标；通过真实测试入口，验证串行与并行选择结果，以及测试模块导入和执行时的隔离目录。浏览器依赖链的 [Zod 已知问题](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)随 Puppeteer 正常升级至 25.16.0 解决，不添加依赖覆盖；锁文件安装审计为零已知漏洞；升级后八项真实浏览器交互测试通过（16.25 秒）。
 
-最终配置复核发现 setup-node 保存默认 `~/.npm`，而测试入口实际下载缓存位于临时工作区；已让 CI 与入口共同使用 `runner.temp/npm-cache`，不缓存工程或构建结果。功能和测试判据未改；这个最终配置的 CI 待验。
+[修复后第二轮 CI](https://github.com/RockingSisyphus/vibeflow/actions/runs/41572114454) 对应源码 `d1d4e0907afa0fcf124b6e53cd304f5f91615c79`，三个 job 全部成功：Linux Node 22 为 670 passed、2 subtests passed（328.24 秒），Node 24 为 670 passed、2 subtests passed（347.49 秒），Windows 为 131 passed（249.16 秒）。两个 Linux job 的五个阶段均通过，没有失败、准备错误或跳过。Windows 保持原宿主/协作/命名入口覆盖，并增加两项测试入口回归；它不代表 Windows 上运行了完整 Linux 浏览器和交付集合。
+
+最终配置复核发现 setup-node 保存默认 `~/.npm`，而测试入口实际下载缓存位于临时工作区；已让 CI 与入口共同使用 `runner.temp/npm-cache`，不缓存工程或构建结果。功能和测试判据未改。
+
+[最终 CI](https://github.com/RockingSisyphus/vibeflow/actions/runs/41573240624) 使用快照 `9fdcfc6aa51d3e9243e91cad69c843ac9043021c`，三个 job 全部成功。直接下载并解析其 JUnit 与 verification.json，结果如下：
+
+| 最终平台 | pytest 自然输出 | 报告核对 |
+| --- | --- | --- |
+| Linux / Python 3.11 / Node 22 | 670 passed、2 subtests passed；427.19 秒 | 五阶段全部通过，总计 455.34 秒；JUnit 670 条 testcase，0 failure/error/skipped |
+| Linux / Python 3.11 / Node 24 | 670 passed、2 subtests passed；425.05 秒 | 五阶段全部通过，总计 454.78 秒；JUnit 670 条 testcase，0 failure/error/skipped |
+| Windows / Python 3.11 / Node 24 | 131 passed；184.64 秒 | JUnit 131 条 testcase，0 failure/error/skipped；宿主范围同第二轮 |
+
+本轮 CI 的 JUnit 没有把子场景展开为额外 testcase，不将终端的两个 subtest 与记录数相加。Linux 日志确认 setup-node 与运行入口均使用 `/home/runner/work/_temp/npm-cache`，缓存成功保存；锁文件安装报告零已知漏洞。耗时是各次 runner 的实际观察，不将批次间差异归因于本次修改或承诺固定速度。
+
+该轮验收结束时只补写本节结果，其他代码保持上述快照；真实索引和本地 main HEAD 未变。远端只更新隔离 CI 分支，未合并 main、发布或部署。该轮临时环境与候选包已清理，仓库 all 检查为零错误、零警告，退役引用审计通过，清理预览为零项。后续补充复核另记如下，不能把该轮通过视为尚未覆盖判据的证明。
+
+### 计算结果与退出码补充复核
+
+用户后续指出三个计算场景只有成功判据、部分诊断未检查退出码，以及生产代码中遗留旧测试探针。前一轮绿色 CI 对这些遗漏没有检错能力，本轮补充以下行为判据：
+
+- free_nodes 独立预期 `value.out = 13`，io_data_store 独立预期 `value.final = 21`；计算案例直接读取必填的 expected_outputs，不再把缺失预期当作空集合。
+- 非 JSON batch metrics 经应用收到的 public_outputs 验证 batch 返回同一业务对象、集合仍是 set 且值为 2/4、NaN 未丢失；训练 metrics 同样验证模型引用、标签 set、NaN 与 loss。应用只导出收到的业务结果，没有增加产品采集接口。
+- 每个诊断案例明确指定退出码。两个含目标 warning 的旧工程同时含拓扑 error，必须拒绝；另用合法工程的重复逻辑 warning 验证 CONCERNS、无 error 和退出 0。没有弱化规则来制造放行。
+- 删除旧私有探针、仅为其维护的保护深度、同步/异步 token 设置及重置，并删除沙箱中无人使用的旧重置函数。实际执行租约、锁栈和锁仲裁保持原职责；同步及显式声明 async 的锁工程覆盖源码/AOT、三种 Python 执行模式。
+
+首轮定向为 258 passed、2 failed，失败揭示了上述混合 error/warning 不能按纯 warning 设置退出预期。执行包补齐对照后为 236 passed、6 failed；六项新增异步输入误用了同步工程声明，修正正常配置的 entry_mode 后，六项定向全部通过（4.45 秒）。其余 25 项并发/协作/会话场景已通过；没有修改产品行为来迎合这些测试准备错误。
+
+在独立源码副本中逐次修改普通业务节点，另两项修改副本的 CLI 返回码；九个错误对照均使对应真实端到端场景失败：
+
+| 故意错误 | 新判据结果 |
+| --- | --- |
+| free_nodes 输出 999；io_data_store 输出 999 | 分别检出，预期为 13/21 |
+| batch metrics 只返回 size=999 | 检出丢失的公开结果字段 |
+| set 换成相同元素的 list；NaN 换成 0 | 分别检出类型与数值语义丢失 |
+| batch 或模型换成等值的新对象 | 分别检出返回引用改变 |
+| error 打印后退出 0；纯 warning 打印后退出 1 | 分别检出错误退出行为 |
+
+错误对照只操作本轮隔离副本，未保留补丁、mock 或产品探针。当前修复待同一 CI 矩阵验收。
 
 ### 样板与成本观察
 
@@ -78,6 +115,6 @@ python tools/verify_project.py --full --workers 4
 
 ### 尚未验证的边界
 
-Linux Node 22/24 全量、Windows Node 24 原有宿主范围已实际通过第二轮 CI；最终缓存配置仍待实际验证。没有在原生 GBK 默认环境进行验收，也不把 UTF-8 mode 切换当作这种证明。Python 的 JSON Schema 输入值域校验按现有能力验证，未扩展为 JS 的同等能力。
+Linux Node 22/24 全量、Windows Node 24 原有宿主范围及新增两项入口回归已通过最终 CI。Windows 未运行 Linux 的完整浏览器和交付集合。没有在原生 GBK 默认环境进行验收，也不把 UTF-8 mode 切换当作这种证明。Python 的 JSON Schema 输入值域校验按现有能力验证，未扩展为 JS 的同等能力。
 
 内部缓存、AST/框架对象身份、内部调用次数和强行插入的布局竞态不属于本体系的通过结论；依赖方向继续由静态检查与代码审查负责。测试数量和文件数量不能代替功能域判据。临时运行数据在记录上述结论后清理；后续 CI 保留正常 verification.json 与 acceptance.xml。

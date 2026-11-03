@@ -2,47 +2,56 @@
   {
     "kind": "config",
     "config": "fail_schema_bad_edge.jsonc",
-    "expect": "CONFIG.SCHEMA.EDGE_PAIR"
+    "expect": "CONFIG.SCHEMA.EDGE_PAIR",
+    "expected_exit": 1
   },
   {
     "kind": "config",
     "config": "fail_async_result_key_missing.jsonc",
-    "expect": "GRAPH.ASYNC.MIGRATION"
+    "expect": "GRAPH.ASYNC.MIGRATION",
+    "expected_exit": 1
   },
   {
     "kind": "run",
     "config": "fail_unknown_node.jsonc",
-    "expect": "NODE.DEFINITION.UNKNOWN"
+    "expect": "NODE.DEFINITION.UNKNOWN",
+    "expected_exit": 1
   },
   {
     "kind": "config",
     "config": "fail_removed_loop_registration.jsonc",
-    "expect": "CONFIG.LOOPS.REMOVED"
+    "expect": "CONFIG.LOOPS.REMOVED",
+    "expected_exit": 1
   },
   {
     "kind": "run",
     "config": "fail_nodeset_key_leak.jsonc",
-    "expect": "NODESET.PROVIDES.UNKNOWN_KEY"
+    "expect": "NODESET.PROVIDES.UNKNOWN_KEY",
+    "expected_exit": 1
   },
   {
     "kind": "run",
     "config": "fail_nodeset_recursion.jsonc",
-    "expect": "NODESET.RECURSION"
+    "expect": "NODESET.RECURSION",
+    "expected_exit": 1
   },
   {
     "kind": "config",
     "config": "fail_removed_boundary.jsonc",
-    "expect": "CONFIG.BOUNDARY.REMOVED"
+    "expect": "CONFIG.BOUNDARY.REMOVED",
+    "expected_exit": 1
   },
   {
     "kind": "run",
     "config": "fail_decision_cycle_forbidden.jsonc",
-    "expect": "GRAPH.CYCLE.FORBIDDEN"
+    "expect": "GRAPH.CYCLE.FORBIDDEN",
+    "expected_exit": 1
   },
   {
     "kind": "run",
     "config": "fail_planned_architecture_run.jsonc",
-    "expect": "GRAPH.PLANNED.NODE_IN_RUN"
+    "expect": "GRAPH.PLANNED.NODE_IN_RUN",
+    "expected_exit": 1
   },
   {
     "kind": "run",
@@ -55,27 +64,32 @@
       "GRAPH.FLOW.ORPHAN_NODE",
       "GRAPH.FLOW.UNREACHABLE_FROM_START",
       "GRAPH.FLOW.CANNOT_REACH_END"
-    ]
+    ],
+    "expected_exit": 1
   },
   {
     "kind": "config",
     "config": "fail_plugin_load.jsonc",
-    "expect": "PLUGIN.DECLARATION.LOAD"
+    "expect": "PLUGIN.DECLARATION.LOAD",
+    "expected_exit": 1
   },
   {
     "kind": "run",
     "config": "fail_rule_missing_record.jsonc",
-    "expect": "RULE.EXECUTION"
+    "expect": "RULE.EXECUTION",
+    "expected_exit": 1
   },
   {
     "kind": "run",
     "config": "fail_rule_execution.jsonc",
-    "expect": "RULE.EXECUTION"
+    "expect": "RULE.EXECUTION",
+    "expected_exit": 1
   },
   {
     "kind": "config",
     "config": "fail_rule_bad_shape.jsonc",
-    "expect": "RULE.EXECUTION"
+    "expect": "RULE.EXECUTION",
+    "expected_exit": 1
   },
   {
     "kind": "runtime_run",
@@ -83,7 +97,8 @@
     "initial": {
       "loop.current": 1
     },
-    "expect": "max_iterations=2"
+    "expect": "max_iterations=2",
+    "expected_exit": 1
   },
   {
     "kind": "concerns",
@@ -96,22 +111,32 @@
       "branch_nodes",
       "branch_edges",
       "suggested_fixes"
-    ]
+    ],
+    "expected_exit": 1
   },
   {
     "kind": "run",
     "config": "fail_mainline_decision_branch_dead_end.jsonc",
     "expect": "GRAPH.MAINLINE.DECISION_BRANCH_DEAD_END",
-    "severity": "warning"
+    "severity": "warning",
+    "expected_exit": 1
   },
   {
     "kind": "run",
     "config": "fail_safe_or_join_ambiguous_unconditional.jsonc",
-    "expect": "GRAPH.JOIN.AMBIGUOUS_UNCONDITIONAL"
+    "expect": "GRAPH.JOIN.AMBIGUOUS_UNCONDITIONAL",
+    "expected_exit": 1
   },
   {
     "kind": "run",
     "config": "fail_safe_or_join_multiple_exactly_one.jsonc",
-    "expect": "GRAPH.DATA.TYPE_CARDINALITY_AMBIGUOUS"
+    "expect": "GRAPH.DATA.TYPE_CARDINALITY_AMBIGUOUS",
+    "expected_exit": 1
+  },
+  {
+    "kind": "concerns",
+    "config": "pass_free_nodes.jsonc",
+    "expect": "GRAPH.SMELL.DUPLICATE_LOGIC",
+    "expected_exit": 0
   }
 ]

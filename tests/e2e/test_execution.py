@@ -18,6 +18,10 @@ def projects(tmp_path_factory):
     for family, relative in (("math","python/workflow_math"),("execution","python/integration"),("piecewise","python/piecewise_math"),("objects","python/object_addition")):
         work = example(root / family, relative)
         values[family] = work
+    configs = values["execution"] / "project/configs"
+    async_lock = json.loads((configs / "pass_global_state_execution_lock.jsonc").read_text(encoding="utf-8"))
+    async_lock["pipeline"]["entry_mode"] = "async"
+    write(configs / "pass_global_state_execution_lock_async.jsonc", async_lock)
     return values
 
 
@@ -61,7 +65,7 @@ def test_python_graph_results(projects, bundles, tmp_path, family, row, executio
         return
     payload = json.loads(next(line[7:] for line in result.stdout.splitlines() if line.startswith("RESULT ")))
     actual = payload["outputs"]
-    for key, value in row.get("expected_outputs",{}).items():
+    for key, value in row["expected_outputs"].items():
         assert actual[key] == value, payload
     assert all(key not in actual for key in row.get("expected_absent_outputs",())), payload
     if row.get("initial_factory") == "training":
@@ -85,10 +89,15 @@ def test_graph_error_boundaries(projects,tmp_path,row):
     else:
         args += ["--json"]
     result = cli(work,*args,success=False)
+    assert result.returncode == row["expected_exit"],result.stdout + result.stderr
     if row["kind"] == "runtime_run":
-        assert result.returncode == 1 and row["expect"] in result.stdout + result.stderr
+        assert row["expect"] in result.stdout + result.stderr
         return
     report = findings(result)
+    if row["expected_exit"] == 0:
+        payload = json.loads(result.stdout)
+        health = payload.get("health", payload)
+        assert health["status"] == "CONCERNS" and not health["errors"],health
     matching = [item for item in report if row["expect"] in item["code"]]
     assert matching,result.stdout + result.stderr
     assert all(item["severity"] == row.get("severity", "warning" if row["kind"] == "concerns" else "error")
