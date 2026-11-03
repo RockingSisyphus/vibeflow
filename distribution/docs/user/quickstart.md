@@ -6,7 +6,7 @@
 
 先阅读根目录 `AGENTS.md`，再按[架构阅读指南](architecture.md)了解项目并定位任务源码。
 
-以下命令使用发行模板的 root 名称；在业务项目中替换为实际路径。
+以下命令使用发行模板的 root 名称；在业务项目中替换为实际路径。目录名和 root ID 可自定义，在 `vibeflow_config.jsonc` 中注册；具体改名步骤及发行元数据的边界见[项目治理](project-governance.md#root-注册与改名)。
 
 ## Python
 

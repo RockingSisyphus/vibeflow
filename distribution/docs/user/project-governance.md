@@ -43,6 +43,32 @@ workspace/
 
 root ID 的 `@` 前缀保留给项目作用域引用。共享资源的文档路径以 `@project/` 表示；其他 root 的文档引用使用 `@<root-id>/`。这类路径用于说明来源，不是 Python 或 JavaScript 的导入语法。
 
+## root 注册与改名
+
+`vibeflow_config.jsonc` 的 `roots` 是实际 root 注册来源。`id` 是逻辑身份，`path` 是目录位置，两者不必同名。发行模板中的 `python_project`、`javascript_project` 及其 ID 都是示例，没有必须保留的名称或语言组合。
+
+只改目录名时，移动目录并更新注册项的 `path`，再同步业务脚本和配置中的实际路径。改 root ID 时，更新注册项的 `id` 以及跨 workflow 引用中的 `root`。已有架构文档记录了 root 身份，应通过正常命令重新生成，例如：
+
+```bash
+python run.py architecture --config worker/configs/main.jsonc --output worker/ARCHITECTURE.jsonc
+```
+
+命令中的 `worker` 替换为实际 root 路径；按该 root 的 `architecture.documents` 登记更新受影响的 workflow。项目总览可用 `python run.py preview --workspace vibeflow_config.jsonc` 更新。
+
+## 发行身份记录
+
+`DISTRIBUTION.json` 是构建器生成的只读发行记录，仅包含：
+
+| 字段 | 含义 |
+| --- | --- |
+| `schema` | 该记录自身的格式标识 `vibeflow.distribution.v3` |
+| `version` | 原始分发包的发行版本 |
+| `development_profile` | 原始分发包的类型：collaborative 或 autonomous |
+
+这些信息供版本识别和发行维护使用，不注册 root，也不决定当前业务项目的 Target、资源、开发协议或自动化行为。业务开发规范由项目 `AGENTS.md` 及其引用的文档说明。
+
+业务改名、增删 root 和调整配置均无需修改发行记录或重封 `kernel/MANIFEST.sha256`。启动器每次运行都会检查受保护发行文件；如果校验失败，应按报错中的 Changed / Missing 文件定位实际改动。root 注册配置、业务目录和业务架构文档不在内核清单的保护范围内。
+
 ## Plugin 的默认整包规则
 
 默认 `vibeflow.project.packages` / `vibeflow.root.packages` 要求文件 Plugin 放在 `plugins/<包名>/` 下。独立的 `vibeflow.project.plugin_ownership` / `vibeflow.root.plugin_ownership` 检查入口、贡献声明、实现、支持文件和导入的项目自有代码均在该包内；检查使用规范化后的实际路径，因此相对路径和符号链接不会绕过归属。Python 使用包内相对导入，JavaScript 使用相对模块引用。标准库、第三方依赖及公开 SDK 无需复制进包。

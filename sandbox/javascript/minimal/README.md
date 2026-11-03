@@ -1,60 +1,14 @@
-# Minimal JavaScript/TypeScript AOT Sandbox
+<!-- vibeflow-directory-purpose -->
+# javascript / 最小 SDK 项目
 
-This project demonstrates a TypeScript node, a TypeScript `base_lib`, JSON
-schemas, a generic host Capability, and all three AOT output profiles.
+正式声明、配置及纯 helper 构成的最小接入示例，供正常构建、应用宿主与隔离交付验证；修改 helper 的效果由端到端输出确认。
 
-From the repository root, run the complete smoke test. The runner copies the
-fixture into a temporary directory, installs the locked project toolchain
-there, and removes all generated files on exit:
+本目录保存真实使用工程、配置与独立预期；驱动和断言按功能统一在 tests/e2e，不保留单独总包或探针。测试复制输入至仓库外工作区后进行修改、构建和运行。
 
-```bash
-PYTHONPATH=src python sandbox/javascript/minimal/run_e2e.py
-```
-
-The runner also installs Puppeteer in its temporary workspace. Use
-`--puppeteer-root <path>` only to reuse an existing installation, or
-`--skip-browser` for a toolchain-only run.
-
-Use `--keep-artifacts` to retain the copied project and build outputs under
-`sandbox/javascript/minimal/.artifacts/`.
-
-To invoke the normal build command directly, first install the fixture's
-project-owned toolchain and then build a standalone Node ESM:
+功能域回归入口：
 
 ```bash
-npm ci --prefix sandbox/javascript/minimal/project
-PYTHONPATH=src python -m vibeflow build \
-  --workspace sandbox/javascript/minimal/vibeflow_config.jsonc \
-  --config sandbox/javascript/minimal/project/configs/greeting.jsonc \
-  --target node \
-  --profile single-esm \
-  --out-dir dist-node
+python tools/run_tests.py -- tests/e2e/test_deployment.py tests/e2e/test_javascript.py
 ```
 
-Build the browser application:
-
-```bash
-PYTHONPATH=src python -m vibeflow build \
-  --workspace sandbox/javascript/minimal/vibeflow_config.jsonc \
-  --config sandbox/javascript/minimal/project/configs/greeting.jsonc \
-  --target browser \
-  --profile web-app \
-  --html sandbox/javascript/minimal/project/web/index.template.html \
-  --app-entry sandbox/javascript/minimal/project/web/app.ts \
-  --out-dir dist-web
-```
-
-Neither output imports Python or a browser-side VibeFlow runtime. The host owns
-the clock implementation and supplies it independently for every
-`runWorkflowAsync()` call. This example is explicitly asynchronous because its
-clock Capability is declared with `completion: "suspend"`.
-
-## 目录用途与边界
-
-仅用于：javascript / minimal 案例，验证最小 SDK / CLI 使用、配置加载与短流程执行；保留真实项目输入与 runner。
-
-- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
-- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
-- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
-
-完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。
+完整验收及其他平台场景见[测试覆盖](../../TEST_COVERAGE.md)和[开发与验证](../../../docs/maintainers/development.md)。新增目录同步说明职责；运行日志、依赖和构建产物不写入本目录。

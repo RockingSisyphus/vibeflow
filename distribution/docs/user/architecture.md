@@ -44,7 +44,7 @@ AI 开始项目开发时，应优先阅读已有架构资料，先了解项目�
 | `nodeset_types` | 理解复用子图、Loop body 与内部调用 |
 | `node_definitions`、`node_types` | 区分业务定义、默认类型和实际调用 |
 | `resources`、实现来源与 `implementation_graph` | 定位 Node、BaseLib、Plugin 的入口、支撑源码及依赖 |
-| `rule_selections`、`rule_checks`、`call_policies` | 查看所选规则、检查结果和调用授权 |
+| `rule_selections`、`rule_checks`、`workflow_operations` | 查看所选规则、检查结果和workflow 协作操作 |
 
 检查字段按本次操作的实际输出读取。按来源记录中的 root 与路径定位文件；同一业务定义在不同调用位置可以使用不同参数和规则。源码引用描述实现位置，planned 状态与运行记录分别说明规划和执行情况。
 

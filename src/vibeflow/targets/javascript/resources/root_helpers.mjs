@@ -16,7 +16,7 @@ function createRoot(workflow, normalized) {
     statusStopping: normalized.statusStopping,
     statusUpdate: normalized.statusUpdate,
     kernelLog: normalized.kernelLog,
-    capabilities: {},
+    workflowSession: normalized.workflowSession,
     controller,
     runtimePlugins: [],
   };
@@ -31,8 +31,6 @@ function createRoot(workflow, normalized) {
 
 function prepareWorkflowInvocation(
   workflow,
-  descriptors,
-  requirements,
   schemas,
   options,
   entryMode,
@@ -46,15 +44,6 @@ function prepareWorkflowInvocation(
   const root = createRoot(workflow, normalized);
   try {
     throwIfAborted(root.signal, workflow);
-    root.capabilities = prepareCapabilities(
-      workflow,
-      descriptors,
-      requirements,
-      schemas,
-      normalized.capabilities,
-      root,
-      entryMode,
-    );
     emitTrace(root, "run_start", {}, true);
     return root;
   } catch (cause) {
@@ -75,24 +64,18 @@ function assertWorkflowAbi(workflow) {
 
 function createStaticWorkflowSync(
   workflowMetadata,
-  capabilityDescriptors,
-  capabilityRequirements,
   schemaCatalog,
   runtimePluginDescriptors,
   runtimePluginFactories,
   executeRoot,
 ) {
   const workflow = deepFreeze(workflowMetadata);
-  const descriptors = deepFreeze(capabilityDescriptors);
-  const requirements = deepFreeze(capabilityRequirements);
   const schemas = deepFreeze(schemaCatalog);
   const plugins = deepFreeze(runtimePluginDescriptors);
   assertWorkflowAbi(workflow);
   return function invokeWorkflow(inputs, options) {
     const root = prepareWorkflowInvocation(
       workflow,
-      descriptors,
-      requirements,
       schemas,
       options,
       "sync",
@@ -150,24 +133,18 @@ function createStaticWorkflowSync(
 
 function createStaticWorkflowAsync(
   workflowMetadata,
-  capabilityDescriptors,
-  capabilityRequirements,
   schemaCatalog,
   runtimePluginDescriptors,
   runtimePluginFactories,
   executeRoot,
 ) {
   const workflow = deepFreeze(workflowMetadata);
-  const descriptors = deepFreeze(capabilityDescriptors);
-  const requirements = deepFreeze(capabilityRequirements);
   const schemas = deepFreeze(schemaCatalog);
   const plugins = deepFreeze(runtimePluginDescriptors);
   assertWorkflowAbi(workflow);
   return async function invokeWorkflow(inputs, options) {
     const root = prepareWorkflowInvocation(
       workflow,
-      descriptors,
-      requirements,
       schemas,
       options,
       "async",

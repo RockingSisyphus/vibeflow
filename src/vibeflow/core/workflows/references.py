@@ -55,13 +55,14 @@ def node_workflow_actions(actions, params, *, root=""):
     result = []
     for original in actions:
         action = dict(original)
-        if action.get("capability") == "vibeflow.workflow":
+        if action.get("operation") in {"invoke_sync", "call", "wait", "send", "receive", "kill"}:
             if set(action) & {"target", "entry", "workflow", "launch", "expected_workflows"}:
                 raise ValueError("workflow action target aliases are removed; configure node.workflow")
             operation = action.get("operation")
             if operation in {"invoke_sync", "call", "kill"}:
-                action["workflow"] = workflow_reference(params.get("workflow"), root=root)
-                if operation == "call":
+                if params.get("workflow") is not None or not action.get("planned"):
+                    action["workflow"] = workflow_reference(params.get("workflow"), root=root)
+                if operation == "call" and not action.get("planned"):
                     launch_configuration(params.get("launch"))
             if operation in {"send", "receive"}:
                 expected = params.get("expected_workflows", ())
@@ -73,10 +74,9 @@ def node_workflow_actions(actions, params, *, root=""):
 
 
 def action_references(action):
-    if action.get("capability") != "vibeflow.workflow":
-        return ()
     if action.get("operation") in {"invoke_sync", "call", "kill"}:
-        return (action["workflow"],)
+        reference = action.get("workflow")
+        return (reference,) if reference is not None else ()
     return tuple(action.get("expected_workflows", ()))
 
 

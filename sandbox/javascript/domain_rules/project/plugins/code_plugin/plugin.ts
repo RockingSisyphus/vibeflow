@@ -1,4 +1,4 @@
-import {definePlugin,defineNode,defineNodeType,defineRule,defineRuleset,defineDataSchema,defineBaseLib,defineCapability,defineResource} from "@vibeflow/plugin";
+import {definePlugin,defineNode,defineNodeType,defineRule,defineRuleset,defineDataSchema,defineBaseLib,defineResource} from "@vibeflow/plugin";
 export const resource_0 = defineRule({"id": "example.model_definition", "display_name": "", "description": "modelForward belongs to model_block and each block defines one modelForward.", "implementations": [{"language": "typescript", "source": {"kind": "file", "ref": "rules/model_definition.ts", "export": "check"}}], "inputs": {}, "outputs": {}, "params_schema": {"model_tag": {"type": "string"}}, "params_defaults": {"model_tag": "model_block"}, "handler": "", "scope": "call", "level": "node"});
 
 export const resource_1 = defineRule({"id": "example.model_files", "display_name": "", "description": "", "implementations": [{"language": "typescript", "source": {"kind": "file", "ref": "rules/model_files.ts", "export": "check"}}], "inputs": {}, "outputs": {}, "params_schema": {}, "params_defaults": {}, "handler": "", "scope": "call", "level": "graph"});

@@ -39,8 +39,6 @@ flowchart LR
 
 节点只有在自身执行、`finally` 和 SDK 操作清理真正结束后，才向正常下游交付输出。失败触发同一工作流的协作取消；工作流等待已经启动的节点实际退出，再报告失败和清理错误。取消信号不能代替实际退出，不响应取消的操作仍由本次执行持有。JavaScript 的 `Promise.race` 失败方仍由当前节点持有至清理结束。
 
-Python 的 `context.signal` 和 JavaScript 的 `context.signal` 保留取消协作；`context.capabilities` 与 `context.trace` 保留。节点不再取得启动其他节点或回收任务的控制器。业务中需要按结果选择后续路径时，使用普通 Decision 与数据边。
-
 ## 共享状态与执行锁
 
 操作共享状态的调用可以声明静态命名的 `execution_lock`：

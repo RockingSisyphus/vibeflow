@@ -46,8 +46,8 @@ def resolve_presentation(
     if identity == "process" and native_class not in {"loopNode", "nodesetNode"} and _parallel_call(node, compiled):
         values["shape"] = "dbl-circ"
     sources = dict.fromkeys(values, "native")
-    operations = {operation for requirement in _get(descriptor, "capabilities", ())
-                  if requirement.id == "vibeflow.workflow" for operation in requirement.operations}
+    declaration = descriptor if descriptor is not None else node
+    operations = {item["operation"] for item in _get(declaration, "workflow_operations", ())}
     primary_operations = operations - {"wait"}
     visible_operations = primary_operations or operations
     operation = next(iter(visible_operations)) if len(visible_operations) == 1 else "multiple" if operations else ""

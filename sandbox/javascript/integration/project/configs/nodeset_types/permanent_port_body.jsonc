@@ -2,7 +2,13 @@
   "type_key": "sandbox.permanent_port_body",
   "display_name": "Permanent Port iteration",
   "description": "Receives one value, applies TypeScript math, and sends the result.",
-  "requires": [],
+  "requires": [
+    {
+      "type": "app.session",
+      "cardinality": "exactly_one",
+      "display_name": "Application session"
+    }
+  ],
   "provides": [],
   "pipeline": {
     "entry_mode": "async",
@@ -46,11 +52,17 @@
         "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Explicit end after sending a host value."
+      },
+      {
+        "id": "receive_start_application",
+        "definition_id": "app.input.nodeset_types_permanent_port_body_jsonc",
+        "display_name": "Application input",
+        "description": "Supplies the application instance to this entry."
       }
     ],
     "edges": [
       [
-        "receive_start",
+        "receive_start_application",
         "receive"
       ],
       {
@@ -64,9 +76,27 @@
       [
         "send",
         "send_end"
-      ]
+      ],
+      [
+        "receive_start",
+        "receive_start_application"
+      ],
+      {
+        "from": "receive_start_application",
+        "to": "send",
+        "schedule": false,
+        "transfer": true
+      }
     ],
-    "outputs": []
+    "outputs": [],
+    "inputs": [
+      {
+        "key": "app.session",
+        "type": "app.session",
+        "display_name": "Application session",
+        "required": true
+      }
+    ]
   },
   "plugins": [
     {

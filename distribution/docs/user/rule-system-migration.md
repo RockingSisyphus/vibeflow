@@ -4,12 +4,12 @@
 
 | 接口／产物 | 当前版本 |
 | --- | --- |
-| Workflow ABI | `vibeflow.workflow.v11` |
-| Plugin ABI | `vibeflow.plugin.v4` |
+| Workflow ABI | `vibeflow.workflow.v12` |
+| Plugin ABI | `vibeflow.plugin.v5` |
 | Rule ABI | `vibeflow.rule.v3` |
-| AOT manifest | `vibeflow.aot-build.v5` |
+| AOT manifest | `vibeflow.aot-build.v6` |
 | Workflow 启动清单 | `vibeflow.workflow-launches.v2` |
-| 预览快照 | v4 |
+| 预览快照 | v5 |
 
 旧计划、manifest、启动清单和预览格式通过重新生成升级；当前工具读取当前格式。业务输出、日志、trace 和发布归档按原用途保留。
 
@@ -31,11 +31,6 @@
 先建立 root 并登记用途、Target 与工具链，再整理资源归属，最后更新类型、调用和规则选择。配置示例见[项目治理](project-governance.md)，规则数据接口见[Rule 与 Node](rules-and-nodes.md)。
 
 ## 输入与宿主边界
-
-- 每个 `pipeline.inputs` 项补齐布尔 `required`；必需输入为 `true`，可省略输入为 `false`。Nodeset、Loop body 与命名入口使用相同格式，详见[Workflow 与 Config](workflow-and-config.md#最小-pipeline)。
-- Host Extension / `createWorkflowHost` 改为宿主注入 Capability API，普通 Node 显式打开、接收和关闭。compiler/runtime Plugin 保留各自框架扩展用途。
-- 原生 `definition_id: "vibeflow.io"` / `io` 字段改为普通 SDK 端口 Node；旧字段报告 `GRAPH.IO.MIGRATION`。补齐端口 Capability、Schema、授权规则及真实 start/end terminal。`vibeflow.io` Ruleset 继续用于终端效果检查。
-- 独立 Self Node 和 Capability 的 `self` 操作改为 Node 上下文的 `context.workflow.self()`。
 
 端口与宿主接入代码见[Workflow 协同](workflow-coordination.md)。
 

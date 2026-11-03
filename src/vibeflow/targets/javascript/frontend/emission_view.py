@@ -7,8 +7,6 @@ from typing import Any, Mapping
 from vibeflow.block_compiler.model import BlockPlan, NodeCallPlan, WorkflowPlan
 from vibeflow.targets.javascript.frontend.bindings import JavascriptBindingPlan, JavascriptCallBinding
 from vibeflow.targets.javascript.frontend.emission_protocol import (
-    BoundCapabilityOperationView,
-    BoundCapabilityView,
     BoundImplementationView,
     BoundInputView,
     BoundLoopView,
@@ -45,9 +43,6 @@ class _BoundContext:
             str(key): self.ordered_schema(("schemas", str(key)), value)
             for key, value in bindings.schemas.to_value().items()
         }
-        self.capabilities = _capability_views(
-            bindings.capabilities.to_value()
-        )
         self._validate()
 
     def _validate(self) -> None:
@@ -110,18 +105,10 @@ class _BoundContext:
             raise AotPlanError(
                 f"JavaScript binding schedule mismatch at '{location}'"
             )
-        capabilities = {item.id: item for item in self.capabilities}
-        for requirement in binding.capabilities:
-            descriptor = capabilities.get(requirement.id)
-            if descriptor is None:
-                raise AotPlanError(f"node '{location}' requires undeclared capability '{requirement.id}'")
-            unknown = sorted(set(requirement.operations) - set(descriptor.operations))
-            if unknown:
-                raise AotPlanError(f"node '{location}' requires unknown operations on capability '{requirement.id}': {unknown}")
         if self.plan.entry_mode != "sync":
             return
         from vibeflow.core.workflows.coordination import synchronous_violation
-        problem = synchronous_violation(binding.completion, capabilities=binding.capabilities, descriptors=self.capabilities)
+        problem = synchronous_violation(binding.completion)
         if problem:
             raise AotPlanError(
                 f"sync workflow contains {problem} at '{location}'",
@@ -179,8 +166,7 @@ class BoundNodeView:
         self.provides = tuple(
             BoundProviderView(item) for item in source.provides
         )
-        self.capabilities = tuple(binding.capabilities)
-        self.capability_policy = source.capability_policy.to_value()
+        self.workflow_operations = source.workflow_operations.to_value()
         self.params = binding.params.to_value()
         self.params_schema = _ordered_contract_schemas(
             context, binding, "params_schema"
@@ -241,12 +227,11 @@ class BoundNodeView:
             is_terminal=self.is_terminal,
             is_nodeset=self.is_nodeset,
             is_loop=self.is_loop,
-            capabilities=[item.to_dict() for item in self.capabilities],
             loop=self.loop.to_dict(),
             completion=self.completion,
             schedule=self.schedule,
             executor=self.executor,
-            capability_policy=self.capability_policy,
+            workflow_operations=self.workflow_operations,
         )
         if self.implementation is not None:
             payload["implementation"] = self.implementation.to_dict()
@@ -277,7 +262,6 @@ class BoundWorkflowView:
         self.default_entry = context.plan.default_entry
         self.max_steps = block.max_steps
         self.schemas = context.schemas
-        self.capabilities = context.capabilities
         input_specs = (
             context.plan.inputs
             if block.id == context.plan.entry_block
@@ -358,7 +342,6 @@ class BoundWorkflowView:
                 key: dict(value)
                 for key, value in sorted(self.schemas.items())
             },
-            "capabilities": [item.to_dict() for item in self.capabilities],
             "entry_mode": self.entry_mode,
         }
 
@@ -389,37 +372,6 @@ def bound_entry_view(workflow, entry):
     return result
 
 
-def _capability_views(
-    values: Mapping[str, object],
-) -> tuple[BoundCapabilityView, ...]:
-    result: list[BoundCapabilityView] = []
-    for capability_id in sorted(values):
-        raw = values[capability_id]
-        if not isinstance(raw, Mapping):
-            raise AotPlanError(
-                f"capability '{capability_id}' must be an object"
-            )
-        operations_raw = raw.get("operations", {})
-        if not isinstance(operations_raw, Mapping):
-            raise AotPlanError(
-                f"capability '{capability_id}'.operations must be an object"
-            )
-        operations: dict[str, BoundCapabilityOperationView] = {}
-        for name in sorted(operations_raw):
-            operation = operations_raw[name]
-            if not isinstance(operation, Mapping):
-                raise AotPlanError(
-                    f"capability '{capability_id}.{name}' must be an object"
-                )
-            operations[str(name)] = BoundCapabilityOperationView(
-                input_type=str(operation.get("input_type", "") or ""),
-                output_type=str(operation.get("output_type", "") or ""),
-                completion=str(
-                    operation.get("completion", "immediate") or "immediate"
-                ),
-            )
-        result.append(BoundCapabilityView(str(capability_id), operations))
-    return tuple(result)
 
 
 def _ordered_contract_schemas(

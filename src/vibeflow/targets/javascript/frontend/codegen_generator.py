@@ -47,10 +47,9 @@ class StaticWorkflowEmitter(
         functions: list[str] = []
         for code in self._codes:
             constants.extend(self._emit_constants(code))
-        descriptors, _, schemas = self._capability_catalogs()
+        schemas = dict(self.workflow.schemas)
         constants.extend(
             [
-                constant("__vfCapabilityDescriptors", descriptors),
                 constant("__vfSchemaCatalog", schemas),
             ]
         )
@@ -62,8 +61,6 @@ class StaticWorkflowEmitter(
             else "createStaticWorkflowAsync"
         )
         for index, (name, selected) in enumerate(roots.items() if roots else [("", self.workflow)]):
-            _, requirements, _ = self._capability_catalogs(self.named_workflows.get(name, self.workflow))
-            constants.append(constant(f"__vfEntryRequirements_{index}", requirements))
             metadata_name = root.metadata_name
             if roots:
                 metadata_name = f"__vfEntryMetadata_{index}"
@@ -71,8 +68,6 @@ class StaticWorkflowEmitter(
             functions.append(
             f"const __vfEntryInvoke_{index} = {workflow_factory}(\n"
             f"  {metadata_name},\n"
-            "  __vfCapabilityDescriptors,\n"
-            f"  __vfEntryRequirements_{index},\n"
             "  __vfSchemaCatalog,\n"
             "  __vfRuntimePluginDescriptors,\n"
             "  __vfRuntimePluginFactories,\n"
@@ -184,8 +179,7 @@ class StaticWorkflowEmitter(
                 "requires": [item.to_dict() for item in node.requires],
                 "provides": [item.to_dict() for item in node.provides],
                 "params": dict(node.params),
-                "capabilities": [item.to_dict() for item in node.capabilities],
-                "capability_policy": node.capability_policy,
+                "workflow_operations": node.workflow_operations,
                 "completion": node.completion,
                 "schedule": node.schedule,
                 "executor": node.executor,
@@ -210,51 +204,6 @@ class StaticWorkflowEmitter(
         result.append(self._emit_scheduler(code))
         return result
 
-    def _capability_catalogs(
-        self, workflow=None,
-    ) -> tuple[dict[str, Any], dict[str, list[str]], dict[str, Any]]:
-        descriptors: dict[str, Any] = {}
-        requirements: dict[str, set[str]] = {}
-        schemas: dict[str, Any] = {}
-
-        def visit(workflow: EmissionWorkflow) -> None:
-            for key, schema in workflow.schemas.items():
-                schemas.setdefault(key, dict(schema))
-            for descriptor in workflow.capabilities:
-                payload = descriptor.to_dict()
-                previous = descriptors.get(descriptor.id)
-                if previous is not None and previous != payload:
-                    raise AotPlanError(
-                        f"capability '{descriptor.id}' has conflicting descriptors",
-                        code="VF_CAPABILITY_CONFLICT",
-                    )
-                descriptors[descriptor.id] = payload
-            descriptor_by_id = {
-                item.id: item for item in workflow.capabilities
-            }
-            for node in workflow.nodes:
-                for requirement in node.capabilities:
-                    descriptor = descriptor_by_id.get(requirement.id)
-                    operations = (
-                        requirement.operations
-                        or tuple(descriptor.operations if descriptor else ())
-                    )
-                    requirements.setdefault(
-                        requirement.id,
-                        set(),
-                    ).update(operations)
-                if node.subplan is not None:
-                    visit(node.subplan)
-
-        visit(workflow or self.workflow)
-        return (
-            {key: descriptors[key] for key in sorted(descriptors)},
-            {
-                key: sorted(requirements[key])
-                for key in sorted(requirements)
-            },
-            {key: schemas[key] for key in sorted(schemas)},
-        )
 
 
 __all__ = ["StaticWorkflowEmitter"]

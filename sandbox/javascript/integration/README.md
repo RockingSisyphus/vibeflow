@@ -1,141 +1,14 @@
-# VibeFlow TypeScript Sandbox
+<!-- vibeflow-directory-purpose -->
+# javascript / 应用功能项目
 
-This sandbox exercises the JavaScript/TypeScript AOT project format without
-containing host-specific integration code.
+真实 SDK 项目与配置，提供配置覆盖、条件控制、嵌套循环、活对象、存储、资源、计划状态和应用端口等输入。执行、会话生命周期、错误和真实页面交互分别由对应功能域测试负责。
 
-The runner now includes the independent [comprehensive math application](../comprehensive_math/README.md). It runs the formula in Node.js and a real browser, with plugin-defined source rules, expected warnings and source-repair controls. The original positive config fixtures remain where pytest preparation, profile, ABI or review checks still use them.
+本目录保存真实使用工程、配置与独立预期；驱动和断言按功能统一在 tests/e2e，不保留单独总包或探针。测试复制输入至仓库外工作区后进行修改、构建和运行。
 
-Positive workflows:
-
-- [workflow_cooperation_math](../workflow_cooperation_math/README.md) combines three independent workflows through two asynchronous message rounds and a synchronous subcall. One bundled script runs in Node and offline headless Chromium, with concurrent numeric cases and four incorrect-formula controls;
-- The independent [workflow_math conditional route case](../workflow_math/project/configs/conditional_routes.jsonc)
-  routes both `done` and `failed` from `receive_event` to the same `finish_call`.
-  Its runner builds sync/async variants with reversed order, an identical duplicate,
-  and overlapping conditions, then checks results, single execution and an unknown-status control;
-- `project/configs/linear.jsonc` computes `(x + a) - b` with two TypeScript
-  nodes importing the registered pure `sandbox.math` base_lib;
-- `project/configs/fanout_join.jsonc` fans out into add/subtract branches and
-  rejoins them with `join_policy: "all"`;
-- `project/configs/edge_roles.jsonc` separates a transfer-only data edge from
-  a schedule-only control edge and proves neither role leaks into the other;
-- `project/configs/branch_join.jsonc` conditionally selects one branch and
-  rejoins it with `join_policy: "any_active"`;
-- `project/configs/nodeset.jsonc` computes `(x + a) - b` inside a reusable
-  nodeset;
-- `project/configs/nested_override.jsonc` applies a qualified config override
-  to one of two sibling nested `math` nodes and proves it does not leak;
-- `project/configs/nested_async.jsonc` nests two nodeset_types around a deferred
-  result and a detached task, then verifies qualified task paths, cleanup
-  timeout location, and successful reuse after cleanup failure;
-- `project/configs/loop.jsonc` carries a number through a bounded three-step
-  while loop;
-- `project/configs/loop_stop_when.jsonc` stops from body data and collects each
-  carried value;
-- `project/configs/loop_max_failure.jsonc` verifies the stable bounded-loop
-  failure when the stop condition cannot converge in time;
-- `project/configs/async_capability.jsonc` combines a Promise node with a
-  per-run injected `sandbox.storage` Capability. The execution-model case
-  proves its serial suspend, deferred ordinary Node and Capability all use the JS
-  event loop rather than a thread executor;
-- `project/configs/optional_input.jsonc` adds an optional offset, treating an
-  omitted `required: false` input as zero;
-- `project/configs/detached.jsonc` checks detached cleanup and timeout behavior
-  through a fake `sandbox.audit` Capability;
-- `project/configs/port_math.jsonc` verifies the async
-  `receive → TypeScript math node/base_lib → send` Port chain;
-- `project/configs/host_extension.jsonc` selects the implemented
-  `sandbox.math_host` at workflow scope and carries an unbundled planned Host
-  Extension for architecture review. The runnable case verifies import/create
-  side-effect freedom, explicit start/stop, idempotent stop, Capability
-  injection, instance config, and manifest packaging;
-- `project/configs/permanent_port_host.jsonc` combines an asynchronous Host
-  Extension with an unbounded loop and the
-  `receive → TypeScript math node/base_lib → send` Port path. The runner stops
-  the host while the next receive is pending and verifies `VF_ABORTED` cleanup;
-- `project/configs/browser_permanent_port_host.jsonc` runs that permanent Port
-  topology in a real headless browser for both `web-app` and `esm-module`.
-  Browser `window.message` inputs are routed into two isolated Host instances;
-  the primary instance processes two values, reaches its third pending
-  `receive`, and is cancelled by idempotent `stop()` with `VF_ABORTED`. The
-  cases also reject import/create side effects and any `unhandledrejection`;
-- `project/configs/runtime_node_failure.jsonc` and
-  `project/configs/runtime_output_failure.jsonc` exercise the stable error ABI
-  for node exceptions and output Schema failures.
-
-The negative configs under `project/configs/negative/` each select one isolated
-invalid node or workflow. In addition to direct dependency violations, they
-exercise barrel, package alias and symlink paths, base_lib reverse imports,
-undeclared external packages, package-root escapes and indirect Node builtins.
-The source audit rejects dynamic code, module-level or discarded Promise work,
-long-lived node listeners and mutable module state, with stable diagnostic
-codes, owners and source locations. Completion mismatches, a suspending node or
-a deferred ordinary Node inside a synchronous workflow remain covered as separate
-execution-model failures.
-
-The runner also verifies that the default synchronous ABI returns a plain,
-non-thenable value immediately, while the explicit `runWorkflowAsync` ABI
-returns a Promise and remains pending across a held suspending Capability. It
-inspects the generated plan for `completion`, `schedule`, `executor` and
-ordinary Node metadata, confirms JS uses `event_loop` rather than pretending to
-spawn Python-style threads, and covers import side-effect freedom, repeated and concurrent
-call isolation, input preflight, cancellation, trace modes and trace callback
-errors, Capability isolation, declaration-file consumption under strict
-TypeScript, source-map origins, deterministic manifests, atomic publication,
-single-file bundling, and the `web-app` no-auto-start contract.
-
-From the repository root, run the complete sandbox with:
+功能域回归入口：
 
 ```bash
-PYTHONPATH=src python sandbox/javascript/integration/run_all.py
+python tools/run_tests.py -- tests/e2e/test_execution.py tests/e2e/test_javascript.py tests/e2e/test_session_behaviors.py tests/e2e/test_preview.py
 ```
 
-The runner copies the fixture to a temporary directory and runs `npm ci` there,
-including the project-owned TypeScript/esbuild toolchain and Puppeteer. All
-dependencies and build outputs are removed on exit. Pass `--keep-artifacts` to
-retain the copied project, toolchain, browser driver, builds and report under
-`sandbox/javascript/integration/.artifacts/`.
-
-The official VibeFlow distribution contains a curated JavaScript example root
-under `javascript_project/`; the repository-only integration sandbox is not
-copied into the release.  The example root imports the colocated
-`kernel/vibeflow-kernel.zip`, so it does not need a source checkout or an
-installed Python package:
-
-```bash
-cd <release>/vibeflow-distribution
-python run.py validate --config javascript_project/configs/linear.jsonc
-python run.py build --config javascript_project/configs/linear.jsonc \
-  --target node --profile single-esm --out-dir output/javascript
-```
-
-The complete 49-case integration runner, including its browser installation,
-remains in this source repository.  The release example keeps its own locked
-TypeScript/esbuild toolchain and does not share dependencies with the Python
-example root.
-
-The default runner and CI gate require the Puppeteer browser cases and do not
-skip them. Use `--skip-browser` only for an explicitly reduced local run when
-Puppeteer is unavailable. The runner builds the
-positive and negative fixtures through VibeFlow's normal build API. The
-`web-app` fixture only registers a button handler; importing its generated
-module does not auto-run `runWorkflow()`. Reports are temporary by default;
-with `--keep-artifacts`, stable JSON and Markdown summaries are written under
-`.artifacts/reports/`.
-
-## Additional simple arithmetic scenarios
-
-`math:plugin-addition` checks multi-file resources, compile/runtime hooks, synchronous repeated calls, local overrides, and a real helper edit/restore (`5→6→5`). `math:async-addition` holds two per-invocation Capability requests, checks `5/30` and separate traces, then checks permanent Port receive/send and Host cleanup. Its browser ESM build is checked; the existing real-browser Host/profile tasks remain independent.
-
-Error, cancellation, detached, taskplan, type and browser regressions remain registered.
-
-The independent [workflow_math](../workflow_math/README.md) checks nested Nodeset, loop, route and execution metadata behavior. Sixteen observation groups use small integer formulas, including a two-level +1 loop, a shared build across full/boundary/off trace, and eight conditional-route builds. Original fixtures still used by pytest and architecture review remain.
-
-## 目录用途与边界
-
-仅用于：javascript / integration 案例，验证公开接口的综合使用、跨资源协作与错误诊断；保留真实项目输入与 runner。
-
-- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
-- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
-- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
-
-完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。
+完整验收及其他平台场景见[测试覆盖](../../TEST_COVERAGE.md)和[开发与验证](../../../docs/maintainers/development.md)。新增目录同步说明职责；运行日志、依赖和构建产物不写入本目录。

@@ -9,14 +9,13 @@ if (!input || !button || !output) {
 }
 
 button.addEventListener("click", async () => {
-  const result = await runWorkflowAsync(
-    { name: input.value },
-    {
-      capabilities: {
-        "example.clock": {
+  const result = await runWorkflowAsync({...({ name: input.value }),app_session:{
+        "clock": {
           now: async () => Date.now(),
         },
-      },
+      }},
+    {
+
     },
   );
   output.value = result.greeting;

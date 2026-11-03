@@ -8,6 +8,7 @@
 
 - 开始开发先遵循[架构阅读与维护指南](kernel/docs/user/architecture.md)，再按任务修改真实源码。
 - 从 `vibeflow_config.jsonc` 确定任务所属 root 和 Target，阅读该 root 的 README、项目配置及目标目录适用的 `AGENTS.md`。
+- `DISTRIBUTION.json` 是只读发行身份记录；root 注册和改名按[项目治理](kernel/docs/user/project-governance.md)操作。
 - 将执行关系、资源依赖和外部边界明确表达在工作流及资源声明中；相同业务职责优先复用已有 Node、Nodeset 或 BaseLib。
 - 按当前开发协议推进，完成与修改相称的检查、构建和执行验证，分别报告机器检查、实际执行与业务验收结果。
 - 同步维护受影响的调用、契约和项目说明，使文档、架构与最终行为一致。

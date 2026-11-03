@@ -17,7 +17,7 @@
 - `sandbox/javascript/integration/project/nodes/session_lifecycle.ts` 用普通节点表达建立与关闭；`configs/browser_message_loop.jsonc` 表达正常业务流程。
 - `sandbox/javascript/integration/project/web/browser_session.ts` 在会话结束或停止时触发 abort；`adapters/window_ports.ts` 响应 abort 并关闭监听。这是当前实际路径，不能因为未来要统一就先删掉。
 - 审核中的 Node AOT 能力替身实验：建立资源后注入错误，仅观察到 open，未观察到 close。它说明普通图的末尾关闭节点不足以覆盖异常；不证明浏览器包装层实际泄漏。
-- `tests/tooling/test_explicit_lifecycle.py` 中通过宿主包装层的取消或错误用例，不能单独证明所有 Target、所有入口具有同样的资源收尾保证。
+- `tests/e2e/test_session_behaviors.py` 中通过宿主包装层的取消或错误用例，不能单独证明所有 Target、所有入口具有同样的资源收尾保证。
 
 ## 开发阶段
 

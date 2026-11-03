@@ -65,10 +65,12 @@ class PythonSourceAnalysis:
             selected.add(current)
             pending.extend(item.target for item in sources.references if item.source == current)
         local = [item for item in sources.symbols if item.path == source.path and item.id in selected]
-        # A selected class already contains its methods; do not traverse twice.
-        classes = {item.name for item in local if item.kind == "class"}
+        # Selected definitions already contain their nested scopes. Projecting
+        # a nested function again at module level changes its name bindings.
+        containers = {item.name for item in local
+                      if isinstance(item._node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))}
         nodes = [item._node for item in local
-                 if not any(item.name.startswith(owner + ".") for owner in classes)]
+                 if not any(item.name.startswith(owner + ".") for owner in containers)]
         used = {item.id for node in nodes for item in ast.walk(node) if isinstance(item, ast.Name)}
         imports = [item for item in (source._tree.body if source._tree else ())
                    if isinstance(item, (ast.Import, ast.ImportFrom))

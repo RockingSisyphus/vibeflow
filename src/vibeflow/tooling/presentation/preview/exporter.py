@@ -30,7 +30,7 @@ def publish_project(root, workspace):
     from copy import deepcopy
     import os
     epoch=os.environ.get("SOURCE_DATE_EPOCH")
-    payload={"version":4, "name":workspace.root.name,
+    payload={"version":5, "name":workspace.root.name,
         "updated_at":datetime.fromtimestamp(int(epoch), timezone.utc).isoformat() if epoch is not None else utc_now()}
     try:
         architecture = load_raw_config_document(path).data
@@ -67,7 +67,7 @@ def publish_preview(*, root, workflow, category, status, architecture, links=(),
         for target in (target_graphs or {}).values():
             if target.get("architecture"):
                 declared_links.extend(_operation_links(target["architecture"], target["workflow"]))
-        payload = dict(version=4, id=record.metadata["id"], workflow=workflow,
+        payload = dict(version=5, id=record.metadata["id"], workflow=workflow,
                        architecture=architecture, links=declared_links, views=views, artifacts={})
         if target_graphs:
             payload["workflow_graphs"] = target_graphs

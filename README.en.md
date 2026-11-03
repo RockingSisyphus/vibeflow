@@ -9,11 +9,11 @@ terminal start → input I/O → process / nodeset → output I/O → terminal e
 ```
 
 
-## Main capabilities
+## Main features
 
 - Python Runtime, relocatable Python AOT packages, and JavaScript/TypeScript AOT;
 - Python and JS/TS plugin SDKs for code-defined Nodes, Rules, Rulesets, and other resources explicitly selected by each workflow;
-- composable Rules and Rulesets, plus Nodes, Nodesets, Loops, Capabilities, and explicit effect boundaries;
+- composable Rules and Rulesets, plus Nodes, Nodesets, Loops, and explicit effect boundaries;
 - explicit multi-file implementations, source ownership, per-file reviews, and default presentation for Nodes, BaseLibs, Plugins, and Hosts;
 - deterministic Architecture JSONC and offline HTML previews with history, expandable calls and resource views; optional Mermaid text exports;
 - config, contract, reachability, control-flow, quality, build, and execution-evidence checks;
@@ -60,6 +60,6 @@ Run the complete source-repository gate with:
 python tools/verify_project.py --full
 ```
 
-Current distribution version: `1.4.5`. Workflow ABI: `vibeflow.workflow.v11`. AOT manifest: `vibeflow.aot-build.v5`. Workflow launch manifest: v2. Plugin ABI: `vibeflow.plugin.v4`.
+Current distribution version: `1.5.1`. Workflow ABI: `vibeflow.workflow.v12`. AOT manifest: `vibeflow.aot-build.v6`. Workflow launch manifest: v2. Plugin ABI: `vibeflow.plugin.v5`.
 Python supports native asynchronous nodes. Python and JavaScript support official synchronous workflow calls and asynchronous in-process collaboration; Node and browsers share the same generic JS coordinator. Migrate older launch configurations and rebuild older AOT artifacts. Preview snapshots remain v4. Planned calls remain visible for review and are excluded from service launch declarations. See the [distribution build instructions](docs/maintainers/release.md).
 Both profiles include the offline HTML viewer, workflow history, and project/root navigation. Named entries and independent workflow coordination are supported. Project/root governance checks shared-resource boundaries; Python AOT carries declared support files of permitted cross-root dependencies. Rebuild older AOT artifacts for the current ABI. See the [coordination guide](distribution/docs/user/workflow-coordination.md), [project governance](distribution/docs/user/project-governance.md), and [distribution build instructions](docs/maintainers/release.md).

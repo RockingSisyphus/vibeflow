@@ -1,27 +1,9 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>VibeFlow browser message workflow</title>
-  </head>
-  <body>
-    <main id="fixture">Explicit browser listener lifecycle</main>
-    <script>
-      globalThis.__vibeflowBrowserHarness = {
-        messages: [],
-        unhandledRejections: [],
-      };
-      window.addEventListener("message", event => {
-        globalThis.__vibeflowBrowserHarness.messages.push(event.data);
-      });
-      window.addEventListener("unhandledrejection", event => {
-        globalThis.__vibeflowBrowserHarness.unhandledRejections.push({
-          code: event.reason?.code ?? null,
-          message: String(event.reason?.message ?? event.reason),
-        });
-      });
-    </script>
-    <!-- VIBEFLOW_APP_ENTRY -->
-  </body>
-</html>
+<html lang="zh"><head><meta charset="utf-8"><title>浏览器消息工作流</title></head>
+<body>
+<button id="start">启动工作流</button><button id="stop">停止工作流</button>
+<label>输入数字<input id="value" type="number" value="4"></label><button id="send">发送消息</button>
+<p>会话状态：<output id="state">未启动</output></p>
+<p>收到的结果：<output id="history">[]</output></p>
+<!-- VIBEFLOW_APP_ENTRY -->
+</body></html>

@@ -6,7 +6,7 @@ from vibeflow.core.rules import RuleCall, RuleDescriptor, RuleRelation, RuleResu
 
 
 RESOURCE_DIRECTORIES = {"node": "nodes", "base_lib": "base_lib",
-    **dict.fromkeys(("node_type", "rule", "ruleset", "data_schema", "capability", "plugin"), "plugins")}
+    **dict.fromkeys(("node_type", "rule", "ruleset", "data_schema", "plugin"), "plugins")}
 
 
 def governance_resources(source_rules=()):

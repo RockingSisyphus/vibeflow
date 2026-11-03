@@ -1,0 +1,117 @@
+[
+  {
+    "kind": "config",
+    "config": "fail_schema_bad_edge.jsonc",
+    "expect": "CONFIG.SCHEMA.EDGE_PAIR"
+  },
+  {
+    "kind": "config",
+    "config": "fail_async_result_key_missing.jsonc",
+    "expect": "GRAPH.ASYNC.MIGRATION"
+  },
+  {
+    "kind": "run",
+    "config": "fail_unknown_node.jsonc",
+    "expect": "NODE.DEFINITION.UNKNOWN"
+  },
+  {
+    "kind": "config",
+    "config": "fail_removed_loop_registration.jsonc",
+    "expect": "CONFIG.LOOPS.REMOVED"
+  },
+  {
+    "kind": "run",
+    "config": "fail_nodeset_key_leak.jsonc",
+    "expect": "NODESET.PROVIDES.UNKNOWN_KEY"
+  },
+  {
+    "kind": "run",
+    "config": "fail_nodeset_recursion.jsonc",
+    "expect": "NODESET.RECURSION"
+  },
+  {
+    "kind": "config",
+    "config": "fail_removed_boundary.jsonc",
+    "expect": "CONFIG.BOUNDARY.REMOVED"
+  },
+  {
+    "kind": "run",
+    "config": "fail_decision_cycle_forbidden.jsonc",
+    "expect": "GRAPH.CYCLE.FORBIDDEN"
+  },
+  {
+    "kind": "run",
+    "config": "fail_planned_architecture_run.jsonc",
+    "expect": "GRAPH.PLANNED.NODE_IN_RUN"
+  },
+  {
+    "kind": "run",
+    "config": "fail_planned_transparent_allow_run.jsonc",
+    "expect": "GRAPH.PLANNED.NODE_IN_RUN",
+    "runtime_options": {
+      "allow_planned_stub": true
+    },
+    "absent": [
+      "GRAPH.FLOW.ORPHAN_NODE",
+      "GRAPH.FLOW.UNREACHABLE_FROM_START",
+      "GRAPH.FLOW.CANNOT_REACH_END"
+    ]
+  },
+  {
+    "kind": "config",
+    "config": "fail_plugin_load.jsonc",
+    "expect": "PLUGIN.DECLARATION.LOAD"
+  },
+  {
+    "kind": "run",
+    "config": "fail_rule_missing_record.jsonc",
+    "expect": "RULE.EXECUTION"
+  },
+  {
+    "kind": "run",
+    "config": "fail_rule_execution.jsonc",
+    "expect": "RULE.EXECUTION"
+  },
+  {
+    "kind": "config",
+    "config": "fail_rule_bad_shape.jsonc",
+    "expect": "RULE.EXECUTION"
+  },
+  {
+    "kind": "runtime_run",
+    "config": "fail_loop_max_iterations.jsonc",
+    "initial": {
+      "loop.current": 1
+    },
+    "expect": "max_iterations=2"
+  },
+  {
+    "kind": "concerns",
+    "config": "concern_mainline_unjoined_sync_fanout.jsonc",
+    "expect": "GRAPH.MAINLINE.UNDECLARED_SYNC_FANOUT",
+    "details": [
+      "owner",
+      "source",
+      "target",
+      "branch_nodes",
+      "branch_edges",
+      "suggested_fixes"
+    ]
+  },
+  {
+    "kind": "run",
+    "config": "fail_mainline_decision_branch_dead_end.jsonc",
+    "expect": "GRAPH.MAINLINE.DECISION_BRANCH_DEAD_END",
+    "severity": "warning"
+  },
+  {
+    "kind": "run",
+    "config": "fail_safe_or_join_ambiguous_unconditional.jsonc",
+    "expect": "GRAPH.JOIN.AMBIGUOUS_UNCONDITIONAL"
+  },
+  {
+    "kind": "run",
+    "config": "fail_safe_or_join_multiple_exactly_one.jsonc",
+    "expect": "GRAPH.DATA.TYPE_CARDINALITY_AMBIGUOUS"
+  }
+]

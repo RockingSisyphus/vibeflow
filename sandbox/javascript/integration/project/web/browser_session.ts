@@ -8,7 +8,7 @@ interface Workflow {
 // the workflow's explicit open Node does that work.
 export function createBrowserSession(workflow:Workflow, entry?:string){
   const controller=new AbortController();
-  const capabilities=createWindowPortApi({signal:controller.signal});
+  const application=createWindowPortApi({signal:controller.signal});
   let invocation:Promise<unknown>|undefined;
   let started=false;
   const settled=()=>{started=false;controller.abort();};
@@ -19,7 +19,7 @@ export function createBrowserSession(workflow:Workflow, entry?:string){
     start(){
       if(invocation)return;
       started=true;
-      invocation=workflow.runWorkflowAsync({}, {capabilities,signal:controller.signal,entry});
+      invocation=workflow.runWorkflowAsync({...({}),app_session:application}, {signal:controller.signal,entry});
       invocation.then(settled,settled);
     },
     async stop(){

@@ -26,9 +26,22 @@
         "description": "Processes window messages until the host is stopped.",
         "loop": {
           "body": "sandbox.permanent_port_body",
-          "max_iterations": null
+          "max_iterations": null,
+          "carry": [
+            {
+              "from": "app.session",
+              "as": "app.session",
+              "update": "app.session"
+            }
+          ]
         },
-        "requires": [],
+        "requires": [
+          {
+            "type": "app.session",
+            "cardinality": "exactly_one",
+            "display_name": "Application session"
+          }
+        ],
         "provides": []
       },
       {
@@ -72,11 +85,23 @@
         "definition_id": "sandbox.terminal",
         "display_name": "One message complete",
         "description": "Finish the finite entry."
+      },
+      {
+        "id": "start_application",
+        "definition_id": "app.input.browser_message_loop_jsonc",
+        "display_name": "Application input",
+        "description": "Supplies the application instance to this entry."
+      },
+      {
+        "id": "once_start_application",
+        "definition_id": "app.input.browser_message_loop_jsonc",
+        "display_name": "Application input",
+        "description": "Supplies the application instance to this entry."
       }
     ],
     "edges": [
       [
-        "start",
+        "start_application",
         "open"
       ],
       [
@@ -92,7 +117,7 @@
         "end"
       ],
       [
-        "once_start",
+        "once_start_application",
         "once_open"
       ],
       [
@@ -106,7 +131,39 @@
       [
         "once_close",
         "once_end"
-      ]
+      ],
+      [
+        "start",
+        "start_application"
+      ],
+      {
+        "from": "start_application",
+        "to": "loop",
+        "schedule": false,
+        "transfer": true
+      },
+      {
+        "from": "start_application",
+        "to": "close",
+        "schedule": false,
+        "transfer": true
+      },
+      [
+        "once_start",
+        "once_start_application"
+      ],
+      {
+        "from": "once_start_application",
+        "to": "once_process",
+        "schedule": false,
+        "transfer": true
+      },
+      {
+        "from": "once_start_application",
+        "to": "once_close",
+        "schedule": false,
+        "transfer": true
+      }
     ],
     "outputs": [],
     "entries": {
@@ -117,7 +174,15 @@
         "start": "once_start"
       }
     },
-    "default_entry": "serve"
+    "default_entry": "serve",
+    "inputs": [
+      {
+        "key": "app_session",
+        "type": "app.session",
+        "display_name": "Application session",
+        "required": true
+      }
+    ]
   },
   "plugins": [
     {

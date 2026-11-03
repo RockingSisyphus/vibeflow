@@ -23,7 +23,6 @@
     }
   ],
   "pipeline": {
-    "entry_mode":"async",
     "entry_mode": "async",
     "inputs": [
       {
@@ -31,6 +30,12 @@
         "type": "math.offset",
         "display_name": "math.offset",
         "required": false
+      },
+      {
+        "key": "app_session",
+        "type": "app.session",
+        "display_name": "Application session",
+        "required": true
       }
     ],
     "nodes": [
@@ -204,11 +209,17 @@
         "definition_id": "math.boundary",
         "display_name": "End",
         "description": "Explicit end after sending a host value."
+      },
+      {
+        "id": "start_application",
+        "definition_id": "app.input.formula_jsonc",
+        "display_name": "Application input",
+        "description": "Supplies the application instance to this entry."
       }
     ],
     "edges": [
       {
-        "from": "start",
+        "from": "start_application",
         "to": "receive"
       },
       {
@@ -272,7 +283,17 @@
       [
         "send",
         "send_end"
-      ]
+      ],
+      [
+        "start",
+        "start_application"
+      ],
+      {
+        "from": "start_application",
+        "to": "send",
+        "schedule": false,
+        "transfer": true
+      }
     ],
     "outputs": [
       {

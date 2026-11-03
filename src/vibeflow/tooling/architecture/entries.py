@@ -12,7 +12,7 @@ def entry_facts(graph, compiled):
     return {"entries": entries, "default_entry": graph.default_entry}
 
 
-def policy_facts(policies):
+def workflow_operation_facts(operations):
     import json
-    return {json.dumps(list(path), ensure_ascii=False, separators=(",", ":")): value for path, value in policies.items()
-            if value.get("capabilities") or value.get("actions")}
+    return {json.dumps(list(path), ensure_ascii=False, separators=(",", ":")): value for path, value in operations.items()
+            if value.get("actions")}

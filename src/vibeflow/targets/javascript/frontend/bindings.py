@@ -13,12 +13,7 @@ from vibeflow.block_compiler.model import (
     WorkflowPlan,
     freeze_json_object,
 )
-from vibeflow.targets.javascript.frontend.contracts import (
-    COMPLETIONS,
-    EXECUTORS,
-    SCHEDULES,
-    CapabilityRequirement,
-)
+from vibeflow.targets.javascript.frontend.contracts import COMPLETIONS, EXECUTORS, SCHEDULES
 
 
 PLUGIN_TYPES = frozenset({"compiler", "runtime"})
@@ -178,7 +173,6 @@ class JavascriptCallBinding:
     implementation: SourceRef
     params: Mapping[str, object] | PortableObject = field(default_factory=dict)
     base_libs: tuple[str, ...] = ()
-    capabilities: tuple[CapabilityRequirement, ...] = ()
     completion: str = "immediate"
     schedule: str = "inline"
     executor: str = "current"
@@ -192,10 +186,6 @@ class JavascriptCallBinding:
             raise TypeError("implementation must be a SourceRef")
         object.__setattr__(self, "params", _portable_object(self.params, "params"))
         object.__setattr__(self, "base_libs", _unique_text_tuple(self.base_libs, "base_libs"))
-        capabilities = tuple(self.capabilities)
-        if not all(isinstance(item, CapabilityRequirement) for item in capabilities):
-            raise TypeError("capabilities must contain CapabilityRequirement values")
-        object.__setattr__(self, "capabilities", capabilities)
         if self.completion not in COMPLETIONS:
             raise ValueError(f"completion must be one of {sorted(COMPLETIONS)}")
         if self.schedule not in SCHEDULES:
@@ -218,7 +208,6 @@ class JavascriptCallBinding:
             "implementation": self.implementation.to_dict(),
             "params": self.params.to_value(),
             "base_libs": list(self.base_libs),
-            "capabilities": [item.to_dict() for item in self.capabilities],
             "completion": self.completion,
             "schedule": self.schedule,
             "executor": self.executor,
@@ -262,7 +251,6 @@ class JavascriptBindingPlan:
     calls: tuple[JavascriptCallBinding, ...] = ()
     schemas: Mapping[str, object] | PortableObject = field(default_factory=dict)
     base_libs: Mapping[str, object] | PortableObject = field(default_factory=dict)
-    capabilities: Mapping[str, object] | PortableObject = field(default_factory=dict)
 
     runtime_plugins: tuple[JavascriptPluginBinding, ...] = ()
     import_policy: Mapping[str, object] | PortableObject = field(default_factory=dict)
@@ -278,7 +266,7 @@ class JavascriptBindingPlan:
         if len(set(paths)) != len(paths):
             raise ValueError("call paths must be unique")
         object.__setattr__(self, "calls", calls)
-        for name in ("schemas", "base_libs", "capabilities", "import_policy"):
+        for name in ("schemas", "base_libs", "import_policy"):
             value = _portable_object(getattr(self, name), name)
             object.__setattr__(self, name, value)
 
@@ -329,7 +317,6 @@ class JavascriptBindingPlan:
             "calls": [item.to_dict() for item in self.calls],
             "schemas": self.schemas.to_value(),
             "base_libs": self.base_libs.to_value(),
-            "capabilities": self.capabilities.to_value(),
 
             "runtime_plugins": [item.to_dict() for item in self.runtime_plugins],
             "import_policy": self.import_policy.to_value(),
@@ -344,14 +331,13 @@ class JavascriptBindingPlan:
             separators=(",", ":"),
         )
 
-def build_javascript_binding_plan(plan: WorkflowPlan, *, implementations: Mapping[str, Mapping[str, object]] | None=None, base_libs_by_definition: Mapping[str, Sequence[str]] | None=None, capabilities_by_definition: Mapping[str, Sequence[CapabilityRequirement | Mapping[str, object]]] | None=None, schemas: Mapping[str, object] | None=None, base_libs: Mapping[str, object] | None=None, capabilities: Mapping[str, object] | None=None, runtime_plugins: Sequence[JavascriptPluginBinding]=(), import_policy: Mapping[str, object] | None=None) -> JavascriptBindingPlan:
+def build_javascript_binding_plan(plan: WorkflowPlan, *, implementations: Mapping[str, Mapping[str, object]] | None=None, base_libs_by_definition: Mapping[str, Sequence[str]] | None=None, schemas: Mapping[str, object] | None=None, base_libs: Mapping[str, object] | None=None, runtime_plugins: Sequence[JavascriptPluginBinding]=(), import_policy: Mapping[str, object] | None=None) -> JavascriptBindingPlan:
     """Build a JavaScript sidecar from plain, in-memory Target facts."""
 
     if not isinstance(plan, WorkflowPlan):
         raise TypeError("plan must be a WorkflowPlan")
     implementation_facts = implementations or {}
     base_lib_facts = base_libs_by_definition or {}
-    capability_facts = capabilities_by_definition or {}
     calls: list[JavascriptCallBinding] = []
     schema_orders: list[JavascriptSchemaMemberOrder] = []
     for block in plan.blocks:
@@ -371,10 +357,6 @@ def build_javascript_binding_plan(plan: WorkflowPlan, *, implementations: Mappin
                     implementation=node.implementation,
                     params=node.params,
                     base_libs=_base_lib_ids(node.definition_id, base_lib_facts),
-                    capabilities=_call_capabilities(
-                        node.definition_id,
-                        capability_facts,
-                    ),
                     completion=completion,
                     schedule=node.schedule,
                     executor=executor,
@@ -394,7 +376,6 @@ def build_javascript_binding_plan(plan: WorkflowPlan, *, implementations: Mappin
         calls=tuple(calls),
         schemas=schema_mapping,
         base_libs=base_libs or {},
-        capabilities=capabilities or {},
 
         runtime_plugins=tuple(runtime_plugins),
         import_policy=import_policy or {},
@@ -516,37 +497,6 @@ def _javascript_executor(completion: str) -> str:
     return "current"
 
 
-def _call_capabilities(
-    definition_id: str,
-    facts: Mapping[
-        str,
-        Sequence[CapabilityRequirement | Mapping[str, object]],
-    ],
-) -> tuple[CapabilityRequirement, ...]:
-    normalized: list[CapabilityRequirement] = []
-    for index, raw in enumerate(facts.get(definition_id, ())):
-        if isinstance(raw, CapabilityRequirement):
-            requirement = raw
-        elif isinstance(raw, Mapping):
-            capability_id = _required_text(
-                raw.get("id"),
-                f"capabilities_by_definition[{definition_id!r}][{index}].id",
-            )
-            operations = raw.get("operations", ())
-            if not isinstance(operations, (tuple, list)):
-                raise TypeError("capability operations must be a tuple or list")
-            names = {
-                _required_text(operation, "capability operation")
-                for operation in operations
-            }
-            requirement = CapabilityRequirement(capability_id, tuple(sorted(names)))
-        else:
-            raise TypeError(
-                "capability facts must contain mappings or "
-                "CapabilityRequirement values"
-            )
-        normalized.append(requirement)
-    return tuple(sorted(normalized, key=lambda item: item.id))
 
 
 def _portable_object(

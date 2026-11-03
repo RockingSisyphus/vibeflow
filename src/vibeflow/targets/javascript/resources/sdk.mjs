@@ -1,6 +1,6 @@
 import {nodeDefinition} from "./node_declarations.mjs";
 /** Pure declarations: importing a resource does not register it. */
-const ABI = "vibeflow.plugin.v4";
+const ABI = "vibeflow.plugin.v5";
 const directBindings = new WeakMap();
 // Source references are literal filesystem paths, including %, # and spaces.
 function resolveFileReference(ref, base) {
@@ -111,7 +111,6 @@ export function __discoverResources(namespace, filename) {
 export const defineRule = options => define("rule", options, "check");
 export const defineRuleset = options => define("ruleset", options);
 export const defineDataSchema = options => define("data_schema", options);
-export const defineCapability = options => define("capability", options);
 export const defineBaseLib = options => define("base_lib", options, typeof options.implementation === "function" ? "implementation" : undefined);
 /** Low-level fixed Descriptor contribution; callable declarations use defineNode/Rule. */
 export const defineResource = options => {

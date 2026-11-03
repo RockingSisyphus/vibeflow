@@ -44,7 +44,7 @@ def encode_snapshot(value, *, relocate=lambda value: value):
             return [encode(child) for child in item]
         if item is None or isinstance(item, (str,int,float,bool)):
             return item
-        raise TypeError(f'Python AOT cannot store live {type(item).__name__}; supply it as a runtime input or capability')
+        raise TypeError(f'Python AOT cannot store live {type(item).__name__}; supply it as a runtime input')
 
     root = encode(value)
     return {'root': root, 'records': records}

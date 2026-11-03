@@ -1,0 +1,209 @@
+[
+  {
+    "name": "free_nodes",
+    "config": "pass_free_nodes.jsonc",
+    "initial": {}
+  },
+  {
+    "name": "io_data_store",
+    "config": "pass_io_data_store.jsonc",
+    "initial": {
+      "io.result": 20
+    }
+  },
+  {
+    "name": "comprehensive_flowchart",
+    "config": "pass_comprehensive_flowchart.jsonc",
+    "initial": {
+      "value.in": 3
+    },
+    "expected_outputs": {
+      "io.output": "final=13;request=13"
+    }
+  },
+  {
+    "name": "global_state_execution_lock",
+    "config": "pass_global_state_execution_lock.jsonc",
+    "initial": {},
+    "expected_outputs": {
+      "value.out": 1
+    }
+  },
+  {
+    "name": "ordinary_callback_warning",
+    "config": "pass_callback_warning.jsonc",
+    "initial_factory": "callback",
+    "expected_outputs": {
+      "value.out": 23
+    },
+    "expected_health_warnings": []
+  },
+  {
+    "name": "training_object_flow",
+    "config": "pass_training_object_flow.jsonc",
+    "initial_factory": "training",
+    "expected_outputs": {
+      "train.loss": 6.0,
+      "train.grad": 0.6,
+      "train.step_report": {
+        "steps": 1,
+        "weight": 0.7
+      }
+    },
+    "expected_health_warnings": [
+      "GRAPH.EXECUTION_LOCK.GLOBAL_STATE_UNCOORDINATED"
+    ]
+  },
+  {
+    "name": "training_non_json_metrics",
+    "config": "pass_training_non_json_metrics.jsonc",
+    "initial_factory": "batch"
+  },
+  {
+    "name": "config_resources_nodeset_arithmetic",
+    "config": "pass_config_resources_nodeset_arithmetic.jsonc",
+    "initial": {
+      "calc.a": 4,
+      "calc.b": 6
+    },
+    "expected_outputs": {
+      "calc.sum": 10,
+      "calc.resource": 50,
+      "calc.final": 203
+    },
+    "expected_health_warnings": [
+      "NODESET.CONFIG.OVERRIDES_GLOBAL_CONFIG",
+      "CONFIG.GLOBAL_CONFIG.OVERRIDES_LOCAL"
+    ]
+  },
+  {
+    "name": "planned_python_stub_arithmetic",
+    "config": "pass_planned_python_stub_arithmetic.jsonc",
+    "initial": {
+      "calc.a": 2,
+      "calc.b": 5
+    },
+    "runtime_options": {
+      "allow_planned_stub": true,
+      "trace": "boundary"
+    },
+    "expected_outputs": {
+      "calc.sum": 7,
+      "calc.scaled": 30,
+      "calc.branch": 30,
+      "calc.final": 36
+    },
+    "expected_health_warnings": [
+      "GRAPH.PLANNED.NODE",
+      "GRAPH.PLANNED.PYTHON_STUB_DEV_ONLY"
+    ]
+  },
+  {
+    "name": "block_linear_training",
+    "config": "pass_block_linear_training.jsonc",
+    "initial_factory": "training",
+    "runtime_options": {
+      "execution": "block"
+    },
+    "expected_outputs": {
+      "train.loss": 6.0,
+      "train.grad": 0.6,
+      "train.step_report": {
+        "steps": 1,
+        "weight": 0.7
+      }
+    }
+  },
+  {
+    "name": "compiled_linear_training",
+    "config": "pass_block_linear_training.jsonc",
+    "initial_factory": "training",
+    "runtime_options": {
+      "trace": "boundary",
+      "node_hooks": false,
+      "execution": "compiled"
+    },
+    "expected_outputs": {
+      "train.loss": 6.0,
+      "train.grad": 0.6,
+      "train.step_report": {
+        "steps": 1,
+        "weight": 0.7
+      }
+    }
+  },
+  {
+    "name": "compiled_decision_branch_exit",
+    "config": "pass_compiled_decision_branch_exit.jsonc",
+    "initial": {
+      "value.in": 4
+    },
+    "runtime_options": {
+      "trace": "boundary",
+      "node_hooks": false,
+      "execution": "compiled"
+    },
+    "expected_outputs": {
+      "flow.route": "external",
+      "value.final": 15
+    }
+  },
+  {
+    "name": "task_result_join",
+    "config": "pass_task_result_join.jsonc",
+    "initial": {},
+    "expected_outputs": {
+      "value.out": 12
+    }
+  },
+  {
+    "name": "unpublished_branch_output",
+    "config": "pass_unconsumed_task_result.jsonc",
+    "initial": {},
+    "expected_outputs": {
+      "value.out": 9
+    },
+    "expected_absent_outputs": [
+      "async.value"
+    ]
+  },
+  {
+    "name": "compiled_fallback_mixed_graph",
+    "config": "pass_task_result_join.jsonc",
+    "initial": {},
+    "runtime_options": {
+      "trace": "full",
+      "node_hooks": false,
+      "execution": "compiled"
+    },
+    "expected_outputs": {
+      "value.out": 12
+    }
+  },
+  {
+    "name": "task_nodeset_result_join",
+    "config": "pass_task_nodeset_result_join.jsonc",
+    "initial": {
+      "value.in": 3
+    },
+    "expected_outputs": {
+      "value.out": 8
+    }
+  },
+  {
+    "name": "background_task_metrics",
+    "config": "pass_background_task_metrics.jsonc",
+    "initial_factory": "batch",
+    "expected_outputs": {
+      "value.out": 10
+    }
+  },
+  {
+    "name": "mainline_nodeset_task",
+    "config": "pass_mainline_nodeset_task.jsonc",
+    "initial": {},
+    "expected_outputs": {
+      "value.out": 10
+    }
+  }
+]

@@ -8,7 +8,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from vibeflow.core.workflows.references import workflow_reference, launch_configuration
-from .operations import Operation, immediate_dispatch
+from .operations import immediate_dispatch
 from .protocol import CoordinationError, json_value, error_record, merge_cleanup_error
 
 
@@ -86,13 +86,16 @@ class WorkflowClient:
         while True:
             if signal:signal.throw_if_aborted()
             if self.closed:raise CoordinationError('VF_INSTANCE_ENDED',self.id)
-            if deadline is not None and loop.time()>=deadline:raise CoordinationError('VF_WAIT_TIMEOUT',identifier)
-            request={'id':identifier}
+            poll = .25 if deadline is None else max(0, min(.25, deadline-loop.time()))
+            request={'id':identifier, 'poll':poll}
             if port is not None:request['port']=port
             result=await self.request(operation,request)
             if not result.get('pending'):return result
+            if deadline is not None and loop.time()>=deadline:raise CoordinationError('VF_WAIT_TIMEOUT',identifier)
 
     async def call(self, workflow, *, launch, inputs=None, timeout=None, signal=None):
+        if signal is not None:
+            signal.throw_if_aborted()
         reference=workflow_reference(workflow,root=self.workflow.get('root','') if isinstance(self.workflow,dict) else '')
         value=await self.request('call',{'sender':self.id,'workflow':reference,'launch':launch_configuration(launch),'inputs':inputs or {}})
         return await self._wait('ready',value['id'],timeout=timeout,signal=signal)
@@ -109,13 +112,10 @@ class WorkflowClient:
         await self.request('kill',value)
         return await self.wait(identifier,timeout=timeout,signal=signal)
 
-    def operations(self):
-        immediate = immediate_dispatch()
-        return {'call':Operation(lambda r,s:self.call(r['workflow'],launch=r['launch'],inputs=r.get('inputs'),timeout=r.get('timeout'),signal=s)),
-                'wait':Operation(lambda r,s:self.wait(r['id'],timeout=r.get('timeout'),signal=s)),
-                'receive':Operation(lambda r,s:self.receive(r.get('port','default'),timeout=r.get('timeout'),signal=s)),
-                'send':Operation(lambda r,s:immediate(lambda:self.send(r['id'],r.get('port','default'),r.get('payload')))),
-                'kill':Operation(lambda r,s:self.kill(r['id'],workflow=r['workflow'],timeout=r.get('timeout'),signal=s))}
+
+    def session(self):
+        from .operations import HttpSession
+        return HttpSession(self)
 
     async def finish(self, *, state='succeeded', outputs=None, error=None):
         if self._finishing is None:self._finishing=asyncio.create_task(self._finish(state,outputs,error))

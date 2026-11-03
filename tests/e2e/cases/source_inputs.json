@@ -1,0 +1,515 @@
+[
+  {
+    "subject": "node",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = ([inputs for inputs in ()], inputs.pop('seed', None))\n        return {}\n",
+        "denied": true,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = (lambda: (inputs.pop('seed', None), [inputs for inputs in ()]))()\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = [inputs for inputs in inputs.pop('seed', ())]\n        return {}\n",
+        "denied": true,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = [inputs.pop('seed', None) for inputs in ()]\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = ({inputs for inputs in ()}, inputs.pop('seed', None))\n        return {}\n",
+        "denied": true,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = (lambda: (inputs.pop('seed', None), {inputs for inputs in ()}))()\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = {inputs for inputs in inputs.pop('seed', ())}\n        return {}\n",
+        "denied": true,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = {inputs.pop('seed', None) for inputs in ()}\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = ({inputs: inputs for inputs in ()}, inputs.pop('seed', None))\n        return {}\n",
+        "denied": true,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = (lambda: (inputs.pop('seed', None), {inputs: inputs for inputs in ()}))()\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = {inputs: inputs for inputs in inputs.pop('seed', ())}\n        return {}\n",
+        "denied": true,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = {inputs.pop('seed', None): inputs.pop('seed', None) for inputs in ()}\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = ((inputs for inputs in ()), inputs.pop('seed', None))\n        return {}\n",
+        "denied": true,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = (lambda: (inputs.pop('seed', None), (inputs for inputs in ())))()\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = (inputs for inputs in inputs.pop('seed', ()))\n        return {}\n",
+        "denied": true,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = (inputs.pop('seed', None) for inputs in ())\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = [(lambda: inputs.pop('seed', None))() for inputs in ()]\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        value = [(lambda: inputs.pop('seed', None))() for item in ()]\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = ([inputs for inputs in ()], inputs.pop('seed', None))\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = (lambda: (inputs.pop('seed', None), [inputs for inputs in ()]))()\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = [inputs for inputs in inputs.pop('seed', ())]\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = [inputs.pop('seed', None) for inputs in ()]\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = ({inputs for inputs in ()}, inputs.pop('seed', None))\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = (lambda: (inputs.pop('seed', None), {inputs for inputs in ()}))()\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = {inputs for inputs in inputs.pop('seed', ())}\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = {inputs.pop('seed', None) for inputs in ()}\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = ({inputs: inputs for inputs in ()}, inputs.pop('seed', None))\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = (lambda: (inputs.pop('seed', None), {inputs: inputs for inputs in ()}))()\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = {inputs: inputs for inputs in inputs.pop('seed', ())}\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = {inputs.pop('seed', None): inputs.pop('seed', None) for inputs in ()}\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = ((inputs for inputs in ()), inputs.pop('seed', None))\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = (lambda: (inputs.pop('seed', None), (inputs for inputs in ())))()\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = (inputs for inputs in inputs.pop('seed', ()))\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = (inputs.pop('seed', None) for inputs in ())\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = [(lambda: inputs.pop('seed', None))() for inputs in ()]\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "comprehension_input_ownership_uses_actual_outer_and_target_bindings",
+        "source": "def task(inputs):\n    value = [(lambda: inputs.pop('seed', None))() for item in ()]\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        task(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_comprehension_walrus_preserves_real_input_aliases",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        values = list([(alias := inputs) for inputs in ({},)])\n        alias.pop('seed', None)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_comprehension_walrus_preserves_real_input_aliases",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        values = list([(alias := inputs) for item in (0,)])\n        alias.pop('seed', None)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_comprehension_walrus_preserves_real_input_aliases",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        values = list([(alias := inputs) for inputs in ({},)])\n        sink(alias)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_comprehension_walrus_preserves_real_input_aliases",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        values = list([(alias := inputs) for item in (0,)])\n        sink(alias)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_comprehension_walrus_preserves_real_input_aliases",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        values = list({(alias := inputs) for inputs in ({},)})\n        alias.pop('seed', None)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_comprehension_walrus_preserves_real_input_aliases",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        values = list({(alias := inputs) for item in (0,)})\n        alias.pop('seed', None)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_comprehension_walrus_preserves_real_input_aliases",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        values = list({(alias := inputs) for inputs in ({},)})\n        sink(alias)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_comprehension_walrus_preserves_real_input_aliases",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        values = list({(alias := inputs) for item in (0,)})\n        sink(alias)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_comprehension_walrus_preserves_real_input_aliases",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        values = list({0: (alias := inputs) for inputs in ({},)})\n        alias.pop('seed', None)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_comprehension_walrus_preserves_real_input_aliases",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        values = list({0: (alias := inputs) for item in (0,)})\n        alias.pop('seed', None)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_comprehension_walrus_preserves_real_input_aliases",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        values = list({0: (alias := inputs) for inputs in ({},)})\n        sink(alias)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_comprehension_walrus_preserves_real_input_aliases",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        values = list({0: (alias := inputs) for item in (0,)})\n        sink(alias)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_comprehension_walrus_preserves_real_input_aliases",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        values = list(((alias := inputs) for inputs in ({},)))\n        alias.pop('seed', None)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_comprehension_walrus_preserves_real_input_aliases",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        values = list(((alias := inputs) for item in (0,)))\n        alias.pop('seed', None)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_comprehension_walrus_preserves_real_input_aliases",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        values = list(((alias := inputs) for inputs in ({},)))\n        sink(alias)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_comprehension_walrus_preserves_real_input_aliases",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        values = list(((alias := inputs) for item in (0,)))\n        sink(alias)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_helper_callsite_input_identity_respects_local_scopes",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        value = [sink(inputs) for inputs in ({},)]\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_helper_callsite_input_identity_respects_local_scopes",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        value = [sink(inputs) for item in (0,)]\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_helper_callsite_input_identity_respects_local_scopes",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        value = {sink(inputs) for inputs in ({},)}\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_helper_callsite_input_identity_respects_local_scopes",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        value = {sink(inputs) for item in (0,)}\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_helper_callsite_input_identity_respects_local_scopes",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        value = {sink(inputs): sink(inputs) for inputs in ({},)}\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_helper_callsite_input_identity_respects_local_scopes",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        value = {sink(inputs): sink(inputs) for item in (0,)}\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_helper_callsite_input_identity_respects_local_scopes",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        value = (sink(inputs) for inputs in ({},))\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_helper_callsite_input_identity_respects_local_scopes",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        value = (sink(inputs) for item in (0,))\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_helper_callsite_input_identity_respects_local_scopes",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        value = (lambda inputs: sink(inputs))({})\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_helper_callsite_input_identity_respects_local_scopes",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        value = (lambda: sink(inputs))()\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_helper_callsite_input_identity_respects_local_scopes",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        value = ([sink(inputs) for inputs in ({},)], sink(inputs))\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "incremental_helper_callsite_input_identity_respects_local_scopes",
+        "source": "def sink(payload):\n    return payload.pop('seed', None)\nclass Task:\n    def run_pure(self, inputs, params):\n        value = ((lambda inputs: sink(inputs))({}), sink(inputs))\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "function_headers_keep_enclosing_input_ownership_until_body",
+        "source": "inputs = {'seed': 1}\nclass Task:\n    def run_pure(self, inputs, params=inputs.pop('seed', None)):\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "function_headers_keep_enclosing_input_ownership_until_body",
+        "source": "inputs = {'seed': 1}\nclass Task:\n    def run_pure(self, inputs, params):\n        inputs.pop('seed', None)\n        return {}\n",
+        "denied": true,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "function_headers_keep_enclosing_input_ownership_until_body",
+        "source": "inputs = {'seed': 1}\ndef helper(inputs, params=inputs.pop('seed', None)):\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        helper(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "function_headers_keep_enclosing_input_ownership_until_body",
+        "source": "inputs = {'seed': 1}\ndef helper(inputs):\n    inputs.pop('seed', None)\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        helper(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "nested_function_and_lambda_input_ownership_follows_real_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        def inner():\n            inputs.pop('seed', None)\n        inner()\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "nested_function_and_lambda_input_ownership_follows_real_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        owned = inputs\n        def inner():\n            owned.pop('seed', None)\n        inner()\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "nested_function_and_lambda_input_ownership_follows_real_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        def inner():\n            inputs = {}\n            inputs.pop('seed', None)\n        inner()\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "nested_function_and_lambda_input_ownership_follows_real_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        inner = lambda inputs: inputs.pop('seed', None)\n        inner({})\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "nested_function_and_lambda_input_ownership_follows_real_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        inner = lambda: inputs.pop('seed', None)\n        inner()\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "nested_function_and_lambda_input_ownership_follows_real_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        inner = lambda inputs=inputs.pop('seed', None): inputs\n        inner()\n        return {}\n",
+        "denied": true,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "nested_function_and_lambda_input_ownership_follows_real_bindings",
+        "source": "class Task:\n    def run_pure(self, inputs, params):\n        def inner(inputs=inputs.pop('seed', None)):\n            return inputs\n        inner()\n        return {}\n",
+        "denied": true,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "nested_function_and_lambda_input_ownership_follows_real_bindings",
+        "source": "def helper(inputs):\n    def inner():\n        inputs.pop('seed', None)\n    inner()\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        helper(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "nested_function_and_lambda_input_ownership_follows_real_bindings",
+        "source": "def helper(inputs):\n    owned = inputs\n    def inner():\n        owned.pop('seed', None)\n    inner()\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        helper(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "nested_function_and_lambda_input_ownership_follows_real_bindings",
+        "source": "def helper(inputs):\n    def inner():\n        inputs = {}\n        inputs.pop('seed', None)\n    inner()\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        helper(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "nested_function_and_lambda_input_ownership_follows_real_bindings",
+        "source": "def helper(inputs):\n    inner = lambda inputs: inputs.pop('seed', None)\n    inner({})\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        helper(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "nested_function_and_lambda_input_ownership_follows_real_bindings",
+        "source": "def helper(inputs):\n    inner = lambda: inputs.pop('seed', None)\n    inner()\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        helper(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "nested_function_and_lambda_input_ownership_follows_real_bindings",
+        "source": "def helper(inputs):\n    inner = lambda inputs=inputs.pop('seed', None): inputs\n    inner()\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        helper(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      },
+      {
+        "name": "nested_function_and_lambda_input_ownership_follows_real_bindings",
+        "source": "def helper(inputs):\n    def inner(inputs=inputs.pop('seed', None)):\n        return inputs\n    inner()\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        helper(inputs)\n        return {}\n",
+        "denied": false,
+        "rule": "vibeflow.input_writes"
+      }
+    ]
+  }
+]

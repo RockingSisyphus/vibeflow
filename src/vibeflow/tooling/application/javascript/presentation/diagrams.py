@@ -267,7 +267,6 @@ def _resource_fragments(result: object):
 def _resource_records(result: object) -> tuple[tuple[str, tuple[Mapping[str, object], ...]], ...]:
     resources = result.architecture.get("resources", {})
     base_lib = resources.get("base_lib", {}) if isinstance(resources, Mapping) else {}
-    capabilities = resources.get("capabilities", {}) if isinstance(resources, Mapping) else {}
     catalogs = result.catalogs
     config = getattr(getattr(result, "document", None), "data", {})
     base_options = config.get("base_lib", {})
@@ -295,7 +294,6 @@ def _resource_records(result: object) -> tuple[tuple[str, tuple[Mapping[str, obj
         ("plugins", tuple(selected_records)),
         ("base_lib", tuple({**record, "_health_status": _resource_health_status(result, ("base_lib",), (record,))}
                            for record in base_records)),
-        ("capabilities", _mapping_records(capabilities)),
     )
 
 

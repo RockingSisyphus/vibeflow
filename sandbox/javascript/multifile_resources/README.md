@@ -1,19 +1,14 @@
-# javascript 多文件资源使用案例
+<!-- vibeflow-directory-purpose -->
+# javascript / 多文件资源
 
-项目通过公开 SDK 声明 Node、BaseLib、Plugin 与显式 Capability，真实数值结果为 6。Architecture JSONC 是登记的展示配置；运行产物写入仓库外。
+Library、Plugin、Node 的声明与实现分别位于真实文件。测试修改 helper 后正常重新构建，再恢复输入，检查输出 6→8→6；字面路径按实际语言构建。
+
+本目录保存真实使用工程、配置与独立预期；驱动和断言按功能统一在 tests/e2e，不保留单独总包或探针。测试复制输入至仓库外工作区后进行修改、构建和运行。
+
+功能域回归入口：
 
 ```bash
-PYTHONPATH=src python -m vibeflow validate --workspace sandbox/javascript/multifile_resources/vibeflow_config.jsonc --config sandbox/javascript/multifile_resources/project/configs/workflow.jsonc --json
+python tools/run_tests.py -- tests/e2e/test_resources.py
 ```
 
-接入说明见 [用户手册](../../../distribution/docs/user/multifile-resources.md)。修改、真实图形与生命周期的系统回归由 tests/tooling/test_resource_preparation.py、test_shared_resource_execution.py 和 test_local_preview.py 执行。
-
-## 目录用途与边界
-
-仅用于：javascript / multifile_resources 案例，验证Node / BaseLib / Plugin 多文件资源归属与审查；保留真实项目输入与 runner。
-
-- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
-- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
-- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
-
-完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。
+完整验收及其他平台场景见[测试覆盖](../../TEST_COVERAGE.md)和[开发与验证](../../../docs/maintainers/development.md)。新增目录同步说明职责；运行日志、依赖和构建产物不写入本目录。

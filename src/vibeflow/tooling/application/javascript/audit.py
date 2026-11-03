@@ -445,26 +445,6 @@ def _validate_graph_tree(
                     f"unknown required base_lib '{base_lib_id}'",
                     call_path,
                 )
-        for requirement in descriptor.capabilities:
-            capability = catalogs.capabilities.get(requirement.id)
-            if capability is None:
-                raise ProjectBuildError(
-                    "VF_AOT_CAPABILITY_UNKNOWN",
-                    f"node '{node.definition_id}' requires unknown capability '{requirement.id}'",
-                    call_path,
-                )
-            unknown = sorted(
-                set(requirement.operations) - set(capability.operations)
-            )
-            if unknown:
-                raise ProjectBuildError(
-                    "VF_AOT_CAPABILITY_OPERATION",
-                    (
-                        f"node '{node.definition_id}' requires unknown operations "
-                        f"on capability '{requirement.id}': {unknown}"
-                    ),
-                    call_path,
-                )
     used_types = {item.type for item in graph.inputs}
     used_types.update(item.type for item in graph.outputs)
     for node in graph.nodes:
@@ -478,14 +458,12 @@ def _validate_entry_completion(plan, *, catalogs, plugin_ids):
     if plan.entry_mode != "sync":
         return
     from vibeflow.core.workflows.coordination import synchronous_violation
-    capabilities = catalogs.capabilities.descriptors()
     for block in plan.blocks:
         for call in block.nodes:
             descriptor = catalogs.nodes.get(call.definition_id)
             if call.status == STATUS_PLANNED or descriptor is None:
                 continue
-            problem = synchronous_violation(call.completion,
-                capabilities=descriptor.capabilities, descriptors=capabilities)
+            problem = synchronous_violation(call.completion)
             if problem:
                 path = (*block.path, call.id)
                 raise ProjectBuildError("VF_ENTRY_MODE_SUSPEND_IN_SYNC",

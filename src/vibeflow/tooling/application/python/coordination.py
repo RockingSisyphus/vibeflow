@@ -21,7 +21,7 @@ async def run_python(args):
     async def execute(client):
         options = dict(initial={**initial, **client.inputs},
             entry=client.entry if client.entry is not None else args.entry,
-            capabilities={"vibeflow.workflow": client.operations()}, run_root=args.run_root, signal=signal)
+            workflow_session=client.session(), run_root=args.run_root, signal=signal)
         options["workflow_instance_id"] = client.id
         if bundle is not None:
             result = await bundle.run_async(**options) if bundle.workflow.entry_mode == 'async' else bundle.run(**options)

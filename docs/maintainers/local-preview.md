@@ -8,7 +8,7 @@
 - Python 资源选择在检查边界保存为不可变事实；后续配置被修改或移除，不改变本次导出。原有 compiled_graph.json 序列化收拢到不依赖 Mermaid 的 compiled_document，消费者直接从 compiled_document 导入。
 - 准备阶段同时记录是否具有配置来源；纯内存构图保持原有正文边界，已经准备好的真实项目则不因配置后来被移除而丢失资源实现事实。
 - 独立 `tooling/architecture` 统一公共 workflow/Nodeset 组装、项目索引、实现关系、JSONC 文档及检查。Target 适配器只提供声明、来源和已准备图访问；`node_presentation` 保留有效样式规则。有效连边来自编译结果，网页不推导执行顺序。
-- `preview/exporter` 只写 version 4 数据：workflow 身份、Architecture 正文、关联、视图。没有重复 body facts、图元、96 方向边界或 Mermaid DOM ID。
+- `preview/exporter` 只写 version 5 数据：workflow 身份、Architecture 正文、关联、视图。没有重复 body facts、图元、96 方向边界或 Mermaid DOM ID。
 - `preview/catalog` 负责记录和追加索引，同 ID 通过 revision 合并；重建在扫描前切换索引，避免旧状态覆盖新终态，不设置全局 workflow 锁。
 - `presentation/viewer` 只安装独立工具。命令适配器分别发布数据和安装页面；数据写入器不导入网页安装器或 Mermaid。
 - 运行观察器公开只读 result，Tooling 在观察器退出后登记终态。保留嵌套 CLI/checked 调用的去重上下文，不再另行根据返回码维护预览终态。非零 CLI 返回码由原观察器记录失败。

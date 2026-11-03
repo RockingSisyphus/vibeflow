@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "ci/**"]
   pull_request:
 
 permissions:
@@ -26,10 +26,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
-          cache-dependency-path: |
-            tests/browser-runtime/package-lock.json
-            sandbox/javascript/minimal/project/package-lock.json
-            sandbox/javascript/integration/project/package-lock.json
+          cache-dependency-path: tests/e2e/runtime/package-lock.json
       - name: Install test environment
         run: |
           python - <<'PY'
@@ -39,7 +36,7 @@ jobs:
           import tomllib
 
           dependencies = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]["optional-dependencies"]["test"]
-          subprocess.check_call([sys.executable, "-m", "pip", "install", "build", *dependencies])
+          subprocess.check_call([sys.executable, "-m", "pip", "install", *dependencies])
           PY
       - name: Run full project verification (isolated pytest)
         env:
@@ -57,6 +54,7 @@ jobs:
           path: |
             ${{ runner.temp }}/verification.log
             ${{ runner.temp }}/verification/*.json
+            ${{ runner.temp }}/verification/acceptance.xml
           if-no-files-found: ignore
 
   workflow-host-windows:
@@ -82,12 +80,14 @@ jobs:
           TMP: ${{ runner.temp }}
           TEMP: ${{ runner.temp }}
         run: |
-          python tools/run_tests.py --workers 4 --scratch "$env:RUNNER_TEMP/workflow-hosts" -- tests/coordination tests/targets/python/test_workflow_entries.py tests/targets/javascript/test_workflow_entries.py tests/targets/javascript/test_sdk_identity.py tests/integration/test_text_encoding.py 2>&1 | Tee-Object "$env:RUNNER_TEMP/workflow-hosts.log"
+          python tools/run_tests.py --workers 4 --scratch "$env:RUNNER_TEMP/workflow-hosts" -- tests/e2e/test_cooperation_protocol.py tests/e2e/test_session_behaviors.py tests/e2e/test_cooperation_hosts.py tests/e2e/test_cooperation_http.py tests/e2e/test_cooperation.py tests/e2e/test_entries.py tests/e2e/test_encoding.py tests/e2e/test_sdk_configuration.py tests/e2e/test_javascript.py tests/e2e/test_resources.py --junitxml "$env:RUNNER_TEMP/workflow-hosts.xml" 2>&1 | Tee-Object "$env:RUNNER_TEMP/workflow-hosts.log"
           exit $LASTEXITCODE
       - name: Preserve workflow host results
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: workflow-hosts-windows
-          path: ${{ runner.temp }}/workflow-hosts.log
+          path: |
+            ${{ runner.temp }}/workflow-hosts.log
+            ${{ runner.temp }}/workflow-hosts.xml
           if-no-files-found: ignore

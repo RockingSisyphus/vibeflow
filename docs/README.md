@@ -43,12 +43,15 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - [JS/TS 检查会话与释放](maintainers/javascript-check-sessions.md)
 - [发行与文档装配](maintainers/release.md)
 - [1.4.5 本地验证记录](maintainers/release-1.4.5-validation.md)
+- [1.5.0 本地验收记录](maintainers/release-1.5.0-validation.md)
 - [目录职责与产物约定](maintainers/directory-layout.md)
 
 
 ## 文档维护
 
-当前规范在上面的设计与维护手册中定义；退役计划、报告和代码直接删除，历史溯源使用 Git。唯一归档例外是带版本标识的压缩分发包。
+当前规范在上面的设计与维护手册中定义；退役计划、报告和代码直接删除，历史溯源使用 Git。带版本标识的压缩分发包可以归档；明确要求彻底退役的实现及说明也从旧分发包中清除。
 
 - [路线与目标决定](goal-decisions.md)
 - [目录职责与产物约定](maintainers/directory-layout.md)
+
+测试入口与维护边界见[开发与验证](maintainers/development.md)，功能域判据见[测试覆盖](../sandbox/TEST_COVERAGE.md)。

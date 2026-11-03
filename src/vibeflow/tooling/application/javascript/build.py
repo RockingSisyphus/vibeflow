@@ -19,7 +19,7 @@ from vibeflow.targets.javascript.build.project_paths import (
     javascript_options as _javascript_options,
     safe_project_path as _safe_project_path,
 )
-from vibeflow.targets.javascript.build.project_resources import bind_base_libs as _bind_base_libs, source_import_facts, required_capabilities as _required_capabilities, schemas_for_types as _schemas_for_types, used_schema_types as _used_schema_types
+from vibeflow.targets.javascript.build.project_resources import bind_base_libs as _bind_base_libs, source_import_facts, schemas_for_types as _schemas_for_types, used_schema_types as _used_schema_types
 from vibeflow.core import (
     CompiledGraph,
     CoreCompileRequest,
@@ -105,7 +105,6 @@ class PreparedProjectBuild:
     external_packages: tuple[str, ...]
     used_node_ids: tuple[str, ...]
     used_base_libs: tuple[str, ...]
-    used_capabilities: tuple[str, ...]
 
 
 
@@ -351,13 +350,8 @@ def prepare_project_build(
         target=request.target,
         project_root=root.path,
     )
-    capabilities = _required_capabilities(
-        state.used_nodes,
-        catalogs=catalogs,
-        target=request.target,
-    )
     schema_types = set(state.used_types)
-    schema_types.update(_used_schema_types(graph, state.used_nodes, capabilities))
+    schema_types.update(_used_schema_types(graph, state.used_nodes))
     schemas = _schemas_for_types(schema_types, catalogs=catalogs)
     plan = compile_graph_plan(
         graph,
@@ -370,11 +364,8 @@ def prepare_project_build(
         target_features=target_features,
     )
 
-    from vibeflow.targets.shared.rule_support.capability_policy import policies_from_executions
-    from vibeflow.block_compiler.policies import apply_call_policies
-    paths = [(*block.path, call.id) for block in plan.blocks for call in block.nodes]
-    plan = apply_call_policies(plan, policies_from_executions(
-        (execution for values in rule_report.results.values() for execution in values), paths))
+    from vibeflow.block_compiler.operations import apply_workflow_operations
+    plan = apply_workflow_operations(plan, graph, catalogs.nodes.get)
 
 
 
@@ -396,13 +387,6 @@ def prepare_project_build(
             key: tuple(descriptor.base_libs)
             for key, descriptor in state.used_nodes.items()
         },
-        capabilities_by_definition={
-            key: tuple(
-                requirement.to_dict()
-                for requirement in descriptor.capabilities
-            )
-            for key, descriptor in state.used_nodes.items()
-        },
         schemas=schemas,
         base_libs={
             descriptor.id: {
@@ -415,17 +399,6 @@ def prepare_project_build(
                 ),
             }
             for descriptor in base_lib_order
-        },
-        capabilities={
-            capability.id: {
-                "operations": {
-                    name: operation.to_dict()
-                    for name, operation in sorted(
-                        capability.operations.items()
-                    )
-                }
-            }
-            for capability in capabilities
         },
 
         runtime_plugins=plugin_plan.runtime_plugins,
@@ -447,7 +420,6 @@ def prepare_project_build(
         external_packages=project_external,
         used_node_ids=tuple(sorted(state.used_nodes)),
         used_base_libs=tuple(item.id for item in base_lib_order),
-        used_capabilities=tuple(item.id for item in capabilities),
 
 
 

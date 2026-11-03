@@ -164,6 +164,7 @@ class NodeCallSpec:
     status: str = STATUS_IMPLEMENTED
     flow_kind: str = ""
     planned_behavior: PlannedBehavior = field(default_factory=blocking_planned_behavior)
+    workflow_operations: tuple = ()
     execution_lock: ExecutionLockSpec | None = None
     rulesets: tuple | None = None
 
@@ -171,6 +172,8 @@ class NodeCallSpec:
     def __post_init__(self) -> None:
         from vibeflow.core.rules.selection.models import selection_refs
         from vibeflow.core.config.concurrency import dispatch_limit
+        from vibeflow.core.workflows.operations import normalize_operations
+        object.__setattr__(self, "workflow_operations", normalize_operations(self.workflow_operations))
         dispatch_limit(self.params)
         object.__setattr__(self, "rulesets", selection_refs(self.rulesets, optional=True))
         if self.execution_lock is not None and not isinstance(

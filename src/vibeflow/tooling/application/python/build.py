@@ -172,7 +172,6 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
             source_import_roots={relative(root):[relative(path) for path in namespace.roots]
                                  for root,namespace in registry.source_namespaces.items()},
             nodes=nodes,plugins=plugins,blocks=blocks,
-            capabilities=[item.to_dict() for item in registry.prepared_resources.catalogs.capabilities.descriptors()],
             config_path=relative(config),runtime_options=asdict(options),health=health.to_dict())
         from vibeflow.tooling.application.python.build_files import python_bundle_files, copy_python_framework
         files = python_bundle_files(workspace, environment.registry, config, inputs,

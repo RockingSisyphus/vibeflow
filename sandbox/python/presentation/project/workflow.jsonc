@@ -1,0 +1,97 @@
+{
+  "plugins": [
+    {
+      "id": "layout.resources",
+      "source": {
+        "kind": "file",
+        "ref": "plugins/layout/plugin.py"
+      }
+    }
+  ],
+  "base_lib": {
+    "modules": [
+      "layout.helper"
+    ]
+  },
+  "rulesets": [
+    "vibeflow.workflow"
+  ],
+  "nodeset_imports": [
+    {
+      "path": "leaf_a.jsonc"
+    },
+    {
+      "path": "leaf_b.jsonc"
+    },
+    {
+      "path": "outer.jsonc"
+    }
+  ],
+  "pipeline": {
+    "nodes": [
+      {
+        "id": "start",
+        "definition_id": "layout.start",
+        "display_name": "start",
+        "description": "Layout fixture start"
+      },
+      {
+        "id": "outer_a",
+        "definition_id": "layout.outer",
+        "display_name": "outer_a",
+        "description": "Layout fixture outer_a"
+      },
+      {
+        "id": "outer_b",
+        "definition_id": "layout.outer",
+        "display_name": "outer_b",
+        "description": "Layout fixture outer_b",
+        "style": {
+          "fill": "#efe0f8"
+        }
+      },
+      {
+        "id": "loop",
+        "definition_id": "vibeflow.loop.while",
+        "display_name": "loop",
+        "description": "Layout fixture loop",
+        "requires": [],
+        "provides": [],
+        "loop": {
+          "body": "layout.outer",
+          "max_iterations": 1,
+          "stop_after": 1
+        }
+      },
+      {
+        "id": "end",
+        "definition_id": "layout.end",
+        "display_name": "end",
+        "description": "Layout fixture end",
+        "similar_to": {
+          "node": "start",
+          "relationship": "copy",
+          "reason": "Empty start and end boundary outputs."
+        }
+      }
+    ],
+    "edges": [
+      [
+        "start",
+        "outer_a"
+      ],
+      [
+        "outer_a",
+        "outer_b"
+      ],
+      [
+        "outer_b",
+        "loop"
+      ],
+      [
+        "loop",
+        "end"
+      ]
+    ]
+  }
+}

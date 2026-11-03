@@ -1,5 +1,5 @@
-export const VIBEFLOW_WORKFLOW_ABI = "vibeflow.workflow.v11";
-export const VIBEFLOW_PLUGIN_ABI = "vibeflow.plugin.v4";
+export const VIBEFLOW_WORKFLOW_ABI = "vibeflow.workflow.v12";
+export const VIBEFLOW_PLUGIN_ABI = "vibeflow.plugin.v5";
 
 export class VibeFlowWorkflowError extends Error {
   constructor(code, message, details = {}) {
@@ -237,7 +237,7 @@ function normalizeOptions(workflow, options) {
     statusStopping: raw.__vfStatusStopping,
     statusUpdate: raw.__vfStatusUpdate,
     kernelLog: raw.__vfKernelLog,
-    capabilities: raw.capabilities ?? {},
+    workflowSession: raw.workflowSession,
     workflowInstanceId: raw.workflowInstanceId,
   };
 }
@@ -431,30 +431,9 @@ function deliverStatic(envelopes, state, targetId, acceptedTypes) {
 }
 
 function nodeContext(node, state, execution) {
-  const allowed = dictionary();
-  for (const requirement of node.capabilities || []) {
-    const capability = state.root.capabilities[requirement.id];
-    if (!capability) continue;
-    const contextual = dictionary();
-    const requested = new Set(requirement.operations || []);
-    for (const [operationName, operation] of Object.entries(capability)) {
-      if (requested.size && !requested.has(operationName)) continue;
-      const grants = node.capability_policy?.capabilities;
-      if (grants && Object.hasOwn(grants, requirement.id) && !grants[requirement.id].includes(operationName)) continue;
-      setOwn(contextual, operationName, (input) => {
-        if (execution && !execution.active) throw vfError("VF_NODE_CONTEXT_EXITED", "Node invocation has exited", state.workflow);
-        return operation(input, {
-        nodePath: nodePath(state, node.id),
-        blockPath: formatBlockPath(state.path), signal: execution?.signal || state.root.signal, execution,
-      });
-      });
-    }
-    setOwn(allowed, requirement.id, Object.freeze(contextual));
-  }
   return Object.freeze({
     signal: execution?.signal || state.root.signal,
-    workflow: state.root.identity,
-    capabilities: Object.freeze(allowed),
+    workflow: nodeWorkflow(state, node, execution),
     updateInfo(info) { state.root.statusUpdate?.(info); },
     trace(kind, details = {}) {
       emitTrace(state.root, "node_trace", {

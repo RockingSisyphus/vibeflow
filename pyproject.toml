@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "vibeflow"
-version = "1.4.5"
+version = "1.5.1"
 description = "Language-neutral workflow architecture, validation, and multi-target compilation"
 requires-python = ">=3.11"
 license = "AGPL-3.0-only"
@@ -12,7 +12,7 @@ license-files = ["LICENSE"]
 dependencies = []
 
 [project.optional-dependencies]
-test = ["pytest>=8,<10", "pytest-xdist>=3.8,<4", "PyYAML>=6,<7", "requests>=2.32,<3"]
+test = ["pytest>=8,<10", "pytest-xdist>=3.8,<4", "build>=1.2,<2", "setuptools>=77", "wheel>=0.43", "PyYAML>=6,<7"]
 
 [project.scripts]
 vibeflow = "vibeflow.tooling.application.cli:main"
@@ -29,9 +29,10 @@ vibeflow = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests/e2e"]
 pythonpath = ["src"]
-python_files = ["test_*.py", "strict_*.py", "vibeflow_strict.py"]
+python_files = ["test_*.py"]
+markers = ["delivery: real package builds, installations and extracted distributions"]
 
 [tool.setuptools.cmdclass]
 build_py = "vibeflow_build.ViewerBuild"

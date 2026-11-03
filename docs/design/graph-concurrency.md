@@ -6,7 +6,7 @@
 
 NodeCallSpec 只描述正常调用；Nodeset 和 Loop 继续复用普通子图。断路检查沿正常调度边反向分析结束可达性，所有 worker 都参加检查。分支的首个必经合流点必须是多前驱 all 汇合节点；绕过收集器的出口、先隐式合流再放单输入标记都不构成有效收集。多前驱 all 节点继续分发多路时，由两 Target 共用的 join 检查产生错误级 `GRAPH.JOIN.FORK_CONFLICT`，阻止验证和构建；不再保留 mainline review 中仅作警告的重复路径。
 
-Workflow ABI v11 的 Block 种类限定为 workflow、nodeset、loop。解码器拒绝旧 ABI 和已删除字段，调用方必须重建产物。Core 和 Block Compiler 保存纯数据，不持有线程、Promise 或语言 callable。
+Workflow ABI v12 的 Block 种类限定为 workflow、nodeset、loop。解码器拒绝旧 ABI 和已删除字段，调用方必须重建产物。Core 和 Block Compiler 保存纯数据，不持有线程、Promise 或语言 callable。
 
 ## Target 调度
 
@@ -36,6 +36,6 @@ Trace 的事件、计数和子图摘要在共用锁内更新；协调器维护�
 
 ## 维护验证
 
-Config 解析、schema、调用配置覆写、便携计划及两 Target 的源码/AOT 必须保留相同额度。`max_concurrency` 是调度字段，不进入业务参数，不从父级 global_config 继承；同额度的不同分发也不能合并计数。相关回归位于 `tests/core/test_dispatch_config.py`、`tests/conformance/test_dispatch_concurrency.py` 与 `test_dispatch_shared_target.py`。
+Config 解析、schema、调用配置覆写、便携计划及两 Target 的源码/AOT 必须保留相同额度。`max_concurrency` 是调度字段，不进入业务参数，不从父级 global_config 继承；同额度的不同分发也不能合并计数。相关回归位于 `tests/e2e/test_concurrency.py` 与 `test_sdk_configuration.py`。
 
 发布前执行两个 [graph_concurrency 沙箱](../../sandbox/README.md)：非法图必须在公开 CLI 返回错误并停止构建，不能仅检查内部 finding 是否存在；正常案例必须检查真实启动、清理、补位与收集次序，不能仅依赖最终输出。两 Target 的集成入口自动包含这些沙箱，JavaScript 同时运行 Node 和 Chromium。发行身份与构建流程见[发行装配](../maintainers/release.md)。

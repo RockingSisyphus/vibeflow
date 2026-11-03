@@ -10,7 +10,7 @@ from vibeflow.core.rules.selection import selection_data
 from vibeflow.core.workflows.references import node_workflow_actions, workflow_node_params
 from vibeflow.core.graph_calls import graph_call_subjects
 from vibeflow.tooling.presentation.node_presentation import resolve_presentation
-from .entries import entry_facts, policy_facts
+from .entries import entry_facts, workflow_operation_facts
 
 
 @dataclass(frozen=True)
@@ -24,7 +24,6 @@ class ArchitectureInputs:
     node_types: Mapping
     resources: Mapping
     global_config: Mapping = field(default_factory=dict)
-    policies: Mapping = field(default_factory=dict)
     health_classes: Mapping = field(default_factory=dict)
     extras: Mapping = field(default_factory=dict)
     effective_params: Mapping = field(default_factory=dict)
@@ -127,25 +126,22 @@ def build_workflow_architecture(inputs):
             "rulesets": selection_data(definition.graph.rulesets), "reachable_from_workflow": key in reachable,
             "requires": requirements_to_dicts(definition.requires), "provides": providers_to_dicts(definition.provides),
             "global_config": configuration(definition.global_config, source), "body": child}
-    policies = {path: plain(policy) for path, policy in inputs.policies.items()}
+    from vibeflow.core.workflows.operations import operation_facts
+    operations = operation_facts(graph, inputs.descriptor, global_config=inputs.global_config)
     effective_params = {(*subject.call_path, node.id): workflow_node_params(node, inputs.descriptor(node.definition_id), subject)
         for subject in graph_call_subjects(graph, global_config=inputs.global_config, include_planned=True, include_planned_calls=True) for node in subject.graph.nodes}
     effective_params.update(inputs.effective_params)
     def annotate(body, prefix=(), active=(), inherited_planned=False):
         for row in body["nodes"]:
             path = (*prefix, row["id"])
-            policy = policies.setdefault(path, {"actions": []})
-            declared = inputs.descriptor(row["definition_id"])
-            actions = policy.get("actions", ())
+            facts = operations.setdefault(path, {"actions": []})
+            actions = facts.get("actions", ())
             planned = inherited_planned or row["status"] == STATUS_PLANNED or (row.get("invokes") or {}).get("target_status") == STATUS_PLANNED
-            if planned and not actions:
-                # Planned calls have no executed Rule records. Their declared
-                # operations still describe review intent without executing Rules.
-                actions = [{"capability":req.id,"operation":operation,"planned":True}
-                    for req in getattr(declared, "capabilities", ()) if req.id == "vibeflow.workflow" for operation in req.operations]
+            if planned:
+                actions = [{**action, "planned": True} for action in actions]
             actions = node_workflow_actions(actions, effective_params.get(path, row["config"]["call"]["values"]), root=graph.root_id)
-            policy["actions"] = actions
-            # Call-path-specific operations also remain in call_policies for reused Nodesets.
+            facts["actions"] = actions
+            # Call-path-specific operations also remain in workflow_operations for reused Nodesets.
             if not prefix: row["operations"] = actions
             target = (row.get("invokes") or {}).get("target")
             if target in definitions and target not in active and definitions[target]["body"]:
@@ -153,4 +149,4 @@ def build_workflow_architecture(inputs):
     annotate(workflow)
     return {"project_target": inputs.target, "workflow": workflow, "nodeset_types": definitions,
         "node_definitions": plain(inputs.node_definitions), "node_types": plain(inputs.node_types),
-        "resources": plain(inputs.resources), "call_policies": policy_facts(policies), **plain(inputs.extras)}
+        "resources": plain(inputs.resources), "workflow_operations": workflow_operation_facts(operations), **plain(inputs.extras)}
