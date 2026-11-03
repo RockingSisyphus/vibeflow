@@ -46,6 +46,20 @@ python tools/verify_project.py --full --workers 4
 
 新增质量对照验证了文件/函数阈值、依赖链和环、重复建议、SDK 声明归属、Node/Library 大小和复杂度，以及调用链的允许/warning/error/恢复。补测发现并修正 JS SDK `run` 缩写、显式属性与方法绑定的质量入口解析，避免遗漏实际调用链；Python 源码投影同时修正嵌套函数被移到外层导致的词法作用域误报。两处均通过正常工程和命令验证。
 
+### CI 二次复查
+
+首轮实际 GitHub Actions 使用独立分支 `ci/e2e-review-20261103`，源码快照 `a8b696119ebd589d52a0f8edf5d9fa0cdfda8e47`；[运行记录](https://github.com/RockingSisyphus/vibeflow/actions/runs/41569848465)。未合并 main，也未构建或发布正式发行物。
+
+| 平台 | 首轮实际结果 | 根因与处理 |
+| --- | --- | --- |
+| Linux / Python 3.11 / Node 22 | 666 passed、2 errors，另 2 subtests passed；540.05 秒 | 文档链接指向 Git 忽略的本机旧 ZIP，干净检出质量检查失败并阻止两个 profile 构建；改为明确的本机产物记录，保留校验值 |
+| Linux / Python 3.11 / Node 24 | 666 passed、2 errors，另 2 subtests passed；540.49 秒 | 同上；未上传历史产物或绕过质量检查 |
+| Windows / Python 3.11 / Node 24 | 113 passed、6 failed、10 errors；258.69 秒 | JSON 路径断言未解码反斜杠；独立构建驱动遗漏子进程输出编码。改为解析后的路径比较，并复用共享 CLI 驱动 |
+
+批次结束后集中修复。三个相关测试文件的 53 项定向验证通过，父环境设为 cp1252；它用于复现驱动编码问题，不替代真实 Windows 验收。仅导出已入快照的源码、不带本机 ZIP，仓库 all 检查为零错误，四项 wheel/sdist/两 profile 交付测试通过（71.79 秒）。
+
+二次代码审查另发现测试入口会将 `-k tools` 等选项值误当作现有目录改写。现在交由 pytest 解析，仅固定已解析的测试目标；通过真实测试入口，验证串行与并行选择结果，以及测试模块导入和执行时的隔离目录。浏览器依赖链的 [Zod 已知问题](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)随 Puppeteer 正常升级至 25.16.0 解决，不添加依赖覆盖；锁文件安装审计为零已知漏洞；升级后八项真实浏览器交互测试通过（16.25 秒）。修复后的完整 CI 尚待验收。
+
 ### 样板与成本观察
 
 以下为完整批次后、依赖已经准备好的单次串行样板，单位秒。基础准备是复制示例或写入基础 SDK 声明；命令时长包含各自正常进程启动、加载与检查开销，未拆分内部解析或编译阶段。
@@ -62,6 +76,6 @@ python tools/verify_project.py --full --workers 4
 
 ### 尚未验证的边界
 
-Linux Node 22、Windows Node 24 的 CI 配置已迁移，但本轮没有运行这些平台；本机完整入口通过不等于 CI 全平台通过。没有在原生 GBK 默认环境进行验收，也不把 UTF-8 mode 切换当作这种证明。Python 的 JSON Schema 输入值域校验按现有能力验证，未扩展为 JS 的同等能力。
+Linux Node 22/24、Windows Node 24 已实际执行首轮 CI；修复后的完整 CI 尚待通过，本机完整入口通过不等于 CI 全平台通过。没有在原生 GBK 默认环境进行验收，也不把 UTF-8 mode 切换当作这种证明。Python 的 JSON Schema 输入值域校验按现有能力验证，未扩展为 JS 的同等能力。
 
 内部缓存、AST/框架对象身份、内部调用次数和强行插入的布局竞态不属于本体系的通过结论；依赖方向继续由静态检查与代码审查负责。测试数量和文件数量不能代替功能域判据。临时运行数据在记录上述结论后清理；后续 CI 保留正常 verification.json 与 acceptance.xml。

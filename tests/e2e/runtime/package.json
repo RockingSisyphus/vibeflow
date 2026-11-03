@@ -4,7 +4,7 @@
   "private": true,
   "dependencies": {
     "esbuild": "0.28.1",
-    "typescript": "7.0.2",
-    "puppeteer": "25.2.1"
+    "puppeteer": "25.16.0",
+    "typescript": "7.0.2"
   }
 }
