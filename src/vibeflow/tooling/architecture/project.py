@@ -4,6 +4,7 @@ from os.path import relpath
 from vibeflow.core.rules.models import plain
 from vibeflow.core.project_layout import DIRECTORY_PURPOSES
 from vibeflow.core.graph_calls import graph_call_subjects
+from vibeflow.core.flow import STATUS_PLANNED
 from vibeflow.core.workflows.references import node_workflow_actions, action_references, workflow_node_params
 from .documents import render_architecture_payload
 from vibeflow.tooling.file_io import atomic_write
@@ -59,19 +60,30 @@ def project_architecture(inventory, *, resources=(), directory_purposes=(), work
                 item["error"] = errors[path].message
             prepared = (workflows or {}).get(path.resolve())
             if prepared:
-                for subject in graph_call_subjects(prepared.graph, global_config=data.get("global_config", {})):
+                planned_paths = set()
+                for subject in graph_call_subjects(prepared.graph, global_config=data.get("global_config", {}),
+                        include_planned=True, include_planned_calls=True):
+                    inherited_planned = (getattr(subject.definition, "status", None) == STATUS_PLANNED or
+                        any(subject.call_path[:size] in planned_paths for size in range(1, len(subject.call_path) + 1)))
                     for node in subject.graph.nodes:
+                        call_path = (*subject.call_path, node.id)
+                        planned = inherited_planned or node.status == STATUS_PLANNED
+                        if planned:
+                            planned_paths.add(call_path)
                         descriptor = prepared.catalogs.nodes.get(node.definition_id)
-                        ops = [operation for req in getattr(descriptor, "capabilities", ()) if req.id == "vibeflow.workflow" for operation in req.operations]
+                        ops = [dict(item) for item in getattr(descriptor, "workflow_operations", node.workflow_operations)]
                         if not ops:
                             continue
+                        if planned:
+                            ops = [{**operation, "planned": True} for operation in ops]
                         try:
                             params = workflow_node_params(node, descriptor, subject)
-                            actions = node_workflow_actions([{"capability":"vibeflow.workflow", "operation":op} for op in ops], params, root=root.id)
+                            actions = node_workflow_actions(ops, params, root=root.id)
                             for action in actions:
                                 for ref in action_references(action):
                                     item["relations"].append({"call_path": list((*subject.call_path, node.id)), "operation":action["operation"],
-                                        "workflow":ref, "expected":action["operation"] in {"send", "receive"}})
+                                        "workflow":ref, "expected":action["operation"] in {"send", "receive"},
+                                        **({"planned": True} if planned else {})})
                         except ValueError as error:
                             item.setdefault("diagnostics", []).append({"call_path":list((*subject.call_path,node.id)), "message":str(error)})
             rows.append(item)

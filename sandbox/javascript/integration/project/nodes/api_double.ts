@@ -6,21 +6,15 @@ interface Inputs {
   readonly "sandbox.number": Envelope<number>;
 }
 
-interface Context {
-  readonly capabilities: {
-    readonly "sandbox.math_session": {
-      readonly double: (input: number) => number;
-    };
-  };
-}
+
 
 export function run(
   inputs: Inputs,
   _params: Readonly<Record<string, unknown>>,
-  context: Context,
+  context: any,
 ): { readonly result: number } {
   return {
-    result: context.capabilities["sandbox.math_session"].double(
+    result: (inputs as any)["app.session"].value.math_session.double(
       inputs["sandbox.number"].value,
     ),
   };

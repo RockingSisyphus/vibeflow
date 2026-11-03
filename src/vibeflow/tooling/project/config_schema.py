@@ -62,7 +62,7 @@ def collect_config_schema_findings(config: Mapping[str, Any]) -> tuple[HealthFin
         _validate_plugins(config["plugins"], findings)
     if "host_extensions" in config:
         findings.append(_error("CONFIG.HOST_EXTENSION.RETIRED",
-            "Host Extension is retired; express initialization, receive and close as workflow Nodes using Capabilities",
+            "Host Extension is retired; express initialization, receive and close as workflow Nodes",
             "host_extensions"))
     if "policy" in config:
         findings.append(_error("CONFIG.POLICY.RETIRED", "policy is retired; configure Rule parameters in root_rules.jsonc or project_rules.jsonc", "policy"))

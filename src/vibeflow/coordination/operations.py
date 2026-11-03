@@ -33,12 +33,54 @@ def immediate_dispatch():
     return dispatch
 
 
-class Operation:
-    def __init__(self, callback, signal=None):
-        self.callback, self.signal = callback, signal
 
-    def with_signal(self, signal):
-        return type(self)(self.callback, signal)
+class CoordinatorSession:
+    """One caller's direct access to the in-process coordinator."""
+    def __init__(self, scope, identifier):
+        self.scope, self.identifier = scope, identifier
+        self.dispatch = immediate_dispatch()
 
-    def __call__(self, request=None):
-        return self.callback(request or {}, self.signal)
+    def invoke_sync(self, request, *, signal=None):
+        return self.scope.invoke_sync(request, sender=self.identifier, _dispatch=self.dispatch)
+
+    def send(self, request, *, signal=None):
+        return self.dispatch(lambda: self.scope.send(self.identifier, request['id'],
+            request.get('payload'), request.get('port', 'default')))
+
+    async def call(self, request, *, signal=None):
+        return await self.scope.call(self.identifier, request, signal=signal)
+
+    async def wait(self, request, *, signal=None):
+        return await self.scope.wait_for('wait', request['id'], timeout=request.get('timeout'), signal=signal)
+
+    async def receive(self, request, *, signal=None):
+        return await self.scope.wait_for('receive', self.identifier,
+            port=request.get('port', 'default'), timeout=request.get('timeout'), signal=signal)
+
+    async def kill(self, request, *, signal=None):
+        reference = self.scope._reference(request['workflow'], self.identifier)
+        self.scope.request_stop(self.scope._instance(request['id']), reference)
+        return await self.wait(request, signal=signal)
+
+
+class HttpSession:
+    """One caller's direct access to the local HTTP workflow protocol."""
+    def __init__(self, client):
+        self.client = client
+        self.dispatch = immediate_dispatch()
+
+    def send(self, request, *, signal=None):
+        return self.dispatch(lambda: self.client.send(request['id'], request.get('port', 'default'), request.get('payload')))
+
+    async def call(self, request, *, signal=None):
+        return await self.client.call(request['workflow'], launch=request['launch'],
+            inputs=request.get('inputs'), timeout=request.get('timeout'), signal=signal)
+
+    async def wait(self, request, *, signal=None):
+        return await self.client.wait(request['id'], timeout=request.get('timeout'), signal=signal)
+
+    async def receive(self, request, *, signal=None):
+        return await self.client.receive(request.get('port', 'default'), timeout=request.get('timeout'), signal=signal)
+
+    async def kill(self, request, *, signal=None):
+        return await self.client.kill(request['id'], workflow=request['workflow'], timeout=request.get('timeout'), signal=signal)

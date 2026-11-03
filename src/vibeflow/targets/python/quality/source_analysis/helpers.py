@@ -25,10 +25,6 @@ def _root_name(node: ast.AST) -> str:
 
 
 
-def _module_matches(module: str, patterns: tuple[str, ...]) -> bool:
-    return any(module == pattern or module.startswith(f"{pattern}.") for pattern in patterns)
-
-
 def _fingerprint_function(node: ast.FunctionDef) -> str:
     node = _FingerprintNormalizer().visit(deepcopy(node))  # type: ignore[assignment]
     ast.fix_missing_locations(node)

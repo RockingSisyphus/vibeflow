@@ -12,7 +12,7 @@ from vibeflow.targets.javascript.frontend.schema import (
     validate_javascript_json_value,
     validate_portable_json_schema,
 )
-from vibeflow.targets.javascript.frontend.templates import ABORT_SIGNAL_DECLARATION
+from vibeflow.targets.javascript.frontend.templates import ABORT_SIGNAL_DECLARATION, WORKFLOW_CONTEXT_DECLARATION
 
 
 def validate_schema_subset(
@@ -64,6 +64,7 @@ def node_contract_check(
     module_bindings: dict[str, str] = {}
     lines = [
         ABORT_SIGNAL_DECLARATION.rstrip(),
+        WORKFLOW_CONTEXT_DECLARATION,
         (
             "type Envelope<T> = Readonly<{ key: string; type: string; "
             "value: T; source_node: string }>;"
@@ -71,7 +72,6 @@ def node_contract_check(
     ]
     checks: list[str] = []
     check_index = 0
-    capability_descriptors = _capability_descriptors(workflow)
 
     def visit(plan: EmissionWorkflow) -> None:
         nonlocal check_index
@@ -125,11 +125,7 @@ def node_contract_check(
                     node.params,
                     implementation_metadata,
                 )
-                context_type = _node_context_type(
-                    node,
-                    capability_descriptors=capability_descriptors,
-                    workflow=workflow,
-                )
+                context_type = "WorkflowNodeContext"
                 checks.extend(
                     [
                         (
@@ -162,8 +158,9 @@ def runtime_plugin_contract_check(bindings: object) -> str:
     imports: list[str] = []
     checks: list[str] = [
         ABORT_SIGNAL_DECLARATION.rstrip(),
+        WORKFLOW_CONTEXT_DECLARATION,
         "type Json = null | boolean | number | string | readonly Json[] | { readonly [key: string]: Json };",
-        "type Context = Readonly<{ abiVersion: 'vibeflow.plugin.v4'; pluginId: string; pluginType: 'runtime'; target: 'node' | 'browser'; workflowId: string; config: Readonly<Record<string, Json>>; signal: VibeFlowAbortSignal }> ;",
+        "type Context = Readonly<{ abiVersion: 'vibeflow.plugin.v5'; pluginId: string; pluginType: 'runtime'; target: 'node' | 'browser'; workflowId: string; config: Readonly<Record<string, Json>>; signal: VibeFlowAbortSignal }> ;",
         "type RuntimePlugin = Readonly<Record<string, unknown>>;",
         "type Factory = (context: Context) => RuntimePlugin;",
     ]
@@ -247,90 +244,8 @@ def _json_value_typescript(value: object) -> str:
     return "unknown"
 
 
-def _capability_descriptors(
-    workflow: EmissionWorkflow,
-) -> Mapping[str, Any]:
-    descriptors: dict[str, Any] = {}
-
-    def visit(plan: EmissionWorkflow) -> None:
-        for descriptor in plan.capabilities:
-            descriptors.setdefault(descriptor.id, descriptor)
-        for node in plan.nodes:
-            if node.subplan is not None:
-                visit(node.subplan)
-
-    visit(workflow)
-    return descriptors
 
 
-def _node_context_type(
-    node: Any,
-    *,
-    capability_descriptors: Mapping[str, Any],
-    workflow: EmissionWorkflow,
-) -> str:
-    capability_members: list[str] = []
-    for requirement in sorted(node.capabilities, key=lambda item: item.id):
-        descriptor = capability_descriptors.get(requirement.id)
-        operations = (
-            tuple(sorted(requirement.operations))
-            if requirement.operations
-            else tuple(sorted(descriptor.operations if descriptor else ()))
-        )
-        operation_members: list[str] = []
-        for operation_name in operations:
-            operation = (
-                descriptor.operations.get(operation_name)
-                if descriptor is not None
-                else None
-            )
-            input_schema = (
-                workflow.schemas.get(operation.input_type)
-                if operation is not None and operation.input_type
-                else None
-            )
-            operation_output_schema = (
-                workflow.schemas.get(operation.output_type)
-                if operation is not None and operation.output_type
-                else None
-            )
-            input_type = schema_to_typescript(input_schema)
-            output_type = schema_to_typescript(operation_output_schema)
-            return_type = (
-                f"Promise<{output_type}>"
-                if operation is not None
-                and operation.completion == "suspend"
-                else output_type
-            )
-            operation_members.append(
-                (
-                    f"readonly {json.dumps(operation_name)}: "
-                    f"(input: {input_type}) => "
-                    f"{return_type}"
-                )
-            )
-        capability_members.append(
-            (
-                f"readonly {json.dumps(requirement.id)}: "
-                "{ "
-                + "; ".join(operation_members)
-                + " }"
-            )
-        )
-    capabilities_type = (
-        "{ " + "; ".join(capability_members) + " }"
-        if capability_members
-        else "Readonly<Record<never, never>>"
-    )
-    return (
-        "Readonly<{ "
-        "signal?: VibeFlowAbortSignal; "
-        "workflow: Readonly<{self(): {id: string}}>; "
-        f"capabilities: {capabilities_type}; "
-        "trace(kind: string, details?: Readonly<Record<string, unknown>>): void; "
-        "updateInfo(info: readonly Readonly<Record<string, unknown>>[]): void"
-        " }>"
-    )
 
 
 __all__ = [

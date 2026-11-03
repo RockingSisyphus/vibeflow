@@ -1,5 +1,4 @@
 """python Rule declarations, assembled through the public contribution model."""
-from vibeflow.targets.python.rules.capabilities import policy_rule_resources
 from vibeflow.targets.python.rules.node.definitions import source_rule_resources, implementation_resources
 from vibeflow.targets.python.rules.source_quality import source_quality_resources, source_quality_handlers, source_quality_rule_defaults
 from vibeflow.targets.python.rules.graph import workflow_topic_resources, workflow_topic_handlers, workflow_plan_resources
@@ -8,7 +7,7 @@ from vibeflow.targets.python.rules.graph import workflow_topic_resources, workfl
 def builtin_rule_resources():
     from vibeflow.targets.python.rulesets import builtin_rulesets
     project_rules, _ = source_quality_resources()
-    return (*policy_rule_resources(), *source_rule_resources(), *implementation_resources(), *project_rules,
+    return ( *source_rule_resources(), *implementation_resources(), *project_rules,
         *workflow_topic_resources(), *workflow_plan_resources()), builtin_rulesets()
 
 
@@ -18,7 +17,7 @@ def builtin_declaration_origins():
     from vibeflow.targets.python.rulesets import standard_rulesets, source_quality_ruleset
     origins = {}
     project_rules, _ = source_quality_resources()
-    for factory, resources in ((policy_rule_resources, policy_rule_resources()), (source_rule_resources, source_rule_resources()),
+    for factory, resources in ((source_rule_resources, source_rule_resources()),
             (implementation_resources, implementation_resources()), (source_quality_resources, project_rules),
             (workflow_topic_resources, workflow_topic_resources()), (workflow_plan_resources, workflow_plan_resources()),
             (standard_rulesets, standard_rulesets()), (source_quality_ruleset, (source_quality_ruleset(),))):

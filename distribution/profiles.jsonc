@@ -1,5 +1,5 @@
 {
-  "schema": "vibeflow.distribution-profiles.v1",
+  "schema": "vibeflow.distribution-profiles.v2",
   "document_sets": {
     "common": [
       "distribution/docs/overview.md",
@@ -37,20 +37,7 @@
       "document_sets": [
         "common",
         "collaborative"
-      ],
-      "agent_protocol": {
-        "change_inventory": "required",
-        "planned_review": true,
-        "human_approval_gate": true,
-        "required_review_artifact": "html_preview"
-      },
-      "agent_automation": {
-        "refresh_architecture": true,
-        "validate": true,
-        "quality": true,
-        "build": true,
-        "workflow_execution_probe": true
-      }
+      ]
     },
     "autonomous": {
       "prompt_fragments": [
@@ -60,20 +47,7 @@
       "document_sets": [
         "common",
         "autonomous"
-      ],
-      "agent_protocol": {
-        "change_inventory": "optional",
-        "planned_review": false,
-        "human_approval_gate": false,
-        "required_review_artifact": "on_demand"
-      },
-      "agent_automation": {
-        "refresh_architecture": true,
-        "validate": true,
-        "quality": true,
-        "build": true,
-        "workflow_execution_probe": true
-      }
+      ]
     }
   }
 }

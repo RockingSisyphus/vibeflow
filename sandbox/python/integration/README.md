@@ -1,75 +1,14 @@
-# 集成沙盒
+<!-- vibeflow-directory-purpose -->
+# python / 应用功能项目
 
-这个目录模拟真实业务项目使用 `vibeflow` 的方式：业务侧通过代码插件和 SDK 声明执行 Node、`base_lib`、Rule/Ruleset、生命周期插件，再用 JSONC 配置组织。运行器通过 `pyproject.toml` 与 `src/vibeflow` 自动定位仓库，不会在 Sandbox 中创建内核软链接。
+真实 SDK 项目与配置，提供配置覆盖、条件控制、嵌套循环、活对象、存储、资源、计划状态和应用端口等输入。执行、会话生命周期、错误和真实页面交互分别由对应功能域测试负责。
 
-入口包含独立的[综合数学应用](../comprehensive_math/README.md)及下列功能与错误路径专项。具体任务和结果以 runner 生成的报告为准。
+本目录保存真实使用工程、配置与独立预期；驱动和断言按功能统一在 tests/e2e，不保留单独总包或探针。测试复制输入至仓库外工作区后进行修改、构建和运行。
 
-运行：
-
-```bash
-PYTHONPATH=src python sandbox/python/integration/run_all.py
-```
-
-脚本会把项目复制到临时目录，并在同一临时目录执行 `npm ci` 安装 Mermaid CLI/Puppeteer，再批量运行合法配置、非法 Node 源码、非法独立声明、非法 `base_lib`、非法配置和 Rule 处理器错误。可以用 `VIBEFLOW_MERMAID_RENDERER_ROOT` 复用已经按锁文件安装的渲染器。默认不在源码树留下依赖、报告或运行产物；需要检查产物时使用 `--keep-artifacts`，结果会写入本目录的 `.artifacts/`。它还会使用真实 CLI 验证本工作区新增的 `review` 审核流程：
-
-- 确认审核结果不发布中间 `.mmd`、provenance sidecar 或嵌入式 provenance metadata。
-- 独立 comprehensive_math 通过注入的 `vibeflow.port` 验证 Python `receive → 两层 Nodeset/数学 Node/BaseLib/Loop → send`，同时检查计算结果、发送值、准确 warning 详情以及修正源码后的 warning 消失。
-- 执行模型专项验证单个就绪节点可在调用线程执行；独立 graph_concurrency 沙箱验证普通分支的 all 汇合、显式容量 12、容量 4 与默认 8 的排队补位，以及回收兼分发和断路的 CLI 拒绝，覆盖 plan/block/compiled 与 AOT。
-- 旧 async/result_key/detached 字段必须报迁移错误；正向示例只使用普通节点和显式下游边。
-- 独立 [cli_addition](../cli_addition/README.md) 使用 YAML、pathlib、标准流三个适配配置执行 `2+3+4=9`。精确检查 stdout/stderr、文件字节、退出码、效果范围、执行次数、日志隔离和架构导出无业务副作用。
-- 独立 [object_addition](../object_addition/README.md) 用 Box 和 Counter 做连续加法，检查原对象身份、非 JSON 报告、Nodeset 导出、绑定参数、固定与条件循环，以及 plan/block/compiled 执行。
-- 独立 [plugin_addition](../plugin_addition/README.md) 检查多文件 Node/BaseLib/Plugin、参数覆盖、编译/运行钩子，并在临时 helper 修改、恢复后确认 `5→6→5`。
-- [workflow_math](../workflow_math/README.md) 验证嵌套、循环和执行/trace，五个配置共 17 组观察。
-- [workflow_cooperation_math](../workflow_cooperation_math/README.md) 用三个独立 workflow、两轮异步消息和同步子调用共同求值；检查五组并发输入及四个错误公式对照，覆盖源码和 AOT 的三种执行模式。
-- [piecewise_math](../piecewise_math/README.md) 验证直线、分支、互斥汇合和数据旁路；四个配置共享短小加法节点，包含等号边界、24 组执行观察、真实编译块和源码、trace、运行与导出图检查。
-
-完整入口还复用独立的跨 root 质检沙箱：从发行最小项目构造 framework/project 双 root，Node 的契约与计算 helper 来自 framework BaseLib，通过真实 `run.py` 对比 `validate`、`quality` 与 `quality --path project`。用例覆盖默认及显式 workspace、直接内核 CLI、所选 root 的扫描范围、真实未声明 BaseLib 错误、workspace policy、独立 root、文件/子目录扫描、禁用 workflow 质检和混合 Target 的隔离子进程。可只运行这一组：
+功能域回归入口：
 
 ```bash
-python tools/run_tests.py -- tests/targets/python/test_quality_workspace_sandbox.py
+python tools/run_tests.py -- tests/e2e/test_execution.py tests/e2e/test_javascript.py tests/e2e/test_session_behaviors.py tests/e2e/test_preview.py
 ```
 
-使用 `--keep-artifacts` 时，脚本输出：
-
-- `.artifacts/reports/summary.json`
-- `.artifacts/reports/summary.md`
-- `.artifacts/reports/mermaid/*.mmd`
-- `.artifacts/{cli_addition,object_addition,plugin_addition,piecewise_math,workflow_math}/report.json`
-- `.artifacts/runs/<case_name>/...`
-
-退出码：
-
-- `0`：全部预期通过。
-- `1`：合法 case 失败，或非法 case 未被拒绝。
-- `2`：环境错误，例如无法定位仓库源码。
-
-Node 声明显式选择 `vibeflow.process`、`vibeflow.io`、`vibeflow.document` 或 `vibeflow.global_state` 等 Ruleset；这些规则的执行记录决定报告中的允许副作用范围。`rulesets: []` 的原生执行机制 fixture 不隐式补充源码审查。`project/rules/checks.py` 和独立 Rule 资源验证正常诊断、处理器异常、返回结构错误以及必需 record 缺失；compiler/runtime 插件仍只参与各自生命周期。源码预检先解析实际导入闭包，再运行选中的 import Rule，不导入业务模块。
-
-本目录包含故意违规的 Python 文件和独立 JSONC 声明，用于验证所选规则或声明解析器能拒绝相应问题。仓库自检器应把这些已知反例按 fixture 精确归属，不能把它们误报为 VibeFlow 源码问题，也不能因此跳过整个 Sandbox。
-
-## Flowchart 示例
-
-普通 `pipeline.edges` 形成环已经被禁止；`project/configs/fail_decision_cycle_forbidden.jsonc` 验证带 decision 和 exit 的旧式 retry 环也会被 `GRAPH.CYCLE.FORBIDDEN` 拒绝。
-
-循环示例请看 `project/configs/pass_loop_while_nodeset_retry.jsonc`、独立 `object_addition` 的 `fixed.jsonc` 和 nested loop fixtures：
-
-- `vibeflow.loop.while` 调用 nodeset body。
-- 固定轮数用 `loop.stop_after`。
-- 条件退出用 body/state 输出的 bool `loop.stop_when`。
-- 运行时仍保留 `max_steps` 作为顶层安全护栏，但不再把 decision cycle 作为循环语义。
-
-`project/configs/pass_io_data_store.jsonc` 展示外部数据/副作用的替代建模方式：`data_store` 节点产出请求数据，`io` 节点消费外部输入结果。旧 `boundary` 配置只保留在失败用例中，验证内核会以 `CONFIG.BOUNDARY.REMOVED` 拒绝。
-
-`project/configs/review_external_nodeset_dedup.jsonc` 是严格 health-pass 的审查渲染 fixture。它用四个 loop 节点调用同一个 `visual.reusable_worker` body，每个调用通过 `loop.outputs` 映射到唯一 provider key，并在 `join_policy: all` 的 terminal `end` 汇合；同时保留一个真实 external 主线节点。`run_all.py` 先要求 `validate` 返回 `PASS`，再检查父图中的四个调用 ID 与四条 `worker_* -> end` 连线、唯一局部详情、`calls: 4` / 前三个 ID / `+1` / 配置计数摘要，以及 external 边框 CSS。普通 nodeset 调用必须与定义保持完全相同的 provides 契约，因此同一父图中的合法重复普通调用还受 provider key 唯一性约束；重复调用的分组与摘要由单元测试覆盖。
-
-## 目录用途与边界
-
-仅用于：python / integration 案例，验证公开接口的综合使用、跨资源协作与错误诊断；保留真实项目输入与 runner。
-
-- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
-- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
-- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
-
-完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。
-
-正式 review 验证已登记架构刷新、HTML 发布和未登记 workflow 的明确拒绝；运行场景核对健康报告及结构化预览。
+完整验收及其他平台场景见[测试覆盖](../../TEST_COVERAGE.md)和[开发与验证](../../../docs/maintainers/development.md)。新增目录同步说明职责；运行日志、依赖和构建产物不写入本目录。

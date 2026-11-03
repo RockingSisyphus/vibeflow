@@ -95,6 +95,16 @@ planned Nodeset 保留 `type_key`、名称、说明和契约，可以暂时省�
 
 普通 graph 和 Nodeset body 保持无环；重复执行由 Loop 表达。Nodeset 调用和 `loop.body` 都参与递归与最大嵌套深度检查。
 
+### 持续运行
+
+`max_iterations` 省略时默认 **1000**；显式设为 `null` 才不限制迭代次数。没有 `stop_after` 和 `stop_when` 时，Loop 持续执行 body，直到取消或失败；静态审查会提示永久循环，但不会禁止运行。
+
+```jsonc
+"loop": {"body": "example.handle_message", "max_iterations": null}
+```
+
+消息服务的 body 可以是“等待消息 → 处理 → 回复”。等待节点采用原生异步等待，workflow 使用 `entry_mode: "async"`；整个循环属于同一次 workflow 实例。需要业务正常结束时增加 `stop_when`，也可以由应用取消运行或由另一 workflow 显式 Kill。停止操作须等待当前执行和清理完成。持续运行时按业务需要保存结果；`collect` 会逐次累积数据，适用于确实需要保留全部迭代结果的场景。
+
 ## 验证
 
 ```bash

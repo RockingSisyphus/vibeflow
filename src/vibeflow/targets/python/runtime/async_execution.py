@@ -31,9 +31,6 @@ class AsyncPipelineRuntime:
                     self._plan = initialize(plugins)
                     self._frames = self._plan.frames
                     self._runtime_plan_factory = None
-                else:
-                    from dataclasses import replace
-                    self._plan = replace(self._plan, python_bindings=replace(self._plan.python_bindings, plugin_registry=plugins))
                 self._runtime_plugins = plugins.runtime_plugins()
                 self._hook_plan = runtime_hook_plan(self._runtime_plugins, self.runtime_options)
                 return await self._run_with_observation_async(initial)

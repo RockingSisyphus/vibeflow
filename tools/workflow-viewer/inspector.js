@@ -45,7 +45,7 @@ window.VFInspector=(()=>{
       ["目标定义",facts.invokes?.target],["汇合策略",facts.join_policy],["副作用范围",facts.effect_scope||nodeDefinition?.info?.effect_scope],
       ["执行锁",facts.effective_execution_lock||facts.execution_lock],
       ["BaseLib 依赖",nodeDefinition?.base_libs?.length?nodeDefinition.base_libs:info.resource?.base_libs?.length?info.resource.base_libs:undefined],
-      ["能力要求",nodeDefinition?.capabilities?.length?nodeDefinition.capabilities:info.resource?.capabilities?.length?info.resource.capabilities:undefined]]);
+      ["workflow 操作",nodeDefinition?.workflow_operations]]);
     if(facts.definition_id||facts.contract||facts.requires||facts.provides){
       contracts(parent,"输入契约",facts.requires??info.contract.requires??definition?.requires,semantics(info,"input_semantics"));
       contracts(parent,"输出契约",facts.provides??info.contract.provides??definition?.provides,semantics(info,"output_semantics"),"output");
@@ -61,7 +61,7 @@ window.VFInspector=(()=>{
     if(facts.preview_operations?.length){
       const part=section(parent,"接口操作与等待行为");
       for(const action of facts.preview_operations){const row=element("article");row.className="contract-detail";
-        row.append(element("strong",VFModel.operationLabel(action)));table(row,Object.entries(action).map(([key,value])=>[({capability:"Capability",workflow:"目标 workflow",expected_workflows:"预期交互 workflow",entry:"目标入口",wait:"等待执行结束",operation:"操作"})[key]||key,value]));part.append(row);}
+        row.append(element("strong",VFModel.operationLabel(action)));table(row,Object.entries(action).map(([key,value])=>[({workflow:"目标 workflow",expected_workflows:"预期交互 workflow",entry:"目标入口",wait:"等待执行结束",operation:"操作"})[key]||key,value]));part.append(row);}
     }
     if(nonempty(definition?.global_config?.values??definition?.global_config)){const part=section(parent,"Nodeset 全局配置声明");table(part,Object.entries(values(definition.global_config)));}
     if(nonempty(facts.metadata)||nonempty(nodeDefinition?.metadata)){const part=section(parent,"补充元数据");table(part,[["调用",facts.metadata],["业务定义",nodeDefinition?.metadata]]);}

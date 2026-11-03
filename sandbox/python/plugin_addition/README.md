@@ -1,21 +1,14 @@
-# python plugin_addition
+<!-- vibeflow-directory-purpose -->
+# python / Plugin 应用
 
-默认 2+3=5，局部覆盖 b=4 得到 6；临时 helper 改为 a+b+1 后 6，恢复后 5。检查源码归属、编译/运行钩子与重复调用；源码阶段各用新解释器。
+业务节点经真实 Plugin 生命周期取得应用资源并执行计算。错误与取消场景另由会话及错误报告测试验证。
+
+本目录保存真实使用工程、配置与独立预期；驱动和断言按功能统一在 tests/e2e，不保留单独总包或探针。测试复制输入至仓库外工作区后进行修改、构建和运行。
+
+功能域回归入口：
 
 ```bash
-python sandbox/python/plugin_addition/run_all.py
+python tools/run_tests.py -- tests/e2e/test_execution.py
 ```
 
-默认使用外部临时目录；`--work-dir /absolute/outside/repository` 保留项目、报告与运行记录。Python 可用 `--renderer-root` 复用 Puppeteer，JavaScript 可用 `--toolchain-root` 复用按 package-lock 安装的 TypeScript/esbuild。
-
-业务代码在 project，Config 在 project/configs，测试驱动在 run_all.py。所有源码修改仅发生在工作副本中。具体断言见同目录 [run_all.py](run_all.py)，报告由每次运行生成。
-
-## 目录用途与边界
-
-仅用于：python / plugin_addition 案例，验证插件、多文件资源、生命周期钩子和加法；保留真实项目输入与 runner。
-
-- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
-- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
-- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
-
-完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。
+完整验收及其他平台场景见[测试覆盖](../../TEST_COVERAGE.md)和[开发与验证](../../../docs/maintainers/development.md)。新增目录同步说明职责；运行日志、依赖和构建产物不写入本目录。

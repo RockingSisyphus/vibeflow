@@ -149,7 +149,7 @@ def _validate_target_metadata(value, *, language):
         _invalid_manifest('invalid JavaScript metadata fields')
     if value['target'] not in {'browser','node'} or value['profile'] not in {'esm-module','single-esm','web-app'}:
         _invalid_manifest('invalid JavaScript target or profile')
-    if value['plugin_abi_version'] != 'vibeflow.plugin.v4':
+    if value['plugin_abi_version'] != 'vibeflow.plugin.v5':
         _invalid_manifest('plugin_abi_version is invalid')
     _validate_toolchain(value['toolchain'])
     _validate_plugins(value['plugins'])

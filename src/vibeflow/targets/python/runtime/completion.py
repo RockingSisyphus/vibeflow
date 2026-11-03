@@ -1,4 +1,4 @@
-"""Completion boundaries used by nodes, capabilities and lifecycle hooks."""
+"""Completion boundaries used by nodes and lifecycle hooks."""
 import inspect
 from concurrent.futures import Future
 

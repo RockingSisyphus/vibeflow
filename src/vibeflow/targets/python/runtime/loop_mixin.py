@@ -57,7 +57,7 @@ class RuntimeLoopMixin:
     def _run_loop_outputs(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
         if frame.subplan is None:
             raise PipelineRuntimeError(f"loop node '{frame.id}' has no body execution plan")
-        return self._run_while_loop(frame, inputs, require_block=False)
+        return self._run_while_loop(frame, inputs)
 
     def _execute_loop_block(self, node_name: str, inputs: object) -> Mapping[str, object]:
         frame = self._frames[node_name]
@@ -65,9 +65,9 @@ class RuntimeLoopMixin:
             raise PipelineRuntimeError(f"loop block '{node_name}' received non-mapping inputs")
         if frame.subplan is None or graph_block(frame.subplan) is None:
             raise PipelineRuntimeError(f"loop node '{frame.id}' body is not block compiled")
-        return self._run_while_loop(frame, inputs, require_block=True)
+        return self._run_while_loop(frame, inputs)
 
-    def _run_while_loop(self, frame: NodeFrame, inputs: Mapping[str, object], *, require_block: bool) -> Mapping[str, object]:
+    def _run_while_loop(self, frame: NodeFrame, inputs: Mapping[str, object]) -> Mapping[str, object]:
         spec = frame.loop_spec
         values = _initial_loop_values(inputs, spec.carry)
         runtime = self._nodeset_runtime(frame)

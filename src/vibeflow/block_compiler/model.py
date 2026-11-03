@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping, TypeAlias
 
 
-WORKFLOW_ABI_VERSION = "vibeflow.workflow.v11"
+WORKFLOW_ABI_VERSION = "vibeflow.workflow.v12"
 _CARDINALITIES = frozenset({"exactly_one", "optional_one", "all"})
 _BLOCK_KINDS = frozenset({"workflow", "nodeset", "loop"})
 _CONDITION_OPERATORS = frozenset({"==", "!="})
@@ -319,7 +319,7 @@ class NodeCallPlan:
     execution_lock: ExecutionLockPlan | None = None
     contains_global_state: bool = False
     max_concurrency: int = 8
-    capability_policy: PortableObject = PortableObject()
+    workflow_operations: PortableObject = PortableObject()
 
     def __post_init__(self) -> None:
         if not isinstance(self.max_concurrency, int) or isinstance(self.max_concurrency, bool) or self.max_concurrency < 1:
@@ -376,7 +376,7 @@ class NodeCallPlan:
             "schedule": self.schedule,
             "executor": self.executor,
             "effect_scope": self.effect_scope,
-            "capability_policy": self.capability_policy.to_value(),
+            "workflow_operations": self.workflow_operations.to_value(),
 
             "execution_lock": (
                 self.execution_lock.to_dict()

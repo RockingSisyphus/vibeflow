@@ -36,14 +36,11 @@ Architecture 中的 `load_state` 记录生成快照时的观察：`loaded`、`no
 
 内置分析借用 Target 持有的 AST。`tree/node/implementation_tree` 等公开资料继续返回隔离副本；实现视图只复制选定符号、需要的 imports 和 helper。指标与投影先查缓存，再构造 AST。
 
-会修改语法树的算法复制实际修改的部分：调整 class body 时复制类外壳，归一化指纹时复制目标函数。新增分析器应验证原 AST 前后完全一致，并验证公开视图的深层修改不会影响下一条规则。
+会修改语法树的算法复制实际修改的部分：调整 class body 时复制类外壳，归一化指纹时复制目标函数。新增分析器应保持这一边界，并通过代码审查确认所有权及复制范围；端到端回归观察相邻规则和后续命令的自然结果，不把 AST 身份作为验收判据。
 
 ## 回归入口
 
-`tests/fixtures/python/review_performance/run_all.py` 在新进程中执行正式 CLI，并在内存中计数，结束后写报告。自动验收检查展示阶段的绑定、规则执行和重复编译，检查真实调用次数及逐文件解析次数。时间使用 monotonic 时钟；代表案例重复三次，报告中位数。
-
-完整门禁包含该沙箱、实际 HTML 浏览器检验、旧规则回归和分发安装验收。沙箱使用 VibeFlow 自身固定的 SDK 资源；详见[运行说明](../../tests/fixtures/python/review_performance/README.md)。
-
+`tests/e2e/test_source_policies.py`、`test_rules.py` 和 `test_resources.py` 经正常声明与命令验证诊断、误报对照和编辑刷新。`test_performance.py` 记录完整构建/运行时间、CPU 与子进程 RSS，同时检查重复、编辑、恢复及跨工程结果。真实 HTML 交互归 test_preview.py 与 test_layout.py；安装与搬移归 test_delivery.py。统一入口与批次边界见[开发与验证](development.md)。内部缓存、对象身份及解析次数不再由测试探针证明。
 
 ## Prepared fact views
 
@@ -69,5 +66,4 @@ view identities. Core still distinguishes phases, parameters and input records.
 
 The former module-initialization AST fingerprint has been removed. Full-view
 identity deliberately invalidates more broadly when background source changes;
-it must not recreate AST copying or source scans in the invocation loop. The
-performance sandbox observes this separately from legitimate AST reads by rules.
+it must not recreate AST copying or source scans in the invocation loop. This is an implementation boundary reviewed in source; end-to-end tests observe public results and process cost.

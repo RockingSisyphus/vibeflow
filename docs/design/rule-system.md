@@ -123,7 +123,7 @@ src/vibeflow/core/rules/
 
 读取器不执行规则；规划不解析语言源码。Python/JavaScript Target 提供语言事实、局部符号视图及实现绑定，消费相同选择和范围；不能各自再实现继承或接管。Tooling 负责配置、Plugin 装配、命令与报告投影，不增加隐式默认注入。
 
-JavaScript 的公开源码服务对未知路径报 `RULE.SOURCE.UNAVAILABLE`，不回退磁盘读取；有限图引用避免完整注册结构形成循环 JSON。Rule ABI 为 v3，Plugin ABI v4 与 Workflow ABI v11 继续承担各自原生协议。
+JavaScript 的公开源码服务对未知路径报 `RULE.SOURCE.UNAVAILABLE`，不回退磁盘读取；有限图引用避免完整注册结构形成循环 JSON。Rule ABI 为 v3，Plugin ABI v5 与 Workflow ABI v12 继续承担各自原生协议。
 
 ## 复用与可解释报告
 
@@ -135,7 +135,7 @@ JavaScript 的公开源码服务对未知路径报 `RULE.SOURCE.UNAVAILABLE`，�
 
 当前综合案例见 [Python](../../sandbox/python/rule_selection/README.md) 与 [JavaScript](../../sandbox/javascript/rule_selection/README.md)。同一嵌套图的 default/dynamic/empty 三份配置，验证静态 Workflow 默认、动态替代、Nodeset 接管、Node 调用选择、局部与图规则共存、重复调用路径和同范围 Records。默认 B 分别负责根/left/right；整体 D 在入口一次负责三张图；接管 C 另行负责 takeover；muted 不继承图规则但保留局部 A。不同执行阶段分别统计。
 
-源码隔离、首次延迟加载、原生错误、混合范围和复用边界的更细回归位于 `tests/core/test_rule_selection.py`、`tests/targets/python/test_rule_selection_boundaries.py`、`tests/targets/python/test_rule_graph_ranges.py` 和 `tests/targets/javascript/test_rule_source_api.py`。综合沙箱补充用户接入情境，不能替代这些回归或整仓库验收。
+源码隔离、首次延迟加载、原生错误、混合范围和复用边界的更细回归位于 `tests/e2e/test_rules.py`、`test_selection.py` 和 `test_source_policies.py`。综合沙箱补充用户接入情境，不能替代这些回归或整仓库验收。
 
 新机制或修复应检查是否仍满足以下判断依据：
 
@@ -149,10 +149,7 @@ JavaScript 的公开源码服务对未知路径报 `RULE.SOURCE.UNAVAILABLE`，�
 
 若实践证据推翻关键假设，复核目标、剩余实现量、验证成本及维护负担。等价修复自主完成；需要改变用户可观察的替代、接管或资料边界时，先说明同一场景下的结果差异，再让用户判断，不以降低实现成本为由静默缩减目标。
 
-## 调用级功能策略
+## 命名入口范围
 
-Workflow 与端口接口共用调用级策略：图规则限制所属有效子图，节点规则为具体完整调用路径生成授权 Record；Target 将有效授权与 Capability 声明的操作求交后绑定上下文。同类型在不同 Nodeset 调用位置不能串授权，名称、形状和颜色不赋予功能。`effect_scope` 继续描述执行副作用，不承担接口权限。
-
-源码准备与 AOT 构建消费同一策略记录；AOT 保存结果，运行不再执行规则。规则与显式操作声明同时供架构事实和 HTML 展示使用，不从实现函数名称推断。call 的实例数据流没有可直接确认的下游 kill 时警告，`allow_background: true` 表示作者主动承担长期运行清理；Wait 和 CallAndWait 的内置等待不再免除此检查；这不是任意业务代码的终止证明。
 
 命名入口的流程健康检查先覆盖完整声明图，再按入口检查数据契约和汇合；不能只检查入口投影而漏掉孤立节点。源码运行只检查所选入口的执行图，review/build 仍保留完整审查范围。

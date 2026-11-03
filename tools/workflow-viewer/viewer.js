@@ -1,4 +1,4 @@
-/* Offline preview protocol v4. No fetch, server, source execution or directory enumeration. */
+/* Offline preview protocol v5. No fetch, server, source execution or directory enumeration. */
 "use strict";
 (() => {
   const $ = id => document.getElementById(id);
@@ -29,10 +29,10 @@
       if(!prior||(value.revision||0)>=(prior.revision||0))target.set(value.id,value);
     },
     project(value) {
-      if(value.version!==4||value.architecture&&value.architecture.format!=="vibeflow.project-architecture.v2")value={roots:[],error:"旧版项目目录；运行 preview --workspace 重新生成。"};
+      if(value.version!==5||value.architecture&&value.architecture.format!=="vibeflow.project-architecture.v2")value={roots:[],error:"旧版项目目录；运行 preview --workspace 重新生成。"};
       const target=document.currentScript?.previewRecords;if(target)target.project=value;else project=value;
     },
-    snapshot(value) { if(value.version!==4)throw new Error("不支持旧快照格式；请重新生成");snapshots.set(value.id,value); },
+    snapshot(value) { if(value.version!==5)throw new Error("不支持旧快照格式；请重新生成");snapshots.set(value.id,value); },
     // The renderer registry also permits future view kinds without changing the tab bar.
     registerRenderer(name, renderer) { renderers.set(name, renderer); }
   };

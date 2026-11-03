@@ -1,22 +1,14 @@
-# 三个独立 Workflow 联合求值（JavaScript）
+<!-- vibeflow-directory-purpose -->
+# javascript / Workflow 协作数学
 
-本目录只负责通用 JS 同进程协作的真实使用项目，以及 Node、浏览器执行器。三个图、输入、独立数值判据与故障预期复用[Python 沙箱说明](../../python/workflow_cooperation_math/README.md)中的共同合同。
+真实 A/B/C 数学 Node 项目；tests/e2e/cooperation.py 只编写正常 workflow 输入并复用正式协作模板。正常构建所得产物通过应用 Coordinator、HTTP、Node 和浏览器按钮运行，覆盖独立实例、消息、取消、错误及清理。
 
-A、B 为 async，C 为 sync；两轮异步消息中嵌入一次同步调用，使用发行包官方节点。最终计算 `F=6(3x-y+8)²-27x+43y-180`；输入 `(2,7)` 必须得到 361。五组输入同时运行，校验所有中间值、消息身份、轮次、独立实例、真实终态与释放。四个错误配置必须产生 3631、196、376、358，不能通过正确答案判据。
+本目录保存真实使用工程、配置与独立预期；驱动和断言按功能统一在 tests/e2e，不保留单独总包或探针。测试复制输入至仓库外工作区后进行修改、构建和运行。
 
-`run_all.py` 通过正式 browser Target 构建三个 workflow 及故障对照，再将 AOT、通用 Coordinator 和 `verify.mjs` 一起打成单个 IIFE 脚本。删除原项目后，**同一个脚本**分别在 Node 和真实 Chromium 运行。
-
-`browser.cjs` 固定 `headless: true`，使用空白页和离线模式，通过本地文件注入脚本，不启动资产或协调服务。监测注入及协作期间的全部页面请求，必须为零。没有 DOM、酒馆 API 或页面生命周期适配。
+功能域回归入口：
 
 ```bash
-python sandbox/javascript/workflow_cooperation_math/run_all.py \
-  --work-dir /path/to/new-work-directory \
-  --toolchain-root /path/to/typescript-esbuild-toolchain \
-  --puppeteer-root /path/to/browser-runtime
+python tools/run_tests.py -- tests/e2e/test_cooperation.py tests/e2e/test_cooperation_javascript.py tests/e2e/test_cooperation_http.py
 ```
 
-工具链使用仓库锁文件安装；可通过 `PUPPETEER_EXECUTABLE_PATH` 显式指定 Chromium。默认临时工作目录自动清理；显式目录保留 `report.json`、单文件脚本、AOT 和 Node／Chromium 的真实 trace。缺少 `--puppeteer-root` 只执行 Node，报告为 `REDUCED`，不能算完整通过。
-
-JS integration 与根目录 `python tools/verify_project.py --full` 自动包含该入口。HTTP、跨语言进程协作、取消清理和错误传播继续由现有专项覆盖；本项目不代表 ERA 生产验收。
-
-正常五组计算与一组 `stop:true` 的主动停止计算并发运行。A 使用官方 Kill，B 在第二轮等待节点的真实异步 finally 中清理并确认；A 在 Kill 返回后零超时读取确认，B 的终态必须为 cancelled 且无数值输出，其他五组答案保持正确。A 的正常完成 Nodeset 用于隔离官方 Wait/Kill 固定的输出 key，三个 workflow 的身份边界不变。详见 Python 沙箱中的主动停止说明。
+完整验收及其他平台场景见[测试覆盖](../../TEST_COVERAGE.md)和[开发与验证](../../../docs/maintainers/development.md)。新增目录同步说明职责；运行日志、依赖和构建产物不写入本目录。

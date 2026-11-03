@@ -339,7 +339,7 @@
       "base_libs": [
         "demo.math"
       ],
-      "capabilities": [],
+      "workflow_operations": [],
       "rulesets": [
         "vibeflow.process"
       ],
@@ -406,7 +406,7 @@
         "base_libs": [
           "demo.math"
         ],
-        "capabilities": [],
+        "workflow_operations": [],
         "rulesets": [
           "vibeflow.process"
         ],
@@ -474,7 +474,7 @@
         }
       ],
       "base_libs": [],
-      "capabilities": [],
+      "workflow_operations": [],
       "rulesets": [],
       "presentation": {},
       "metadata": {},
@@ -513,7 +513,7 @@
           }
         ],
         "base_libs": [],
-        "capabilities": [],
+        "workflow_operations": [],
         "rulesets": [],
         "presentation": {},
         "metadata": {}
@@ -602,7 +602,6 @@
         "external_packages": []
       }
     },
-    "capabilities": {},
     "plugins": [
       {
         "id": "demo.runtime",
@@ -627,7 +626,7 @@
       }
     ]
   },
-  "call_policies": {},
+  "workflow_operations": {},
   "resource_use": {
     "workflow": "resource-demo:configs/workflow.jsonc",
     "resources": [
@@ -672,16 +671,6 @@
       {
         "kind": "rule",
         "id": "vibeflow.async_lifecycle",
-        "reason": "builtin"
-      },
-      {
-        "kind": "rule",
-        "id": "vibeflow.capability.allow",
-        "reason": "builtin"
-      },
-      {
-        "kind": "rule",
-        "id": "vibeflow.capability.restrict",
         "reason": "builtin"
       },
       {
@@ -2117,7 +2106,7 @@
                         "path": "plugins/demo/plugin.ts",
                         "module": "plugins/demo/plugin.ts",
                         "lines": 4,
-                        "bytes": 485,
+                        "bytes": 468,
                         "function_count": 1,
                         "class_count": 0,
                         "public_api_count": 2,
@@ -2147,12 +2136,11 @@
                             "resolved_path": "@vibeflow/javascript/sdk.d.ts",
                             "symbols": [
                               "definePlugin",
-                              "defineCapability",
                               "defineDataSchema"
                             ],
                             "path": "plugins/demo/plugin.ts",
                             "line": 1,
-                            "column": 62,
+                            "column": 45,
                             "framework_resource": "javascript/sdk.d.ts"
                           },
                           {
@@ -2378,7 +2366,7 @@
                         "path": "plugins/demo/plugin.ts",
                         "module": "plugins/demo/plugin.ts",
                         "lines": 4,
-                        "bytes": 485,
+                        "bytes": 468,
                         "function_count": 1,
                         "class_count": 0,
                         "public_api_count": 2,
@@ -2408,12 +2396,11 @@
                             "resolved_path": "@vibeflow/javascript/sdk.d.ts",
                             "symbols": [
                               "definePlugin",
-                              "defineCapability",
                               "defineDataSchema"
                             ],
                             "path": "plugins/demo/plugin.ts",
                             "line": 1,
-                            "column": 62,
+                            "column": 45,
                             "framework_resource": "javascript/sdk.d.ts"
                           },
                           {
@@ -3365,7 +3352,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/plugin.py",
+            "path": "@kernel/targets/shared/rule_support/plugin.py",
             "symbol": ""
           }
         },
@@ -3427,7 +3414,7 @@
             "base_libs": [
               "demo.math"
             ],
-            "capabilities": [],
+            "workflow_operations": [],
             "rulesets": [
               "vibeflow.process"
             ],
@@ -3490,7 +3477,7 @@
               }
             ],
             "base_libs": [],
-            "capabilities": [],
+            "workflow_operations": [],
             "rulesets": [],
             "presentation": {},
             "metadata": {}
@@ -3520,7 +3507,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/handlers.py",
+                  "ref": "@kernel/targets/javascript/rules/node/handlers.py",
                   "export": "javascript_source_bindings.<locals>.asynchronous"
                 }
               }
@@ -3540,121 +3527,9 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/definitions.py",
+            "path": "@kernel/targets/javascript/rules/node/definitions.py",
             "line": 8,
             "symbol": "source_rule_resources"
-          }
-        },
-        {
-          "kind": "rule",
-          "id": "vibeflow.capability.allow",
-          "descriptor": {
-            "kind": "rule",
-            "id": "vibeflow.capability.allow",
-            "display_name": "",
-            "description": "",
-            "implementations": [
-              {
-                "language": "python",
-                "source": {
-                  "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/capability_policy.py",
-                  "export": "allow"
-                }
-              }
-            ],
-            "inputs": {},
-            "outputs": {
-              "policy": "vibeflow.capability_policy.v1"
-            },
-            "params_schema": {
-              "capability": {
-                "type": "string"
-              },
-              "operations": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "actions": {
-                "type": "array",
-                "items": {
-                  "type": "object"
-                }
-              }
-            },
-            "params_defaults": {
-              "capability": "",
-              "operations": [],
-              "actions": []
-            },
-            "handler": "",
-            "scope": "call",
-            "level": "node"
-          },
-          "origin": {
-            "owner": {
-              "kind": "plugin",
-              "id": "vibeflow.core",
-              "root_id": "",
-              "path": ""
-            },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/capabilities.py",
-            "line": 6,
-            "symbol": "policy_rule_resources"
-          }
-        },
-        {
-          "kind": "rule",
-          "id": "vibeflow.capability.restrict",
-          "descriptor": {
-            "kind": "rule",
-            "id": "vibeflow.capability.restrict",
-            "display_name": "",
-            "description": "",
-            "implementations": [
-              {
-                "language": "python",
-                "source": {
-                  "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/capability_policy.py",
-                  "export": "restrict"
-                }
-              }
-            ],
-            "inputs": {},
-            "outputs": {
-              "policy": "vibeflow.capability_policy.v1"
-            },
-            "params_schema": {
-              "capabilities": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              }
-            },
-            "params_defaults": {
-              "capabilities": [
-                "vibeflow.port",
-                "vibeflow.workflow"
-              ]
-            },
-            "handler": "",
-            "scope": "call",
-            "level": "graph"
-          },
-          "origin": {
-            "owner": {
-              "kind": "plugin",
-              "id": "vibeflow.core",
-              "root_id": "",
-              "path": ""
-            },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/capabilities.py",
-            "line": 6,
-            "symbol": "policy_rule_resources"
           }
         },
         {
@@ -3670,7 +3545,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/graph.py",
+                  "ref": "@kernel/targets/shared/rule_support/graph.py",
                   "export": "_duplicates"
                 }
               }
@@ -3690,7 +3565,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/graph/topics.py",
+            "path": "@kernel/targets/javascript/rules/graph/topics.py",
             "line": 6,
             "symbol": "workflow_topic_resources"
           }
@@ -3708,7 +3583,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/graph.py",
+                  "ref": "@kernel/targets/shared/rule_support/graph.py",
                   "export": "_flow"
                 }
               }
@@ -3728,7 +3603,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/graph/topics.py",
+            "path": "@kernel/targets/javascript/rules/graph/topics.py",
             "line": 6,
             "symbol": "workflow_topic_resources"
           }
@@ -3746,7 +3621,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/graph.py",
+                  "ref": "@kernel/targets/shared/rule_support/graph.py",
                   "export": "_join"
                 }
               }
@@ -3766,7 +3641,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/graph/topics.py",
+            "path": "@kernel/targets/javascript/rules/graph/topics.py",
             "line": 6,
             "symbol": "workflow_topic_resources"
           }
@@ -3784,7 +3659,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/graph.py",
+                  "ref": "@kernel/targets/shared/rule_support/graph.py",
                   "export": "_nodesets"
                 }
               }
@@ -3815,7 +3690,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/graph/topics.py",
+            "path": "@kernel/targets/javascript/rules/graph/topics.py",
             "line": 6,
             "symbol": "workflow_topic_resources"
           }
@@ -3833,7 +3708,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/graph.py",
+                  "ref": "@kernel/targets/shared/rule_support/graph.py",
                   "export": "_planned"
                 }
               }
@@ -3855,7 +3730,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/graph/topics.py",
+            "path": "@kernel/targets/javascript/rules/graph/topics.py",
             "line": 6,
             "symbol": "workflow_topic_resources"
           }
@@ -3873,7 +3748,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/source_quality.py",
+                  "ref": "@kernel/targets/shared/rule_support/source_quality.py",
                   "export": "_dependencies"
                 }
               }
@@ -3907,7 +3782,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -3925,7 +3800,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/source_quality.py",
+                  "ref": "@kernel/targets/shared/rule_support/source_quality.py",
                   "export": "_duplicates"
                 }
               }
@@ -3945,7 +3820,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -3963,7 +3838,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/source_quality.py",
+                  "ref": "@kernel/targets/shared/rule_support/source_quality.py",
                   "export": "_files"
                 }
               }
@@ -4029,7 +3904,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -4047,7 +3922,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/source_quality.py",
+                  "ref": "@kernel/targets/shared/rule_support/source_quality.py",
                   "export": "_structure"
                 }
               }
@@ -4195,7 +4070,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -4213,7 +4088,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/handlers.py",
+                  "ref": "@kernel/targets/javascript/rules/node/handlers.py",
                   "export": "javascript_source_bindings.<locals>.implementation.<locals>.check"
                 }
               }
@@ -4241,7 +4116,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/definitions.py",
+            "path": "@kernel/targets/javascript/rules/node/definitions.py",
             "line": 31,
             "symbol": "implementation_resources"
           }
@@ -4259,7 +4134,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/handlers.py",
+                  "ref": "@kernel/targets/javascript/rules/node/handlers.py",
                   "export": "javascript_source_bindings.<locals>.implementation.<locals>.check"
                 }
               }
@@ -4287,7 +4162,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/definitions.py",
+            "path": "@kernel/targets/javascript/rules/node/definitions.py",
             "line": 31,
             "symbol": "implementation_resources"
           }
@@ -4305,7 +4180,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/handlers.py",
+                  "ref": "@kernel/targets/javascript/rules/node/handlers.py",
                   "export": "javascript_source_bindings.<locals>.implementation.<locals>.check"
                 }
               }
@@ -4333,7 +4208,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/definitions.py",
+            "path": "@kernel/targets/javascript/rules/node/definitions.py",
             "line": 31,
             "symbol": "implementation_resources"
           }
@@ -4351,7 +4226,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/handlers.py",
+                  "ref": "@kernel/targets/javascript/rules/node/handlers.py",
                   "export": "javascript_source_bindings.<locals>.imports"
                 }
               }
@@ -4418,7 +4293,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/definitions.py",
+            "path": "@kernel/targets/javascript/rules/node/definitions.py",
             "line": 8,
             "symbol": "source_rule_resources"
           }
@@ -4436,7 +4311,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/handlers.py",
+                  "ref": "@kernel/targets/javascript/rules/node/handlers.py",
                   "export": "javascript_source_bindings.<locals>.input_writes"
                 }
               }
@@ -4476,7 +4351,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/definitions.py",
+            "path": "@kernel/targets/javascript/rules/node/definitions.py",
             "line": 8,
             "symbol": "source_rule_resources"
           }
@@ -4494,7 +4369,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/handlers.py",
+                  "ref": "@kernel/targets/javascript/rules/node/handlers.py",
                   "export": "javascript_source_bindings.<locals>.maintainability"
                 }
               }
@@ -4522,7 +4397,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/definitions.py",
+            "path": "@kernel/targets/javascript/rules/node/definitions.py",
             "line": 8,
             "symbol": "source_rule_resources"
           }
@@ -4540,7 +4415,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/handlers.py",
+                  "ref": "@kernel/targets/javascript/rules/node/handlers.py",
                   "export": "javascript_source_bindings.<locals>.effects"
                 }
               }
@@ -4609,7 +4484,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/definitions.py",
+            "path": "@kernel/targets/javascript/rules/node/definitions.py",
             "line": 8,
             "symbol": "source_rule_resources"
           }
@@ -4627,7 +4502,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/handlers.py",
+                  "ref": "@kernel/targets/javascript/rules/node/handlers.py",
                   "export": "javascript_source_bindings.<locals>.architecture"
                 }
               }
@@ -4647,7 +4522,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/definitions.py",
+            "path": "@kernel/targets/javascript/rules/node/definitions.py",
             "line": 8,
             "symbol": "source_rule_resources"
           }
@@ -4665,7 +4540,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/handlers.py",
+                  "ref": "@kernel/targets/javascript/rules/node/handlers.py",
                   "export": "javascript_source_bindings.<locals>.interface"
                 }
               }
@@ -4694,7 +4569,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/node/definitions.py",
+            "path": "@kernel/targets/javascript/rules/node/definitions.py",
             "line": 8,
             "symbol": "source_rule_resources"
           }
@@ -4712,7 +4587,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/resource_governance.py",
+                  "ref": "@kernel/targets/shared/rule_support/resource_governance.py",
                   "export": "shared_dependencies"
                 }
               }
@@ -4738,7 +4613,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -4756,7 +4631,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+                  "ref": "@kernel/targets/shared/rule_support/governance.py",
                   "export": "project_layout"
                 }
               }
@@ -4782,7 +4657,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -4800,7 +4675,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/resource_governance.py",
+                  "ref": "@kernel/targets/shared/rule_support/resource_governance.py",
                   "export": "packages"
                 }
               }
@@ -4820,7 +4695,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -4838,7 +4713,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/resource_use/ownership.py",
+                  "ref": "@kernel/targets/shared/rule_support/resource_use/ownership.py",
                   "export": "ownership"
                 }
               }
@@ -4858,7 +4733,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -4876,7 +4751,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+                  "ref": "@kernel/targets/shared/rule_support/governance.py",
                   "export": "shared_resources"
                 }
               }
@@ -4896,7 +4771,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -4914,7 +4789,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/resource_governance.py",
+                  "ref": "@kernel/targets/shared/rule_support/resource_governance.py",
                   "export": "project_structure"
                 }
               }
@@ -4934,7 +4809,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -4952,7 +4827,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/source_quality.py",
+                  "ref": "@kernel/targets/javascript/rules/source_quality.py",
                   "export": "project_handler.<locals>.check"
                 }
               }
@@ -4986,7 +4861,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/source_quality.py",
+            "path": "@kernel/targets/javascript/rules/source_quality.py",
             "line": 12,
             "symbol": "source_quality_resources"
           }
@@ -5004,7 +4879,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/source_quality.py",
+                  "ref": "@kernel/targets/javascript/rules/source_quality.py",
                   "export": "project_handler.<locals>.check"
                 }
               }
@@ -5024,7 +4899,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/source_quality.py",
+            "path": "@kernel/targets/javascript/rules/source_quality.py",
             "line": 12,
             "symbol": "source_quality_resources"
           }
@@ -5042,7 +4917,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/source_quality.py",
+                  "ref": "@kernel/targets/javascript/rules/source_quality.py",
                   "export": "project_handler.<locals>.check"
                 }
               }
@@ -5108,7 +4983,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/source_quality.py",
+            "path": "@kernel/targets/javascript/rules/source_quality.py",
             "line": 12,
             "symbol": "source_quality_resources"
           }
@@ -5126,7 +5001,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/source_quality.py",
+                  "ref": "@kernel/targets/javascript/rules/source_quality.py",
                   "export": "project_handler.<locals>.check"
                 }
               }
@@ -5274,7 +5149,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/source_quality.py",
+            "path": "@kernel/targets/javascript/rules/source_quality.py",
             "line": 12,
             "symbol": "source_quality_resources"
           }
@@ -5292,7 +5167,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+                  "ref": "@kernel/targets/shared/rule_support/governance.py",
                   "export": "governance_handlers.<locals>.root_quality.<locals>.check"
                 }
               }
@@ -5326,7 +5201,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -5344,7 +5219,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+                  "ref": "@kernel/targets/shared/rule_support/governance.py",
                   "export": "governance_handlers.<locals>.root_quality.<locals>.check"
                 }
               }
@@ -5364,7 +5239,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -5382,7 +5257,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+                  "ref": "@kernel/targets/shared/rule_support/governance.py",
                   "export": "governance_handlers.<locals>.root_quality.<locals>.check"
                 }
               }
@@ -5448,7 +5323,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -5466,7 +5341,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+                  "ref": "@kernel/targets/shared/rule_support/governance.py",
                   "export": "root_layout"
                 }
               }
@@ -5492,7 +5367,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -5510,7 +5385,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/resource_governance.py",
+                  "ref": "@kernel/targets/shared/rule_support/resource_governance.py",
                   "export": "nodesets"
                 }
               }
@@ -5530,7 +5405,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -5548,7 +5423,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/resource_governance.py",
+                  "ref": "@kernel/targets/shared/rule_support/resource_governance.py",
                   "export": "packages"
                 }
               }
@@ -5568,7 +5443,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -5586,7 +5461,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/resource_use/ownership.py",
+                  "ref": "@kernel/targets/shared/rule_support/resource_use/ownership.py",
                   "export": "ownership"
                 }
               }
@@ -5606,7 +5481,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -5624,7 +5499,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/resource_use/selection.py",
+                  "ref": "@kernel/targets/shared/rule_support/resource_use/selection.py",
                   "export": "duplicates"
                 }
               }
@@ -5644,7 +5519,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -5662,7 +5537,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/resource_use/selection.py",
+                  "ref": "@kernel/targets/shared/rule_support/resource_use/selection.py",
                   "export": "independent"
                 }
               }
@@ -5684,7 +5559,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -5702,7 +5577,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/resource_use/selection.py",
+                  "ref": "@kernel/targets/shared/rule_support/resource_use/selection.py",
                   "export": "plugins"
                 }
               }
@@ -5724,7 +5599,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -5742,7 +5617,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/resource_use/references.py",
+                  "ref": "@kernel/targets/shared/rule_support/resource_use/references.py",
                   "export": "references"
                 }
               }
@@ -5764,7 +5639,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -5782,7 +5657,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/resource_use/selection.py",
+                  "ref": "@kernel/targets/shared/rule_support/resource_use/selection.py",
                   "export": "compose"
                 }
               }
@@ -5808,7 +5683,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -5826,7 +5701,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/resource_use/selection.py",
+                  "ref": "@kernel/targets/shared/rule_support/resource_use/selection.py",
                   "export": "visibility"
                 }
               }
@@ -5848,7 +5723,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -5866,7 +5741,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+                  "ref": "@kernel/targets/shared/rule_support/governance.py",
                   "export": "root_resources"
                 }
               }
@@ -5892,7 +5767,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -5910,7 +5785,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+                  "ref": "@kernel/targets/shared/rule_support/governance.py",
                   "export": "governance_handlers.<locals>.root_quality.<locals>.check"
                 }
               }
@@ -6058,7 +5933,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -6076,7 +5951,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/workflow.py",
+                  "ref": "@kernel/targets/shared/rule_support/workflow.py",
                   "export": "summary"
                 }
               }
@@ -6102,7 +5977,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/graph/workflow.py",
+            "path": "@kernel/targets/javascript/rules/graph/workflow.py",
             "line": 6,
             "symbol": "workflow_plan_resources"
           }
@@ -6120,7 +5995,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/workflow.py",
+                  "ref": "@kernel/targets/shared/rule_support/workflow.py",
                   "export": "analysis"
                 }
               }
@@ -6142,7 +6017,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/graph/workflow.py",
+            "path": "@kernel/targets/javascript/rules/graph/workflow.py",
             "line": 6,
             "symbol": "workflow_plan_resources"
           }
@@ -6160,7 +6035,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/workflow.py",
+                  "ref": "@kernel/targets/shared/rule_support/workflow.py",
                   "export": "topic.<locals>.check"
                 }
               }
@@ -6182,7 +6057,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/graph/workflow.py",
+            "path": "@kernel/targets/javascript/rules/graph/workflow.py",
             "line": 6,
             "symbol": "workflow_plan_resources"
           }
@@ -6200,7 +6075,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/workflow.py",
+                  "ref": "@kernel/targets/shared/rule_support/workflow.py",
                   "export": "topic.<locals>.check"
                 }
               }
@@ -6222,7 +6097,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/graph/workflow.py",
+            "path": "@kernel/targets/javascript/rules/graph/workflow.py",
             "line": 6,
             "symbol": "workflow_plan_resources"
           }
@@ -6240,7 +6115,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/workflow.py",
+                  "ref": "@kernel/targets/shared/rule_support/workflow.py",
                   "export": "topic.<locals>.check"
                 }
               }
@@ -6262,7 +6137,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/graph/workflow.py",
+            "path": "@kernel/targets/javascript/rules/graph/workflow.py",
             "line": 6,
             "symbol": "workflow_plan_resources"
           }
@@ -6280,7 +6155,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/workflow.py",
+                  "ref": "@kernel/targets/shared/rule_support/workflow.py",
                   "export": "nodeset_types"
                 }
               }
@@ -6313,7 +6188,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/graph/workflow.py",
+            "path": "@kernel/targets/javascript/rules/graph/workflow.py",
             "line": 6,
             "symbol": "workflow_plan_resources"
           }
@@ -6331,7 +6206,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/workflow.py",
+                  "ref": "@kernel/targets/shared/rule_support/workflow.py",
                   "export": "topic.<locals>.check"
                 }
               }
@@ -6355,7 +6230,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/graph/workflow.py",
+            "path": "@kernel/targets/javascript/rules/graph/workflow.py",
             "line": 6,
             "symbol": "workflow_plan_resources"
           }
@@ -6373,7 +6248,7 @@
                 "language": "python",
                 "source": {
                   "kind": "file",
-                  "ref": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/workflow.py",
+                  "ref": "@kernel/targets/shared/rule_support/workflow.py",
                   "export": "review"
                 }
               }
@@ -6397,7 +6272,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rules/graph/workflow.py",
+            "path": "@kernel/targets/javascript/rules/graph/workflow.py",
             "line": 6,
             "symbol": "workflow_plan_resources"
           }
@@ -6473,7 +6348,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rulesets/standard.py",
+            "path": "@kernel/targets/javascript/rulesets/standard.py",
             "line": 5,
             "symbol": "standard_rulesets"
           }
@@ -6553,7 +6428,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rulesets/standard.py",
+            "path": "@kernel/targets/javascript/rulesets/standard.py",
             "line": 5,
             "symbol": "standard_rulesets"
           }
@@ -6633,7 +6508,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rulesets/standard.py",
+            "path": "@kernel/targets/javascript/rulesets/standard.py",
             "line": 5,
             "symbol": "standard_rulesets"
           }
@@ -6713,7 +6588,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rulesets/standard.py",
+            "path": "@kernel/targets/javascript/rulesets/standard.py",
             "line": 5,
             "symbol": "standard_rulesets"
           }
@@ -6793,7 +6668,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rulesets/standard.py",
+            "path": "@kernel/targets/javascript/rulesets/standard.py",
             "line": 5,
             "symbol": "standard_rulesets"
           }
@@ -6871,7 +6746,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rulesets/standard.py",
+            "path": "@kernel/targets/javascript/rulesets/standard.py",
             "line": 5,
             "symbol": "standard_rulesets"
           }
@@ -6918,7 +6793,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rulesets/standard.py",
+            "path": "@kernel/targets/javascript/rulesets/standard.py",
             "line": 5,
             "symbol": "standard_rulesets"
           }
@@ -6998,7 +6873,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rulesets/standard.py",
+            "path": "@kernel/targets/javascript/rulesets/standard.py",
             "line": 5,
             "symbol": "standard_rulesets"
           }
@@ -7055,7 +6930,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -7135,7 +7010,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rulesets/standard.py",
+            "path": "@kernel/targets/javascript/rulesets/standard.py",
             "line": 5,
             "symbol": "standard_rulesets"
           }
@@ -7194,7 +7069,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rulesets/source_quality.py",
+            "path": "@kernel/targets/javascript/rulesets/source_quality.py",
             "line": 5,
             "symbol": "source_quality_ruleset"
           }
@@ -7348,7 +7223,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -7451,7 +7326,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/shared/rule_support/governance.py",
+            "path": "@kernel/targets/shared/rule_support/governance.py",
             "line": 12,
             "symbol": "governance_resources"
           }
@@ -7638,7 +7513,7 @@
               "root_id": "",
               "path": ""
             },
-            "path": "/home/rockingsisyphus/projects/VibeFlow/src/vibeflow/targets/javascript/rulesets/standard.py",
+            "path": "@kernel/targets/javascript/rulesets/standard.py",
             "line": 5,
             "symbol": "standard_rulesets"
           }
@@ -7846,7 +7721,7 @@
           "base_libs": [
             "demo.math"
           ],
-          "capabilities": [],
+          "workflow_operations": [],
           "rulesets": [
             "vibeflow.process"
           ],
@@ -7894,7 +7769,7 @@
             }
           ],
           "base_libs": [],
-          "capabilities": [],
+          "workflow_operations": [],
           "rulesets": [],
           "presentation": {},
           "metadata": {}
@@ -8120,7 +7995,7 @@
         "base_libs": [
           "demo.math"
         ],
-        "capabilities": [],
+        "workflow_operations": [],
         "rulesets": [
           "vibeflow.process"
         ],
@@ -8454,7 +8329,7 @@
           }
         ],
         "base_libs": [],
-        "capabilities": [],
+        "workflow_operations": [],
         "rulesets": [],
         "presentation": {},
         "metadata": {},

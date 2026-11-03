@@ -7,6 +7,11 @@
       "type": "sandbox.number",
       "cardinality": "exactly_one",
       "display_name": "Number"
+    },
+    {
+      "type": "app.session",
+      "cardinality": "exactly_one",
+      "display_name": "Application session"
     }
   ],
   "provides": [
@@ -22,6 +27,12 @@
         "key": "x",
         "type": "sandbox.number",
         "display_name": "Number",
+        "required": true
+      },
+      {
+        "key": "app.session",
+        "type": "app.session",
+        "display_name": "Application session",
         "required": true
       }
     ],
@@ -52,15 +63,21 @@
         "definition_id": "sandbox.terminal",
         "display_name": "Inner end",
         "description": "Ends after the deferred result is joined."
+      },
+      {
+        "id": "start_application",
+        "definition_id": "app.input.nodeset_types_nested_async_inner_jsonc",
+        "display_name": "Application input",
+        "description": "Supplies the application instance to this entry."
       }
     ],
     "edges": [
       {
-        "from": "start",
+        "from": "start_application",
         "to": "double"
       },
       {
-        "from": "start",
+        "from": "start_application",
         "to": "audit"
       },
       {
@@ -70,7 +87,11 @@
       {
         "from": "audit",
         "to": "end"
-      }
+      },
+      [
+        "start",
+        "start_application"
+      ]
     ],
     "outputs": [
       {

@@ -7,6 +7,12 @@
         "type": "name.text",
         "display_name": "Name",
         "required": true
+      },
+      {
+        "key": "app_session",
+        "type": "app.session",
+        "display_name": "Application session",
+        "required": true
       }
     ],
     "nodes": [

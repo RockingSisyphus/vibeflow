@@ -48,7 +48,7 @@ def _node(value):
         exports=tuple(_record(v, m.DataProviderPlan) for v in value["exports"]),
         params=m.freeze_json_object(value["params"]),
         config_overrides=m.freeze_json_object(value["config_overrides"]),
-        capability_policy=m.freeze_json_object(value.get("capability_policy", {})),
+        workflow_operations=m.freeze_json_object(value.get("workflow_operations", {})),
         execution_lock=_lock(value["execution_lock"]),
     )
 

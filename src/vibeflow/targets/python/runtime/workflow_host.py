@@ -7,7 +7,7 @@ from .values import _public_result_value
 def bind_workflow(coordinator, descriptor, runtime_factory):
     def execute(inputs, options):
         runtime=runtime_factory(entry=options.get('entry'),
-            capabilities=options.get('capabilities',{}),workflow_instance_id=options['workflow_instance_id'])
+            workflow_session=options.get('workflow_session'),workflow_instance_id=options['workflow_instance_id'])
         def outputs(result):
             return {spec.public_name:_public_result_value(result.get(spec.public_name))
                     for spec in runtime.graph.outputs if result.exists(spec.public_name)}
@@ -24,7 +24,7 @@ async def run_connected(runtime_factory, *, workflow=None, initial=None, entry=N
     signal=CancellationSignal()
     async def execute(client):
         runtime=runtime_factory(entry=client.entry if client.entry is not None else entry,
-            capabilities={'vibeflow.workflow':client.operations()},workflow_instance_id=client.id)
+            workflow_session=client.session(),workflow_instance_id=client.id)
         unsubscribe=signal.subscribe(runtime.request_stop)
         try:
             inputs={**(initial or {}),**client.inputs}

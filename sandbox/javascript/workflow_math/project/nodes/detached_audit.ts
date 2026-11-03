@@ -2,25 +2,15 @@ interface AuditParams {
   readonly label: string;
 }
 
-interface AuditContext {
-  readonly capabilities: {
-    readonly "sandbox.audit": {
-      readonly record: (
-        input: { readonly label: string },
-      ) =>
-        | { readonly accepted: boolean }
-        | Promise<{ readonly accepted: boolean }>;
-    };
-  };
-}
+
 
 export async function run(
-  _inputs: Readonly<Record<never, never>>,
+  inputs: Readonly<Record<never, never>>,
   params: AuditParams,
-  context: AuditContext,
+  context: any,
 ): Promise<Readonly<Record<never, never>>> {
-  await context.capabilities["sandbox.audit"].record({
+  await (inputs as any)["app.session"].value.audit.record({
     label: params.label,
-  });
+  }, {signal: context.signal});
   return {};
 }

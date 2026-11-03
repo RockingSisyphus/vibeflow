@@ -6,7 +6,7 @@ from vibeflow.core.workflows.references import action_references
 
 def workflow_relations(architecture, workflow):
     result = []
-    for path, policy in architecture.get("call_policies", {}).items():
+    for path, policy in architecture.get("workflow_operations", {}).items():
         for action in policy.get("actions", ()):
             for reference in action_references(action):
                 result.append({"from_root":workflow["root_id"], "from_workflow":workflow["path"],

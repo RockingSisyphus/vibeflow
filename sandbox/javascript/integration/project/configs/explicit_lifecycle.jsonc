@@ -7,6 +7,12 @@
         "type": "sandbox.number",
         "display_name": "Number",
         "required": true
+      },
+      {
+        "key": "app_session",
+        "type": "app.session",
+        "display_name": "Application session",
+        "required": true
       }
     ],
     "nodes": [
@@ -39,11 +45,17 @@
         "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends the Host Extension fixture."
+      },
+      {
+        "id": "start_application",
+        "definition_id": "app.input.explicit_lifecycle_jsonc",
+        "display_name": "Application input",
+        "description": "Supplies the application instance to this entry."
       }
     ],
     "edges": [
       [
-        "start",
+        "start_application",
         "open"
       ],
       [
@@ -57,7 +69,17 @@
       [
         "close",
         "end"
-      ]
+      ],
+      [
+        "start",
+        "start_application"
+      ],
+      {
+        "from": "start_application",
+        "to": "close",
+        "schedule": false,
+        "transfer": true
+      }
     ],
     "outputs": [
       {

@@ -5,25 +5,8 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-PROFILE_SCHEMA = "vibeflow.distribution-profiles.v1"
+PROFILE_SCHEMA = "vibeflow.distribution-profiles.v2"
 PROFILE_NAMES = ("collaborative", "autonomous")
-PROTOCOL_KEYS = frozenset(
-    {
-        "change_inventory",
-        "planned_review",
-        "human_approval_gate",
-        "required_review_artifact",
-    }
-)
-AUTOMATION_KEYS = frozenset(
-    {
-        "refresh_architecture",
-        "validate",
-        "quality",
-        "build",
-        "workflow_execution_probe",
-    }
-)
 
 
 class DistributionProfileError(ValueError):
@@ -35,8 +18,6 @@ class DistributionProfile:
     name: str
     prompt_fragments: tuple[Path, ...]
     documents: tuple[Path, ...]
-    agent_protocol: Mapping[str, Any]
-    agent_automation: Mapping[str, bool]
 
 
 def load_distribution_profiles(path: Path) -> dict[str, DistributionProfile]:
@@ -70,7 +51,7 @@ def load_distribution_profiles(path: Path) -> dict[str, DistributionProfile]:
         raw = _mapping(raw_profiles[name], f"profiles.{name}")
         _reject_unknown(
             raw,
-            {"prompt_fragments", "document_sets", "agent_protocol", "agent_automation"},
+            {"prompt_fragments", "document_sets"},
             f"profiles.{name}",
         )
         prompts = _paths(
@@ -91,19 +72,10 @@ def load_distribution_profiles(path: Path) -> dict[str, DistributionProfile]:
         if len(documents) != len(set(documents)):
             raise DistributionProfileError(f"profiles.{name} contains duplicate documents")
 
-        protocol = _mapping(raw.get("agent_protocol"), f"profiles.{name}.agent_protocol")
-        _require_exact_keys(protocol, PROTOCOL_KEYS, f"profiles.{name}.agent_protocol")
-        automation = _mapping(raw.get("agent_automation"), f"profiles.{name}.agent_automation")
-        _require_exact_keys(automation, AUTOMATION_KEYS, f"profiles.{name}.agent_automation")
-        if any(not isinstance(value, bool) for value in automation.values()):
-            raise DistributionProfileError(f"profiles.{name}.agent_automation values must be booleans")
-        _validate_protocol(name, protocol)
         profiles[name] = DistributionProfile(
             name=name,
             prompt_fragments=prompts,
             documents=documents,
-            agent_protocol=dict(protocol),
-            agent_automation={key: bool(value) for key, value in automation.items()},
         )
     return profiles
 
@@ -195,36 +167,6 @@ def _reject_unknown(value: Mapping[str, Any], allowed: set[str], label: str) -> 
     unknown = sorted(set(value) - allowed)
     if unknown:
         raise DistributionProfileError(f"{label} contains unknown fields: {', '.join(unknown)}")
-
-
-def _require_exact_keys(value: Mapping[str, Any], expected: frozenset[str], label: str) -> None:
-    _reject_unknown(value, set(expected), label)
-    missing = sorted(expected - set(value))
-    if missing:
-        raise DistributionProfileError(f"{label} is missing fields: {', '.join(missing)}")
-
-
-def _validate_protocol(name: str, protocol: Mapping[str, Any]) -> None:
-    if protocol["change_inventory"] not in {"required", "optional"}:
-        raise DistributionProfileError(f"profiles.{name}.agent_protocol.change_inventory is invalid")
-    if protocol["required_review_artifact"] not in {"html_preview", "on_demand"}:
-        raise DistributionProfileError(
-            f"profiles.{name}.agent_protocol.required_review_artifact is invalid"
-        )
-    if not isinstance(protocol["planned_review"], bool) or not isinstance(protocol["human_approval_gate"], bool):
-        raise DistributionProfileError(f"profiles.{name}.agent_protocol boolean fields must be booleans")
-    if name == "collaborative":
-        expected = ("required", True, True, "html_preview")
-    else:
-        expected = ("optional", False, False, "on_demand")
-    actual = (
-        protocol["change_inventory"],
-        protocol["planned_review"],
-        protocol["human_approval_gate"],
-        protocol["required_review_artifact"],
-    )
-    if actual != expected:
-        raise DistributionProfileError(f"profiles.{name}.agent_protocol is contradictory")
 
 
 __all__ = [

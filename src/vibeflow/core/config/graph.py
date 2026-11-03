@@ -180,7 +180,7 @@ def _parse_node(item: Any, *, index: int) -> NodeCallSpec:
     if status == STATUS_IMPLEMENTED and flow_kind:
         raise GraphConfigError(f"pipeline.nodes[{index}].flow_kind is only allowed for planned nodes")
     if "io" in item or definition_id == "vibeflow.io":
-        raise GraphConfigError("replace native io with ordinary SDK nodes, explicit contracts and vibeflow.port Capability; add terminal boundaries", "GRAPH.IO.MIGRATION")
+        raise GraphConfigError("replace native io with ordinary SDK nodes, explicit contracts; add terminal boundaries", "GRAPH.IO.MIGRATION")
     explicit_contract = status == STATUS_PLANNED or definition_id in LOOP_DEFINITION_IDS
     if explicit_contract:
         for field_name in ("requires", "provides"):
@@ -210,7 +210,9 @@ def _parse_node(item: Any, *, index: int) -> NodeCallSpec:
     )
     if "task_targets" in item:
         raise GraphConfigError("GRAPH.TASK.MIGRATION: declare ordinary pipeline nodes and edges with an explicit downstream join", "GRAPH.TASK.MIGRATION")
-    reserved = {"task_targets", "rulesets", "id", "definition_id", "requires", "provides", "config", "node_configs", "allow_config_override", "override_child_config", "status", "flow_kind", "planned_behavior", "async", "result_key", "execution_lock", "display_name", "description", "style", "similar_to", "join_policy", "loop", "io"}
+    if status != STATUS_PLANNED and "workflow_operations" in item:
+        raise GraphConfigError("workflow_operations for implemented nodes belongs on the Node definition")
+    reserved = {"workflow_operations", "task_targets", "rulesets", "id", "definition_id", "requires", "provides", "config", "node_configs", "allow_config_override", "override_child_config", "status", "flow_kind", "planned_behavior", "async", "result_key", "execution_lock", "display_name", "description", "style", "similar_to", "join_policy", "loop", "io"}
     return NodeCallSpec(
         id=node_id,
         rulesets=_parse_rulesets(item.get("rulesets"), explicit="rulesets" in item),
@@ -228,6 +230,7 @@ def _parse_node(item: Any, *, index: int) -> NodeCallSpec:
         status=status,
         flow_kind=flow_kind,
         planned_behavior=planned_behavior,
+        workflow_operations=item.get("workflow_operations", ()),
         execution_lock=execution_lock,
     )
 

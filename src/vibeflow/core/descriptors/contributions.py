@@ -13,18 +13,18 @@ from vibeflow.core.descriptors.models import DescriptorModelError, _required_tex
 from vibeflow.core.descriptors.ownership import ResourceOwner
 
 
-PLUGIN_ABI = "vibeflow.plugin.v4"
+PLUGIN_ABI = "vibeflow.plugin.v5"
 RESOURCE_GROUPS = {
     "node_type": "node_types",
     "node": "nodes", "rule": "rules", "ruleset": "rulesets",
     "data_schema": "schemas", "base_lib": "base_libs",
-    "capability": "capabilities",  "plugin": "plugins",
+    "plugin": "plugins",
 }
 
 
 def resource_kind(descriptor: Any) -> str:
     """Read typed declaration identity without serializing its contents."""
-    from vibeflow.core.descriptors.models import NodeDescriptor, DataSchemaDescriptor, BaseLibDescriptor, CapabilityDescriptor, PluginDescriptor
+    from vibeflow.core.descriptors.models import NodeDescriptor, DataSchemaDescriptor, BaseLibDescriptor, PluginDescriptor
     from vibeflow.core.rules.models import RuleDescriptor, RulesetDescriptor
     from vibeflow.core.descriptors.source_bundle import PluginDeclarationDescriptor
     from vibeflow.core.descriptors.node_types import NodeTypeDescriptor
@@ -32,7 +32,6 @@ def resource_kind(descriptor: Any) -> str:
         return "node_type"
     types = ((NodeDescriptor, "node"), (RuleDescriptor, "rule"), (RulesetDescriptor, "ruleset"),
              (DataSchemaDescriptor, "data_schema"), (BaseLibDescriptor, "base_lib"),
-             (CapabilityDescriptor, "capability"),
              (PluginDescriptor, "plugin"), (PluginDeclarationDescriptor, "plugin_declaration"))
     for descriptor_type, kind in types:
         if isinstance(descriptor, descriptor_type):

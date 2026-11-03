@@ -11,10 +11,10 @@ import tempfile
 
 RESOURCE_NAMES = frozenset(
     {
-        "capability_helpers.mjs", "plugin_helpers.mjs", "root_helpers.mjs",
+        "workflow_session.mjs", "plugin_helpers.mjs", "root_helpers.mjs",
         "coordination/contracts.mjs", "coordination/coordinator.mjs", "coordination/workflow_client.mjs", "coordination/workflow_host.mjs", "coordination/workflow_node.mjs",
         "runtime_helpers.mjs", "execution_helpers.mjs", "status_helpers.mjs", "node_observation.mjs",
-        "sdk.mjs", "sdk.d.ts", "sdk_loader.mjs", "node_declarations.mjs", "node_contracts.d.ts",
+        "sdk.mjs", "sdk.d.ts", "sdk_loader.mjs", "node_declarations.mjs", "node_contracts.d.ts", "workflow_contracts.d.ts", "workflow_contracts.d.ts", "workflow_contracts.d.ts", "workflow_contracts.d.ts", "workflow_contracts.d.ts", "workflow_contracts.d.ts", "workflow_contracts.d.ts", "workflow_contracts.d.ts",
         "plugin_worker.mjs",
         "plugin_abi.d.ts",
         "rule_abi.d.ts",

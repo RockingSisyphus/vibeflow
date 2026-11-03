@@ -18,7 +18,7 @@ def prepare_targets(architecture, *, config, workspace, load_own_target=None):
         item = graphs[identity]
         facts = item["architecture"]
         from vibeflow.core.workflows.references import action_references
-        references = {json.dumps(ref, sort_keys=True):ref for policy in facts.get("call_policies", {}).values()
+        references = {json.dumps(ref, sort_keys=True):ref for policy in facts.get("workflow_operations", {}).values()
             for action in policy.get("actions", ()) for ref in action_references(action)}
         for reference in references.values():
             target_id = reference["root"] + ":" + reference["path"]

@@ -22,7 +22,7 @@ def workflow_plan_from_execution_plan(
     original = execution_plan.workflow_plan
     if original is None:
         raise PortablePlanError("execution plan has no prepared workflow")
-    original = workflow_subplan(original, execution_plan.python_bindings.block_id)
+    original = workflow_subplan(original, execution_plan.block_id)
     sources = _normalize_source_map(source_by_definition)
     frames_by_path = {}
     def collect(native, block_id):

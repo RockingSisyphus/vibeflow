@@ -19,9 +19,7 @@ from vibeflow.targets.javascript.frontend.declarations import declarations, sche
 from vibeflow.targets.javascript.frontend.errors import AotBuildError, ProjectBuildError
 from vibeflow.block_compiler.model import WORKFLOW_ABI_VERSION as ABI_VERSION
 from vibeflow.targets.javascript.frontend.errors import AotPlanError
-from vibeflow.targets.javascript.frontend.contracts import (
-    CapabilityRequirement, COMPLETIONS, EXECUTORS, SCHEDULES,
-)
+from vibeflow.targets.javascript.frontend.contracts import COMPLETIONS, EXECUTORS, SCHEDULES
 
 from vibeflow.targets.javascript.frontend.schema import (
     JAVASCRIPT_SAFE_INTEGER_MAX,
@@ -36,7 +34,6 @@ __all__ = [
     "ABI_VERSION",
     "AotBuildError",
     "AotPlanError",
-    "CapabilityRequirement",
     "COMPLETIONS",
     "EXECUTORS",
     "JAVASCRIPT_SAFE_INTEGER_MAX",

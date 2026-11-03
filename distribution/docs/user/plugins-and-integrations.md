@@ -1,6 +1,6 @@
 # Plugin 与宿主 API
 
-Plugin 是一个原子资源包，贡献 NodeType、Rule、Ruleset、DataSchema、私有 BaseLib、Capability 及可选 compiler/runtime 扩展。业务 Node 在所属 `nodes/` 中独立声明，不放入 Plugin 的 `resources`。
+Plugin 是一个原子资源包，贡献 NodeType、Rule、Ruleset、DataSchema、私有 BaseLib 及可选 compiler/runtime 扩展。业务 Node 在所属 `nodes/` 中独立声明，不放入 Plugin 的 `resources`。
 
 ## 声明与选择
 
@@ -71,11 +71,14 @@ def create_runtime(context):
 
 ## 宿主集成
 
-宿主提供普通 Capability API，Node 显式声明所用操作，并由 Rule 授权。比如浏览器应用构造一个尚未监听消息的 API，将其注入运行；图中的“建立监听”节点调用 open，接收节点等待消息，关闭节点调用 close。宿主提供取消后的必要资源释放，图中仍可审查正常路径的关键生命周期。
+Node 可以在实际运行时直接使用所属环境的 API，例如浏览器的 DOM、应用模块提供的队列或桌面程序接口。按操作选择适当的副作用规则；纯处理节点仍只做计算。JS 的 DOM 节点可选择现有的 `vibeflow.document`，进程环境等宿主 IO 可选择 `vibeflow.python_io`（这是共享 Rule 的既有名称，同样用于 JS）；`vibeflow.io` 的范围仅覆盖终端 IO。
 
-浏览器、桌面程序和后台服务管理各自生命周期，跨程序启动和通信通过 workflow 协同接口接入。
+同进程需要传入队列等活对象时，将其作为普通运行输入，并在输入契约中声明对应业务类型。实例不能写入 JSON 配置或 AOT；应用负责创建、并发隔离、监听和清理。浏览器监听应在节点执行时建立，并在完成或取消后移除。
 
-Capability 声明与有效 Rule 策略共同限定节点上下文提供的操作。
+
+例如，在浏览器 Node 的实际 `run` 中使用 `document.querySelector("#result").textContent = String(value)`，并为该 Node 选择 `vibeflow.document`。事件监听在 `run` 内建立，用 `try/finally` 在正常完成、失败或取消后移除；异步 Node 声明 `completion: "suspend"`，显式把 `context.signal` 接入等待。不要在导入模块时监听页面。
+
+独立 workflow 使用专用 `context.workflow` 接口通信。浏览器、桌面程序和后台服务管理各自生命周期；标准协作宿主只负责接入、消息和真实终态，不接管整个应用。
 
 ## 相关文档
 

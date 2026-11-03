@@ -1,36 +1,14 @@
-# JavaScript 嵌套与循环数学
+<!-- vibeflow-directory-purpose -->
+# javascript / 嵌套与循环数学
 
-通过真实 TypeScript Plugin、Node、BaseLib、Config 和 AOT 构建执行。共享纯数学库；每个配置只构建一次，trace 矩阵复用同一构建，每次调用使用独立运行状态。
+真实小整数 Node、BaseLib、Nodeset 与循环配置。retry 从 1 连加三次 2 得到 7；nested 的独立期望为 (4+6)×2+5=25。停止条件、carry、输出及正常运行日志由功能测试检查。
 
-| 场景 | 手写期望及通过条件 |
-| --- | --- |
-| nested_override | 输入 5：覆盖分支 `5*3+4=19`，同级默认分支 `5*2+1=11`；覆盖不泄漏，嵌套路径正确 |
-| loop | 从 4 开始加三次 1：7；三次 carry、迭代事件正确 |
-| nested_loop | 从 4 开始，外层两次、内层三次，每次加 1：10；六次 increment、八个内外层迭代事件 |
-| edge_roles | 10 加 1 再乘 2：22；调度边不传送 999，数据边不提前触发消费者；实际顺序正确 |
-| nested_async | 两层 Nodeset 内 `7*2=14`；deferred/detached 计划与完整路径正确；保留超时诊断和失败后复用检查 |
-| task_metadata | 同步 `(10+8)-3=15`、等待能力后 `6*2=12`；区分同步返回与 Promise，核对 ordinary Node 与 event_loop executor；数据释放前不得完成 |
-| loop_max_failure | 从 1 开始加 1，目标无法在两次内达到；应报 VF_MAX_STEPS，错误包含 workflow/节点/块路径，end 不执行 |
-| trace_matrix | 同一 nested_override 构建分别 full/boundary/off 调用，数字不变；full 有节点事件，boundary 保留 Nodeset 边界，off 不输出事件 |
-| conditional_routes | `receive_event → finish_call` 同时声明 `done` 和 `failed` 两条条件边；两个状态均得到 `42+1=43`，收尾节点恰好执行一次。同步/异步各检查原顺序、反顺序、完全重复边及条件重叠；未知状态作为对照，只有重叠条件明确覆盖时才执行 |
+本目录保存真实使用工程、配置与独立预期；驱动和断言按功能统一在 tests/e2e，不保留单独总包或探针。测试复制输入至仓库外工作区后进行修改、构建和运行。
 
-保留旧断言的公共辅助函数，避免重复编写任务元数据和错误路径检查。新增双层循环直接复用单层的 +1 body。正常源码使用标准 vibeflow.process；自定义 Rule 专项由原 comprehensive_math 和其他保留入口验证。
+功能域回归入口：
 
 ```bash
-python sandbox/javascript/workflow_math/run_all.py --work-dir /tmp/workflow-math-js \
-  --toolchain-root /path/to/project-with-installed-node_modules
+python tools/run_tests.py -- tests/e2e/test_javascript.py
 ```
 
-共十六组观察，其中 trace_matrix 包含三次独立调用，conditional_routes 包含八次 AOT 构建、二十四次真实 Node.js 调用。入口自动纳入 JS integration，并由根目录 `python tools/verify_project.py --full` 执行。原配置仍被 pytest 和架构审查使用，继续保留。完整验证的执行方式见[开发与验证](../../../docs/maintainers/development.md#验证层级)。
-
-条件边回归的固定配置是 [conditional_routes.jsonc](project/configs/conditional_routes.jsonc)。修改内核时不要把两个不同条件改成一条边来使测试通过：本例保护的正是同一起点和终点允许多条独立条件边。旧的按起终点合并行为会让 `failed` 丢失；交换顺序后则让 `done` 丢失。完全重复和重叠用例额外检查不会重复执行或重复传入同一份数据。变体配置仅生成在临时工作区；保留默认 Workflow/Node Rules。
-
-## 目录用途与边界
-
-仅用于：javascript / workflow_math 案例，验证以数学流程验证嵌套、循环、执行与 trace；保留真实项目输入与 runner。
-
-- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
-- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
-- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
-
-完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。
+完整验收及其他平台场景见[测试覆盖](../../TEST_COVERAGE.md)和[开发与验证](../../../docs/maintainers/development.md)。新增目录同步说明职责；运行日志、依赖和构建产物不写入本目录。

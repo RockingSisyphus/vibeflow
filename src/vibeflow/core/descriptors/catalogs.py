@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Generic, Iterable, Iterator, TypeVar
 
-from vibeflow.core.descriptors.models import BaseLibDescriptor, CapabilityDescriptor, DataSchemaDescriptor, NodeDescriptor, PluginDescriptor
+from vibeflow.core.descriptors.models import BaseLibDescriptor, DataSchemaDescriptor, NodeDescriptor, PluginDescriptor
 
 
 DescriptorT = TypeVar(
@@ -11,7 +11,6 @@ DescriptorT = TypeVar(
     NodeDescriptor,
     BaseLibDescriptor,
     DataSchemaDescriptor,
-    CapabilityDescriptor,
 
     PluginDescriptor,
 )
@@ -161,9 +160,6 @@ class SchemaRegistry(_DescriptorCatalog[DataSchemaDescriptor]):
     descriptor_type = DataSchemaDescriptor
 
 
-class CapabilityCatalog(_DescriptorCatalog[CapabilityDescriptor]):
-    descriptor_label = "capability"
-    descriptor_type = CapabilityDescriptor
 
 
 
@@ -197,7 +193,6 @@ class DescriptorCatalogs:
     nodes: NodeCatalog
     base_libs: BaseLibCatalog
     schemas: SchemaRegistry
-    capabilities: CapabilityCatalog
 
     plugins: PluginCatalog = field(default_factory=PluginCatalog)
     node_types: NodeTypeCatalog = field(default_factory=NodeTypeCatalog)
@@ -216,7 +211,6 @@ class DescriptorCatalogs:
             nodes=NodeCatalog(),
             base_libs=BaseLibCatalog(),
             schemas=SchemaRegistry(),
-            capabilities=CapabilityCatalog(),
 
             plugins=PluginCatalog(),
         )
@@ -227,7 +221,6 @@ class DescriptorCatalogs:
             "node_types": self.node_types.to_dict(),
             "base_lib": self.base_libs.to_dict(),
             "data_schemas": self.schemas.to_dict(),
-            "capabilities": self.capabilities.to_dict(),
 
             "plugins": self.plugins.to_dict(),
             "rules": self.rules.to_dict(),

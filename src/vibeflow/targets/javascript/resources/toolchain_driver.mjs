@@ -699,7 +699,7 @@ function isSdkDeclaration(ts, sourceFile, value) {
     if (bindings?.elements) for (const item of bindings.elements) imports.set(item.name.text, (item.propertyName || item.name).text);
     else if (bindings?.name) imports.set(bindings.name.text, "*");
   }
-  const names = new Set(["defineNode", "defineNodeType", "defineRule", "defineRuleset", "definePlugin", "defineDataSchema", "defineBaseLib", "defineCapability", "defineResource"]);
+  const names = new Set(["defineNode", "defineNodeType", "defineRule", "defineRuleset", "definePlugin", "defineDataSchema", "defineBaseLib", "defineResource"]);
   const identified = names.has(imports.get(expression.text)) ||
     (imports.get(expression.expression?.text) === "*" && names.has(expression.name?.text));
   // Constructor arguments remain ordinary expressions. Inline implementations
@@ -1929,7 +1929,7 @@ function auditHostIo(ts, sourceFile, checker, project, policy, ruleParams = {}) 
       sourceFile,
       node,
       code,
-      `${owner.kind} '${owner.id}' cannot access host global '${name}' under effect_scope '${scope}'; use an explicitly permitted effect or Capability`,
+      `${owner.kind} '${owner.id}' cannot access host global '${name}' under effect_scope '${scope}'; use an explicitly permitted effect`,
     ));
   }
 
@@ -2274,7 +2274,14 @@ function qualityCallGraph(ts, sourceFile, exportName) {
     visit(node.body);
     graph[name] = [...calls].sort();
   }
-  const entry = functions.has(exportName) ? exportName : (aliases.get(exportName) || "");
+  // SDK bindings such as task.run can refer to a separately declared function
+  // through a shorthand/property. Resolve the same implementation used by the
+  // other source checks rather than silently analyzing an empty call graph.
+  const implementation = implementationDeclaration(ts, sourceFile, exportName);
+  const bound = implementation && [...functions].find(([, node]) =>
+    node.kind === implementation.kind && node.getStart(sourceFile) === implementation.getStart(sourceFile)
+      && node.getEnd() === implementation.getEnd())?.[0];
+  const entry = functions.has(exportName) ? exportName : (bound || aliases.get(exportName) || "");
   return { entry, calls: graph };
 }
 

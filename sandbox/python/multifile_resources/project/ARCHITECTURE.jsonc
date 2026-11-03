@@ -480,7 +480,7 @@
       }
     ]
   },
-  "call_policies": {},
+  "workflow_operations": {},
   "resource_use": {
     "workflow": "resource-python:configs/workflow.jsonc",
     "resources": [
@@ -525,16 +525,6 @@
       {
         "kind": "rule",
         "id": "vibeflow.async_lifecycle",
-        "reason": "builtin"
-      },
-      {
-        "kind": "rule",
-        "id": "vibeflow.capability.allow",
-        "reason": "builtin"
-      },
-      {
-        "kind": "rule",
-        "id": "vibeflow.capability.restrict",
         "reason": "builtin"
       },
       {
@@ -922,7 +912,7 @@
         "base_libs": [
           "demo.math"
         ],
-        "capabilities": [],
+        "workflow_operations": [],
         "rulesets": [
           "vibeflow.process"
         ],
@@ -1298,7 +1288,7 @@
           }
         ],
         "base_libs": [],
-        "capabilities": [],
+        "workflow_operations": [],
         "rulesets": [],
         "presentation": {},
         "metadata": {},

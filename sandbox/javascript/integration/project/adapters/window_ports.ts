@@ -54,7 +54,6 @@ export function createWindowPortApi(context: WindowPortContext) {
   let hostId: number | null = null;
   const queued: unknown[] = [];
   let pending: PendingReceive | null = null;
-  let receiveCount = 0;
   let started = false;
 
   function notify(payload: Record<string, unknown>): void {
@@ -89,21 +88,10 @@ export function createWindowPortApi(context: WindowPortContext) {
           request: PortRequest,
           options: PortCallOptions = {},
         ): Promise<{ readonly value: unknown }> {
-          receiveCount += 1;
-          notify({
-            kind: "vibeflow-sandbox-receive",
-            port: request.port,
-            receiveCount,
-          });
           if (queued.length > 0) {
             return Promise.resolve({ value: queued.shift() });
           }
           const signal = options.signal ?? context.signal;
-          notify({
-            kind: "vibeflow-sandbox-waiting",
-            port: request.port,
-            receiveCount,
-          });
           return new Promise((resolve, reject) => {
             const onAbort = () => {
               if (pending?.onAbort !== onAbort) return;
@@ -145,5 +133,5 @@ export function createWindowPortApi(context: WindowPortContext) {
     notify({ kind: "vibeflow-sandbox-lifecycle", phase: "stop" });
     return null;
   }
-  return {"vibeflow.port":ports,"sandbox.window_session":{open,close}};
+  return {queue:ports,window_session:{open,close}};
 }

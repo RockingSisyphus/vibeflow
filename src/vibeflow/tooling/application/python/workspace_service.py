@@ -94,7 +94,7 @@ def run_workspace_checked(
     run_id: str | None = None,
     runtime_options: object | None = None,
     delegate_cli: bool = False,
-    capabilities: Mapping[str, object] | None = None,
+    workflow_session: object | None = None,
     workflow_instance_id: str | None = None,
     _prepared_run_dir: Path | None = None,
     preview_root: str | Path | None = None,
@@ -152,8 +152,8 @@ def run_workspace_checked(
         _write_preflight_artifacts(run_dir, graph, compiled, health, registry=env.registry, resources=resources, prepared=presentation)
         _refuse_on_health_failure(health, run_dir, actual_run_id)
         execute_kwargs = {"delegate_cli": True} if delegate_cli else {}
-        if capabilities is not None:
-            execute_kwargs["capabilities"] = capabilities
+        if workflow_session is not None:
+            execute_kwargs["workflow_session"] = workflow_session
         if workflow_instance_id is not None:
             execute_kwargs["workflow_instance_id"] = workflow_instance_id
         from vibeflow.tooling.application.python.project.lifecycle import lifecycle_registry, checked_runtime_plugins

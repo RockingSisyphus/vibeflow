@@ -73,10 +73,10 @@ export class WorkflowClient {
     while(true) {
       signal?.throwIfAborted();
       if(this.closed)throw new WorkflowCoordinationError("VF_INSTANCE_ENDED",this.id);
-      if(Date.now()>=deadline)throw new WorkflowCoordinationError("VF_WAIT_TIMEOUT",id);
-      const value={id};if(port!==undefined)value.port=port;
+      const value={id,poll:Math.max(0,Math.min(.25,(deadline-Date.now())/1000))};if(port!==undefined)value.port=port;
       const result=await this.request(operation,value,signal);
       if(!result.pending)return result;
+      if(Date.now()>=deadline)throw new WorkflowCoordinationError("VF_WAIT_TIMEOUT",id);
     }
   }
   async call(workflow, {launch,inputs={},timeout,signal}={}) {
@@ -87,7 +87,7 @@ export class WorkflowClient {
   wait(id, options={}) {return this.poll("wait",id,options);}
   receive(port="default", options={}) {return this.poll("receive",this.id,{...options,port});}
   async kill(id, options={}) {await this.request("kill",{id,...(options.workflow?{workflow:{...options.workflow,root:options.workflow.root||this.workflow?.root||""}}:{})},options.signal);return this.wait(id,options);}
-  operations() {
+  session() {
     return {
       call:(request,context={})=>this.call(request.workflow,{...request,signal:context.signal}),
       wait:(request,context={})=>this.wait(request.id,{...request,signal:context.signal}),

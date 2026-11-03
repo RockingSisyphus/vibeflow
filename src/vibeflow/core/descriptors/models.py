@@ -310,29 +310,6 @@ class NodeContractDescriptor:
         }
 
 
-@dataclass(frozen=True)
-class CapabilityRequirementDescriptor:
-    id: str
-    operations: tuple[str, ...]
-
-    def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "id",
-            _required_text(self.id, field_name="capability requirement id"),
-        )
-        operations = _string_tuple(
-            self.operations,
-            field_name="capability requirement operations",
-        )
-        if not operations:
-            raise DescriptorModelError(
-                "capability requirement operations cannot be empty"
-            )
-        object.__setattr__(self, "operations", operations)
-
-    def to_dict(self) -> dict[str, object]:
-        return {"id": self.id, "operations": list(self.operations)}
 
 
 @dataclass(frozen=True)
@@ -346,7 +323,7 @@ class NodeDescriptor:
     node_type: str
     implementations: tuple[ImplementationDescriptor, ...] = ()
     base_libs: tuple[str, ...] = ()
-    capabilities: tuple[CapabilityRequirementDescriptor, ...] = ()
+    workflow_operations: tuple[Mapping[str, Any], ...] = ()
     author: str | None = None
     tags: tuple[str, ...] = ()
     external: bool = False
@@ -398,19 +375,6 @@ class NodeDescriptor:
             implementations,
             field_name="node.implementations",
         )
-        capabilities = tuple(self.capabilities)
-        if not all(
-            isinstance(item, CapabilityRequirementDescriptor)
-            for item in capabilities
-        ):
-            raise DescriptorModelError(
-                "node.capabilities must contain CapabilityRequirementDescriptor values"
-            )
-        capability_ids = tuple(item.id for item in capabilities)
-        if len(set(capability_ids)) != len(capability_ids):
-            raise DescriptorModelError(
-                "node.capabilities contains duplicate capability ids"
-            )
         if not isinstance(self.external, bool):
             raise DescriptorModelError("node.external must be a boolean")
         object.__setattr__(self, "implementations", implementations)
@@ -419,7 +383,8 @@ class NodeDescriptor:
             "base_libs",
             _string_tuple(self.base_libs, field_name="node.base_libs"),
         )
-        object.__setattr__(self, "capabilities", capabilities)
+        from vibeflow.core.workflows.operations import normalize_operations
+        object.__setattr__(self, "workflow_operations", normalize_operations(self.workflow_operations))
         object.__setattr__(self, "author", _optional_text(self.author))
         object.__setattr__(
             self,
@@ -436,11 +401,6 @@ class NodeDescriptor:
     def required_base_libs(self) -> tuple[str, ...]:
         return self.base_libs
 
-    @property
-    def required_capabilities(
-        self,
-    ) -> tuple[CapabilityRequirementDescriptor, ...]:
-        return self.capabilities
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
@@ -458,7 +418,7 @@ class NodeDescriptor:
                 item.to_dict() for item in self.implementations
             ],
             "base_libs": list(self.base_libs),
-            "capabilities": [item.to_dict() for item in self.capabilities],
+            "workflow_operations": [dict(item) for item in self.workflow_operations],
         }
         if self.author is not None:
             payload["author"] = self.author
@@ -486,7 +446,4 @@ def _validate_implementation_coverage(
             seen[target] = implementation
 
 
-from vibeflow.core.descriptors._resource_models import BaseLibDescriptor, CapabilityDescriptor, CapabilityOperationDescriptor, DataSchemaDescriptor, PluginDescriptor
-
-CapabilityOperation = CapabilityOperationDescriptor
-CapabilityRequirement = CapabilityRequirementDescriptor
+from vibeflow.core.descriptors._resource_models import BaseLibDescriptor, DataSchemaDescriptor, PluginDescriptor

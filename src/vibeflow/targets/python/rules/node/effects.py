@@ -13,17 +13,6 @@ def no_side_effects(context, inputs, params):
     scope = rule_effect_scope(params)
     policy = source_policy(params, sections=("imports",))
     policy_record = RuleRecord(EFFECT_POLICY_TYPE, {"effect_scope": scope, "source": "vibeflow.no_side_effects"})
-    if context.subject.get("kind") == "python_source":
-        from vibeflow.targets.python.rules.node.project_effects import source_effect_findings
-        sources = context.facts.get("python_sources")
-        if sources is None:
-            sources = ((context.require("python_source"), context.require("source_file")),)
-        from vibeflow.targets.python.quality.source_context import build_python_source_context
-        source_context = build_python_source_context((), (parsed for _, parsed in sources))
-        return RuleResult(records={"effect_policy":policy_record},findings=tuple(
-            finding for source, parsed in sources if parsed._tree is not None
-            for finding in source_effect_findings(source, parsed._tree, policy=policy, effect_scope=scope,
-                resolved_calls=source_context.resolved_function_calls(parsed.path))))
     if context.subject.get("kind") == "base_lib":
         from vibeflow.targets.python.rules.node.base_lib_effects import _BaseLibEffectVisitor
         source = context.require("base_lib_file")

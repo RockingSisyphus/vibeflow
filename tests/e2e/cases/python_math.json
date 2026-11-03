@@ -1,0 +1,65 @@
+[
+  {
+    "config": "retry",
+    "initial": {
+      "loop.current": 1
+    },
+    "expected_outputs": {
+      "loop.next": 7,
+      "loop.done": true,
+      "loop.iterations": 3
+    }
+  },
+  {
+    "config": "wrapped_retry",
+    "initial": {
+      "loop.current": 1
+    },
+    "expected_outputs": {
+      "loop.next": 7,
+      "loop.done": true,
+      "loop.iterations": 3
+    }
+  },
+  {
+    "config": "outer_fixed",
+    "initial": {},
+    "expected_outputs": {
+      "total.final": 6,
+      "outer.final": 3,
+      "outer.done": false,
+      "outer.iterations": 3,
+      "inner.iterations.history": [
+        2,
+        2,
+        2
+      ]
+    }
+  },
+  {
+    "config": "outer_condition",
+    "initial": {},
+    "expected_outputs": {
+      "total.final": 6,
+      "outer.final": 2,
+      "outer.done": true,
+      "outer.iterations": 2,
+      "inner.iterations.history": [
+        3,
+        3
+      ]
+    }
+  },
+  {
+    "config": "nested",
+    "initial": {
+      "calc.a": 4,
+      "calc.b": 6
+    },
+    "expected_outputs": {
+      "calc.scaled": 20,
+      "calc.branch": 20,
+      "calc.final": 25
+    }
+  }
+]

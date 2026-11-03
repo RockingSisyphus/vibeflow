@@ -147,7 +147,7 @@ class Coordinator:
             item=self.reserve(workflow=reference)
             self.register({'id':item['id'],'workflow':reference})
             options = {'entry':entry,'workflow_instance_id':item['id'],
-                       'capabilities':{'vibeflow.workflow':self.operations(item['id'])}}
+                       'workflow_session':self.session(item['id'])}
             return reference, runner, entry, item, inputs, options
         reference, runner, entry, item, inputs, options = _dispatch(prepare)
         try:
@@ -193,7 +193,7 @@ class Coordinator:
             try:
                 result = runner(json_value(item['inputs']), {'entry':entry,
                     'workflow_instance_id':item['id'],
-                    'capabilities':{'vibeflow.workflow':self.operations(item['id'])}})
+                    'workflow_session':self.session(item['id'])})
                 if descriptor['entry_mode'] == 'sync' and (inspect.isawaitable(result) or isinstance(result,Future)):
                     if inspect.iscoroutine(result):result.close()
                     raise CoordinationError('VF_COMPLETION_MISMATCH','sync target returned pending work')
@@ -213,7 +213,9 @@ class Coordinator:
     _error = staticmethod(error_record)
 
     async def call(self, sender, request, *, wait_ready=True, signal=None):
-        reference = workflow_reference(request['workflow'],root=self._instance(sender)['workflow'].get('root','') if isinstance(self._instance(sender)['workflow'],dict) else '')
+        if signal is not None:
+            signal.throw_if_aborted()
+        reference = self._reference(request['workflow'], sender)
         launch = launch_configuration(request['launch'])
         declarations = [item for item in self.launches if item['workflow']==reference and item['launch']==launch
                         and (not item.get('caller') or isinstance(self._instance(sender)['workflow'],dict)
@@ -246,18 +248,10 @@ class Coordinator:
             if item['task'] is not None:cancel_once(item['task'])
             self._notify(item)
 
-    def operations(self, identifier):
-        from .operations import Operation, immediate_dispatch
-        immediate = immediate_dispatch()
-        async def call(request,signal):return await self.call(identifier,request,signal=signal)
-        async def wait(request,signal):return await self.wait_for('wait',request['id'],timeout=request.get('timeout'),signal=signal)
-        async def receive(request,signal):return await self.wait_for('receive',identifier,port=request.get('port','default'),timeout=request.get('timeout'),signal=signal)
-        async def kill(request,signal):
-            self.request_stop(self._instance(request['id']),request['workflow'])
-            return await wait(request,signal)
-        return {'invoke_sync':Operation(lambda request,signal:self.invoke_sync(request,sender=identifier,_dispatch=immediate)),
-                'call':Operation(call),'wait':Operation(wait),'receive':Operation(receive),'kill':Operation(kill),
-                'send':Operation(lambda request,signal:immediate(lambda:self.send(identifier,request['id'],request.get('payload'),request.get('port','default'))))}
+
+    def session(self, identifier):
+        from .operations import CoordinatorSession
+        return CoordinatorSession(self, identifier)
 
     def release(self, identifier):
         item=self._instance(identifier)

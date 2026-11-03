@@ -82,8 +82,8 @@ def prepare_python_workflow(graph, compiled, *, registry, global_config=None, no
         )
     except ValueError as exc:
         raise PipelineRuntimeError(str(exc)) from exc
-    from vibeflow.block_compiler.policies import apply_call_policies
-    workflow = apply_call_policies(workflow, registry.call_capability_policies)
+    from vibeflow.block_compiler.operations import apply_workflow_operations
+    workflow = apply_workflow_operations(workflow, graph, lambda key: registry.descriptor(key) if key in registry.available() else None)
     return PreparedPythonWorkflow(workflow, graphs,
         {_block_id(path): value for path, value in compilations.items()}, globals_by_block, overrides_by_block)
 
@@ -109,7 +109,6 @@ def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_reg
     """
     from vibeflow.targets.python.runtime.planning import ExecutionPlan, NodeFrame
     from vibeflow.targets.python.runtime.block_compiler import compile_blocks
-    from vibeflow.targets.python.runtime.support.binding_builder import build_python_binding_plan
     from vibeflow.targets.python.runtime.support.planned import resolve_stub_module_path, hash_file
     from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
     from vibeflow.core.config.scope import attach_global_config
@@ -170,12 +169,10 @@ def bind_python_workflow(prepared, *, registry, runtime_options=None, plugin_reg
                 loop_spec=spec.loop, execution_lock=spec.execution_lock,
                 subplan=bind(call.child_block) if call.child_block else None,
                 accepts_context=accepts_context, planned_behavior=behavior,
-                capability_policy=call.capability_policy.to_value(), completion=call.completion,
+                workflow_operations=call.workflow_operations.to_value(), completion=call.completion,
                 planned_stub_module=behavior.stub_module, planned_stub_path=stub_path, planned_stub_hash=stub_hash)
-        bindings = build_python_binding_plan(frames, order=block.order, path=block.path,
-            plugin_registry=plugin_registry if block_id == prepared.workflow.entry_block else None)
         plan = ExecutionPlan(graph=graph, compiled=compiled, frames=frames, order=block.order,
-            max_steps=block.max_steps, python_bindings=bindings, workflow_plan=prepared.workflow,
+            max_steps=block.max_steps, block_id=block_id, workflow_plan=prepared.workflow,
             contains_global_state=block.contains_global_state,
             contains_execution_locks=bool(block.execution_lock) or any(
                 not frame.is_planned and (frame.execution_lock or (frame.subplan and frame.subplan.contains_execution_locks)

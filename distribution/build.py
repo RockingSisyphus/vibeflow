@@ -396,7 +396,7 @@ def _populate_distribution(output: Path, *, profile: DistributionProfile | None 
     _copy_license(output)
     _copy_third_party_notices(output)
     _copy_javascript_sdk(output)
-    _copy_coordination_templates(output)
+    _copy_tree(ROOT / "distribution/templates", output / "kernel/templates")
     _write_kernel_archive(ROOT / "src" / "vibeflow", output / KERNEL_ZIP_RELATIVE,
                           viewer_source=ROOT / "tools" / "workflow-viewer")
     _ensure_standard_project_dirs(output)
@@ -418,6 +418,9 @@ def _write_profile_assets(output: Path, profile: DistributionProfile) -> None:
         f"# VibeFlow {VERSION} {profile_title}开发包\n\n"
         "本发行包包含相同内核下的最小 Python Runtime 与 JavaScript AOT 项目。"
         "先阅读 `AGENTS.md` 和 `kernel/docs/README.md`。\n\n"
+        "业务 root 在 `vibeflow_config.jsonc` 中注册，目录名和 ID 均可自定义。"
+        "`DISTRIBUTION.json` 只记录原始发行身份，不用于项目配置；"
+        "目录调整见[项目治理](kernel/docs/user/project-governance.md)。\n\n"
         "双击 `vibeflow-preview.html` 可离线打开浏览工具；初始历史为空。"
         "执行 `python run.py review --config <workflow>` 后，在页面刷新历史或打开返回的快照定位链接。"
         "`vibeflow-preview.config.js` 配置数据位置，页面资源和历史在 `vibeflow-preview/`。\n",
@@ -653,11 +656,6 @@ def _verify_profile_assets(output: Path) -> None:
         profile = _select_profile(_load_profiles(), str(metadata.get("development_profile", "")))
     except (OSError, json.JSONDecodeError, BuildDistributionError) as exc:
         raise BuildDistributionError(f"distribution profile metadata is invalid: {exc}") from exc
-    if (
-        metadata.get("agent_protocol") != dict(profile.agent_protocol)
-        or metadata.get("agent_automation") != dict(profile.agent_automation)
-    ):
-        raise BuildDistributionError("distribution metadata does not match the selected agent protocol")
     expected_prompt = "\n\n".join(
         path.read_text(encoding="utf-8").rstrip()
         for path in profile.prompt_fragments
@@ -759,26 +757,10 @@ def _copy_javascript_sdk(output: Path) -> None:
         else:
             data = (origin / name).read_text(encoding="utf-8")
         (target / name).write_text(data, encoding="utf-8")
-    for name in ("node_declarations.mjs", "node_contracts.d.ts"):
+    for name in ("node_declarations.mjs", "node_contracts.d.ts", "workflow_contracts.d.ts"):
         shutil.copy2(source / name, target / name)
 
 
-def _copy_coordination_templates(output: Path) -> None:
-    """Copy ordinary SDK examples; protocol declarations have one Core source."""
-    from vibeflow.core.workflows.interfaces import (
-        WORKFLOW_SCHEMA_TYPES, PORT_SCHEMA_TYPES,
-        workflow_capability_descriptor, port_capability_descriptor,
-    )
-    target = output / "kernel/templates"
-    _copy_tree(ROOT / "distribution/templates", target)
-    capabilities = [workflow_capability_descriptor().to_dict(),
-                    port_capability_descriptor({"receive", "send"}).to_dict()]
-    for descriptor in capabilities:
-        descriptor.pop("kind", None)
-    source = "// Generated from vibeflow.core.workflows.interfaces.\n"
-    source += "export const capabilities=" + json.dumps(capabilities, ensure_ascii=False) + ";\n"
-    source += "export const schemas=" + json.dumps({**WORKFLOW_SCHEMA_TYPES, **PORT_SCHEMA_TYPES}) + ";\n"
-    (target / "workflow_nodes/interfaces.mjs").write_text(source, encoding="utf-8")
 
 
 def _copy_third_party_notices(output: Path) -> None:
@@ -1092,29 +1074,10 @@ def _write_preview_entry(output: Path) -> None:
 
 
 def _write_distribution_metadata(output: Path, *, profile: DistributionProfile) -> None:
-    kernel_archive = output / KERNEL_ZIP_RELATIVE
     payload = {
-        "schema": "vibeflow.distribution.v2",
+        "schema": "vibeflow.distribution.v3",
         "version": VERSION,
         "development_profile": profile.name,
-        "agent_protocol": dict(profile.agent_protocol),
-        "agent_automation": dict(profile.agent_automation),
-        "roots": [
-            {
-                "id": "python-project",
-                "path": "python_project",
-                "project_target": "python",
-            },
-            {
-                "id": "javascript-project",
-                "path": "javascript_project",
-                "project_target": "javascript",
-            },
-        ],
-        "kernel": {
-            "archive": KERNEL_ZIP_RELATIVE.as_posix(),
-            "sha256": _hash_file(kernel_archive),
-        },
     }
     (output / "DISTRIBUTION.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",

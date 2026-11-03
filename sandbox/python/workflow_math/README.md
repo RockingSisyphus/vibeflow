@@ -1,31 +1,14 @@
-# 嵌套与循环数学
+<!-- vibeflow-directory-purpose -->
+# python / 嵌套与循环数学
 
-一个独立 SDK 数学项目，共享小整数节点和纯加法 BaseLib；通过正式 checked run 导出 Architecture 和 HTML 预览快照，每种配置只准备一次，后续模式使用独立 Runtime。
+真实小整数 Node、BaseLib、Nodeset 与循环配置。retry 从 1 连加三次 2 得到 7；nested 的独立期望为 (4+6)×2+5=25。停止条件、carry、输出及正常运行日志由功能测试检查。
 
-| 场景 | 手写期望 | 额外通过条件 |
-| --- | --- | --- |
-| retry | 1 连加三次 2 得到 7 | carry、第三次停止、三次迭代、完整摘要及 qualified 路径；plan/compiled |
-| wrapped_retry | Nodeset 内执行上述循环，得到 7 | 包裹层、循环层、迭代层路径完整 |
-| outer_fixed | 外层三次，内层每次加两次 1，最终 6 | 外层固定停止；内层条件停止；历史 [2,2,2]；plan/block |
-| outer_condition | 外层两次，内层每次加三次 1，最终 6 | 外层条件停止；内层固定停止；历史 [3,3]；plan/compiled |
-| nested | `(4+6)*2+5=25` | 子计划参数 factor=2、节点顺序、导出清单、真实执行块及生成源码 |
+本目录保存真实使用工程、配置与独立预期；驱动和断言按功能统一在 tests/e2e，不保留单独总包或探针。测试复制输入至仓库外工作区后进行修改、构建和运行。
 
-同一个 nested 配置额外运行 plan/block/compiled × full/boundary/off 的九组矩阵。检查完整节点事件、边界事件顺序、off 仅保留运行摘要，以及 node_hooks 开关下 before_node/after_node/after_run 的表现。外部 Hooks 对象仅作为观察器，业务资源通过真实 SDK Plugin 声明。
-
-共 17 组观察，另有五次 checked run。`expectations.json` 保存手写数字、路径和事件数量；没有调用被测计算来生成期望值。旧双层循环的业务累加从 outer+inner+1 简化为每次加 1，停止条件、carry/collect、迭代次数和路径保持原检查。
+功能域回归入口：
 
 ```bash
-python sandbox/python/workflow_math/run_all.py --work-dir /path/outside/repository/workflow-math-python
+python tools/run_tests.py -- tests/e2e/test_execution.py
 ```
 
-入口自动纳入 [Python integration](../integration/README.md)，每次运行的结果由 runner 生成报告。
-
-## 目录用途与边界
-
-仅用于：python / workflow_math 案例，验证以数学流程验证嵌套、循环、执行与 trace；保留真实项目输入与 runner。
-
-- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
-- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
-- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
-
-完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。
+完整验收及其他平台场景见[测试覆盖](../../TEST_COVERAGE.md)和[开发与验证](../../../docs/maintainers/development.md)。新增目录同步说明职责；运行日志、依赖和构建产物不写入本目录。

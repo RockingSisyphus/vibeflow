@@ -20,19 +20,50 @@
         "description": "Processes Port values until the host aborts this invocation.",
         "loop": {
           "body": "sandbox.permanent_port_body",
-          "max_iterations": null
+          "max_iterations": null,
+          "carry": [
+            {
+              "from": "app.session",
+              "as": "app.session",
+              "update": "app.session"
+            }
+          ]
         },
-        "requires": [],
+        "requires": [
+          {
+            "type": "app.session",
+            "cardinality": "exactly_one",
+            "display_name": "Application session"
+          }
+        ],
         "provides": []
+      },
+      {
+        "id": "start_application",
+        "definition_id": "app.input.permanent_mailbox_loop_jsonc",
+        "display_name": "Application input",
+        "description": "Supplies the application instance to this entry."
       }
     ],
     "edges": [
       {
-        "from": "start",
+        "from": "start_application",
         "to": "loop"
-      }
+      },
+      [
+        "start",
+        "start_application"
+      ]
     ],
-    "outputs": []
+    "outputs": [],
+    "inputs": [
+      {
+        "key": "app_session",
+        "type": "app.session",
+        "display_name": "Application session",
+        "required": true
+      }
+    ]
   },
   "plugins": [
     {

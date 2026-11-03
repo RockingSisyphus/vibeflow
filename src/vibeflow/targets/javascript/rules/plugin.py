@@ -1,12 +1,11 @@
 """Assemble the JavaScript standard Rule Plugin."""
-from vibeflow.targets.shared.rule_support.capability_policy import handlers as capability_handlers
 from vibeflow.targets.javascript.rules.node.handlers import javascript_source_bindings
 
 
 def javascript_rule_bindings():
     from vibeflow.targets.javascript.rules.graph import workflow_topic_handlers, workflow_plan_handlers
     from vibeflow.targets.javascript.rules.source_quality import javascript_project_bindings
-    return {**capability_handlers(), **javascript_source_bindings(), **workflow_topic_handlers(), **workflow_plan_handlers(),
+    return {**javascript_source_bindings(), **workflow_topic_handlers(), **workflow_plan_handlers(),
         **javascript_project_bindings()}
 
 

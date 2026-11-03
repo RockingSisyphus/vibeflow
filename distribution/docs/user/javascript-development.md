@@ -1,7 +1,5 @@
 # JavaScript/TypeScript 资源与 AOT
 
-用户资源从 `@vibeflow/plugin` 的 SDK 定义。业务声明与执行代码可以放在一起，置于 nodes/；Plugin 提供类型、规则、Schema 或 Capability，须位于独立包内。JS/TS 属于同一执行族，生成物是普通 ESM。
-
 ## 业务 Node 与类型
 
 `nodes/text.ts`：
@@ -26,8 +24,6 @@ export const normalize = defineNode({
 });
 ```
 
-可绑定执行代码的资源使用具名导出。SDK 自动记录原始声明、实现符号和位置；函数保留在 Target worker 中，不经过 JSON 序列化。Rule 使用 `defineRule({id, check(...) {...}})`，Ruleset 使用 `defineRuleset`。BaseLib 可用 `defineBaseLib({id, implementation(...) {...}})` 定位同文件函数，也可声明整个独立辅助模块。Capability 使用 `defineCapability`。
-
 直接提供 `run`、`check`、`implementation` 时，实际导出的资源对象确定实现身份。若同时显式填写同语言 `source/implementations`，它必须指向同一实现；同文件导出别名可以使用。指向另一文件或另一资源的声明会返回 `RESOURCE.IMPLEMENTATION.CONFLICT`，诊断包含声明和实际实现位置。没有直接函数的延迟定义仍由 `source` 绑定，核对来源不会额外加载延迟模块。
 
 `vibeflow_project.jsonc` 只保存项目及工具链信息：
@@ -41,8 +37,6 @@ workflow 显式启用：
 ```jsonc
 {"plugins": [{"source": {"kind": "file", "ref": "plugins/schemas/plugin.ts"}}], "pipeline": { /* definition_id 引用 nodes/ 中的业务定义 */ }}
 ```
-
-DataSchema 由选中插件贡献，供公共输入输出、Node 和 Capability 查找。
 
 ## SDK 解析与运行协议
 

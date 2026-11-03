@@ -8,7 +8,6 @@ from vibeflow.core.compiler import CompiledGraph
 from vibeflow.core.contracts import DataProvider, DataRequirement, provider_keys, requirement_types
 from vibeflow.core.flow import EdgeSpec, GraphConfig, LoopSpec, ExecutionLockSpec, STATUS_IMPLEMENTED, STATUS_PLANNED
 from vibeflow.targets.python.sdk.protocols import PureNode
-from vibeflow.targets.python.project.bindings import PythonBindingPlan
 from vibeflow.core.planned import PLANNED_BEHAVIOR_PYTHON_STUB, PlannedBehavior, blocking_planned_behavior
 from vibeflow.targets.python.project.registry import NodeRegistry
 from vibeflow.core.config.scope import ConfigScope
@@ -44,7 +43,7 @@ class NodeFrame:
     planned_stub_module: str = ""
     planned_stub_path: str = ""
     planned_stub_hash: str = ""
-    capability_policy: Mapping[str, object] = field(default_factory=dict)
+    workflow_operations: Mapping[str, object] = field(default_factory=dict)
     completion: str = "immediate"
 
     @property
@@ -70,7 +69,7 @@ class NodeFrame:
 
 @dataclass(frozen=True)
 class ExecutionPlan:
-    """Python plan whose binding sidecar shadows, but never drives, execution."""
+    """Prepared Python frames and their corresponding portable block."""
 
     graph: GraphConfig
     compiled: CompiledGraph
@@ -79,17 +78,13 @@ class ExecutionPlan:
     max_steps: int
     blocks: tuple[CompiledBlock, ...] = ()
     workflow_plan: object | None = None
-    python_bindings: PythonBindingPlan = field(default_factory=lambda: PythonBindingPlan(block_id="block:/"))
+    block_id: str = "block:/"
     contains_global_state: bool = False
     contains_execution_locks: bool = False
 
     def frame(self, name: str) -> NodeFrame:
         return self.frames[name]
 
-
-    @property
-    def binding_plan(self) -> PythonBindingPlan:
-        return self.python_bindings
 
     def to_workflow_plan(
         self,

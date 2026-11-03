@@ -1,0 +1,212 @@
+[
+  {
+    "subject": "node",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    CACHE = open(\"never-open\")\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    CACHE: object = open(\"never-open\")\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    with open(\"never-open\") as value:\n        pass\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    from sys import stdout\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    CACHE = {\"value\": tuple((1, 2))}\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "node_class_base_and_decorator_arguments_use_shared_effects",
+        "source": "def constructor(value):\n    return object\nclass Task(constructor(open(\"never-open\"))):\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_base_and_decorator_arguments_use_shared_effects",
+        "source": "def constructor(value):\n    return object\n@constructor(open(\"never-open\"))\nclass Task:\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "terminal",
+    "policy": {},
+    "cases": [
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    CACHE = open(\"never-open\")\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    CACHE: object = open(\"never-open\")\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    with open(\"never-open\") as value:\n        pass\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    from sys import stdout\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    CACHE = {\"value\": tuple((1, 2))}\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "node_class_base_and_decorator_arguments_use_shared_effects",
+        "source": "def constructor(value):\n    return object\nclass Task(constructor(open(\"never-open\"))):\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_base_and_decorator_arguments_use_shared_effects",
+        "source": "def constructor(value):\n    return object\n@constructor(open(\"never-open\"))\nclass Task:\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "python_io",
+    "policy": {},
+    "cases": [
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    CACHE = open(\"never-open\")\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    CACHE: object = open(\"never-open\")\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    with open(\"never-open\") as value:\n        pass\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    from sys import stdout\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    CACHE = {\"value\": tuple((1, 2))}\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "node_class_base_and_decorator_arguments_use_shared_effects",
+        "source": "def constructor(value):\n    return object\nclass Task(constructor(open(\"never-open\"))):\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "node_class_base_and_decorator_arguments_use_shared_effects",
+        "source": "def constructor(value):\n    return object\n@constructor(open(\"never-open\"))\nclass Task:\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "global_state",
+    "policy": {},
+    "cases": [
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    CACHE = open(\"never-open\")\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    CACHE: object = open(\"never-open\")\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    with open(\"never-open\") as value:\n        pass\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    from sys import stdout\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    CACHE = {\"value\": tuple((1, 2))}\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "node_class_base_and_decorator_arguments_use_shared_effects",
+        "source": "def constructor(value):\n    return object\nclass Task(constructor(open(\"never-open\"))):\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_base_and_decorator_arguments_use_shared_effects",
+        "source": "def constructor(value):\n    return object\n@constructor(open(\"never-open\"))\nclass Task:\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "trusted",
+    "policy": {},
+    "cases": [
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    CACHE = open(\"never-open\")\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    CACHE: object = open(\"never-open\")\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    with open(\"never-open\") as value:\n        pass\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    from sys import stdout\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_body_uses_shared_effect_traversal_through_catalog_plan",
+        "source": "class Task:\n    CACHE = {\"value\": tuple((1, 2))}\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "node_class_base_and_decorator_arguments_use_shared_effects",
+        "source": "def constructor(value):\n    return object\nclass Task(constructor(open(\"never-open\"))):\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_class_base_and_decorator_arguments_use_shared_effects",
+        "source": "def constructor(value):\n    return object\n@constructor(open(\"never-open\"))\nclass Task:\n    def run_pure(self, inputs, params):\n        return {}\n",
+        "denied": true
+      }
+    ]
+  }
+]

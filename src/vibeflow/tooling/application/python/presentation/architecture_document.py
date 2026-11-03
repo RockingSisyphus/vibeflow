@@ -55,7 +55,6 @@ def build_architecture_facts(prepared) -> dict[str, object]:
         node_types=registry.prepared_resources.catalogs.node_types.to_dict() if getattr(registry, "prepared_resources", None) else {},
         resources=_resources_document(graph, resources, roots=roots),
         global_config=resources_payload(resources).get("global_config", {}),
-        policies=getattr(registry, "call_capability_policies", {}),
         extras={"resource_use": resources.resource_use.to_dict() if getattr(resources, "resource_use", None) else None}))
     if getattr(registry, "prepared_resources", None) is not None and prepared.source_config_available:
         from vibeflow.tooling.architecture.resources import resource_architecture
@@ -317,10 +316,6 @@ def _resource_document(item: Mapping[str, object], *, kind: str, roots: Mapping[
 
 def _resource_value(item: Mapping[str, object], info: Mapping[str, object], field: str) -> str:
     return str(item.get(field, "") or info.get(field, "") or "")
-
-
-def _config_declaration(value: object, *, source: Mapping[str, str]) -> dict[str, object]:
-    return {"values": _snapshot(value), "source": dict(source)}
 
 
 def _root_paths(graph: GraphConfig) -> dict[str, str]:

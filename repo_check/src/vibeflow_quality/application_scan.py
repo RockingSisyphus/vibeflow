@@ -37,7 +37,6 @@ _PYTHON_ONLY_SYMBOLS = frozenset(
         "PipelineRuntime",
         "PluginRegistry",
         "PureNode",
-        "PythonBindingPlan",
         "PythonResourceBinding",
         "PythonResources",
         "PythonCompiledBlock",

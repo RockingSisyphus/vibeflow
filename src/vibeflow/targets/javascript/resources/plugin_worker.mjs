@@ -8,7 +8,7 @@ import { pathToFileURL } from "node:url";
 
 import {sdkPlugin} from "./sdk_loader.mjs";
 
-const PLUGIN_ABI = "vibeflow.plugin.v4";
+const PLUGIN_ABI = "vibeflow.plugin.v5";
 const RULE_ABI = "vibeflow.rule.v3";
 const instances = new Map();
 const sourceAnalyses = new Map();

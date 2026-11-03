@@ -128,8 +128,6 @@ def data_schema(*, type_key: str, schema, **options):
     return _declare("data_schema", {"type_key": type_key, "schema": schema, **options})
 
 
-def capability(*, id: str, **options):
-    return _declare("capability", {"id": id, **options})
 
 
 def node_type(*, id: str, **options):
@@ -149,5 +147,5 @@ def lifecycle(*, id: str, type: str, source=None, **options):
 
 
 
-__all__ = ["ResourceDefinition", "rule", "ruleset", "data_schema", "capability", "node_type",
+__all__ = ["ResourceDefinition", "rule", "ruleset", "data_schema", "node_type",
            "base_lib", "lifecycle",  "RuleCall", "RuleRelation", "SourceLocator", "RulesetDescriptor"]

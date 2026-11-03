@@ -1,0 +1,588 @@
+[
+  {
+    "subject": "plugin",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "resolved_plugin_methods_are_reviewed_by_their_bodies",
+        "source": "class Value:\n    @staticmethod\n    def close(value):\n        return value\ndef task(value):\n    return Value.close(value)\n",
+        "denied": false,
+        "export": "task"
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda close: close()):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        },
+        "export": "task"
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda *, close: close()):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        },
+        "export": "task"
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda close=close: close()):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        },
+        "export": "task"
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda value=close(): value):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        },
+        "export": "task"
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda close=close(): close):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        },
+        "export": "task"
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda: close()):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        },
+        "export": "task"
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda close: close()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        },
+        "export": "task"
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda *, close: close()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        },
+        "export": "task"
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda close=close: close()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        },
+        "export": "task"
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda value=close(): value\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        },
+        "export": "task"
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda close=close(): close\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        },
+        "export": "task"
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda: close()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        },
+        "export": "task"
+      },
+      {
+        "name": "module_callable_alias_default_keeps_real_function_body_and_structure",
+        "source": "from base_lib.helper import close\nclean = close\ndef task(clean=clean()):\n    return 1\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: clean",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        },
+        "export": "task"
+      },
+      {
+        "name": "module_callable_alias_default_keeps_real_function_body_and_structure",
+        "source": "from base_lib.helper import close\nclean = close\ndef task(clean=clean()):\n    return 1\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: clean",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        },
+        "export": "task"
+      },
+      {
+        "name": "module_callable_alias_default_keeps_real_function_body_and_structure",
+        "source": "from base_lib.helper import close\nclean = close\ndef task(value=clean()):\n    return 1\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: clean",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        },
+        "export": "task"
+      },
+      {
+        "name": "module_callable_alias_default_keeps_real_function_body_and_structure",
+        "source": "from base_lib.helper import close\nclean = close\ndef task(value=clean()):\n    return 1\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: clean",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        },
+        "export": "task"
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "global_state",
+    "policy": {},
+    "cases": [
+      {
+        "name": "function_scope_restores_alias_candidates_for_later_definitions",
+        "source": "import sys\nimport math\np = math\ndef first():\n    if marker:\n        p = sys\n    else:\n        p = math\n    return 1\ndef after():\n    p.path = []\n    return 1\n",
+        "denied": false
+      },
+      {
+        "name": "nested_global_restores_module_host_alias_beyond_enclosing_parameter_shadow",
+        "source": "import sys\ndef outer(sys):\n    def helper():\n        global sys\n        return sys.argv\n    return helper\nclass Task:\n    def run_pure(self, inputs, params):\n        outer(None)\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "nested_global_restores_module_host_alias_beyond_enclosing_parameter_shadow",
+        "source": "import sys as process\ndef outer(process):\n    def helper():\n        global process\n        return process.argv\n    return helper\nclass Task:\n    def run_pure(self, inputs, params):\n        outer(None)\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "nested_global_restores_assignment_alias_from_real_module_scope",
+        "source": "from builtins import print as p\nemit = p\ndef outer(emit):\n    def helper():\n        global emit\n        emit('terminal')\n        return 1\n    return helper\nclass Task:\n    def run_pure(self, inputs, params):\n        outer(None)\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "library_initializers",
+        "source": "def constructor():\n    return {}\nCACHE = constructor()\ndef helper(value):\n    setattr(value, \"x\", 1)\n",
+        "denied": false
+      },
+      {
+        "name": "library_initializers",
+        "source": "CACHE = open(\"never-open\")\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "global_state",
+    "policy": {},
+    "cases": [
+      {
+        "name": "nested_global_restores_module_host_alias_beyond_enclosing_parameter_shadow",
+        "source": "import sys\ndef outer(sys):\n    def helper():\n        global sys\n        return sys.argv\n    return helper\nclass Task:\n    def run_pure(self, inputs, params):\n        outer(None)\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "nested_global_restores_module_host_alias_beyond_enclosing_parameter_shadow",
+        "source": "import sys as process\ndef outer(process):\n    def helper():\n        global process\n        return process.argv\n    return helper\nclass Task:\n    def run_pure(self, inputs, params):\n        outer(None)\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "nested_global_restores_assignment_alias_from_real_module_scope",
+        "source": "from builtins import print as p\nemit = p\ndef outer(emit):\n    def helper():\n        global emit\n        emit('terminal')\n        return 1\n    return helper\nclass Task:\n    def run_pure(self, inputs, params):\n        outer(None)\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "node_helper_slice_excludes_same_named_module_initializer_under_real_parameter_shadow",
+        "source": "from builtins import print as p\nemit = p('unselected initializer')\ndef outer(emit):\n    def helper():\n        emit('local receiver')\n        return 1\n    return helper\nclass Task:\n    def run_pure(self, inputs, params):\n        outer(lambda value: value)\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "node_helper_defaults_resolve_module_assignment_alias_before_own_parameter_shadow",
+        "source": "from builtins import print as p\nemit = p\ndef helper(emit=emit('default')):\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        helper()\n        return {}\n",
+        "denied": true,
+        "contains": "builtins.print"
+      },
+      {
+        "name": "node_helper_defaults_resolve_module_assignment_alias_before_own_parameter_shadow",
+        "source": "from builtins import print as p\nemit = p\ndef helper(value=emit('default')):\n    return {}\nclass Task:\n    def run_pure(self, inputs, params):\n        helper()\n        return {}\n",
+        "denied": true,
+        "contains": "builtins.print"
+      }
+    ]
+  },
+  {
+    "subject": "plugin",
+    "scope": "global_state",
+    "policy": {},
+    "cases": [
+      {
+        "name": "nested_global_restores_module_host_alias_beyond_enclosing_parameter_shadow",
+        "source": "import sys\ndef outer(sys):\n    def helper():\n        global sys\n        return sys.argv\n    return helper\nclass Task:\n    def run_pure(self, inputs, params):\n        outer(None)\n        return {}\n",
+        "denied": true,
+        "export": "outer"
+      },
+      {
+        "name": "nested_global_restores_module_host_alias_beyond_enclosing_parameter_shadow",
+        "source": "import sys as process\ndef outer(process):\n    def helper():\n        global process\n        return process.argv\n    return helper\nclass Task:\n    def run_pure(self, inputs, params):\n        outer(None)\n        return {}\n",
+        "denied": true,
+        "export": "outer"
+      },
+      {
+        "name": "nested_global_restores_assignment_alias_from_real_module_scope",
+        "source": "from builtins import print as p\nemit = p\ndef outer(emit):\n    def helper():\n        global emit\n        emit('terminal')\n        return 1\n    return helper\nclass Task:\n    def run_pure(self, inputs, params):\n        outer(None)\n        return {}\n",
+        "denied": true,
+        "export": "outer"
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda close: close()):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda *, close: close()):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda close=close: close()):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda value=close(): value):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda close=close(): close):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda: close()):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda close: close()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda *, close: close()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda close=close: close()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda value=close(): value\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda close=close(): close\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda: close()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "module_callable_alias_default_keeps_real_function_body_and_structure",
+        "source": "from base_lib.helper import close\nclean = close\ndef task(clean=clean()):\n    return 1\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: clean",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "module_callable_alias_default_keeps_real_function_body_and_structure",
+        "source": "from base_lib.helper import close\nclean = close\ndef task(clean=clean()):\n    return 1\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: clean",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "module_callable_alias_default_keeps_real_function_body_and_structure",
+        "source": "from base_lib.helper import close\nclean = close\ndef task(value=clean()):\n    return 1\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: clean",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "module_callable_alias_default_keeps_real_function_body_and_structure",
+        "source": "from base_lib.helper import close\nclean = close\ndef task(value=clean()):\n    return 1\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: clean",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda close: close()):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda *, close: close()):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda close=close: close()):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda value=close(): value):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda close=close(): close):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task(fn=lambda: close()):\n    return fn\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda close: close()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda *, close: close()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda close=close: close()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda value=close(): value\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda close=close(): close\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "lambda_reference_facts_distinguish_defaults_and_bound_parameters",
+        "source": "from base_lib.helper import close\ndef task():\n    return lambda: close()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "module_callable_alias_default_keeps_real_function_body_and_structure",
+        "source": "from base_lib.helper import close\nclean = close\ndef task(clean=clean()):\n    return 1\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: clean",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "module_callable_alias_default_keeps_real_function_body_and_structure",
+        "source": "from base_lib.helper import close\nclean = close\ndef task(clean=clean()):\n    return 1\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: clean",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "module_callable_alias_default_keeps_real_function_body_and_structure",
+        "source": "from base_lib.helper import close\nclean = close\ndef task(value=clean()):\n    return 1\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: clean",
+        "files": {
+          "helper.py": "def close():\n    return 1\n"
+        }
+      },
+      {
+        "name": "module_callable_alias_default_keeps_real_function_body_and_structure",
+        "source": "from base_lib.helper import close\nclean = close\ndef task(value=clean()):\n    return 1\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: clean",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "library_initializers",
+        "source": "writer = open\ndef helper():\n    return writer(\"never-open\")\n",
+        "denied": true
+      },
+      {
+        "name": "library_initializers",
+        "source": "for value in ():\n    pass\n",
+        "denied": true
+      }
+    ]
+  }
+]

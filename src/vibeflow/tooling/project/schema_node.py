@@ -16,7 +16,7 @@ def _validate_node(value: Any, prefix: str, findings: list[HealthFinding]) -> No
         findings.append(_error("CONFIG.SCHEMA.NODE_OBJECT", f"{prefix} must be an object", prefix))
         return
     if "io" in value or value.get("definition_id") == "vibeflow.io":
-        findings.append(_error("GRAPH.IO.MIGRATION", "use ordinary SDK nodes with explicit contracts and vibeflow.port Capability; add terminal boundaries", prefix))
+        findings.append(_error("GRAPH.IO.MIGRATION", "use ordinary SDK nodes with explicit contracts; add terminal boundaries", prefix))
         return
     status = str(value.get("status", "implemented")).strip()
     if "rulesets" in value:

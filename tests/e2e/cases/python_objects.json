@@ -1,0 +1,50 @@
+[
+  {
+    "config": "single",
+    "initial_factory": "objects",
+    "expected_outputs": {
+      "object.snapshot": {
+        "value": 5,
+        "steps": 1
+      }
+    },
+    "expected_object_value": 5,
+    "expected_object_steps": 1
+  },
+  {
+    "config": "override",
+    "initial_factory": "objects",
+    "expected_outputs": {
+      "object.snapshot": {
+        "value": 10,
+        "steps": 1
+      }
+    },
+    "expected_object_value": 10,
+    "expected_object_steps": 1
+  },
+  {
+    "config": "fixed",
+    "initial_factory": "objects",
+    "expected_outputs": {
+      "object.snapshot": {
+        "value": 14,
+        "steps": 4
+      }
+    },
+    "expected_object_value": 14,
+    "expected_object_steps": 4
+  },
+  {
+    "config": "conditional",
+    "initial_factory": "objects",
+    "expected_outputs": {
+      "object.snapshot": {
+        "value": 8,
+        "steps": 2
+      }
+    },
+    "expected_object_value": 8,
+    "expected_object_steps": 2
+  }
+]

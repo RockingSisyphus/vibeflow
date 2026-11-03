@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest a VibeFlow capability or rule
+about: Suggest a VibeFlow feature or rule
 labels: enhancement
 ---
 

@@ -30,10 +30,9 @@ window.VFModel = (()=>{
     return {id,entry,error:graphs[id]?.error||(selectDefault&&names.length>1&&!entry?"多入口且无默认值；请配置 workflow.entry":"")};
   }
   function workflowOptions(facts,architecture,localPath,graphs={}){
-    const actions=architecture.call_policies?.[JSON.stringify(localPath)]?.actions||facts.operations||[];
+    const actions=architecture.workflow_operations?.[JSON.stringify(localPath)]?.actions||facts.operations||[];
     const result=new Map();
     for(const action of actions){
-      if(action.capability!=="vibeflow.workflow")continue;
       const refs=action.workflow?[action.workflow]:action.expected_workflows||[];
       for(const ref of refs){
         const {id,entry,error}=workflowTarget(ref,graphs,["call","invoke_sync"].includes(action.operation)),key=id+"|"+entry;
@@ -57,7 +56,7 @@ window.VFModel = (()=>{
     return ({invoke_sync:"同步调用 workflow · 当前调用返回",wait:"等待实例结束",send:"发送消息 · 不等待处理",receive:"接收消息 · 等待",kill:"停止实例 · 确认终态"})[action.operation]||action.operation;
   }
   function workflowOperation(actions){
-    const operations=new Set(actions.filter(a=>a.capability==="vibeflow.workflow").map(a=>a.operation));
+    const operations=new Set(actions.map(a=>a.operation));
     const primary=[...operations].filter(op=>op!=="wait"),visible=primary.length?primary:[...operations];
     return visible.length===1?visible[0]:visible.length?"multiple":"";
   }
