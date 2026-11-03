@@ -5,7 +5,7 @@ from vibeflow.core.constants import FLOW_KIND_GLOBAL_STATE
 from vibeflow.core.flow import STATUS_PLANNED
 from vibeflow.targets.python.runtime.errors import PipelineRuntimeError
 from vibeflow.targets.python.runtime.execution_locks import CURRENT_EXECUTION_LEASE, PROCESS_EXECUTION_LOCK_COORDINATOR, ExecutionLease
-from .execution_lock_mixin import _HeldExecutionLock, _CURRENT_EXECUTION_LOCK_STACK, _CURRENT_EXECUTION_PROTECTION_DEPTH
+from .execution_lock_mixin import _HeldExecutionLock, _CURRENT_EXECUTION_LOCK_STACK
 from contextlib import asynccontextmanager
 
 class AsyncRuntimeExecutionLockMixin:
@@ -20,13 +20,10 @@ class AsyncRuntimeExecutionLockMixin:
                 scope = 'block' if self._trace_path_prefix else 'root'
                 held = await self._acquire_execution_lock_async(root_lock.key, mode='exclusive', scope=scope)
                 self._run_lock_tokens.append((held, scope))
-            if _CURRENT_EXECUTION_PROTECTION_DEPTH.get() > 0 or root_lock is not None:
-                self._root_protection_context_token = _CURRENT_EXECUTION_PROTECTION_DEPTH.set(_CURRENT_EXECUTION_PROTECTION_DEPTH.get() + 1)
         except BaseException:
             try:
                 self._release_run_execution_locks()
             finally:
-                self._reset_root_protection_context()
                 self._reset_lease_context()
             raise
 
@@ -75,14 +72,11 @@ class AsyncRuntimeExecutionLockMixin:
         if lock is not None:
             held_lock = await self._acquire_execution_lock_async(lock.key, mode='exclusive', scope=lock_scope, node_name=node_name, definition_id=definition_id)
         is_global_state = not is_planned and getattr(frame, 'flow_kind', '') == FLOW_KIND_GLOBAL_STATE
-        protection_context_token = None
         failed = False
         global_state_entered = False
         primary_error: BaseException | None = None
         try:
             self._signal.throw_if_aborted()
-            if held_lock is not None:
-                protection_context_token = _CURRENT_EXECUTION_PROTECTION_DEPTH.set(_CURRENT_EXECUTION_PROTECTION_DEPTH.get() + 1)
             if is_global_state:
                 self._record_runtime_event('global_state_enter', node_name, definition_id, details=self._lease_details())
                 self._global_state_started = True
@@ -111,12 +105,5 @@ class AsyncRuntimeExecutionLockMixin:
             except BaseException as exc:
                 if cleanup_error is None:
                     cleanup_error = exc
-            finally:
-                if protection_context_token is not None:
-                    try:
-                        _CURRENT_EXECUTION_PROTECTION_DEPTH.reset(protection_context_token)
-                    except BaseException as exc:
-                        if cleanup_error is None:
-                            cleanup_error = exc
             if primary_error is None and cleanup_error is not None:
                 raise cleanup_error

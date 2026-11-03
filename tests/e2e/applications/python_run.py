@@ -1,6 +1,7 @@
 """A small application using source projects or deployable Python bundles."""
 import json
 import asyncio
+import math
 from pathlib import Path
 import sys
 
@@ -82,9 +83,24 @@ try:
             **({"entry":request["entry"]} if request.get("entry") else {}))
     if request.get("mode")=="async":result=asyncio.run(result)
     public = result.public_outputs
+    if factory == "batch" and "train.metrics" in public:
+        public = dict(public)
+        metrics = public.pop("train.metrics")
+        public["application_metrics"] = {
+            "items":sorted(metrics["items"]),
+            "items_are_set":isinstance(metrics["items"], set),
+            "unstable_is_nan":isinstance(metrics["unstable"], float) and math.isnan(metrics["unstable"]),
+            "batch_returned":metrics["batch"] is initial["train.batch"],
+            "batch_items":metrics["batch"].items}
     if factory == "training":
         # The caller receives its live business objects through the public API.
         public = dict(public)
+        metrics = public.pop("train.metrics")
+        public["application_metrics"] = {
+            "loss":metrics["loss"],"tags":sorted(metrics["tags"]),
+            "tags_are_set":isinstance(metrics["tags"], set),
+            "unstable_is_nan":isinstance(metrics["unstable"], float) and math.isnan(metrics["unstable"]),
+            "model_returned":metrics["model"] is initial["train.model"]}
         public["application_objects"] = {
             "model_returned":public.pop("train.model_after", None) is initial["train.model"],
             "optimizer_returned":public.pop("train.optimizer_after", None) is initial["train.optimizer"],

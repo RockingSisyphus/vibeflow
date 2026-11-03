@@ -22,10 +22,6 @@ _CURRENT_EXECUTION_LOCK_STACK: ContextVar[tuple[tuple[str, str], ...]] = Context
     "vibeflow_python_execution_lock_stack",
     default=(),
 )
-_CURRENT_EXECUTION_PROTECTION_DEPTH: ContextVar[int] = ContextVar(
-    "vibeflow_python_execution_protection_depth",
-    default=0,
-)
 
 
 @dataclass(frozen=True)
@@ -38,7 +34,6 @@ class RuntimeExecutionLockMixin:
     def _reset_execution_lock_state(self) -> None:
         self._lease: ExecutionLease | None = None
         self._lease_context_token = None
-        self._root_protection_context_token = None
         self._run_lock_tokens: list[tuple[_HeldExecutionLock, str]] = []
         self._global_state_started = False
         self._global_state_nodes: list[str] = []
@@ -57,20 +52,10 @@ class RuntimeExecutionLockMixin:
                     scope=scope,
                 )
                 self._run_lock_tokens.append((held, scope))
-            if (
-                _CURRENT_EXECUTION_PROTECTION_DEPTH.get() > 0
-                or root_lock is not None
-            ):
-                self._root_protection_context_token = (
-                    _CURRENT_EXECUTION_PROTECTION_DEPTH.set(
-                        _CURRENT_EXECUTION_PROTECTION_DEPTH.get() + 1
-                    )
-                )
         except BaseException:
             try:
                 self._release_run_execution_locks()
             finally:
-                self._reset_root_protection_context()
                 self._reset_lease_context()
             raise
 
@@ -78,17 +63,8 @@ class RuntimeExecutionLockMixin:
         try:
             self._release_run_execution_locks()
         finally:
-            try:
-                self._reset_root_protection_context()
-            finally:
-                self._reset_lease_context()
-                self._lease = None
-
-    def _reset_root_protection_context(self) -> None:
-        token = self._root_protection_context_token
-        self._root_protection_context_token = None
-        if token is not None:
-            _CURRENT_EXECUTION_PROTECTION_DEPTH.reset(token)
+            self._reset_lease_context()
+            self._lease = None
 
     def _reset_lease_context(self) -> None:
         token = self._lease_context_token
@@ -233,19 +209,12 @@ class RuntimeExecutionLockMixin:
             not is_planned
             and getattr(frame, "flow_kind", "") == FLOW_KIND_GLOBAL_STATE
         )
-        protection_context_token = None
         failed = False
         global_state_entered = False
         primary_error: BaseException | None = None
         try:
             # A ready invocation may have waited for another execution domain.
             self._signal.throw_if_aborted()
-            if held_lock is not None:
-                protection_context_token = (
-                    _CURRENT_EXECUTION_PROTECTION_DEPTH.set(
-                        _CURRENT_EXECUTION_PROTECTION_DEPTH.get() + 1
-                    )
-                )
             if is_global_state:
                 self._record_runtime_event(
                     "global_state_enter",
@@ -293,15 +262,6 @@ class RuntimeExecutionLockMixin:
             except BaseException as exc:
                 if cleanup_error is None:
                     cleanup_error = exc
-            finally:
-                if protection_context_token is not None:
-                    try:
-                        _CURRENT_EXECUTION_PROTECTION_DEPTH.reset(
-                            protection_context_token
-                        )
-                    except BaseException as exc:
-                        if cleanup_error is None:
-                            cleanup_error = exc
             if primary_error is None and cleanup_error is not None:
                 raise cleanup_error
 
@@ -318,12 +278,5 @@ class RuntimeExecutionLockMixin:
             "domain": effective_key,
             "scope": effective_scope,
         }
-
-    @staticmethod
-    def _execution_scope_is_protected():
-        return _CURRENT_EXECUTION_PROTECTION_DEPTH.get() > 0
-
-
-
 
 __all__ = ["RuntimeExecutionLockMixin"]

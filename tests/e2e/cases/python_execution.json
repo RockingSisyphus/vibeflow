@@ -2,13 +2,19 @@
   {
     "name": "free_nodes",
     "config": "pass_free_nodes.jsonc",
-    "initial": {}
+    "initial": {},
+    "expected_outputs": {
+      "value.out": 13
+    }
   },
   {
     "name": "io_data_store",
     "config": "pass_io_data_store.jsonc",
     "initial": {
       "io.result": 20
+    },
+    "expected_outputs": {
+      "value.final": 21
     }
   },
   {
@@ -30,6 +36,15 @@
     }
   },
   {
+    "name": "global_state_execution_lock_async",
+    "config": "pass_global_state_execution_lock_async.jsonc",
+    "initial": {},
+    "expected_outputs": {
+      "value.out": 1
+    },
+    "mode": "async"
+  },
+  {
     "name": "ordinary_callback_warning",
     "config": "pass_callback_warning.jsonc",
     "initial_factory": "callback",
@@ -48,6 +63,16 @@
       "train.step_report": {
         "steps": 1,
         "weight": 0.7
+      },
+      "application_metrics": {
+        "loss": 6.0,
+        "tags": [
+          "sandbox",
+          "train"
+        ],
+        "tags_are_set": true,
+        "unstable_is_nan": true,
+        "model_returned": true
       }
     },
     "expected_health_warnings": [
@@ -57,7 +82,22 @@
   {
     "name": "training_non_json_metrics",
     "config": "pass_training_non_json_metrics.jsonc",
-    "initial_factory": "batch"
+    "initial_factory": "batch",
+    "expected_outputs": {
+      "application_metrics": {
+        "items": [
+          2,
+          4
+        ],
+        "items_are_set": true,
+        "unstable_is_nan": true,
+        "batch_returned": true,
+        "batch_items": [
+          2,
+          4
+        ]
+      }
+    }
   },
   {
     "name": "config_resources_nodeset_arithmetic",
@@ -111,6 +151,16 @@
       "train.step_report": {
         "steps": 1,
         "weight": 0.7
+      },
+      "application_metrics": {
+        "loss": 6.0,
+        "tags": [
+          "sandbox",
+          "train"
+        ],
+        "tags_are_set": true,
+        "unstable_is_nan": true,
+        "model_returned": true
       }
     }
   },
@@ -129,6 +179,16 @@
       "train.step_report": {
         "steps": 1,
         "weight": 0.7
+      },
+      "application_metrics": {
+        "loss": 6.0,
+        "tags": [
+          "sandbox",
+          "train"
+        ],
+        "tags_are_set": true,
+        "unstable_is_nan": true,
+        "model_returned": true
       }
     }
   },
