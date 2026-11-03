@@ -19,6 +19,8 @@ jobs:
       PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - uses: actions/checkout@v7
+      - name: Configure npm download cache
+        run: echo "npm_config_cache=${RUNNER_TEMP}/npm-cache" >> "${GITHUB_ENV}"
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
