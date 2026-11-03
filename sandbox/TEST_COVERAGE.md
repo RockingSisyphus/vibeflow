@@ -58,7 +58,9 @@ python tools/verify_project.py --full --workers 4
 
 批次结束后集中修复。三个相关测试文件的 53 项定向验证通过，父环境设为 cp1252；它用于复现驱动编码问题，不替代真实 Windows 验收。仅导出已入快照的源码、不带本机 ZIP，仓库 all 检查为零错误，四项 wheel/sdist/两 profile 交付测试通过（71.79 秒）。
 
-二次代码审查另发现测试入口会将 `-k tools` 等选项值误当作现有目录改写。现在交由 pytest 解析，仅固定已解析的测试目标；通过真实测试入口，验证串行与并行选择结果，以及测试模块导入和执行时的隔离目录。浏览器依赖链的 [Zod 已知问题](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)随 Puppeteer 正常升级至 25.16.0 解决，不添加依赖覆盖；锁文件安装审计为零已知漏洞；升级后八项真实浏览器交互测试通过（16.25 秒）。修复后的完整 CI 尚待验收。
+二次代码审查另发现测试入口会将 `-k tools` 等选项值误当作现有目录改写。现在交由 pytest 解析，仅固定已解析的测试目标；通过真实测试入口，验证串行与并行选择结果，以及测试模块导入和执行时的隔离目录。浏览器依赖链的 [Zod 已知问题](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)随 Puppeteer 正常升级至 25.16.0 解决，不添加依赖覆盖；锁文件安装审计为零已知漏洞；升级后八项真实浏览器交互测试通过（16.25 秒）。[修复后第二轮 CI](https://github.com/RockingSisyphus/vibeflow/actions/runs/41572114454) 对应源码 `d1d4e0907afa0fcf124b6e53cd304f5f91615c79`，三个 job 全部成功：Linux Node 22 为 670 passed、2 subtests passed（328.24 秒），Node 24 为 670 passed、2 subtests passed（347.49 秒），Windows 为 131 passed（249.16 秒）。两个 Linux job 的五个阶段均通过，没有失败、准备错误或跳过。Windows 保持原宿主/协作/命名入口覆盖，并增加两项测试入口回归；它不代表 Windows 上运行了完整 Linux 浏览器和交付集合。
+
+最终配置复核发现 setup-node 保存默认 `~/.npm`，而测试入口实际下载缓存位于临时工作区；已让 CI 与入口共同使用 `runner.temp/npm-cache`，不缓存工程或构建结果。功能和测试判据未改；这个最终配置的 CI 待验。
 
 ### 样板与成本观察
 
@@ -76,6 +78,6 @@ python tools/verify_project.py --full --workers 4
 
 ### 尚未验证的边界
 
-Linux Node 22/24、Windows Node 24 已实际执行首轮 CI；修复后的完整 CI 尚待通过，本机完整入口通过不等于 CI 全平台通过。没有在原生 GBK 默认环境进行验收，也不把 UTF-8 mode 切换当作这种证明。Python 的 JSON Schema 输入值域校验按现有能力验证，未扩展为 JS 的同等能力。
+Linux Node 22/24 全量、Windows Node 24 原有宿主范围已实际通过第二轮 CI；最终缓存配置仍待实际验证。没有在原生 GBK 默认环境进行验收，也不把 UTF-8 mode 切换当作这种证明。Python 的 JSON Schema 输入值域校验按现有能力验证，未扩展为 JS 的同等能力。
 
 内部缓存、AST/框架对象身份、内部调用次数和强行插入的布局竞态不属于本体系的通过结论；依赖方向继续由静态检查与代码审查负责。测试数量和文件数量不能代替功能域判据。临时运行数据在记录上述结论后清理；后续 CI 保留正常 verification.json 与 acceptance.xml。
