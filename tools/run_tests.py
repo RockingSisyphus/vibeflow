@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Run VibeFlow pytest suites in an isolated, disposable work directory.
 
-Tests are allowed to exercise the real runtime.  Some programmatic Runtime
-calls intentionally use the public default ``runs/vibeflow`` location, so the
-test process must never use the repository as its working directory.  This
-entrypoint also prevents user-site packages and ambient pytest plugins from
-affecting repository verification.
+Pytest parses its arguments in the repository; the workdir plugin moves test
+collection and execution into isolated directories. This preserves native path
+and selector semantics while keeping default runtime outputs out of the
+checkout. User-site packages and ambient pytest plugins are disabled.
 """
 
 from __future__ import annotations
@@ -82,8 +81,18 @@ def _runtime_requirements(arguments: list[str]) -> set[str]:
     """Dependency preparation follows selected test fixtures, not product imports."""
     if any(value in {"--collect-only", "--co", "--help", "-h", "--version"} for value in arguments):
         return set()
-    selected = [Path(value.split("::")[0]) for value in _resolve_paths(arguments)
-                if not value.startswith("-") and Path(value.split("::")[0]).exists()]
+    # These paths are only dependency-preparation hints. Pytest itself parses
+    # targets and option values; this driver must never rewrite selectors.
+    candidates = [ROOT / value.split("::")[0] for value in arguments if not value.startswith("-")]
+    selected = []
+    for path in candidates:
+        try:
+            if path.exists():
+                selected.append(path)
+        except OSError:
+            # An option value may not be a valid filesystem path. Pytest owns
+            # argument validation; these optional hints must not reject it.
+            continue
     if not selected:
         selected = list(DEFAULT_TEST_PATHS)
     files = {file for path in selected for file in (path.rglob("test_*.py") if path.is_dir() else (path,))}
@@ -92,25 +101,6 @@ def _runtime_requirements(arguments: list[str]) -> set[str]:
                for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))) if isinstance(node, ast.arguments)
                for argument in (*node.posonlyargs, *node.args, *node.kwonlyargs)
                if argument.arg in {"toolchain", "browser_runtime"}}
-
-
-def _resolve_paths(arguments: list[str]) -> list[str]:
-    if not arguments:
-        return [str(path) for path in DEFAULT_TEST_PATHS]
-    resolved: list[str] = []
-    has_tests = False
-    for argument in arguments:
-        filename, *selection = argument.split("::", 1)
-        candidate = Path(filename)
-        repository_candidate = ROOT / candidate
-        if not argument.startswith("-") and not candidate.is_absolute() and repository_candidate.exists():
-            resolved.append(str(repository_candidate.resolve()) + ("::" + selection[0] if selection else ""))
-            has_tests = has_tests or repository_candidate.is_dir() or repository_candidate.suffix == ".py"
-        else:
-            resolved.append(argument)
-            has_tests = has_tests or (candidate.is_absolute() and candidate.exists() and
-                (candidate.is_dir() or candidate.suffix == ".py"))
-    return resolved if has_tests else [*(str(path) for path in DEFAULT_TEST_PATHS), *resolved]
 
 
 def run_tests(scratch: Path, pytest_args: list[str], *, workers: int = DEFAULT_WORKERS) -> int:
@@ -144,12 +134,12 @@ def run_tests(scratch: Path, pytest_args: list[str], *, workers: int = DEFAULT_W
         "-p", "pytest_workdirs",
         "--basetemp", str(scratch / "pytest-tmp"),
         *(("-p", "xdist.plugin", "-n", str(workers), "--dist", "loadfile") if parallel else ()),
-        *_resolve_paths(pytest_args),
+        *pytest_args,
     )
     print("$ " + " ".join(command), flush=True)
     return subprocess.run(
         command,
-        cwd=work_root,
+        cwd=ROOT,
         env=environment,
         check=False,
     ).returncode

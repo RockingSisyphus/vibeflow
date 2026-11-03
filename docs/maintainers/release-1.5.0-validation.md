@@ -54,12 +54,14 @@
 
 两个最终 ZIP 均按随包公开入口通过内核校验、Python 验证与源码运行、Python AOT 构建、JS 验证、Node / Browser 单文件构建和 review。随后删除整个解压目录（包括内核与两个源工程），Python 的 plan / block / compiled、Node 和真实浏览器按钮操作仍得到预期业务输出。两个 profile 的内核 ZIP 字节一致。
 
+下列名称指本机 `archive/` 中的历史产物，不是随源码提供的文件；此处保留原验收事实与校验值。
+
 | Profile | 最终 ZIP | SHA256 |
 | --- | --- | --- |
-| collaborative | [vibeflow-distribution-1.5.0.zip](../../archive/vibeflow-distribution-1.5.0.zip) | `17d3857ba913ecad4615f8f40c86902f29fe66c84394cb5d38f5c8f519ffef91` |
-| autonomous | [vibeflow-distribution-autonomous-1.5.0.zip](../../archive/vibeflow-distribution-autonomous-1.5.0.zip) | `2fdd9858426e850686c595c20c5d76dc3a92b8f46ffc98a1e5dd485a11b411d5` |
+| collaborative | `vibeflow-distribution-1.5.0.zip` | `17d3857ba913ecad4615f8f40c86902f29fe66c84394cb5d38f5c8f519ffef91` |
+| autonomous | `vibeflow-distribution-autonomous-1.5.0.zip` | `2fdd9858426e850686c595c20c5d76dc3a92b8f46ffc98a1e5dd485a11b411d5` |
 
-共同内核 SHA256：`72548f31b56ebd22d86dba3daf2d89fbd0e4545f92ddb0f2d8f45aa0dd72a710`。校验索引见 [SHA256SUMS-1.5.0.txt](../../archive/SHA256SUMS-1.5.0.txt)。
+共同内核 SHA256：`72548f31b56ebd22d86dba3daf2d89fbd0e4545f92ddb0f2d8f45aa0dd72a710`。校验索引见 `SHA256SUMS-1.5.0.txt`。
 
 ## 旧产物与残留
 

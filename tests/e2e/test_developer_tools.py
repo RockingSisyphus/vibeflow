@@ -1,5 +1,6 @@
 """Destructive developer commands only touch repositories created by this test."""
 import json
+from pathlib import Path
 import os
 import shutil
 import sys
@@ -72,3 +73,26 @@ def test_cleaner_protects_tracked_source_and_external_symlink_target(own_reposit
     assert refused.returncode == 0 and "REMOVE" in refused.stdout
     assert not (repository / "build").is_symlink()
     assert external.read_text(encoding="utf-8") == "valuable"
+
+
+@pytest.mark.parametrize("workers",[1,2])
+def test_runner_preserves_selection_and_isolation(tmp_path,workers):
+    program=write(tmp_path / "test_selection_input.py",'''import json
+from pathlib import Path
+collection_directory=str(Path.cwd())
+
+def test_tools_selected():
+    Path(__file__).with_suffix('.json').write_text(json.dumps({
+        'collection':collection_directory,'execution':str(Path.cwd())}),encoding='utf-8')
+
+def test_other_unselected():
+    raise AssertionError('The keyword selector must exclude this test.')
+''')
+    scratch=tmp_path / "runner"
+    result=command(sys.executable,"-B",ROOT / "tools/run_tests.py","--workers",workers,
+        "--scratch",scratch,"--","-k","tools",program,cwd=ROOT)
+    assert "1 passed" in result.stdout,result.stdout+result.stderr
+    report=json.loads(program.with_suffix('.json').read_text(encoding='utf-8'))
+    for phase in ('collection','execution'):
+        directory=Path(report[phase]).resolve()
+        assert directory.is_relative_to(scratch.resolve()) and not directory.is_relative_to(ROOT),report

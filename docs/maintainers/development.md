@@ -26,7 +26,7 @@ python tools/verify_project.py --full --workers 4
 
 默认最多 12 个 worker，可用 `--workers` 或 `VIBEFLOW_TEST_WORKERS` 调整，命令行优先。按文件分配 worker，文件内共享工程的修改、构建、运行、恢复顺序保持串行。测试调度不改变业务 `max_concurrency`。
 
-入口固定本仓 `src`，关闭用户站点和第三方 pytest 插件自动加载；进程工作目录、临时目录、日志、依赖及构建产物均位于仓库外。省略 `--scratch` 自动清理；显式提供仓库外目录则由调用者负责清理和保留所需结果。工具链按 `tests/e2e/runtime/package-lock.json` 一次准备，集合查看和纯 Python 场景不安装 Node 依赖；仅需 Node 的场景不下载浏览器。已有环境可通过 `VIBEFLOW_TEST_TOOLCHAIN_ROOT`、`VIBEFLOW_BROWSER_RUNTIME_ROOT` 复用；系统 Chrome 可用 `PUPPETEER_EXECUTABLE_PATH` 指定。缺少必需运行环境报错，不当作通过或自动跳过。
+入口固定本仓 `src`，关闭用户站点和第三方 pytest 插件自动加载。pytest 先在仓库目录解析原生命令参数，公开配置钩子再将已解析的测试目标固定为绝对路径，并在导入测试模块前切换至隔离工作目录；`-k`、`-m` 等选项值不被当作路径改写。并行调度进程留在调用目录启动 worker，实际收集与执行发生在各 worker 的隔离目录。临时目录、日志、依赖及构建产物均位于仓库外。省略 `--scratch` 自动清理；显式提供仓库外目录则由调用者负责清理和保留所需结果。工具链按 `tests/e2e/runtime/package-lock.json` 一次准备，集合查看和纯 Python 场景不安装 Node 依赖；仅需 Node 的场景不下载浏览器。已有环境可通过 `VIBEFLOW_TEST_TOOLCHAIN_ROOT`、`VIBEFLOW_BROWSER_RUNTIME_ROOT` 复用；系统 Chrome 可用 `PUPPETEER_EXECUTABLE_PATH` 指定。缺少必需运行环境报错，不当作通过或自动跳过。
 
 所有维护的测试位于 `tests/e2e`，真实示例源码保存在 `sandbox`。测试从正常 SDK 声明、CLI、构建所得产物、应用宿主或页面控件进入，只断言正常结果、诊断、导出、日志及自然 DOM。共享辅助只驱动命令、文件、隔离环境和浏览器，不实现解析器、编译器或规则。不得构造内部 IR/RuleContext、替换模块/布局、调用页面业务函数、窥探缓存/AST/内部对象身份或统计内部调用次数。
 

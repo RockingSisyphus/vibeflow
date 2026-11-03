@@ -16,12 +16,14 @@ README、AGENTS 和项目治理指南明确区分目录位置、root ID 与发�
 
 两个最终 ZIP 分别通过三字段身份识别、自定义 root 目录与 ID、架构刷新、Python 运行、JS 构建/运行、身份只读以及内核清单不变的独立验收。两个 profile 的内核 ZIP 彼此相同，也与归档 1.5.0 内核逐字节相同。原始 1.5.0 ZIP 和校验索引保留于 archive，原校验值核对通过。
 
+以下为本机 `dist/` 中的构建产物记录，不属于 Git 检出内容；文件名供本机查阅。源码与 CI 无需这些 ZIP 或校验索引即可检查和构建新的隔离候选包。
+
 | 本地包 | SHA256 |
 | --- | --- |
-| [vibeflow-distribution-1.5.1.zip](../../dist/vibeflow-distribution-1.5.1.zip) | `9596a1f9ca9a71209acdb2d799def4eeeef6c88b3d7b701b11be73ad5017470a` |
-| [vibeflow-distribution-autonomous-1.5.1.zip](../../dist/vibeflow-distribution-autonomous-1.5.1.zip) | `2980f41c60a5dfd4a038ecb76e17bf876f49f85150b4dde223d376752187cc34` |
+| `vibeflow-distribution-1.5.1.zip` | `9596a1f9ca9a71209acdb2d799def4eeeef6c88b3d7b701b11be73ad5017470a` |
+| `vibeflow-distribution-autonomous-1.5.1.zip` | `2980f41c60a5dfd4a038ecb76e17bf876f49f85150b4dde223d376752187cc34` |
 
-当前校验索引为 [SHA256SUMS-1.5.1.txt](../../dist/SHA256SUMS-1.5.1.txt)。最终仓库 all 检查为 0 error、0 warning，旧版及新版 ZIP 校验值均通过，本次隔离临时材料已清理。验收仅覆盖本机 Linux 的发行层使用流程；本次未重跑 wheel、其他平台、完整适配采集或完整功能门禁。
+当前校验索引为 `SHA256SUMS-1.5.1.txt`。最终仓库 all 检查为 0 error、0 warning，旧版及新版 ZIP 校验值均通过，本次隔离临时材料已清理。验收仅覆盖本机 Linux 的发行层使用流程；本次未重跑 wheel、其他平台、完整适配采集或完整功能门禁。
 
 ## 1.5.0 构建内容
 

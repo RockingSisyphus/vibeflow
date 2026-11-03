@@ -4,11 +4,11 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
-import sys
 
 import pytest
 
 from tests.e2e.async_cases import async_case
+from tests.e2e.support import cli
 from vibeflow.coordination import Coordinator, CoordinationError, WorkflowClient, WorkflowServer
 from vibeflow.targets.python.runtime.workflow_host import bind_workflow
 from vibeflow.targets.python.sdk import CancellationSignal
@@ -103,10 +103,8 @@ plugin=Plugin(id="session.protocol",resources=[data_schema(type_key="session.res
                 "edges":[["start","operate"],["operate","end"]],
                 "outputs":[{"type":"session.result","as":"result","cardinality":"exactly_one","display_name":"Result"}]}})
         destination = root / name
-        built = subprocess.run([sys.executable, "-B", "-m", "vibeflow", "build",
-            "--workspace", str(source / "vibeflow_config.jsonc"), "--config", str(config),
-            "--out-dir", str(destination)], capture_output=True, text=True, encoding="utf-8", timeout=60)
-        assert built.returncode == 0, built.stdout + built.stderr
+        cli(source, "build", "--workspace", source / "vibeflow_config.jsonc", "--config", config,
+            "--out-dir", destination, timeout=60)
         bundles[name] = load_bundle(destination)
     shutil.rmtree(source)
     return bundles

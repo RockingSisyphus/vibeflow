@@ -81,7 +81,7 @@ def test_project_configuration_errors_use_official_commands(tmp_path,change,expe
         source / "project/configs/config.jsonc","--json",success=False)
     payload=json.loads(result.stdout)
     assert result.returncode==1 and payload["code"]==expected,payload
-    assert str(source / "project/vibeflow_project.jsonc") in result.stdout,payload
+    assert Path(payload["details"]["path"]) == source / "project/vibeflow_project.jsonc",payload
 
 
 @pytest.mark.parametrize("field",["unexpected","quality","target"])
