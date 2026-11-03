@@ -1,24 +1,12 @@
-# Python 运行观测沙箱
+<!-- vibeflow-directory-purpose -->
+# Python 运行观测输入
 
-公开 SDK 构造真实 workflow，使用默认 `vibeflow.python_io` Ruleset 允许所测试的控制台、进程和线程操作。正式 CLI 分别执行成功、业务异常和启动配置失败。
-
-外部进程持续读取固定 JSON 路径，断言更新时间持续变化、数组信息是独立快照、失败及成功状态正确；同时检查 stdout、stderr、原生文件描述符、子进程、普通线程的控制台输出进入业务日志，终端保留显示，内核报告独立保存。连续案例复用监控位置，检查新运行清空旧信息。
+project.py 只编写正常 SDK 工程及配置，供运行观测和 SDK 配置场景复用。进程驱动与断言统一在 tests/e2e；运行数据写入仓库外的隔离工作区。
 
 ```bash
-PYTHONPATH=src:. python -B -m sandbox.python.runtime_observation.probe \
-  --work /tmp/vf-runtime-observation --report /tmp/vf-runtime-observation.json
+python tools/run_tests.py -- tests/e2e/test_observation.py tests/e2e/test_sdk_configuration.py
 ```
 
-使用新的工作目录。不匹配返回非零。pytest 还检查空信息、非法 JSON、参数校验、并发运行隔离、默认 Process Node 更新、项目默认值以及中断退出。
+当前回归通过真实 CLI 验证成功、业务异常及启动失败，观察自然状态、业务控制台与内核日志，并验证新运行的状态重置。SDK 场景另行验证原生默认值、覆盖和实例隔离；Node 与浏览器的状态交互也使用各自真实应用入口。
 
-`documentation-release.json` 记录两种正式发行包的文档与提示词一致性，以及从解压包运行 Python/JS 手册 Node 的结果；这些示例在默认 Process Ruleset 下更新 info 并返回原契约输出。
-
-## 目录用途与边界
-
-仅用于：python / runtime_observation 案例，验证运行时观察、调度及可见执行证据；保留真实项目输入与 runner。
-
-- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
-- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
-- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
-
-完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。
+逐域判据与实际运行边界见[测试覆盖](../../TEST_COVERAGE.md)，统一执行规则见[开发与验证](../../../docs/maintainers/development.md)。这里不维护独立 probe、报告聚合或内部状态采集器。

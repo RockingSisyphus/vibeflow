@@ -80,7 +80,7 @@ jobs:
           TMP: ${{ runner.temp }}
           TEMP: ${{ runner.temp }}
         run: |
-          python tools/run_tests.py --workers 4 --scratch "$env:RUNNER_TEMP/workflow-hosts" -- tests/e2e/test_cooperation_protocol.py tests/e2e/test_session_behaviors.py tests/e2e/test_cooperation_hosts.py tests/e2e/test_cooperation_http.py tests/e2e/test_cooperation.py tests/e2e/test_entries.py tests/e2e/test_encoding.py tests/e2e/test_sdk_configuration.py tests/e2e/test_javascript.py tests/e2e/test_resources.py --junitxml "$env:RUNNER_TEMP/workflow-hosts.xml" 2>&1 | Tee-Object "$env:RUNNER_TEMP/workflow-hosts.log"
+          python tools/run_tests.py --workers 4 --scratch "$env:RUNNER_TEMP/workflow-hosts" -- tests/e2e/test_cooperation_protocol.py tests/e2e/test_session_behaviors.py tests/e2e/test_cooperation_hosts.py tests/e2e/test_cooperation_http.py tests/e2e/test_cooperation.py tests/e2e/test_entries.py tests/e2e/test_encoding.py tests/e2e/test_sdk_configuration.py tests/e2e/test_javascript.py tests/e2e/test_resources.py tests/e2e/test_developer_tools.py::test_runner_preserves_selection_and_isolation --junitxml "$env:RUNNER_TEMP/workflow-hosts.xml" 2>&1 | Tee-Object "$env:RUNNER_TEMP/workflow-hosts.log"
           exit $LASTEXITCODE
       - name: Preserve workflow host results
         if: always()
