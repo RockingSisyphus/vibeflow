@@ -7,6 +7,7 @@ from vibeflow.targets.javascript.frontend.errors import AotPlanError
 from vibeflow.targets.javascript.frontend.codegen_common import (
     WorkflowCode,
     constant,
+    js,
 )
 from vibeflow.targets.javascript.frontend.codegen_nodes import NodeCodegenMixin
 from vibeflow.targets.javascript.frontend.codegen_scheduler import SchedulerCodegenMixin
@@ -47,12 +48,8 @@ class StaticWorkflowEmitter(
         functions: list[str] = []
         for code in self._codes:
             constants.extend(self._emit_constants(code))
-        schemas = dict(self.workflow.schemas)
-        constants.extend(
-            [
-                constant("__vfSchemaCatalog", schemas),
-            ]
-        )
+        schemas = js(dict(self.workflow.schemas))
+        constants.append(f"const __vfSchemaCatalog = deepFreeze({schemas});")
         for code in reversed(self._codes):
             functions.extend(self._emit_functions(code))
         workflow_factory = (
@@ -75,7 +72,6 @@ class StaticWorkflowEmitter(
             ");"
             )
         if roots:
-            from .codegen_common import js
             functions.append("const __vfEntryInvocations = new Map([" + ",".join(
                 f"[{js(name)}, __vfEntryInvoke_{index}]" for index, name in enumerate(roots)) + "]);\n"
                 "function __vfInvokeWorkflow(inputs, options = {}) {\n"
@@ -155,10 +151,6 @@ class StaticWorkflowEmitter(
             "max_steps": workflow.max_steps,
             "entry_mode": workflow.entry_mode,
             "entries": list(workflow.entries),
-            "schemas": {
-                key: dict(value)
-                for key, value in sorted(workflow.schemas.items())
-            },
         }
     def _emit_constants(self, code: WorkflowCode) -> list[str]:
         workflow = code.workflow

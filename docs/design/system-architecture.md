@@ -93,6 +93,8 @@ Python 将准备与装配分开：静态阶段保存共同计划及有限的原�
 
 Python 的文件收集、加载 API 与 CLI 属于 Tooling；框架通过包资源读取，因此源码、wheel 和 ZIP 发行采用同一构建入口。两种 Target 共用暂存、原子发布、构建结果与 v6 元数据；JS 保留 emitter、esbuild、Node/Browser runtime。加载只解析格式、ABI 和运行所需字段，不重新扫描源码或校验文件哈希。
 
+每个 JavaScript 工作流模块在初始化时构造并深冻结一份私有 schema 目录。根工作流、命名入口和子工作流通过根运行上下文读取它，端口自身的 schema 优先。节点各自构造配置参数。
+
 命名入口和目标的纯解析位于 `core/workflows`，入口范围与调用授权写入公共计划。授权由显式 Rule Record 折叠，不由 `flow_kind` 或外观产生；Python 上下文与 JS 生成模块执行同一有效权限。端口收发改为普通 SDK Node，执行器和计划不再保留原生 IO 分支。
 
 ## 展示产物边界

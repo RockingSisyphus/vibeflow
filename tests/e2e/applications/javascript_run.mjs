@@ -9,7 +9,7 @@ const events=[];
 const initial={...request.initial};
 const received=[],sent=[];
 if(request.session){
- const records=new Map([['held','released']]);
+ const records=new Map([['held',request.storage_value??'released']]);
  initial.app_session={
   clock:{async now(){return '2026-01-02T03:04:05Z';}},
   storage:{async read(value){return {value:records.get(value.key)};},async get(value){return records.get(value.key);}},

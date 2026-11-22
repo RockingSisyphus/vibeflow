@@ -249,7 +249,7 @@ function inputValues(workflow, inputs, input) {
   return [inputs[input.key]];
 }
 
-function validatePublicInputs(workflow, inputs) {
+function validatePublicInputs(workflow, inputs, schemas) {
   assertObject(inputs, "VF_INPUT_SCHEMA", "workflow inputs must be an object", workflow);
   const known = new Set(workflow.inputs.map((item) => item.key));
   for (const key of Object.keys(inputs)) {
@@ -264,7 +264,7 @@ function validatePublicInputs(workflow, inputs) {
     }
     if (!present) continue;
     const failure = inputValues(workflow,inputs,input).map(value=>validateJsonSchema(
-      value,input.schema || workflow.schemas?.[input.type])).find(Boolean);
+      value,input.schema || schemas[input.type])).find(Boolean);
     if (failure) {
       throw vfError(
         "VF_INPUT_SCHEMA",
@@ -280,7 +280,7 @@ function createEnvelope(key, type, value, sourceNode) {
 }
 
 function createStaticState(workflow, initial, root, path) {
-  validatePublicInputs(workflow, initial);
+  validatePublicInputs(workflow, initial, root.schemas);
   return {
     workflow,
     root,
@@ -397,7 +397,7 @@ function validateNodeOutputs(node, outputs, state) {
     );
   }
   for (const provider of node.provides) {
-    const schema = state.workflow.schemas?.[provider.type];
+    const schema = state.root.schemas[provider.type];
     const failure = validateJsonSchema(outputs[provider.key], schema);
     if (failure) {
       throw vfError(
@@ -653,7 +653,7 @@ function finalizeOutputs(state) {
     } else {
       setOwn(output, spec.as, matches.map((item) => item.value));
     }
-    const schema = spec.schema || state.workflow.schemas?.[spec.type];
+    const schema = spec.schema || state.root.schemas[spec.type];
     const values = spec.cardinality === "all"
       ? matches.map((item) => item.value)
       : Object.prototype.hasOwnProperty.call(output, spec.as) ? [output[spec.as]] : [];

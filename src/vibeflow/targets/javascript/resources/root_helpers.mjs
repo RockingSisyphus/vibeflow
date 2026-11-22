@@ -1,5 +1,5 @@
 // Native runtime support; assembled by frontend.templates.
-function createRoot(workflow, normalized) {
+function createRoot(workflow, schemas, normalized) {
   const instanceId=normalized.workflowInstanceId??Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)),value=>value.toString(16).padStart(2,"0")).join("");
   const controller = new AbortController();
   const parentSignal = normalized.signal;
@@ -8,6 +8,7 @@ function createRoot(workflow, normalized) {
   if (parentSignal?.aborted) propagate();
   const root = {
     workflow,
+    schemas,
     workflowId: workflow.workflow_id,
     identity: Object.freeze({self:()=>({id:instanceId})}),
     signal: controller.signal,
@@ -41,7 +42,7 @@ function prepareWorkflowInvocation(
   } catch (cause) {
     throw ensureErrorLocation(cause, workflow, []);
   }
-  const root = createRoot(workflow, normalized);
+  const root = createRoot(workflow, schemas, normalized);
   try {
     throwIfAborted(root.signal, workflow);
     emitTrace(root, "run_start", {}, true);
@@ -70,13 +71,12 @@ function createStaticWorkflowSync(
   executeRoot,
 ) {
   const workflow = deepFreeze(workflowMetadata);
-  const schemas = deepFreeze(schemaCatalog);
   const plugins = deepFreeze(runtimePluginDescriptors);
   assertWorkflowAbi(workflow);
   return function invokeWorkflow(inputs, options) {
     const root = prepareWorkflowInvocation(
       workflow,
-      schemas,
+      schemaCatalog,
       options,
       "sync",
     );
@@ -139,13 +139,12 @@ function createStaticWorkflowAsync(
   executeRoot,
 ) {
   const workflow = deepFreeze(workflowMetadata);
-  const schemas = deepFreeze(schemaCatalog);
   const plugins = deepFreeze(runtimePluginDescriptors);
   assertWorkflowAbi(workflow);
   return async function invokeWorkflow(inputs, options) {
     const root = prepareWorkflowInvocation(
       workflow,
-      schemas,
+      schemaCatalog,
       options,
       "async",
     );

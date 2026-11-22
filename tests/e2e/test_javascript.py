@@ -17,6 +17,8 @@ ROWS=[
  {"config":"detached","initial":{"x":7},"mode":"async","session":True,"expected":{"result":7}},
  {"config":"async_storage","initial":{"x":6,"key":"held"},"mode":"async","session":True,
   "expected":{"doubled":12,"value":"released"}},
+ {"config":"async_storage","initial":{"x":6,"key":"held"},"mode":"async","session":True,
+  "storage_value":123,"error":"VF_OUTPUT_SCHEMA"},
  {"config":"loop_max_failure","initial":{"x":1},"error":"VF_MAX_STEPS"},
  {"config":"linear","initial":{},"error":"VF_INPUT_REQUIRED"},
  {"config":"linear","initial":{"x":"invalid"},"error":"VF_INPUT_SCHEMA"},
