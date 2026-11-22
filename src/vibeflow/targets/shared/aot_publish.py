@@ -60,7 +60,7 @@ def validate_owned_build_directory(
         )
     manifest_keys = set(manifest)
     if manifest_keys != _MANIFEST_KEYS:
-        _invalid_manifest("AOT manifest fields do not match v3; rebuild with current tools")
+        _invalid_manifest(f"AOT manifest fields do not match {manifest_format}; rebuild with current tools")
     if manifest.get("format") != manifest_format:
         raise AotPublishError(
             "VF_BUILD_REPLACE",

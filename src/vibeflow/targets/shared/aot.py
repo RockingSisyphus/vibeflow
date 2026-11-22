@@ -20,8 +20,9 @@ class BuildResult:
     files: tuple[str, ...]
 
 
-def artifact_manifest(staging, *, workflow, project_target, entry, plan_sha256, target_metadata):
-    return dict(format=BUILD_MANIFEST_FORMAT, abi_version=workflow.abi_version,
+def artifact_manifest(staging, *, workflow, project_target, entry, plan_sha256, target_metadata,
+                      manifest_format=BUILD_MANIFEST_FORMAT):
+    return dict(format=manifest_format, abi_version=workflow.abi_version,
         project_target=project_target, workflow_id=workflow.workflow_id,
         entry_mode=workflow.entry_mode, entry=entry, plan_sha256=plan_sha256,
         target_metadata=target_metadata,
@@ -30,18 +31,18 @@ def artifact_manifest(staging, *, workflow, project_target, entry, plan_sha256, 
 
 
 @contextmanager
-def staged_build(out_dir, *, replace=False):
+def staged_build(out_dir, *, replace=False, manifest_format=BUILD_MANIFEST_FORMAT):
     output = Path(out_dir).expanduser().absolute()
     if output.exists():
         if not replace:
             raise FileExistsError(f'output directory already exists: {output}')
-        validate_owned_build_directory(output, manifest_format=BUILD_MANIFEST_FORMAT)
+        validate_owned_build_directory(output, manifest_format=manifest_format)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.' + output.name + '.aot-', dir=output.parent) as temporary:
         staging = Path(temporary) / 'dist'
         staging.mkdir()
         yield staging
-        atomic_publish_directory(staging, output, replace=replace, manifest_format=BUILD_MANIFEST_FORMAT)
+        atomic_publish_directory(staging, output, replace=replace, manifest_format=manifest_format)
 
 
 def write_manifest(staging, manifest):

@@ -7,7 +7,7 @@
 | Workflow ABI | `vibeflow.workflow.v12` |
 | Plugin ABI | `vibeflow.plugin.v5` |
 | Rule ABI | `vibeflow.rule.v3` |
-| AOT manifest | `vibeflow.aot-build.v6` |
+| AOT manifest | JavaScript `vibeflow.aot-build.v6`，Python `vibeflow.aot-build.v7` |
 | Workflow 启动清单 | `vibeflow.workflow-launches.v2` |
 | 预览快照 | v5 |
 

@@ -13,18 +13,6 @@ from vibeflow.core.models import CoreCompilation, ImplementationFacts
 from vibeflow.core.rules.models import plain, readonly
 
 
-def final_python_compilation(graph, registry):
-    from vibeflow.targets.python.project.check_session import current_python_check
-    from vibeflow.targets.python.project.compiler import GraphCompiler
-
-    session = current_python_check(registry)
-    compilation = getattr(session, "compilation", None)
-    if compilation is not None and getattr(session, "compilation_input", None) is graph:
-        return compilation
-    facts = GraphCompiler().prepare_implementation_facts(graph, registry=registry)
-    return GraphCompiler().compile_with_findings(graph, implementation_facts=facts)
-
-
 @dataclass(frozen=True)
 class PreparedPythonPresentation:
     graph: GraphConfig

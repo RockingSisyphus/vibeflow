@@ -12,6 +12,9 @@ from vibeflow.core.rules import models as rule_models
 from vibeflow.core.rules.selection import models as selection_models
 
 
+PYTHON_AOT_FORMAT = "vibeflow.aot-build.v7"
+
+
 _RECORDS = {value.__module__ + '.' + value.__name__: value
     for module in (flow, contracts, planned, compiler, rule_models, selection_models, entries)
     for value in vars(module).values() if isinstance(value, type) and is_dataclass(value)}

@@ -1,6 +1,6 @@
 """Native asynchronous checked source entry, sharing project preparation."""
 from __future__ import annotations
-from .workspace_service import Any, CheckedRunError, CheckedRunResult, HealthReport, Mapping, Path, WorkspaceConfig, _environment_or_report, _final_compilation, _prepare_workspace_graph, _python_check_scope, _validate_prepared_workspace_graph, _workspace_runtime_options, observed_checked_run, replace, source_paths, summarize_mapping, validate_run_id
+from .workspace_service import Any, CheckedRunError, CheckedRunResult, HealthReport, Mapping, Path, WorkspaceConfig, _environment_or_report, _prepare_workspace_graph, _python_check_scope, _validate_prepared_workspace_graph, _workspace_runtime_options, observed_checked_run, replace, source_paths, summarize_mapping, validate_run_id
 
 @observed_checked_run
 async def run_workspace_checked_async(config_path: str | Path, *, workspace: WorkspaceConfig, initial: Mapping[str, Any] | None=None, run_root: str | Path | None=None, run_id: str | None=None, runtime_options: object | None=None, delegate_cli: bool=False, workflow_session: object | None=None, workflow_instance_id: str | None=None, _prepared_run_dir: Path | None=None, preview_root: str | Path | None=None, entry: str | None=None, signal=None) -> CheckedRunResult:
@@ -38,7 +38,7 @@ async def run_workspace_checked_async(config_path: str | Path, *, workspace: Wor
         if health.status in {'FAIL', 'ERROR'}:
             _write_refused_artifacts(run_dir, health)
             _refuse_on_health_failure(health, run_dir, actual_run_id)
-        compilation = _final_compilation(graph, env.registry)
+        compilation = prepared.compilation
         graph, compiled = (compilation.workflow.graph, compilation.compiled_graph)
         from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
         presentation = prepare_python_presentation(graph, registry=env.registry, resources=resources, compilation=compilation)

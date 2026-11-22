@@ -58,10 +58,7 @@ from vibeflow.tooling.project.workspace_model import (
     WorkspaceConfig,
     WorkspaceRoot,
 )
-from vibeflow.targets.python.project.check_session import python_check_scope as _python_check_scope
-from vibeflow.tooling.application.python.presentation.prepared import (
-    final_python_compilation as _final_compilation,
-)
+from vibeflow.targets.python.project.check_session import current_python_check, python_check_scope as _python_check_scope
 
 
 def validate_workspace_config_path(path: Path, *, workspace: WorkspaceConfig, environment=None) -> HealthReport:
@@ -143,7 +140,7 @@ def run_workspace_checked(
         if health.status in {"FAIL", "ERROR"}:
             _write_refused_artifacts(run_dir, health)
             _refuse_on_health_failure(health, run_dir, actual_run_id)
-        compilation = _final_compilation(graph, env.registry)
+        compilation = prepared.compilation
         graph, compiled = compilation.workflow.graph, compilation.compiled_graph
         from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
         presentation = prepare_python_presentation(graph, registry=env.registry, resources=resources, compilation=compilation)
@@ -213,9 +210,8 @@ def _load_workspace_graph_for_presentation(path, *, workspace, validate_health, 
         if health.status not in {"FAIL", "ERROR"}:
             from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
 
-            compilation = _final_compilation(graph, env.registry)
-            presentation = prepare_python_presentation(graph, registry=env.registry,
-                resources=resources, compilation=compilation)
+            presentation = prepare_python_presentation(prepared.graph, registry=env.registry,
+                resources=resources, compilation=prepared.compilation)
             graph, compiled = presentation.graph, presentation.compiled
         return graph, compiled, env.registry, resources, None, health, presentation
 
@@ -247,7 +243,12 @@ def _validate_prepared_workspace_graph(
         **({"entry": entry} if entry is not None and rule_phase == "run" else {}),
     )
     if health.status not in {"FAIL", "ERROR"}:
-        compilation = _final_compilation(graph, env.registry)
+        session = current_python_check(env.registry)
+        compilation = session.checked_compilation(graph) if session is not None else None
+        if compilation is None:
+            compiler = GraphCompiler()
+            facts = compiler.prepare_implementation_facts(graph, registry=env.registry)
+            compilation = compiler.compile_with_findings(graph, implementation_facts=facts)
         graph, compiled = compilation.workflow.graph, compilation.compiled_graph
         prepared.graph, prepared.compilation = graph, compilation
     info = dict(health.info)

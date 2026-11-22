@@ -91,7 +91,7 @@ Architecture JSONC 的 implementation_graph 保存当前项目的资源、源码
 
 Python 将准备与装配分开：静态阶段保存共同计划及有限的原生图/编译记录，运行阶段绑定类、独立参数容器、活对象和现有 PipelineRuntime。源码与目录 bundle 共用装配函数。生成块在调用时读取追踪和 Hook 选项，不为各 profile 复制编译逻辑。无法生成块的结构保留原动态调度。
 
-Python 的文件收集、加载 API 与 CLI 属于 Tooling；框架通过包资源读取，因此源码、wheel 和 ZIP 发行采用同一构建入口。两种 Target 共用暂存、原子发布、构建结果与 v6 元数据；JS 保留 emitter、esbuild、Node/Browser runtime。加载只解析格式、ABI 和运行所需字段，不重新扫描源码或校验文件哈希。
+Python 的文件收集、快照编解码、加载 API 与 CLI 属于 Tooling。源码、wheel 和 ZIP 发行通过同一构建入口读取框架资源。两种 Target 共用暂存、原子发布和清单结构，Python 使用 v7 格式，JavaScript 使用 v6 格式。Python 快照保存一份检查报告和各入口的 delegated CLI 额外问题，加载后按选定入口合成运行报告。加载只解析格式、ABI 和运行所需字段。
 
 每个 JavaScript 工作流模块在初始化时构造并深冻结一份私有 schema 目录。根工作流、命名入口和子工作流通过根运行上下文读取它，端口自身的 schema 优先。节点各自构造配置参数。
 

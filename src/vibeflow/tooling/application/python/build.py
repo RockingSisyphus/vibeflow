@@ -11,7 +11,8 @@ import shutil
 from vibeflow.core.findings import HealthReport
 from vibeflow.targets.shared.aot import BuildResult, artifact_manifest, staged_build, write_manifest
 from vibeflow.targets.python.runtime.preparation import prepare_python_workflow, bind_python_workflow
-from vibeflow.targets.python.runtime.support.snapshot import encode_snapshot
+from vibeflow.tooling.application.python.bundle_snapshot import PYTHON_AOT_FORMAT, encode_snapshot
+from vibeflow.tooling.application.python.delegate_contract import delegate_cli_contract_findings
 
 
 @dataclass(frozen=True)
@@ -35,7 +36,6 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
     from vibeflow.tooling.application.python.workspace_service import (
         _environment_or_report, _prepare_workspace_graph, _validate_prepared_workspace_graph)
     from vibeflow.tooling.application.python.project.project_options import _workspace_runtime_options
-    from vibeflow.tooling.application.python.presentation.prepared import final_python_compilation
     from vibeflow.targets.python.project.check_session import python_check_scope
     from vibeflow.core.descriptors.json_values import thaw_json
 
@@ -56,7 +56,7 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
             runtime_options=options,rule_phase='run')
         if health.status in {'FAIL','ERROR'}:
             raise ValueError(json.dumps(health.to_dict(),ensure_ascii=False))
-        compilation = final_python_compilation(checked.graph,environment.registry)
+        compilation = checked.compilation
         prepared = prepare_python_workflow(compilation.workflow.graph,compilation.compiled_graph,
             registry=environment.registry,global_config=checked.resources.global_config)
         from vibeflow.targets.python.runtime.helpers import planned_items
@@ -159,13 +159,14 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
                 if call.child_block:
                     save_blocks(frame.subplan,call.child_block)
         save_blocks(native_plan,prepared.workflow.entry_block)
-        from vibeflow.tooling.application.python.delegate_contract import validate_delegate_cli_graph_contract
-        delegate_health = validate_delegate_cli_graph_contract(compilation.workflow.graph, health)
+        delegate_findings = delegate_cli_contract_findings(compilation.workflow.graph)
         from vibeflow.core.workflows.entries import project_entry
-        delegate_entries = {name: validate_delegate_cli_graph_contract(
-            project_entry(compilation.workflow.graph, compilation.compiled_graph, name)[0], health).to_dict()
+        delegate_entries = {
+            name: [finding.to_dict() for finding in delegate_cli_contract_findings(
+                project_entry(compilation.workflow.graph, compilation.compiled_graph, name)[0])]
             for name in compilation.workflow.graph.entries}
-        data = dict(workflow_reference={"root":workspace.root_for_path(config).id, "path":config.relative_to(workspace.root_for_path(config).path).as_posix()}, resource_use=checked.resources.resource_use.to_dict(), delegate_health=delegate_health.to_dict(), delegate_health_by_entry=delegate_entries,
+        data = dict(workflow_reference={"root":workspace.root_for_path(config).id, "path":config.relative_to(workspace.root_for_path(config).path).as_posix()}, resource_use=checked.resources.resource_use.to_dict(),
+            delegate_findings=[finding.to_dict() for finding in delegate_findings], delegate_findings_by_entry=delegate_entries,
             workflow=prepared.workflow.to_dict(),graphs=encode_snapshot(prepared.graphs,relocate=relocate),
             compiled=encode_snapshot(prepared.compiled),globals=encode_snapshot(prepared.globals),overrides=encode_snapshot(prepared.overrides),
             source_roots=list(dict.fromkeys([*destinations.values(),*(destination for _,destination in dependency_roots)])),
@@ -186,7 +187,9 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
             return python_preview(presentation, config=config, workspace=workspace,
                 preview_root=request.preview_root, category="build", status="building", check_status=health.status)
         preview_record = incidental_preview(publish_build_preview)
-        with preview_operation(preview_record), staged_build(request.out_dir,replace=request.replace) as staging:
+        with preview_operation(preview_record), staged_build(
+            request.out_dir, replace=request.replace, manifest_format=PYTHON_AOT_FORMAT
+        ) as staging:
             copy_python_framework(staging/'_framework/vibeflow')
             from vibeflow.tooling.project.workflow_launches import graph_launches, write_bundle_launches
             launches = graph_launches(compilation.workflow.graph, registry.prepared_resources.catalogs,
@@ -205,6 +208,7 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
             (staging/'run.py').write_text("from pathlib import Path\nimport sys\nsys.dont_write_bytecode = True\nROOT = Path(__file__).resolve().parent\nsys.path.insert(0, str(ROOT / '_framework'))\nfrom vibeflow.tooling.application.python.bundle_cli import main\nif __name__ == '__main__':\n    raise SystemExit(main(ROOT))\n",encoding='utf-8')
             manifest = artifact_manifest(staging,workflow=prepared.workflow,project_target='python',entry='run.py',
                 plan_sha256=hashlib.sha256(prepared.workflow.to_json().encode()).hexdigest(),
+                manifest_format=PYTHON_AOT_FORMAT,
                 target_metadata=dict(target='python',profile='python-package',toolchain={'python':platform.python_version()},bindings='python-workflow.json'))
             write_manifest(staging,manifest)
         output = Path(request.out_dir).resolve()

@@ -120,6 +120,8 @@ python candidate-bundle/run.py delegate-cli -- --help
 
 构建元数据的共同头保存工作流、ABI、入口和文件，`target_metadata` 保存该语言的 profile、工具链与绑定定位。
 
+Python AOT 使用 `vibeflow.aot-build.v7`。旧包可用自带的 `run.py` 或配套框架继续运行。通过新版框架的 `load_bundle()` 使用工作流时，请将旧包重新构建到新目录。`--replace` 用于同格式的完整构建目录。
+
 ## 原生异步入口与生命周期
 
 `pipeline.entry_mode: "async"` 使用 `PipelineRuntime.run_async()`、`PythonBundle.run_async()`、`run_checked_async()` 或 `run_workspace_checked_async()`；后两者也从 `vibeflow.tooling.application.python` 导出。同步入口保留 `run()`，传错模式会报 `VF_ENTRY_MODE_MISMATCH`。仅顶层 CLI 创建事件循环，应用直接 await SDK 入口。

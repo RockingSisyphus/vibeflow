@@ -1,6 +1,7 @@
 """Load prepared Python workflows without source checks or graph compilation."""
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import replace
 import json
 from pathlib import Path
@@ -10,22 +11,25 @@ from threading import RLock
 from vibeflow.block_compiler import workflow_plan_from_dict, WORKFLOW_ABI_VERSION, map_plan_sources
 from vibeflow.core.descriptors.decode import decode_resource
 from vibeflow.core.descriptors.models import SourceLocator
+from vibeflow.core.findings import HealthFinding, HealthReport
+from vibeflow.core.workflows.entries import choose_entry
 from vibeflow.targets.python.project.registry import NodeRegistry, load_node_implementation
 from vibeflow.targets.python.project.plugins import PluginRegistry, create_lifecycle_plugin
 from vibeflow.targets.python.runtime.preparation import PreparedPythonWorkflow, bind_python_workflow
-from vibeflow.targets.python.runtime.support.snapshot import decode_snapshot
 from vibeflow.targets.python.sdk.loading import load_plugin, source_paths, load_source_module
 from vibeflow.targets.python.sdk.source_namespace import source_namespace
+from vibeflow.tooling.application.python.bundle_snapshot import PYTHON_AOT_FORMAT, decode_snapshot
+from vibeflow.tooling.application.python.delegate_contract import apply_delegate_cli_findings
 
 
 class PythonBundle:
     def __init__(self, path):
         self.path = Path(path).resolve()
         self.metadata = json.loads((self.path / 'vibeflow-build.json').read_text(encoding='utf-8'))
-        if self.metadata.get('format') != 'vibeflow.aot-build.v6' or self.metadata.get('abi_version') != WORKFLOW_ABI_VERSION:
-            raise ValueError('unsupported Python AOT format or workflow ABI; rebuild the bundle')
         if self.metadata.get('project_target') != 'python':
             raise ValueError('bundle is not a Python workflow')
+        if self.metadata.get('format') != PYTHON_AOT_FORMAT or self.metadata.get('abi_version') != WORKFLOW_ABI_VERSION:
+            raise ValueError('unsupported Python AOT format or workflow ABI; rebuild the bundle')
         self.data = json.loads((self.path / self.metadata['target_metadata']['bindings']).read_text(encoding='utf-8'))
         relocate = lambda value: str(self.path / value[len('@bundle/'):]) if isinstance(value,str) and value.startswith('@bundle/') else value
         self.workflow = map_plan_sources(workflow_plan_from_dict(self.data['workflow']),
@@ -49,7 +53,6 @@ class PythonBundle:
 
     @property
     def workflow_descriptor(self):
-        from copy import deepcopy
         return deepcopy(self.data['workflow_descriptor'])
 
     def _prepare_node(self, record):
@@ -200,6 +203,19 @@ class PythonBundle:
         from vibeflow.targets.python.runtime.options import merge_runtime_options
         return merge_runtime_options(self.data['runtime_options'], overrides)
 
+    def _run_health(self, *, entry, delegate_cli):
+        entries = {item.name: item for item in self.workflow.named_entries}
+        selected = choose_entry(entries, self.workflow.default_entry, entry)
+        health = self.health
+        if not delegate_cli:
+            return health
+        if selected is None:
+            stored = self.data['delegate_findings']
+        else:
+            stored = self.data['delegate_findings_by_entry'][selected]
+        findings = tuple(HealthFinding(**item) for item in deepcopy(stored))
+        return apply_delegate_cli_findings(health, findings)
+
     def run(self, initial=None, *, runtime_options=None, workflow_session=None, run_root=None, run_id=None,
             delegate_cli=False, node_config_overrides=None, global_config=None, _prepared_run_dir=None, entry=None, signal=None, workflow_instance_id=None):
         from vibeflow.tooling.application.python.run_directory import prepare_run_dir as _prepare_run_dir
@@ -209,10 +225,7 @@ class PythonBundle:
         directory = _prepared_run_dir or _prepare_run_dir(run_root, actual_id)
         effective = self.effective_options(runtime_options)
         with observe_run(directory, effective):
-            from vibeflow.core.workflows.entries import choose_entry
-            selected = choose_entry({item.name:item for item in self.workflow.named_entries}, self.workflow.default_entry, entry)
-            delegate_health = self.data['delegate_health_by_entry'][selected] if selected is not None else self.data['delegate_health']
-            health = self._health(delegate_health if delegate_cli else self.data['health'])
+            health = self._run_health(entry=entry, delegate_cli=delegate_cli)
             _write_json(directory / 'health_report.json', health.to_dict())
             _write_json(directory / 'effective_policy.json', health.effective_policy)
             if health.status in {'FAIL','ERROR'}:
@@ -242,10 +255,7 @@ class PythonBundle:
         directory = _prepared_run_dir or _prepare_run_dir(run_root, actual_id)
         effective = self.effective_options(runtime_options)
         with observe_run(directory, effective):
-            from vibeflow.core.workflows.entries import choose_entry
-            selected = choose_entry({item.name: item for item in self.workflow.named_entries}, self.workflow.default_entry, entry)
-            delegate_health = self.data['delegate_health_by_entry'][selected] if selected is not None else self.data['delegate_health']
-            health = self._health(delegate_health if delegate_cli else self.data['health'])
+            health = self._run_health(entry=entry, delegate_cli=delegate_cli)
             _write_json(directory / 'health_report.json', health.to_dict())
             _write_json(directory / 'effective_policy.json', health.effective_policy)
             if health.status in {'FAIL', 'ERROR'}:
@@ -266,19 +276,15 @@ class PythonBundle:
 
     @property
     def health(self):
-        return self._health(self.data['health'])
-
-    @staticmethod
-    def _health(value):
-        from vibeflow.core.findings import HealthReport, HealthFinding
-        return HealthReport(**{**value,**{key:tuple(HealthFinding(**item) for item in value[key])
-            for key in ('errors','warnings','skipped')}})
+        report = deepcopy(self.data['health'])
+        for key in ('errors', 'warnings', 'skipped'):
+            report[key] = tuple(HealthFinding(**item) for item in report[key])
+        return HealthReport(**report)
 
     def _path(self, value):
         return str(self.path / value[len('@bundle/'):]) if value.startswith('@bundle/') else value
 
     def _descriptor(self, value):
-        from copy import deepcopy
         value = deepcopy(value)
         for implementation in value.get('implementations',()):
             for source in (implementation['source'],*implementation.get('implementation_files',())):

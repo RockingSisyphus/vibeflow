@@ -38,7 +38,7 @@ export const core=defineNode({id:"entry.core",node_type:"vibeflow.node",rulesets
 def entry_project(tmp_path_factory,toolchain,request):
     root=tmp_path_factory.mktemp("named-entries")
     language=request.param
-    if language=="python":
+    if language.startswith("python"):
         app=workspace(root,PYTHON,plugin='''from vibeflow.targets.python.sdk import Plugin,data_schema
 plugin=Plugin(id="entries",resources=[data_schema(type_key=key,schema={"type":kind}) for key,kind in [("number","number"),("string","string"),("seed","number")]])
 ''')
@@ -54,9 +54,11 @@ export const plugin=definePlugin({id:"entries",resources:[["number","number"],["
     entries={name:{"start":name+"_start","inputs":[{"key":key,"type":kind,"required":True,"display_name":key}],
         "outputs":[{"type":"number","as":name+"_answer","cardinality":"exactly_one","display_name":"Answer"}]}
         for name,key,kind in (("cli","text","string"),("gui","value","number"))}
+    if language.startswith("python-delegate"):
+        entries["gui"]["inputs"][0]["key"] = "cli.argv"
     config=write(app / "configs/main.jsonc",{"plugins":[{"source":{"kind":"file","ref":plugin}}],"rulesets":[],"pipeline":{
         "nodes":nodes,"edges":[[a,b] for a,b in (("cli_start","cli"),("gui_start","gui"),("cli","core"),("gui","core"),("core","end"))],
-        "entries":entries,"entry_mode":"async" if language=="javascript-async" else "sync"}})
+        "entries":entries,"entry_mode":"async" if language.endswith("-async") else "sync"}})
     args=["build","--workspace",workspace_path,"--config",config,"--out-dir",root / "bundle"]
     if language.startswith("javascript"):args += ["--target","node","--profile","esm-module"]
     result=cli(root,*args)
@@ -103,6 +105,36 @@ def test_javascript_entry_schema_value_rejection(entry_project,tmp_path):
     result=command("node",ROOT / "tests/e2e/applications/javascript_run.mjs",built["entry"],request,cwd=tmp_path,success=False)
     payload=json.loads(next(line[8:] for line in result.stdout.splitlines() if line.startswith("FAILURE ")))
     assert result.returncode==1 and payload["code"]=="VF_INPUT_SCHEMA",payload
+
+
+@pytest.mark.parametrize("entry_project", ["python-delegate", "python-delegate-async"], indirect=True)
+def test_delegated_bundle_reports_selected_entry_contract(entry_project, tmp_path):
+    language, root, _, _ = entry_project
+    app = write(tmp_path / "delegate.py", """
+import asyncio
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(sys.argv[1]) / "_framework"))
+from vibeflow.tooling.application.python import load_bundle
+
+bundle = load_bundle(sys.argv[1])
+options = dict(entry="gui", delegate_cli=True, run_root=sys.argv[2], run_id="gui")
+if sys.argv[3] == "async":
+    asyncio.run(bundle.run_async({"cli.argv": []}, **options))
+else:
+    bundle.run({"cli.argv": []}, **options)
+""")
+    runs = tmp_path / "runs"
+    mode = "async" if language.endswith("-async") else "sync"
+    result = command(sys.executable, "-B", app, root / "bundle", runs, mode, cwd=tmp_path,
+                     env={"PYTHONPATH": None}, success=False)
+    assert result.returncode == 1 and "invalid delegated CLI contract" in result.stderr
+    report = json.loads((runs / "gui/health_report.json").read_text(encoding="utf-8"))
+    assert report["status"] == "FAIL"
+    assert [error["code"] for error in report["errors"]] == [
+        "CLI.DELEGATE.ARGV_INPUT", "CLI.DELEGATE.EXIT_OUTPUT", "CLI.DELEGATE.EXIT_PROVIDER",
+    ]
+    assert report["errors"][0]["details"]["inputs"] == [{"key": "cli.argv", "type": "number"}]
 
 
 @pytest.mark.parametrize("entry_project",["javascript"],indirect=True)

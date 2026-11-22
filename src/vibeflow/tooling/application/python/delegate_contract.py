@@ -16,6 +16,10 @@ def validate_delegate_cli_graph_contract(
     graph: object,
     report: HealthReport,
 ) -> HealthReport:
+    return apply_delegate_cli_findings(report, delegate_cli_contract_findings(graph))
+
+
+def delegate_cli_contract_findings(graph: object) -> tuple[HealthFinding, ...]:
     findings: list[HealthFinding] = []
     argv_inputs = [
         item
@@ -100,6 +104,13 @@ def validate_delegate_cli_graph_contract(
             )
         )
 
+    return tuple(findings)
+
+
+def apply_delegate_cli_findings(
+    report: HealthReport,
+    findings: tuple[HealthFinding, ...],
+) -> HealthReport:
     if not findings:
         return report
     status = "ERROR" if report.status == "ERROR" else "FAIL"
