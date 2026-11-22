@@ -48,7 +48,7 @@ class PipelineRuntime(AsyncPipelineRuntime, AsyncRuntimeNodeMixin, AsyncRuntimeN
         global_config: Mapping[str, Any] | None = None,
         runtime_options: RuntimeOptions | Mapping[str, object] | None = None,
         delegate_cli: bool = False,
-        capabilities: Mapping[str, object] | None = None,
+        workflow_session: object | None = None,
         workflow_instance_id: str | None = None,
         entry: str | None = None,
         _execution_plan: ExecutionPlan | None = None,
@@ -91,7 +91,7 @@ class PipelineRuntime(AsyncPipelineRuntime, AsyncRuntimeNodeMixin, AsyncRuntimeN
         self._run_dir = Path(run_dir) if run_dir is not None else Path("runs") / "vibeflow"
         self._trace_sink: RuntimeTraceSink | None = None
         self._trace_path_prefix: tuple[str, ...] = ()
-        self._capabilities = dict(capabilities or {})
+        self._workflow_session = workflow_session
         from vibeflow.core.workflows.identity import WorkflowIdentity
         self.workflow = WorkflowIdentity(workflow_instance_id) if workflow_instance_id is not None else WorkflowIdentity()
         from .lifecycle import CancellationSignal
@@ -120,7 +120,7 @@ class PipelineRuntime(AsyncPipelineRuntime, AsyncRuntimeNodeMixin, AsyncRuntimeN
         runtime._trace_path_prefix = parent._trace_path_prefix
         runtime.runtime_options = parent.runtime_options
         runtime.delegate_cli = parent.delegate_cli
-        runtime._capabilities = parent._capabilities
+        runtime._workflow_session = parent._workflow_session
         runtime.workflow = parent.workflow
         runtime._signal = parent._signal
         runtime._owns_run = False
@@ -147,9 +147,6 @@ class PipelineRuntime(AsyncPipelineRuntime, AsyncRuntimeNodeMixin, AsyncRuntimeN
                     self._plan = initialize(plugins)
                     self._frames = self._plan.frames
                     self._runtime_plan_factory = None
-                else:
-                    from dataclasses import replace
-                    self._plan = replace(self._plan,python_bindings=replace(self._plan.python_bindings,plugin_registry=plugins))
                 self._runtime_plugins = plugins.runtime_plugins()
                 self._hook_plan = runtime_hook_plan(self._runtime_plugins, self.runtime_options)
                 self._assert_entry_mode("sync")
@@ -236,12 +233,10 @@ class PipelineRuntime(AsyncPipelineRuntime, AsyncRuntimeNodeMixin, AsyncRuntimeN
             raise NodeContractError("VF_ENTRY_MODE_MISMATCH", f"{self.graph.entry_mode} workflow requires {'run_async' if self.graph.entry_mode == 'async' else 'run'}()")
         if mode == "sync":
             from vibeflow.core.workflows.coordination import synchronous_violation
-            from .contracts import capability_descriptors
-            descriptors = capability_descriptors(self.registry)
             for block in self._plan.workflow_plan.blocks:
                 for call in block.nodes:
                     declared = self.registry.descriptor(call.definition_id) if call.definition_id in self.registry.available() else None
-                    problem = synchronous_violation(call.completion, capabilities=getattr(declared, "capabilities", ()), descriptors=descriptors)
+                    problem = synchronous_violation(call.completion)
                     if problem:
                         raise NodeContractError("VF_ENTRY_MODE_SUSPEND_IN_SYNC", f"{call.id}: {problem}")
             for descriptor in getattr(self, '_runtime_plugin_descriptors', ()):

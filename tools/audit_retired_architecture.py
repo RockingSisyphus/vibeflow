@@ -102,12 +102,9 @@ RETIRED_DIAGNOSTIC_CODES = frozenset({'node_info_flow_kind', 'node_flow_kind_inv
     'missing_node_info', 'missing_contract', 'node_external_invalid',
     'node_decision_missing_route_output', 'type_mismatch', 'signature_unavailable',
     'example_shape'})
-RETIRED_HELPERS = ('tests/fixtures/support/code_plugins.py',
-    'tests/fixtures/support/source_membership.py', 'tests/fixtures/support/contributions.py')
 RETIRED_MODULES = frozenset('vibeflow.' + value.removesuffix('.py').replace('/', '.').removesuffix('.__init__')
     for value in (*RETIRED_FILES, *MOVED_FILES)
     if not (ROOT / 'src/vibeflow' / value.removesuffix('.py') / '__init__.py').is_file())
-RETIRED_HELPER_MODULES = frozenset(value.removesuffix('.py').replace('/', '.') for value in RETIRED_HELPERS)
 
 
 def _retired_source_references(source, path):
@@ -131,9 +128,6 @@ def audit(wheel=None):
     for relative in RETIRED_PACKAGE_DIRS:
         if (ROOT / 'src/vibeflow' / relative).exists():
             failures.append({'path': 'src/vibeflow/' + relative, 'reason': 'retired package namespace remains'})
-    for relative in RETIRED_HELPERS:
-        if (ROOT / relative).exists():
-            failures.append({'path': relative, 'reason': 'test conversion bridge remains'})
     for path in (ROOT / 'src/vibeflow').rglob('*.py'):
         failures.extend(_retired_source_references(path.read_text(encoding="utf-8"), str(path.relative_to(ROOT))))
     for directory in ('src', 'tests', 'sandbox', 'distribution', 'tools'):
@@ -148,15 +142,12 @@ def audit(wheel=None):
             for node in ast.walk(tree):
                 modules = [node.module or ''] if isinstance(node, ast.ImportFrom) else [value.name for value in node.names] if isinstance(node, ast.Import) else []
                 for module in modules:
-                    if module in RETIRED_HELPER_MODULES:
-                        failures.append({'path': str(path.relative_to(ROOT)), 'line': node.lineno,
-                                         'reason': 'test conversion bridge import'})
                     if any(module == retired or module.startswith(retired + '.') for retired in RETIRED_MODULES):
                         failures.append({'path': str(path.relative_to(ROOT)), 'line': node.lineno,
                                          'reason': 'retired product module import: ' + module})
-                if isinstance(node, ast.Constant) and isinstance(node.value, str) and not path.is_relative_to(ROOT / 'tests/fixtures/rule_parity'):
-                    # Frozen parity generators contain historical imports. Current
-                    # generated programs must use the same API as normal callers.
+                if directory in ('src', 'tools', 'distribution') and isinstance(node, ast.Constant) and isinstance(node.value, str):
+                    # Product-generated programs follow current module boundaries.
+                    # Tests and examples also contain deliberately invalid user inputs.
                     for module in RETIRED_MODULES:
                         if 'from ' + module + ' import ' in node.value or 'import ' + module + '\n' in node.value:
                             failures.append({'path': str(path.relative_to(ROOT)), 'line': node.lineno,
@@ -175,7 +166,6 @@ def audit(wheel=None):
                     failures.extend(_retired_source_references(archive.read(name).decode(), name))
     return {'status': 'FAIL' if failures else 'PASS',
             'retired_files': list(RETIRED_FILES), 'relocated_builtin_files': list(MOVED_FILES),
-            'retired_test_helpers': list(RETIRED_HELPERS),
             'retired_package_namespaces': list(RETIRED_PACKAGE_DIRS),
             'retired_symbols': sorted(RETIRED_SYMBOLS),
             'retired_diagnostic_codes': sorted(RETIRED_DIAGNOSTIC_CODES), 'failures': failures}

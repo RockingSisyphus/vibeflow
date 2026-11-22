@@ -1,13 +1,7 @@
 """Python completion facts shared by source checks and Runtime binding."""
 from vibeflow.core.workflows.coordination import synchronous_violation
-from vibeflow.core.workflows.interfaces import workflow_capability_descriptor, port_capability_descriptor
 
 
-def capability_descriptors(registry):
-    prepared = getattr(registry, 'prepared_resources', None)
-    declared = (prepared.catalogs.capabilities.descriptors() if prepared is not None
-                else getattr(registry, 'capability_descriptors', ()))
-    return (*declared, workflow_capability_descriptor(), port_capability_descriptor({'send', 'receive'}))
 
 
 def graph_sync_findings(graph, registry, *, source_context=None):
@@ -22,8 +16,7 @@ def graph_sync_findings(graph, registry, *, source_context=None):
                 continue
             descriptor = registry.descriptor(node.definition_id)
             implementation = next((item for item in descriptor.implementations if item.language == 'python'), None)
-            problem = synchronous_violation(implementation.completion if implementation else 'immediate',
-                capabilities=descriptor.capabilities, descriptors=capability_descriptors(registry))
+            problem = synchronous_violation(implementation.completion if implementation else 'immediate')
             if problem:
                 path = '/'.join((*subject.call_path, node.id))
                 info = registry.source_info(node.definition_id)

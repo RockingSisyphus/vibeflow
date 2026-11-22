@@ -1,0 +1,136 @@
+[
+  {
+    "config": "linear",
+    "initial": {
+      "a": 2,
+      "b": 3
+    },
+    "expected_outputs": {
+      "result": 5,
+      "u": 5,
+      "selected_w": 6,
+      "copied": 6
+    }
+  },
+  {
+    "config": "bypass",
+    "initial": {
+      "a": 2,
+      "b": 3
+    },
+    "expected_outputs": {
+      "result": 11,
+      "u": 5,
+      "selected_w": 6,
+      "selected.key": "left.w"
+    }
+  },
+  {
+    "config": "split",
+    "initial": {
+      "a": 2,
+      "b": 3,
+      "c": 1,
+      "d": 2
+    },
+    "expected_outputs": {
+      "u": 5,
+      "v": 3,
+      "route": "left",
+      "selected_w": 6,
+      "left.result": 11
+    },
+    "expected_absent_outputs": [
+      "right.result"
+    ]
+  },
+  {
+    "config": "split",
+    "initial": {
+      "a": 1,
+      "b": 1,
+      "c": 2,
+      "d": 3
+    },
+    "expected_outputs": {
+      "u": 2,
+      "v": 5,
+      "route": "right",
+      "selected_w": 4,
+      "right.result": 6
+    },
+    "expected_absent_outputs": [
+      "left.result"
+    ]
+  },
+  {
+    "config": "split",
+    "initial": {
+      "a": 1,
+      "b": 2,
+      "c": 1,
+      "d": 2
+    },
+    "expected_outputs": {
+      "u": 3,
+      "v": 3,
+      "route": "left",
+      "selected_w": 4,
+      "left.result": 7
+    },
+    "expected_absent_outputs": [
+      "right.result"
+    ]
+  },
+  {
+    "config": "join",
+    "initial": {
+      "a": 2,
+      "b": 3,
+      "c": 1,
+      "d": 2
+    },
+    "expected_outputs": {
+      "u": 5,
+      "v": 3,
+      "route": "left",
+      "selected_w": 6,
+      "result": 11,
+      "selected.key": "left.w"
+    }
+  },
+  {
+    "config": "join",
+    "initial": {
+      "a": 1,
+      "b": 1,
+      "c": 2,
+      "d": 3
+    },
+    "expected_outputs": {
+      "u": 2,
+      "v": 5,
+      "route": "right",
+      "selected_w": 4,
+      "result": 6,
+      "selected.key": "right.w"
+    }
+  },
+  {
+    "config": "join",
+    "initial": {
+      "a": 1,
+      "b": 2,
+      "c": 1,
+      "d": 2
+    },
+    "expected_outputs": {
+      "u": 3,
+      "v": 3,
+      "route": "left",
+      "selected_w": 4,
+      "result": 7,
+      "selected.key": "left.w"
+    }
+  }
+]

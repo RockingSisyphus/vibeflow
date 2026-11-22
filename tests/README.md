@@ -1,12 +1,6 @@
 <!-- vibeflow-directory-purpose -->
 # tests
 
-## 目录用途与边界
+所有维护的测试统一放在 `e2e/`，按用户功能组织。真实 SDK 示例归 sandbox，案例输入、薄驱动和普通宿主应用归 e2e 对应目录。一次运行的输出与依赖放在仓库外工作区。
 
-仅用于：非沙盒的单元、功能、集成、一致性与实现回归测试；真实使用项目归 sandbox，测试运行输出归仓库外工作区。
-
-- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
-- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
-- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
-
-完整归位规则见[仓库目录职责](../docs/maintainers/directory-layout.md)。
+通过 `python tools/run_tests.py` 运行；完整交付验收使用 `python tools/verify_project.py --full`。测试边界、环境及批次规则见[开发与验证](../docs/maintainers/development.md)，逐域判据见[测试覆盖](../sandbox/TEST_COVERAGE.md)。

@@ -1,23 +1,14 @@
-# 普通图并发沙箱（JavaScript）
+<!-- vibeflow-directory-purpose -->
+# javascript / 并发、补位与清理
 
-通过公开 TypeScript SDK、CLI 构建、Node.js 与真实 Chromium 验证 12 个普通 worker，经独立 `join_policy: all` 收集节点连接结束节点。启用标准 `vibeflow.workflow` 规则，无独立任务图或管理器。
+真实 12 个工作项分别以容量 12、4 和默认 8 执行。业务节点的开始及清理日志验证峰值和清理后的增量补位，输出收据验证工作完整性；回收兼分发及断图配置由正式检查命令拒绝。
 
-`run_all.py` 固定执行以下案例，任何断言失败都会使入口失败：
+本目录保存真实使用工程、配置与独立预期；驱动和断言按功能统一在 tests/e2e，不保留单独总包或探针。测试复制输入至仓库外工作区后进行修改、构建和运行。
 
-| 案例 | 通过条件 |
-| --- | --- |
-| 正常分发 | 显式 `max_concurrency: 12`，12 个 worker 通过屏障并全部清理，按声明顺序交付结果，收集节点只执行一次 |
-| 容量 4 | 12 个调用、峰值恰好 4；首批最后一个调用完成清理后补入下一项，此时其余三个仍未结束 |
-| 默认容量 | 不设置 `max_concurrency`，12 个调用、峰值恰好 8，同样验证即时补位 |
-| 回收兼分发 | 同一普通节点以 `all` 汇合后再次分叉；`validate` 和 `build` 都必须退出 1，并报告 `GRAPH.JOIN.FORK_CONFLICT`，不得发布构建产物 |
-| 断路 | 删除一个 worker 到收集节点的边；两个 CLI 入口都必须退出 1，并报告 `GRAPH.FLOW.CANNOT_REACH_END`，不得发布构建产物 |
-
-三个正常案例分别构建 Node 和 browser 产物，每个模块连续执行两次。队列案例除指定先完成的调用外，首批调用等待下一项启动；若实现等待整批结束才补位，将超时失败。Node 和 Chromium 使用同一个 `verify.mjs` 收集完整 trace，再由共用断言检查峰值、清理后补位、每个 worker 恰好执行一次，以及收集发生在全部清理之后。
-
-运行：
+功能域回归入口：
 
 ```bash
-python sandbox/javascript/graph_concurrency/run_all.py --work-dir /tmp/vibeflow-js-concurrency --toolchain-root /path/to/toolchain --puppeteer-root /path/to/renderer
+python tools/run_tests.py -- tests/e2e/test_concurrency.py
 ```
 
-使用新的工作目录；配置变体由受版本控制的共享案例生成器写入该目录，避免维护重复全图。目录内保留 `report.json`、各反例 CLI 原始输出、Node／Chromium 完整 trace。未提供 `--puppeteer-root` 时，报告明确标记 Chromium 为 `SKIP`，整体为 `REDUCED`。两 Target 的 integration 入口及根目录 `--full` 均包含此入口；取消、失败与更复杂嵌套场景另见 conformance 和生命周期回归。
+完整验收及其他平台场景见[测试覆盖](../../TEST_COVERAGE.md)和[开发与验证](../../../docs/maintainers/development.md)。新增目录同步说明职责；运行日志、依赖和构建产物不写入本目录。

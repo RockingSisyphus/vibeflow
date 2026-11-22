@@ -8,7 +8,7 @@ from vibeflow.targets.python.sdk.resources import ResourceDefinition
 
 
 _RESOURCE_CONSTRUCTORS = frozenset({"node", "node_type", "rule", "ruleset", "base_lib",
-                                   "data_schema", "capability", "ResourceDefinition"})
+                                   "data_schema", "ResourceDefinition"})
 
 
 def declares_resources(path, *, syntax_cache=None):

@@ -44,7 +44,7 @@ window.VFLayout=(()=>{
   const values=await Promise.all(facts.map(async original=>{
     const localPath=[...localPrefix,original.id];
     const options=VFModel.childOptions(original,body,localPath,data.bodies);
-    const actions=architecture.call_policies?.[JSON.stringify(localPath)]?.actions||original.operations||[];
+    const actions=architecture.workflow_operations?.[JSON.stringify(localPath)]?.actions||original.operations||[];
     const operations=actions.map(action=>{
       if(action.operation!=="call"||!action.workflow)return action;
       const {entry}=VFModel.workflowTarget(action.workflow,data.workflow_graphs,true);

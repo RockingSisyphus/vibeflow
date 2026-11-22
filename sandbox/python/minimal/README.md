@@ -1,20 +1,14 @@
-# Python 最小示例
+<!-- vibeflow-directory-purpose -->
+# python / 最小 SDK 项目
 
-`code_plugin.py` 通过 Python SDK 声明 Node、契约与规则，`nodes.py` 保存实现；workflow 显式选择固定插件对象。`base_lib/` 提供纯算术辅助函数，`nodeset_types.jsonc` 与 `config_with_imports.jsonc` 演示组合和导入。
+正式声明、配置及纯 helper 构成的最小接入示例，供正常构建、应用宿主与隔离交付验证；修改 helper 的效果由端到端输出确认。
+
+本目录保存真实使用工程、配置与独立预期；驱动和断言按功能统一在 tests/e2e，不保留单独总包或探针。测试复制输入至仓库外工作区后进行修改、构建和运行。
+
+功能域回归入口：
 
 ```bash
-python -m vibeflow build --workspace sandbox/python/minimal/vibeflow_config.jsonc --config sandbox/python/minimal/config.jsonc --out-dir /path/to/candidate-bundle
-python /path/to/candidate-bundle/run.py run
+python tools/run_tests.py -- tests/e2e/test_deployment.py tests/e2e/test_javascript.py
 ```
 
-默认生成 python-package；整个目录可搬迁到提供 Python 与业务依赖的环境。检查不执行契约中的示例输入。运行选项与 API 见 [Python 开发](../../../distribution/docs/user/python-development.md#aot-目录部署)。
-
-## 目录用途与边界
-
-仅用于：python / minimal 案例，验证最小 SDK / CLI 使用、配置加载与短流程执行；保留真实项目输入与 runner。
-
-- 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
-- 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。
-- 已确定过时且不再使用的内容直接删除；需要追溯时使用 Git 历史，不默认另建归档。
-
-完整归位规则见[仓库目录职责](../../../docs/maintainers/directory-layout.md)。
+完整验收及其他平台场景见[测试覆盖](../../TEST_COVERAGE.md)和[开发与验证](../../../docs/maintainers/development.md)。新增目录同步说明职责；运行日志、依赖和构建产物不写入本目录。

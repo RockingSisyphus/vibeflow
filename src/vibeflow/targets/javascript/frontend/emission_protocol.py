@@ -34,11 +34,10 @@ class EmissionNode(Protocol):
     is_loop: bool
     subplan: "EmissionWorkflow | None"
     loop: object
-    capabilities: Sequence[object]
     completion: str
     schedule: str
     executor: str
-    capability_policy: Mapping[str, Any]
+    workflow_operations: Mapping[str, Any]
 
 
 class EmissionWorkflow(Protocol):
@@ -52,7 +51,6 @@ class EmissionWorkflow(Protocol):
     entries: Sequence[str]
     max_steps: int
     schemas: Mapping[str, Mapping[str, Any]]
-    capabilities: Sequence[object]
     entry_mode: str
 
     def to_dict(self) -> dict[str, Any]: ...
@@ -202,33 +200,8 @@ class BoundImplementationView:
         )
 
 
-@dataclass(frozen=True)
-class BoundCapabilityOperationView:
-    input_type: str = ""
-    output_type: str = ""
-    completion: str = "immediate"
-
-    def to_dict(self) -> dict[str, str]:
-        return _truthy_fields(
-            input_type=self.input_type,
-            output_type=self.output_type,
-            completion=self.completion,
-        )
 
 
-@dataclass(frozen=True)
-class BoundCapabilityView:
-    id: str
-    operations: Mapping[str, BoundCapabilityOperationView]
-
-    def to_dict(self) -> dict[str, Any]:
-        return dict(
-            id=self.id,
-            operations={
-                key: value.to_dict()
-                for key, value in sorted(self.operations.items())
-            },
-        )
 
 
 @dataclass(frozen=True)
@@ -335,10 +308,6 @@ def _optional_field(
     return payload
 
 
-def _truthy_fields(**values: str) -> dict[str, str]:
-    return {key: value for key, value in values.items() if value}
-
-
 def _loop_payload(loop: BoundLoopView) -> dict[str, Any]:
     payload = dict(
         max_iterations=loop.max_iterations,
@@ -357,8 +326,6 @@ def _loop_payload(loop: BoundLoopView) -> dict[str, Any]:
 
 
 __all__ = [
-    "BoundCapabilityOperationView",
-    "BoundCapabilityView",
     "BoundImplementationView",
     "BoundInputView",
     "BoundLoopView",

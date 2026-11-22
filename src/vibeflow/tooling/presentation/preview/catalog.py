@@ -57,7 +57,7 @@ def new_record(root, workflow, category, status):
         raise ValueError(f"unknown preview category: {category}")
     now = utc_now()
     identity = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ-") + uuid4().hex[:12]
-    result = PreviewRecord(Path(root).resolve(), dict(version=4, id=identity, category=category, status=status,
+    result = PreviewRecord(Path(root).resolve(), dict(version=5, id=identity, category=category, status=status,
         created_at=now, updated_at=now, workflow=workflow, views=[]))
     result.directory.mkdir(parents=True, exist_ok=False)
     return result
@@ -76,7 +76,7 @@ def reindex(root):
             value = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(value,dict):
                 raise ValueError("snapshot record must be an object")
-            if value.get("version") != 4:
+            if value.get("version") != 5:
                 obsolete += 1
                 continue
             if not isinstance(value, dict) or not isinstance(value.get("workflow"), dict):

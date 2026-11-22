@@ -1,0 +1,2564 @@
+[
+  {
+    "subject": "node",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, [sys for sys in ()])\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys for sys in ()})\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys: sys for sys in ()})\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, (sys for sys in ()))\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, (sys for sys in ())))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), [close for close in ()]))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [close() for close in ()])()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [1 for close in close()])()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), {close for close in ()}))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {close() for close in ()})()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {1 for close in close()})()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), {close: close for close in ()}))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {close(): close() for close in ()})()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {1: 1 for close in close()})()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), (close for close in ())))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close() for close in ()))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (1 for close in close()))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [(lambda: close())() for close in ()])()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [(lambda: close())() for item in ()])()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [[close() for item in ()] for close in ()])()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [item for item in (1,) if close() for close in ()])()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), [close for close in ()]))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [close() for close in ()])()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [1 for close in close()])()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), {close for close in ()}))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {close() for close in ()})()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {1 for close in close()})()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), {close: close for close in ()}))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {close(): close() for close in ()})()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {1: 1 for close in close()})()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), (close for close in ())))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close() for close in ()))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (1 for close in close()))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [(lambda: close())() for close in ()])()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [(lambda: close())() for item in ()])()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [[close() for item in ()] for close in ()])()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [item for item in (1,) if close() for close in ()])()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "terminal",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, [sys for sys in ()])\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys for sys in ()})\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys: sys for sys in ()})\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, (sys for sys in ()))\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, (sys for sys in ())))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "python_io",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, [sys for sys in ()])\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys for sys in ()})\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys: sys for sys in ()})\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, (sys for sys in ()))\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, (sys for sys in ())))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "global_state",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, [sys for sys in ()])\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys for sys in ()})\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys: sys for sys in ()})\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, (sys for sys in ()))\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, (sys for sys in ())))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return [sys for sys in sys.argv]\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return (lambda: [sys for sys in sys.argv])()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return {sys for sys in sys.argv}\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return (lambda: {sys for sys in sys.argv})()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return {sys: sys for sys in sys.argv}\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return (lambda: {sys: sys for sys in sys.argv})()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return (sys for sys in sys.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return (lambda: (sys for sys in sys.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [sys.argv for sys in ()]\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return {sys.argv for sys in ()}\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return {sys.argv: sys.argv for sys in ()}\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return (sys.argv for sys in ())\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [sys.argv for (sys, item) in ()]\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [sys.argv for sys in () if sys.argv for item in sys.argv]\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [sys.argv for item in () for sys in () if sys.argv]\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [([sys.argv for sys in ()], sys.argv) for sys in ()]\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [([sys.argv for sys in ()], sys.argv) for item in ()]\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [(lambda: sys.argv) for sys in ()]\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [(lambda: sys.argv) for item in ()]\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [(lambda: (sys.argv, [sys for sys in ()])) for item in ()]\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return ([(sys := None) for item in (0,)], sys.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return ([(process := sys) for item in (0,)], process.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return ([(process := sys) for item in (0,)], (lambda: process.argv)())\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return (lambda: ([(sys := None) for item in (0,)], sys.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "global_state",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return (lambda: ([(process := sys) for item in (0,)], process.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return (lambda: ([(process := sys) for item in (0,)], (lambda: process.argv)()))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_starred_tuple_target_keeps_host_name_local",
+        "source": "import sys\ndef task():\n    return (lambda: [sys.argv for (item, *sys) in ()])()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_starred_tuple_target_keeps_host_name_local",
+        "source": "import sys\ndef task():\n    return (lambda: {sys.argv for (item, *sys) in ()})()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_starred_tuple_target_keeps_host_name_local",
+        "source": "import sys\ndef task():\n    return (lambda: {sys.argv: sys.argv for (item, *sys) in ()})()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_starred_tuple_target_keeps_host_name_local",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv for (item, *sys) in ()))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (list([(sys_alias := sys) for item in (0,)]), sys_alias.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (lambda: (list([(sys_alias := sys) for item in (0,)]), sys_alias.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (list({(sys_alias := sys) for item in (0,)}), sys_alias.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (lambda: (list({(sys_alias := sys) for item in (0,)}), sys_alias.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (list({0: (sys_alias := sys) for item in (0,)}), sys_alias.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (lambda: (list({0: (sys_alias := sys) for item in (0,)}), sys_alias.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (list(((sys_alias := sys) for item in (0,))), sys_alias.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (lambda: (list(((sys_alias := sys) for item in (0,))), sys_alias.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list([(lambda value=(sys := None): value) for item in (0,)]), sys.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list([(lambda value=(sys_alias := sys): value) for item in (0,)]), sys_alias.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list([(lambda: (sys := None)) for item in (0,)]), sys.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list([(lambda value=(sys := None): value) for item in (0,)]), sys.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list([(lambda value=(sys_alias := sys): value) for item in (0,)]), sys_alias.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list([(lambda: (sys := None)) for item in (0,)]), sys.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({(lambda value=(sys := None): value) for item in (0,)}), sys.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({(lambda value=(sys_alias := sys): value) for item in (0,)}), sys_alias.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({(lambda: (sys := None)) for item in (0,)}), sys.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({(lambda value=(sys := None): value) for item in (0,)}), sys.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({(lambda value=(sys_alias := sys): value) for item in (0,)}), sys_alias.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({(lambda: (sys := None)) for item in (0,)}), sys.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({0: (lambda value=(sys := None): value) for item in (0,)}), sys.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({0: (lambda value=(sys_alias := sys): value) for item in (0,)}), sys_alias.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({0: (lambda: (sys := None)) for item in (0,)}), sys.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({0: (lambda value=(sys := None): value) for item in (0,)}), sys.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({0: (lambda value=(sys_alias := sys): value) for item in (0,)}), sys_alias.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({0: (lambda: (sys := None)) for item in (0,)}), sys.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "global_state",
+    "policy": {},
+    "cases": [
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list(((lambda value=(sys := None): value) for item in (0,))), sys.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list(((lambda value=(sys_alias := sys): value) for item in (0,))), sys_alias.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list(((lambda: (sys := None)) for item in (0,))), sys.argv)\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list(((lambda value=(sys := None): value) for item in (0,))), sys.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list(((lambda value=(sys_alias := sys): value) for item in (0,))), sys_alias.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list(((lambda: (sys := None)) for item in (0,))), sys.argv))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "trusted",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, [sys for sys in ()])\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys for sys in ()})\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys: sys for sys in ()})\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, (sys for sys in ()))\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, (sys for sys in ())))()\nclass Task:\n    def run_pure(self, inputs, params):\n        task()\n        return {}\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, [sys for sys in ()])\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys: sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, (sys for sys in ()))\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), [close for close in ()]))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [close() for close in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [1 for close in close()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), {close for close in ()}))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {close() for close in ()})()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {1 for close in close()})()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), {close: close for close in ()}))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {close(): close() for close in ()})()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {1: 1 for close in close()})()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), (close for close in ())))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close() for close in ()))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (1 for close in close()))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [(lambda: close())() for close in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [(lambda: close())() for item in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [[close() for item in ()] for close in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [item for item in (1,) if close() for close in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), [close for close in ()]))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [close() for close in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [1 for close in close()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), {close for close in ()}))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {close() for close in ()})()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {1 for close in close()})()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), {close: close for close in ()}))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {close(): close() for close in ()})()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {1: 1 for close in close()})()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), (close for close in ())))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close() for close in ()))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (1 for close in close()))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [(lambda: close())() for close in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [(lambda: close())() for item in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [[close() for item in ()] for close in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [item for item in (1,) if close() for close in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "terminal",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, [sys for sys in ()])\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys: sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, (sys for sys in ()))\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "python_io",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, [sys for sys in ()])\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys: sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, (sys for sys in ()))\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "global_state",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, [sys for sys in ()])\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys: sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, (sys for sys in ()))\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return [sys for sys in sys.argv]\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return (lambda: [sys for sys in sys.argv])()\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return {sys for sys in sys.argv}\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return (lambda: {sys for sys in sys.argv})()\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return {sys: sys for sys in sys.argv}\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return (lambda: {sys: sys for sys in sys.argv})()\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return (sys for sys in sys.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return (lambda: (sys for sys in sys.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [sys.argv for sys in ()]\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return {sys.argv for sys in ()}\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return {sys.argv: sys.argv for sys in ()}\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return (sys.argv for sys in ())\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [sys.argv for (sys, item) in ()]\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [sys.argv for sys in () if sys.argv for item in sys.argv]\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [sys.argv for item in () for sys in () if sys.argv]\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [([sys.argv for sys in ()], sys.argv) for sys in ()]\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [([sys.argv for sys in ()], sys.argv) for item in ()]\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [(lambda: sys.argv) for sys in ()]\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [(lambda: sys.argv) for item in ()]\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [(lambda: (sys.argv, [sys for sys in ()])) for item in ()]\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return ([(sys := None) for item in (0,)], sys.argv)\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return ([(process := sys) for item in (0,)], process.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return ([(process := sys) for item in (0,)], (lambda: process.argv)())\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return (lambda: ([(sys := None) for item in (0,)], sys.argv))()\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "global_state",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return (lambda: ([(process := sys) for item in (0,)], process.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return (lambda: ([(process := sys) for item in (0,)], (lambda: process.argv)()))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_starred_tuple_target_keeps_host_name_local",
+        "source": "import sys\ndef task():\n    return (lambda: [sys.argv for (item, *sys) in ()])()\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_starred_tuple_target_keeps_host_name_local",
+        "source": "import sys\ndef task():\n    return (lambda: {sys.argv for (item, *sys) in ()})()\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_starred_tuple_target_keeps_host_name_local",
+        "source": "import sys\ndef task():\n    return (lambda: {sys.argv: sys.argv for (item, *sys) in ()})()\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_starred_tuple_target_keeps_host_name_local",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv for (item, *sys) in ()))()\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (list([(sys_alias := sys) for item in (0,)]), sys_alias.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (lambda: (list([(sys_alias := sys) for item in (0,)]), sys_alias.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (list({(sys_alias := sys) for item in (0,)}), sys_alias.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (lambda: (list({(sys_alias := sys) for item in (0,)}), sys_alias.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (list({0: (sys_alias := sys) for item in (0,)}), sys_alias.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (lambda: (list({0: (sys_alias := sys) for item in (0,)}), sys_alias.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (list(((sys_alias := sys) for item in (0,))), sys_alias.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (lambda: (list(((sys_alias := sys) for item in (0,))), sys_alias.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list([(lambda value=(sys := None): value) for item in (0,)]), sys.argv)\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list([(lambda value=(sys_alias := sys): value) for item in (0,)]), sys_alias.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list([(lambda: (sys := None)) for item in (0,)]), sys.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list([(lambda value=(sys := None): value) for item in (0,)]), sys.argv))()\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list([(lambda value=(sys_alias := sys): value) for item in (0,)]), sys_alias.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list([(lambda: (sys := None)) for item in (0,)]), sys.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({(lambda value=(sys := None): value) for item in (0,)}), sys.argv)\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({(lambda value=(sys_alias := sys): value) for item in (0,)}), sys_alias.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({(lambda: (sys := None)) for item in (0,)}), sys.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({(lambda value=(sys := None): value) for item in (0,)}), sys.argv))()\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({(lambda value=(sys_alias := sys): value) for item in (0,)}), sys_alias.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({(lambda: (sys := None)) for item in (0,)}), sys.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({0: (lambda value=(sys := None): value) for item in (0,)}), sys.argv)\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({0: (lambda value=(sys_alias := sys): value) for item in (0,)}), sys_alias.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({0: (lambda: (sys := None)) for item in (0,)}), sys.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({0: (lambda value=(sys := None): value) for item in (0,)}), sys.argv))()\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({0: (lambda value=(sys_alias := sys): value) for item in (0,)}), sys_alias.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({0: (lambda: (sys := None)) for item in (0,)}), sys.argv))()\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "global_state",
+    "policy": {},
+    "cases": [
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list(((lambda value=(sys := None): value) for item in (0,))), sys.argv)\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list(((lambda value=(sys_alias := sys): value) for item in (0,))), sys_alias.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list(((lambda: (sys := None)) for item in (0,))), sys.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list(((lambda value=(sys := None): value) for item in (0,))), sys.argv))()\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list(((lambda value=(sys_alias := sys): value) for item in (0,))), sys_alias.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list(((lambda: (sys := None)) for item in (0,))), sys.argv))()\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "trusted",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, [sys for sys in ()])\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys: sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, (sys for sys in ()))\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "plugin",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, [sys for sys in ()])\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys: sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, (sys for sys in ()))\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), [close for close in ()]))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [close() for close in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [1 for close in close()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), {close for close in ()}))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {close() for close in ()})()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {1 for close in close()})()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), {close: close for close in ()}))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {close(): close() for close in ()})()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {1: 1 for close in close()})()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), (close for close in ())))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close() for close in ()))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (1 for close in close()))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [(lambda: close())() for close in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [(lambda: close())() for item in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [[close() for item in ()] for close in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [item for item in (1,) if close() for close in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return (1,)\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), [close for close in ()]))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [close() for close in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [1 for close in close()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), {close for close in ()}))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {close() for close in ()})()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {1 for close in close()})()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), {close: close for close in ()}))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {close(): close() for close in ()})()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      }
+    ]
+  },
+  {
+    "subject": "plugin",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: {1: 1 for close in close()})()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close(), (close for close in ())))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (close() for close in ()))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: (1 for close in close()))()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [(lambda: close())() for close in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [(lambda: close())() for item in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [[close() for item in ()] for close in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "comprehension_callable_facts_follow_real_cross_file_bindings",
+        "source": "from base_lib.helper import close\ndef task():\n    return (lambda: [item for item in (1,) if close() for close in ()])()\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close():\n    return open('never-open').read()\n"
+        }
+      }
+    ]
+  },
+  {
+    "subject": "plugin",
+    "scope": "terminal",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, [sys for sys in ()])\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys: sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, (sys for sys in ()))\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "plugin",
+    "scope": "python_io",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, [sys for sys in ()])\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys: sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, (sys for sys in ()))\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "plugin",
+    "scope": "global_state",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, [sys for sys in ()])\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys: sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, (sys for sys in ()))\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return [sys for sys in sys.argv]\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return (lambda: [sys for sys in sys.argv])()\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return {sys for sys in sys.argv}\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return (lambda: {sys for sys in sys.argv})()\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return {sys: sys for sys in sys.argv}\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return (lambda: {sys: sys for sys in sys.argv})()\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return (sys for sys in sys.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "first_comprehension_iterable_keeps_enclosing_host_identity",
+        "source": "import sys\ndef task():\n    return (lambda: (sys for sys in sys.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [sys.argv for sys in ()]\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return {sys.argv for sys in ()}\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return {sys.argv: sys.argv for sys in ()}\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return (sys.argv for sys in ())\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [sys.argv for (sys, item) in ()]\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [sys.argv for sys in () if sys.argv for item in sys.argv]\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [sys.argv for item in () for sys in () if sys.argv]\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [([sys.argv for sys in ()], sys.argv) for sys in ()]\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [([sys.argv for sys in ()], sys.argv) for item in ()]\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [(lambda: sys.argv) for sys in ()]\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [(lambda: sys.argv) for item in ()]\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_internal_bindings_restore_at_nested_boundaries",
+        "source": "import sys\ndef task():\n    return [(lambda: (sys.argv, [sys for sys in ()])) for item in ()]\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return ([(sys := None) for item in (0,)], sys.argv)\n",
+        "denied": false
+      },
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return ([(process := sys) for item in (0,)], process.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return ([(process := sys) for item in (0,)], (lambda: process.argv)())\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return (lambda: ([(sys := None) for item in (0,)], sys.argv))()\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "plugin",
+    "scope": "global_state",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return (lambda: ([(process := sys) for item in (0,)], process.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_walrus_binds_and_preserves_aliases_in_enclosing_scope",
+        "source": "import sys\ndef task():\n    return (lambda: ([(process := sys) for item in (0,)], (lambda: process.argv)()))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_starred_tuple_target_keeps_host_name_local",
+        "source": "import sys\ndef task():\n    return (lambda: [sys.argv for (item, *sys) in ()])()\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_starred_tuple_target_keeps_host_name_local",
+        "source": "import sys\ndef task():\n    return (lambda: {sys.argv for (item, *sys) in ()})()\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_starred_tuple_target_keeps_host_name_local",
+        "source": "import sys\ndef task():\n    return (lambda: {sys.argv: sys.argv for (item, *sys) in ()})()\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_starred_tuple_target_keeps_host_name_local",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv for (item, *sys) in ()))()\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (list([(sys_alias := sys) for item in (0,)]), sys_alias.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (lambda: (list([(sys_alias := sys) for item in (0,)]), sys_alias.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (list({(sys_alias := sys) for item in (0,)}), sys_alias.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (lambda: (list({(sys_alias := sys) for item in (0,)}), sys_alias.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (list({0: (sys_alias := sys) for item in (0,)}), sys_alias.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (lambda: (list({0: (sys_alias := sys) for item in (0,)}), sys_alias.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (list(((sys_alias := sys) for item in (0,))), sys_alias.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_walrus_host_alias_escapes_each_comprehension_form",
+        "source": "import sys\ndef task():\n    return (lambda: (list(((sys_alias := sys) for item in (0,))), sys_alias.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list([(lambda value=(sys := None): value) for item in (0,)]), sys.argv)\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list([(lambda value=(sys_alias := sys): value) for item in (0,)]), sys_alias.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list([(lambda: (sys := None)) for item in (0,)]), sys.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list([(lambda value=(sys := None): value) for item in (0,)]), sys.argv))()\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list([(lambda value=(sys_alias := sys): value) for item in (0,)]), sys_alias.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list([(lambda: (sys := None)) for item in (0,)]), sys.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({(lambda value=(sys := None): value) for item in (0,)}), sys.argv)\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({(lambda value=(sys_alias := sys): value) for item in (0,)}), sys_alias.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({(lambda: (sys := None)) for item in (0,)}), sys.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({(lambda value=(sys := None): value) for item in (0,)}), sys.argv))()\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({(lambda value=(sys_alias := sys): value) for item in (0,)}), sys_alias.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({(lambda: (sys := None)) for item in (0,)}), sys.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({0: (lambda value=(sys := None): value) for item in (0,)}), sys.argv)\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({0: (lambda value=(sys_alias := sys): value) for item in (0,)}), sys_alias.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list({0: (lambda: (sys := None)) for item in (0,)}), sys.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({0: (lambda value=(sys := None): value) for item in (0,)}), sys.argv))()\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({0: (lambda value=(sys_alias := sys): value) for item in (0,)}), sys_alias.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list({0: (lambda: (sys := None)) for item in (0,)}), sys.argv))()\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "plugin",
+    "scope": "global_state",
+    "policy": {},
+    "cases": [
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list(((lambda value=(sys := None): value) for item in (0,))), sys.argv)\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list(((lambda value=(sys_alias := sys): value) for item in (0,))), sys_alias.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (list(((lambda: (sys := None)) for item in (0,))), sys.argv)\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list(((lambda value=(sys := None): value) for item in (0,))), sys.argv))()\n",
+        "denied": false
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list(((lambda value=(sys_alias := sys): value) for item in (0,))), sys_alias.argv))()\n",
+        "denied": true
+      },
+      {
+        "name": "incremental_lambda_default_walrus_uses_outer_scope_but_body_stays_local",
+        "source": "import sys\ndef task():\n    return (lambda: (list(((lambda: (sys := None)) for item in (0,))), sys.argv))()\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "plugin",
+    "scope": "trusted",
+    "policy": {},
+    "cases": [
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, [sys for sys in ()])\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, [sys for sys in ()]))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, {sys: sys for sys in ()})\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, {sys: sys for sys in ()}))()\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (sys.argv, (sys for sys in ()))\n",
+        "denied": true
+      },
+      {
+        "name": "comprehension_targets_do_not_bind_enclosing_function_or_lambda",
+        "source": "import sys\ndef task():\n    return (lambda: (sys.argv, (sys for sys in ())))()\n",
+        "denied": true
+      }
+    ]
+  }
+]

@@ -19,7 +19,7 @@ from vibeflow.core.descriptors.values import (
     required_string as _required_string,
     string_list as _string_list,
 )
-from vibeflow.core.descriptors.models import BaseLibDescriptor, CapabilityDescriptor, CapabilityOperationDescriptor, CapabilityRequirementDescriptor, DataSchemaDescriptor, DescriptorModelError, ImplementationDescriptor, NodeContractDescriptor, NodeDescriptor, PluginDescriptor, SourceLocator
+from vibeflow.core.descriptors.models import BaseLibDescriptor, DataSchemaDescriptor, DescriptorModelError, ImplementationDescriptor, NodeContractDescriptor, NodeDescriptor, PluginDescriptor, SourceLocator
 from vibeflow.core.config.node import normalize_node_config_spec
 from vibeflow.core.rules.models import RuleDescriptor, RulesetDescriptor
 
@@ -32,7 +32,6 @@ def decode_resource(
     NodeDescriptor
     | BaseLibDescriptor
     | DataSchemaDescriptor
-    | CapabilityDescriptor
     | PluginDescriptor
     | RuleDescriptor
     | RulesetDescriptor
@@ -62,7 +61,6 @@ def decode_resource(
         "node": _parse_node,
         "base_lib": _parse_base_lib,
         "data_schema": _parse_data_schema,
-        "capability": _parse_capability,
 
         "plugin": _parse_plugin,
     }
@@ -93,7 +91,7 @@ def _parse_node(data: Mapping[str, Any]) -> NodeDescriptor:
             "contract",
             "implementations",
             "base_libs",
-            "capabilities",
+            "workflow_operations",
             "rulesets",
             "presentation",
             "metadata",
@@ -129,9 +127,7 @@ def _parse_node(data: Mapping[str, Any]) -> NodeDescriptor:
             data.get("base_libs", ()),
             field="node.base_libs",
         ),
-        capabilities=_parse_capability_requirements(
-            data.get("capabilities", ()),
-        ),
+        workflow_operations=data.get("workflow_operations", ()),
         rulesets=data.get("rulesets"),
         presentation=_mapping_or_empty(data.get("presentation"), field="node.presentation"),
         metadata=_mapping_or_empty(data.get("metadata"), field="node.metadata"),
@@ -306,24 +302,6 @@ def _parse_implementations(
     return tuple(implementations)
 
 
-def _parse_capability_requirements(
-    value: object,
-) -> tuple[CapabilityRequirementDescriptor, ...]:
-    items = _object_list(value, field="node.capabilities")
-    requirements: list[CapabilityRequirementDescriptor] = []
-    for index, item in enumerate(items):
-        field = f"node.capabilities[{index}]"
-        _check_fields(item, allowed={"id", "operations"}, field=field)
-        requirements.append(
-            CapabilityRequirementDescriptor(
-                id=_required_string(item.get("id"), field=f"{field}.id"),
-                operations=_string_list(
-                    item.get("operations"),
-                    field=f"{field}.operations",
-                ),
-            )
-        )
-    return tuple(requirements)
 
 
 def _parse_base_lib(data: Mapping[str, Any]) -> BaseLibDescriptor:
@@ -408,55 +386,6 @@ def _parse_data_schema(data: Mapping[str, Any]) -> DataSchemaDescriptor:
     )
 
 
-def _parse_capability(data: Mapping[str, Any]) -> CapabilityDescriptor:
-    _check_fields(
-        data,
-        allowed={
-            "kind",
-            "id",
-            "targets",
-            "display_name",
-            "description",
-            "operations",
-        },
-        field="capability",
-    )
-    raw_operations = _required_mapping(
-        data.get("operations"),
-        field="capability.operations",
-    )
-    operations: dict[str, CapabilityOperationDescriptor] = {}
-    for name, raw_operation in raw_operations.items():
-        field = f"capability.operations.{name}"
-        operation = _required_mapping(raw_operation, field=field)
-        _check_fields(
-            operation,
-            allowed={"input_type", "output_type", "completion"},
-            field=field,
-        )
-        operations[str(name)] = CapabilityOperationDescriptor(
-            input_type=_required_string(
-                operation.get("input_type"),
-                field=f"{field}.input_type",
-            ),
-            output_type=_required_string(
-                operation.get("output_type"),
-                field=f"{field}.output_type",
-            ),
-            completion=_optional_string(
-                operation.get("completion")
-            ) or "immediate",
-        )
-    return CapabilityDescriptor(
-        id=_required_string(data.get("id"), field="capability.id"),
-        targets=_string_list(
-            data.get("targets"),
-            field="capability.targets",
-        ),
-        display_name=_optional_string(data.get("display_name")),
-        description=_optional_string(data.get("description")),
-        operations=operations,
-    )
 
 
 

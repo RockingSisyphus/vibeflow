@@ -1,0 +1,44 @@
+{
+  "type_key": "layout.leaf_b",
+  "display_name": "Leaf B",
+  "description": "A concrete layout fixture body.",
+  "requires": [],
+  "provides": [],
+  "pipeline": {
+    "nodes": [
+      {
+        "id": "b_start",
+        "definition_id": "layout.start",
+        "display_name": "b_start",
+        "description": "Layout fixture b_start"
+      },
+      {
+        "id": "middle",
+        "definition_id": "layout.step",
+        "display_name": "middle",
+        "description": "Layout fixture middle"
+      },
+      {
+        "id": "b_end",
+        "definition_id": "layout.end",
+        "display_name": "b_end",
+        "description": "Layout fixture b_end",
+        "similar_to": {
+          "node": "b_start",
+          "relationship": "copy",
+          "reason": "Both fixture boundaries return empty outputs."
+        }
+      }
+    ],
+    "edges": [
+      [
+        "b_start",
+        "middle"
+      ],
+      [
+        "middle",
+        "b_end"
+      ]
+    ]
+  }
+}

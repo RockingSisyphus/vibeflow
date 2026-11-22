@@ -1,0 +1,64 @@
+{
+  "type_key": "layout.outer",
+  "display_name": "Outer",
+  "description": "A concrete layout fixture body.",
+  "requires": [],
+  "provides": [],
+  "pipeline": {
+    "nodes": [
+      {
+        "id": "outer_start",
+        "definition_id": "layout.start",
+        "display_name": "outer_start",
+        "description": "Layout fixture outer_start"
+      },
+      {
+        "id": "inner_a",
+        "definition_id": "layout.leaf_a",
+        "display_name": "inner_a",
+        "description": "Layout fixture inner_a"
+      },
+      {
+        "id": "inner_b",
+        "definition_id": "layout.leaf_a",
+        "display_name": "inner_b",
+        "description": "Layout fixture inner_b"
+      },
+      {
+        "id": "inner_c",
+        "definition_id": "layout.leaf_b",
+        "display_name": "inner_c",
+        "description": "Layout fixture inner_c"
+      },
+      {
+        "id": "outer_end",
+        "definition_id": "layout.end",
+        "display_name": "outer_end",
+        "description": "Layout fixture outer_end",
+        "similar_to": {
+          "node": "outer_start",
+          "relationship": "copy",
+          "reason": "Both fixture boundaries return empty outputs."
+        }
+      }
+    ],
+    "edges": [
+      [
+        "outer_start",
+        "inner_a"
+      ],
+      [
+        "inner_a",
+        "inner_b"
+      ],
+      [
+        "inner_b",
+        "inner_c"
+      ],
+      [
+        "inner_c",
+        "outer_end"
+      ]
+    ]
+  }
+}

@@ -29,8 +29,6 @@ Workflow 顶层 `rulesets` 省略时使用内置及所选 Plugin 的图级默认
 | `vibeflow.document` / `vibeflow.data_store` | 文件、网络、数据库等 Python I/O |
 | `vibeflow.global_state` | 有限效果检查识别的共享／模块状态操作 |
 
-有效规则记录中的 `effect_scope` 表达所选源码效果政策。`flow_kind` 描述执行身份，`external` 标记外部边界；Capability 操作由其声明及有效授权 Rule 控制。
-
 ## Python 进程环境变量
 
 `vibeflow.global_state` Ruleset 使用 `vibeflow.no_side_effects` 的 `effect_scope="global_state"`，允许在运行时通过 `os.environ` / `os.environb` 读取、设置、删除环境键和调用其方法，也允许 `os.getenv` / `os.getenvb`、`os.putenv`、`os.unsetenv`。环境键名不受白名单限制；显式 import policy 和导入时执行检查仍生效。Node、BaseLib 和运行插件使用相同效果检查，流程类别名称本身不授予权限。
@@ -97,8 +95,3 @@ plugin = Plugin(id="conventions", resources=[workflow_checks])
 在 workflow 或 NodesetType 顶层选择 `"rulesets": ["example.workflow"]`。该集合已包含内置检查，不必再并列选择 `vibeflow.workflow`。覆盖只影响当前集合中的指定路径；其他调用保留自己的默认值。`review-rules` 可核对展开后的路径、有效参数和来源。
 
 ## 相关文档
-
-- [Python 开发](python-development.md)、[JavaScript 开发](javascript-development.md)：业务 Node 和 SDK 实现。
-- [项目治理](project-governance.md)：project/root 的规则配置。
-- [Workflow 协同](workflow-coordination.md#capability-与显式规则)：Capability 操作授权。
-- [产品检查边界](product-check-boundaries.md)：源码检查的实际覆盖。

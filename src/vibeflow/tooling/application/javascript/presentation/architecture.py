@@ -34,11 +34,6 @@ def build_architecture_facts(
     from .status import node_health_classes
     if rule_report is not None:
         findings = rule_report.findings
-    from vibeflow.tooling.architecture.entries import policy_facts
-    from vibeflow.targets.shared.rule_support.capability_policy import policies_from_executions
-    from vibeflow.core.graph_calls import graph_call_subjects
-    paths = [(*subject.call_path, node.id) for subject in graph_call_subjects(graph) for node in subject.graph.nodes]
-    policies = policies_from_executions((item for values in rule_report.results.values() for item in values), paths) if rule_report else {}
     health_classes = node_health_classes(graph, findings)
     adapted = {
         "node_definitions": {
@@ -56,15 +51,6 @@ def build_architecture_facts(
                 for key, value in catalogs.base_libs.to_dict().items()
                 if key in active_base_lib_ids
             },
-            "capabilities": {
-                key: value
-                for key, value in catalogs.capabilities.to_dict().items()
-                if key in _active_capability_ids(
-                    catalogs,
-                    used_node_ids=used_node_ids,
-
-                )
-            },
 
             "plugins": list(plugin_records),
         },
@@ -77,7 +63,7 @@ def build_architecture_facts(
     payload = build_workflow_architecture(ArchitectureInputs(graph=graph, compiled=compiled,
         target="javascript", descriptor=catalogs.nodes.get, compile_graph=compile_graph,
         node_definitions=adapted["node_definitions"], node_types=adapted["node_types"],
-        resources=adapted["resources"], policies=policies, health_classes=health_classes,
+        resources=adapted["resources"], health_classes=health_classes,
         global_config=global_config or {},
         effective_params=effective_params or {},
         extras={"resource_use": resource_use.to_dict() if resource_use else None}))
@@ -99,20 +85,6 @@ def build_architecture_facts(
     return payload
 
 
-def _active_capability_ids(
-    catalogs: DescriptorCatalogs,
-    *,
-    used_node_ids: frozenset[str],
-) -> frozenset[str]:
-    active = {
-        requirement.id
-        for type_key in used_node_ids
-        for descriptor in (catalogs.nodes.get(type_key),)
-        if descriptor is not None
-        for requirement in descriptor.capabilities
-    }
-
-    return frozenset(active)
 
 
 def build_prepared_architecture(prepared):

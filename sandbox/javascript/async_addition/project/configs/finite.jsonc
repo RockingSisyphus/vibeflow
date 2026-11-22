@@ -21,6 +21,12 @@
         "type": "addition.b",
         "display_name": "addition.b",
         "required": true
+      },
+      {
+        "key": "app_session",
+        "type": "app.session",
+        "display_name": "Application session",
+        "required": true
       }
     ],
     "nodes": [
@@ -47,11 +53,17 @@
         "definition_id": "addition.boundary",
         "display_name": "end",
         "description": "end"
+      },
+      {
+        "id": "start_application",
+        "definition_id": "app.input.finite_jsonc",
+        "display_name": "Application input",
+        "description": "Supplies the application instance to this entry."
       }
     ],
     "edges": [
       {
-        "from": "start",
+        "from": "start_application",
         "to": "read"
       },
       {
@@ -61,7 +73,11 @@
       {
         "from": "add",
         "to": "end"
-      }
+      },
+      [
+        "start",
+        "start_application"
+      ]
     ],
     "outputs": [
       {

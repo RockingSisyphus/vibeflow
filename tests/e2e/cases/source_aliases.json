@@ -1,0 +1,1829 @@
+[
+  {
+    "subject": "node",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([(alias := sys) for sys in objects])\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([(alias := sys.stdout) for sys in objects])\n    return alias\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([[(alias := sys) for sys in objects] for item in objects])\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([(lambda value=(alias := sys): value) for sys in objects])\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([(alias := sys) for (item, *sys) in objects])\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({(alias := sys) for sys in objects})\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({(alias := sys.stdout) for sys in objects})\n    return alias\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([{(alias := sys) for sys in objects} for item in objects])\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({(lambda value=(alias := sys): value) for sys in objects})\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({(alias := sys) for (item, *sys) in objects})\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({0: (alias := sys) for sys in objects})\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({0: (alias := sys.stdout) for sys in objects})\n    return alias\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([{0: (alias := sys) for sys in objects} for item in objects])\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({0: (lambda value=(alias := sys): value) for sys in objects})\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({0: (alias := sys) for (item, *sys) in objects})\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list(((alias := sys) for sys in objects))\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list(((alias := sys.stdout) for sys in objects))\n    return alias\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([((alias := sys) for sys in objects) for item in objects])\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list(((lambda value=(alias := sys): value) for sys in objects))\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list(((alias := sys) for (item, *sys) in objects))\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_identity_is_independent_of_target_spelling",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_identity_is_independent_of_target_spelling",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := item) for item in objects]\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias = sys\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias = sys\n    return getattr(alias, 'argv')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias = sys\n    return vars(alias)['argv']\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias: object = sys\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias: object = sys\n    return getattr(alias, 'argv')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias: object = sys\n    return vars(alias)['argv']\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    (alias := sys)\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    (alias := sys)\n    return getattr(alias, 'argv')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    (alias := sys)\n    return vars(alias)['argv']\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for item in objects]\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    if flag:\n        alias = sys\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    [(alias := sys) for sys in objects]\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    return getattr(alias, 'argv')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "both_branch_local_overwrites_remove_previous_host_alias_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    if flag:\n        alias = objects\n    else:\n        alias = objects\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.close\n    return callback()\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.read\n    return callback()\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.write\n    return callback()\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_stdout_alias_does_not_invent_terminal_or_io_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write('a')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_create_an_ffi_security_ban",
+        "source": "import sys\ndef task(sys):\n    callback = sys.CDLL\n    return callback(None)\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(sys):\n    alias = sys\n    alias2 = alias\n    return getattr(alias2, 'argv')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(sys):\n    alias = getattr(sys, 'argv')\n    alias2 = alias\n    return alias2\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(sys):\n    alias = vars(sys)\n    alias2 = alias\n    return alias2['argv']\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(sys):\n    alias = getattr(sys, '__dict__')\n    alias2 = alias\n    return alias2['argv']\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(sys):\n    alias = vars(sys)['argv']\n    alias2 = alias\n    return alias2\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(os):\n    alias = os\n    alias2 = alias\n    return getattr(alias2, 'argv')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(os):\n    alias = getattr(os, 'argv')\n    alias2 = alias\n    return alias2\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(os):\n    alias = vars(os)\n    alias2 = alias\n    return alias2['argv']\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(os):\n    alias = getattr(os, '__dict__')\n    alias2 = alias\n    return alias2['argv']\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(os):\n    alias = vars(os)['argv']\n    alias2 = alias\n    return alias2\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(builtins):\n    alias = builtins\n    alias2 = alias\n    return getattr(alias2, 'argv')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(builtins):\n    alias = getattr(builtins, 'argv')\n    alias2 = alias\n    return alias2\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(builtins):\n    alias = vars(builtins)\n    alias2 = alias\n    return alias2['argv']\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(builtins):\n    alias = getattr(builtins, '__dict__')\n    alias2 = alias\n    return alias2['argv']\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(builtins):\n    alias = vars(builtins)['argv']\n    alias2 = alias\n    return alias2\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(importlib):\n    alias = importlib\n    alias2 = alias\n    return getattr(alias2, 'argv')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(importlib):\n    alias = getattr(importlib, 'argv')\n    alias2 = alias\n    return alias2\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(importlib):\n    alias = vars(importlib)\n    alias2 = alias\n    return alias2['argv']\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(importlib):\n    alias = getattr(importlib, '__dict__')\n    alias2 = alias\n    return alias2['argv']\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(importlib):\n    alias = vars(importlib)['argv']\n    alias2 = alias\n    return alias2\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(item):\n    alias = item\n    alias2 = alias\n    return getattr(alias2, 'argv')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(item):\n    alias = getattr(item, 'argv')\n    alias2 = alias\n    return alias2\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(item):\n    alias = vars(item)\n    alias2 = alias\n    return alias2['argv']\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(item):\n    alias = getattr(item, '__dict__')\n    alias2 = alias\n    return alias2['argv']\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(item):\n    alias = vars(item)['argv']\n    alias2 = alias\n    return alias2\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "same_spelling_local_and_host_branch_aliases_keep_both_identities",
+        "source": "import sys\ndef task(objects, flag=False):\n    if flag:\n        [(alias := sys) for sys in objects]\n    else:\n        alias = sys\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "same_spelling_local_and_host_branch_aliases_keep_both_identities",
+        "source": "import sys\ndef task(objects, flag=False):\n    if flag:\n        alias = sys\n    else:\n        [(alias := sys) for sys in objects]\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([(alias := sys) for sys in objects])\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([(alias := sys.stdout) for sys in objects])\n    return alias\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([[(alias := sys) for sys in objects] for item in objects])\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([(lambda value=(alias := sys): value) for sys in objects])\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([(alias := sys) for (item, *sys) in objects])\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({(alias := sys) for sys in objects})\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({(alias := sys.stdout) for sys in objects})\n    return alias\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([{(alias := sys) for sys in objects} for item in objects])\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({(lambda value=(alias := sys): value) for sys in objects})\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({(alias := sys) for (item, *sys) in objects})\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({0: (alias := sys) for sys in objects})\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({0: (alias := sys.stdout) for sys in objects})\n    return alias\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([{0: (alias := sys) for sys in objects} for item in objects])\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({0: (lambda value=(alias := sys): value) for sys in objects})\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({0: (alias := sys) for (item, *sys) in objects})\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list(((alias := sys) for sys in objects))\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list(((alias := sys.stdout) for sys in objects))\n    return alias\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([((alias := sys) for sys in objects) for item in objects])\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list(((lambda value=(alias := sys): value) for sys in objects))\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list(((alias := sys) for (item, *sys) in objects))\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_identity_is_independent_of_target_spelling",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_identity_is_independent_of_target_spelling",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := item) for item in objects]\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias = sys\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias = sys\n    return getattr(alias, 'argv')\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias = sys\n    return vars(alias)['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias: object = sys\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias: object = sys\n    return getattr(alias, 'argv')\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias: object = sys\n    return vars(alias)['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    (alias := sys)\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    (alias := sys)\n    return getattr(alias, 'argv')\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    (alias := sys)\n    return vars(alias)['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for item in objects]\n    return alias.argv\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    if flag:\n        alias = sys\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    [(alias := sys) for sys in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    return getattr(alias, 'argv')\n",
+        "denied": true
+      },
+      {
+        "name": "both_branch_local_overwrites_remove_previous_host_alias_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    if flag:\n        alias = objects\n    else:\n        alias = objects\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.close\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.read\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.write\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_stdout_alias_does_not_invent_terminal_or_io_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write('a')\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_create_an_ffi_security_ban",
+        "source": "import sys\ndef task(sys):\n    callback = sys.CDLL\n    return callback(None)\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(sys):\n    alias = sys\n    alias2 = alias\n    return getattr(alias2, 'argv')\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(sys):\n    alias = getattr(sys, 'argv')\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(sys):\n    alias = vars(sys)\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(sys):\n    alias = getattr(sys, '__dict__')\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(sys):\n    alias = vars(sys)['argv']\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(os):\n    alias = os\n    alias2 = alias\n    return getattr(alias2, 'argv')\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(os):\n    alias = getattr(os, 'argv')\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(os):\n    alias = vars(os)\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(os):\n    alias = getattr(os, '__dict__')\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(os):\n    alias = vars(os)['argv']\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(builtins):\n    alias = builtins\n    alias2 = alias\n    return getattr(alias2, 'argv')\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(builtins):\n    alias = getattr(builtins, 'argv')\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(builtins):\n    alias = vars(builtins)\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(builtins):\n    alias = getattr(builtins, '__dict__')\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(builtins):\n    alias = vars(builtins)['argv']\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(importlib):\n    alias = importlib\n    alias2 = alias\n    return getattr(alias2, 'argv')\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(importlib):\n    alias = getattr(importlib, 'argv')\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(importlib):\n    alias = vars(importlib)\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(importlib):\n    alias = getattr(importlib, '__dict__')\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(importlib):\n    alias = vars(importlib)['argv']\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(item):\n    alias = item\n    alias2 = alias\n    return getattr(alias2, 'argv')\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(item):\n    alias = getattr(item, 'argv')\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(item):\n    alias = vars(item)\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(item):\n    alias = getattr(item, '__dict__')\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(item):\n    alias = vars(item)['argv']\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "same_spelling_local_and_host_branch_aliases_keep_both_identities",
+        "source": "import sys\ndef task(objects, flag=False):\n    if flag:\n        [(alias := sys) for sys in objects]\n    else:\n        alias = sys\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "same_spelling_local_and_host_branch_aliases_keep_both_identities",
+        "source": "import sys\ndef task(objects, flag=False):\n    if flag:\n        alias = sys\n    else:\n        [(alias := sys) for sys in objects]\n    return alias.argv\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "plugin",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([(alias := sys) for sys in objects])\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([(alias := sys.stdout) for sys in objects])\n    return alias\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([[(alias := sys) for sys in objects] for item in objects])\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([(lambda value=(alias := sys): value) for sys in objects])\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([(alias := sys) for (item, *sys) in objects])\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({(alias := sys) for sys in objects})\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({(alias := sys.stdout) for sys in objects})\n    return alias\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([{(alias := sys) for sys in objects} for item in objects])\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({(lambda value=(alias := sys): value) for sys in objects})\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({(alias := sys) for (item, *sys) in objects})\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({0: (alias := sys) for sys in objects})\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({0: (alias := sys.stdout) for sys in objects})\n    return alias\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([{0: (alias := sys) for sys in objects} for item in objects])\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({0: (lambda value=(alias := sys): value) for sys in objects})\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list({0: (alias := sys) for (item, *sys) in objects})\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list(((alias := sys) for sys in objects))\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list(((alias := sys.stdout) for sys in objects))\n    return alias\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list([((alias := sys) for sys in objects) for item in objects])\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list(((lambda value=(alias := sys): value) for sys in objects))\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_comprehension_alias_escape_preserves_object_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    list(((alias := sys) for (item, *sys) in objects))\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_identity_is_independent_of_target_spelling",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_identity_is_independent_of_target_spelling",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := item) for item in objects]\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias = sys\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias = sys\n    return getattr(alias, 'argv')\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias = sys\n    return vars(alias)['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias: object = sys\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias: object = sys\n    return getattr(alias, 'argv')\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    alias: object = sys\n    return vars(alias)['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    (alias := sys)\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    (alias := sys)\n    return getattr(alias, 'argv')\n",
+        "denied": false
+      },
+      {
+        "name": "function_parameter_alias_keeps_local_identity_through_assignments_and_reflection",
+        "source": "import sys\ndef task(sys):\n    (alias := sys)\n    return vars(alias)['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for item in objects]\n    return alias.argv\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "plugin",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    if flag:\n        alias = sys\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    [(alias := sys) for sys in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    return getattr(alias, 'argv')\n",
+        "denied": true
+      },
+      {
+        "name": "both_branch_local_overwrites_remove_previous_host_alias_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    if flag:\n        alias = objects\n    else:\n        alias = objects\n    return alias.argv\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.close\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.read\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.write\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_stdout_alias_does_not_invent_terminal_or_io_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write('a')\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_create_an_ffi_security_ban",
+        "source": "import sys\ndef task(sys):\n    callback = sys.CDLL\n    return callback(None)\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(sys):\n    alias = sys\n    alias2 = alias\n    return getattr(alias2, 'argv')\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(sys):\n    alias = getattr(sys, 'argv')\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(sys):\n    alias = vars(sys)\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(sys):\n    alias = getattr(sys, '__dict__')\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(sys):\n    alias = vars(sys)['argv']\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(os):\n    alias = os\n    alias2 = alias\n    return getattr(alias2, 'argv')\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(os):\n    alias = getattr(os, 'argv')\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(os):\n    alias = vars(os)\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(os):\n    alias = getattr(os, '__dict__')\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(os):\n    alias = vars(os)['argv']\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(builtins):\n    alias = builtins\n    alias2 = alias\n    return getattr(alias2, 'argv')\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(builtins):\n    alias = getattr(builtins, 'argv')\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(builtins):\n    alias = vars(builtins)\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(builtins):\n    alias = getattr(builtins, '__dict__')\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(builtins):\n    alias = vars(builtins)['argv']\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(importlib):\n    alias = importlib\n    alias2 = alias\n    return getattr(alias2, 'argv')\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(importlib):\n    alias = getattr(importlib, 'argv')\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(importlib):\n    alias = vars(importlib)\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(importlib):\n    alias = getattr(importlib, '__dict__')\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(importlib):\n    alias = vars(importlib)['argv']\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(item):\n    alias = item\n    alias2 = alias\n    return getattr(alias2, 'argv')\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(item):\n    alias = getattr(item, 'argv')\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(item):\n    alias = vars(item)\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "plugin",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(item):\n    alias = getattr(item, '__dict__')\n    alias2 = alias\n    return alias2['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_alias_chains_and_reflection_escape_without_host_spelling_identity",
+        "source": "def task(item):\n    alias = vars(item)['argv']\n    alias2 = alias\n    return alias2\n",
+        "denied": false
+      },
+      {
+        "name": "same_spelling_local_and_host_branch_aliases_keep_both_identities",
+        "source": "import sys\ndef task(objects, flag=False):\n    if flag:\n        [(alias := sys) for sys in objects]\n    else:\n        alias = sys\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "same_spelling_local_and_host_branch_aliases_keep_both_identities",
+        "source": "import sys\ndef task(objects, flag=False):\n    if flag:\n        alias = sys\n    else:\n        [(alias := sys) for sys in objects]\n    return alias.argv\n",
+        "denied": true
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "terminal",
+    "policy": {},
+    "cases": [
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for item in objects]\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    if flag:\n        alias = sys\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    [(alias := sys) for sys in objects]\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    return getattr(alias, 'argv')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.close\n    return callback()\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.read\n    return callback()\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.write\n    return callback()\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_stdout_alias_does_not_invent_terminal_or_io_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write('a')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_create_an_ffi_security_ban",
+        "source": "import sys\ndef task(sys):\n    callback = sys.CDLL\n    return callback(None)\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "python_io",
+    "policy": {},
+    "cases": [
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for item in objects]\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    if flag:\n        alias = sys\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    [(alias := sys) for sys in objects]\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    return getattr(alias, 'argv')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.close\n    return callback()\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.read\n    return callback()\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.write\n    return callback()\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_stdout_alias_does_not_invent_terminal_or_io_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write('a')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_create_an_ffi_security_ban",
+        "source": "import sys\ndef task(sys):\n    callback = sys.CDLL\n    return callback(None)\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "global_state",
+    "policy": {},
+    "cases": [
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for item in objects]\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    if flag:\n        alias = sys\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    [(alias := sys) for sys in objects]\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    return getattr(alias, 'argv')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.close\n    return callback()\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.read\n    return callback()\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.write\n    return callback()\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_stdout_alias_does_not_invent_terminal_or_io_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write('a')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_create_an_ffi_security_ban",
+        "source": "import sys\ndef task(sys):\n    callback = sys.CDLL\n    return callback(None)\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(sys):\n    alias = sys\n    return alias.__dict__['argv']\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(sys):\n    alias = sys\n    alias.path = []\n    return 1\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(os):\n    alias = os\n    return alias.__dict__['argv']\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(os):\n    alias = os\n    alias.path = []\n    return 1\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(builtins):\n    alias = builtins\n    return alias.__dict__['argv']\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(builtins):\n    alias = builtins\n    alias.path = []\n    return 1\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "imported_module_dynamic_reads_are_not_a_security_gate",
+        "source": "import __vibeflow_local__ as host\ndef task(key):\n    alias = host.tools\n    return alias.__dict__[key]\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "imported_module_dynamic_reads_are_not_a_security_gate",
+        "source": "import example_package as host\ndef task(key):\n    alias = host.tools\n    return alias.__dict__[key]\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "node",
+    "scope": "trusted",
+    "policy": {},
+    "cases": [
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for item in objects]\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    if flag:\n        alias = sys\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    [(alias := sys) for sys in objects]\n    return alias.argv\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    return getattr(alias, 'argv')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": true
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.close\n    return callback()\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.read\n    return callback()\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.write\n    return callback()\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_stdout_alias_does_not_invent_terminal_or_io_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write('a')\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_create_an_ffi_security_ban",
+        "source": "import sys\ndef task(sys):\n    callback = sys.CDLL\n    return callback(None)\nclass Task:\n    def run_pure(self, inputs, params):\n        task(())\n        return {}\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "terminal",
+    "policy": {},
+    "cases": [
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for item in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    if flag:\n        alias = sys\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    [(alias := sys) for sys in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    return getattr(alias, 'argv')\n",
+        "denied": true
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.close\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.read\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.write\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_stdout_alias_does_not_invent_terminal_or_io_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write('a')\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_create_an_ffi_security_ban",
+        "source": "import sys\ndef task(sys):\n    callback = sys.CDLL\n    return callback(None)\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "python_io",
+    "policy": {},
+    "cases": [
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for item in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    if flag:\n        alias = sys\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    [(alias := sys) for sys in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    return getattr(alias, 'argv')\n",
+        "denied": true
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.close\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.read\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.write\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_stdout_alias_does_not_invent_terminal_or_io_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write('a')\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_create_an_ffi_security_ban",
+        "source": "import sys\ndef task(sys):\n    callback = sys.CDLL\n    return callback(None)\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "global_state",
+    "policy": {},
+    "cases": [
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for item in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    if flag:\n        alias = sys\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    [(alias := sys) for sys in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    return getattr(alias, 'argv')\n",
+        "denied": true
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.close\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.read\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.write\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_stdout_alias_does_not_invent_terminal_or_io_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write('a')\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_create_an_ffi_security_ban",
+        "source": "import sys\ndef task(sys):\n    callback = sys.CDLL\n    return callback(None)\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(sys):\n    alias = sys\n    return alias.__dict__['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(sys):\n    alias = sys\n    alias.path = []\n    return 1\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(os):\n    alias = os\n    return alias.__dict__['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(os):\n    alias = os\n    alias.path = []\n    return 1\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(builtins):\n    alias = builtins\n    return alias.__dict__['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(builtins):\n    alias = builtins\n    alias.path = []\n    return 1\n",
+        "denied": false
+      },
+      {
+        "name": "imported_module_dynamic_reads_are_not_a_security_gate",
+        "source": "import __vibeflow_local__ as host\ndef task(key):\n    alias = host.tools\n    return alias.__dict__[key]\n",
+        "denied": false
+      },
+      {
+        "name": "imported_module_dynamic_reads_are_not_a_security_gate",
+        "source": "import example_package as host\ndef task(key):\n    alias = host.tools\n    return alias.__dict__[key]\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "trusted",
+    "policy": {},
+    "cases": [
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for item in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    if flag:\n        alias = sys\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    [(alias := sys) for sys in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    return getattr(alias, 'argv')\n",
+        "denied": true
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.close\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.read\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.write\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_stdout_alias_does_not_invent_terminal_or_io_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write('a')\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_create_an_ffi_security_ban",
+        "source": "import sys\ndef task(sys):\n    callback = sys.CDLL\n    return callback(None)\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "plugin",
+    "scope": "terminal",
+    "policy": {},
+    "cases": [
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for item in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    if flag:\n        alias = sys\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    [(alias := sys) for sys in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    return getattr(alias, 'argv')\n",
+        "denied": true
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.close\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.read\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.write\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_stdout_alias_does_not_invent_terminal_or_io_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write('a')\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_create_an_ffi_security_ban",
+        "source": "import sys\ndef task(sys):\n    callback = sys.CDLL\n    return callback(None)\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "plugin",
+    "scope": "python_io",
+    "policy": {},
+    "cases": [
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for item in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    if flag:\n        alias = sys\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    [(alias := sys) for sys in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    return getattr(alias, 'argv')\n",
+        "denied": true
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.close\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.read\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.write\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_stdout_alias_does_not_invent_terminal_or_io_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write('a')\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_create_an_ffi_security_ban",
+        "source": "import sys\ndef task(sys):\n    callback = sys.CDLL\n    return callback(None)\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "plugin",
+    "scope": "global_state",
+    "policy": {},
+    "cases": [
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for item in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    if flag:\n        alias = sys\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    [(alias := sys) for sys in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    return getattr(alias, 'argv')\n",
+        "denied": true
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.close\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.read\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.write\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_stdout_alias_does_not_invent_terminal_or_io_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write('a')\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_create_an_ffi_security_ban",
+        "source": "import sys\ndef task(sys):\n    callback = sys.CDLL\n    return callback(None)\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(sys):\n    alias = sys\n    return alias.__dict__['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(sys):\n    alias = sys\n    alias.path = []\n    return 1\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(os):\n    alias = os\n    return alias.__dict__['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(os):\n    alias = os\n    alias.path = []\n    return 1\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(builtins):\n    alias = builtins\n    return alias.__dict__['argv']\n",
+        "denied": false
+      },
+      {
+        "name": "local_namespace_alias_does_not_create_host_namespace_or_state_identity",
+        "source": "def task(builtins):\n    alias = builtins\n    alias.path = []\n    return 1\n",
+        "denied": false
+      },
+      {
+        "name": "imported_module_dynamic_reads_are_not_a_security_gate",
+        "source": "import __vibeflow_local__ as host\ndef task(key):\n    alias = host.tools\n    return alias.__dict__[key]\n",
+        "denied": false
+      },
+      {
+        "name": "imported_module_dynamic_reads_are_not_a_security_gate",
+        "source": "import example_package as host\ndef task(key):\n    alias = host.tools\n    return alias.__dict__[key]\n",
+        "denied": false
+      }
+    ]
+  },
+  {
+    "subject": "plugin",
+    "scope": "trusted",
+    "policy": {},
+    "cases": [
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for item in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys) for sys in objects]\n    if flag:\n        alias = sys\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    [(alias := sys) for sys in objects]\n    return alias.argv\n",
+        "denied": true
+      },
+      {
+        "name": "real_host_aliases_and_mixed_branch_facts_stay_forbidden",
+        "source": "import sys\ndef task(objects, flag=False):\n    alias = sys\n    return getattr(alias, 'argv')\n",
+        "denied": true
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.close\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.read\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_invent_io_from_leaf_name",
+        "source": "import sys\ndef task(sys):\n    callback = sys.write\n    return callback()\n",
+        "denied": false
+      },
+      {
+        "name": "local_stdout_alias_does_not_invent_terminal_or_io_identity",
+        "source": "import sys\ndef task(objects, flag=False):\n    [(alias := sys.stdout) for sys in objects]\n    return alias.write('a')\n",
+        "denied": false
+      },
+      {
+        "name": "local_callable_alias_does_not_create_an_ffi_security_ban",
+        "source": "import sys\ndef task(sys):\n    callback = sys.CDLL\n    return callback(None)\n",
+        "denied": false
+      }
+    ]
+  }
+]

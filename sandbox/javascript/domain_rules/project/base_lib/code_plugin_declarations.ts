@@ -1,1 +1,1 @@
-import {definePlugin,defineNode,defineNodeType,defineRule,defineRuleset,defineDataSchema,defineBaseLib,defineCapability,defineResource} from "@vibeflow/plugin";
+import {definePlugin,defineNode,defineNodeType,defineRule,defineRuleset,defineDataSchema,defineBaseLib,defineResource} from "@vibeflow/plugin";

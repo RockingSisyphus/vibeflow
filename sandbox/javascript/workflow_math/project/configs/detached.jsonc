@@ -7,6 +7,12 @@
         "type": "sandbox.number",
         "display_name": "Number",
         "required": true
+      },
+      {
+        "key": "app_session",
+        "type": "app.session",
+        "display_name": "Application session",
+        "required": true
       }
     ],
     "nodes": [
@@ -40,15 +46,21 @@
         "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Ends after the main calculation is available."
+      },
+      {
+        "id": "start_application",
+        "definition_id": "app.input.detached_jsonc",
+        "display_name": "Application input",
+        "description": "Supplies the application instance to this entry."
       }
     ],
     "edges": [
       {
-        "from": "start",
+        "from": "start_application",
         "to": "audit"
       },
       {
-        "from": "start",
+        "from": "start_application",
         "to": "calculate"
       },
       {
@@ -58,7 +70,11 @@
       {
         "from": "audit",
         "to": "end"
-      }
+      },
+      [
+        "start",
+        "start_application"
+      ]
     ],
     "outputs": [
       {

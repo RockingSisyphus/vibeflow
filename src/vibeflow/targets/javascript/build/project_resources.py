@@ -14,7 +14,7 @@ from vibeflow.targets.javascript.frontend.schema import (
     PortableSchemaError,
     validate_portable_json_schema,
 )
-from vibeflow.core.descriptors import BaseLibCatalog, BaseLibDescriptor, CapabilityDescriptor, DescriptorCatalogs, ImplementationDescriptor, NodeDescriptor
+from vibeflow.core.descriptors import BaseLibCatalog, BaseLibDescriptor, DescriptorCatalogs, ImplementationDescriptor, NodeDescriptor
 from vibeflow.core.descriptors.source_bundle import implementation_sources, source_resources
 from vibeflow.core.flow import GraphConfig
 
@@ -32,45 +32,6 @@ def bind_base_libs(identifiers, *, catalog, target, project_root):
     return tuple(ordered), implementations
 
 
-def required_capabilities(
-    nodes: Mapping[str, NodeDescriptor],
-    *,
-    catalogs: DescriptorCatalogs,
-    target: str,
-) -> tuple[CapabilityDescriptor, ...]:
-    selected: dict[str, CapabilityDescriptor] = {}
-    for node in nodes.values():
-        for requirement in node.capabilities:
-            capability = catalogs.capabilities.get(requirement.id)
-            if capability is None:
-                raise ProjectBuildError(
-                    "VF_AOT_CAPABILITY_UNKNOWN",
-                    (
-                        f"node '{node.id}' requires unknown capability "
-                        f"'{requirement.id}'"
-                    ),
-                )
-            if target not in capability.targets:
-                raise ProjectBuildError(
-                    "VF_AOT_CAPABILITY_TARGET",
-                    (
-                        f"capability '{capability.id}' does not support "
-                        f"target '{target}'"
-                    ),
-                )
-            unknown = sorted(
-                set(requirement.operations) - set(capability.operations)
-            )
-            if unknown:
-                raise ProjectBuildError(
-                    "VF_AOT_CAPABILITY_OPERATION",
-                    (
-                        f"node '{node.id}' requires unknown operations "
-                        f"on capability '{capability.id}': {unknown}"
-                    ),
-                )
-            selected[capability.id] = capability
-    return tuple(selected[key] for key in sorted(selected))
 
 
 
@@ -79,7 +40,6 @@ def required_capabilities(
 def used_schema_types(
     graph: GraphConfig,
     nodes: Mapping[str, NodeDescriptor],
-    capabilities: tuple[CapabilityDescriptor, ...],
 ) -> set[str]:
     used = {item.type for item in graph.inputs}
     used.update(item.type for item in graph.outputs)
@@ -89,10 +49,6 @@ def used_schema_types(
     for entry in graph.entries.values():
         used.update(item.type for item in entry.inputs or ())
         used.update(item.type for item in entry.outputs or ())
-    for capability in capabilities:
-        for operation in capability.operations.values():
-            used.add(operation.input_type)
-            used.add(operation.output_type)
     return used
 
 
@@ -296,7 +252,6 @@ def driver_import_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
 __all__ = [
     "bind_base_libs",
     "driver_import_policy",
-    "required_capabilities",
     "schemas_for_types",
     "source_import_facts",
     "used_schema_types",

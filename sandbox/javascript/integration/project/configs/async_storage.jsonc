@@ -1,0 +1,103 @@
+{
+  "pipeline": {
+    "entry_mode": "async",
+    "inputs": [
+      {
+        "key": "x",
+        "type": "sandbox.number",
+        "display_name": "Number",
+        "required": true
+      },
+      {
+        "key": "key",
+        "type": "sandbox.storage.key",
+        "display_name": "Storage key",
+        "required": true
+      },
+      {
+        "key": "app_session",
+        "type": "app.session",
+        "display_name": "Application session",
+        "required": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start",
+        "definition_id": "sandbox.terminal",
+        "display_name": "Start",
+        "description": "Starts the async and application API workflow."
+      },
+      {
+        "id": "double",
+        "definition_id": "sandbox.async_double",
+        "display_name": "double",
+        "description": "Executes the declared ordinary workflow node."
+      },
+      {
+        "id": "read",
+        "definition_id": "sandbox.storage_read",
+        "display_name": "Read storage",
+        "description": "Reads from the application storage input."
+      },
+      {
+        "id": "end",
+        "definition_id": "sandbox.terminal",
+        "display_name": "End",
+        "description": "Ends after the asynchronous and application API results are available.",
+        "join_policy": "all"
+      },
+      {
+        "id": "start_application",
+        "definition_id": "app.input.async_storage_jsonc",
+        "display_name": "Application input",
+        "description": "Supplies the application instance to this entry."
+      }
+    ],
+    "edges": [
+      {
+        "from": "start_application",
+        "to": "double"
+      },
+      {
+        "from": "start_application",
+        "to": "read"
+      },
+      {
+        "from": "read",
+        "to": "end"
+      },
+      {
+        "from": "double",
+        "to": "end"
+      },
+      [
+        "start",
+        "start_application"
+      ]
+    ],
+    "outputs": [
+      {
+        "type": "sandbox.async.value",
+        "cardinality": "exactly_one",
+        "display_name": "Doubled value",
+        "as": "doubled"
+      },
+      {
+        "type": "sandbox.storage.value",
+        "cardinality": "exactly_one",
+        "display_name": "Stored value",
+        "as": "value"
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "source": {
+        "kind": "file",
+        "ref": "plugins/code_plugin/plugin.ts",
+        "export": "plugin"
+      }
+    }
+  ]
+}

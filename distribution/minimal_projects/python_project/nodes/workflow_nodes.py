@@ -19,7 +19,6 @@ def _value(inputs, data_type: str):
               'input_semantics': {},
               'output_semantics': {}},
  'base_libs': [],
- 'capabilities': [],
  'tags': ['boundary']})
 class StartNode:
 
@@ -45,7 +44,6 @@ class StartNode:
               'output_semantics': {'internal_payload': ['Internal payload passed to business '
                                                         'processing.']}},
  'base_libs': [],
- 'capabilities': [],
  'tags': ['boundary']})
 class InputBoundaryNode:
 
@@ -72,7 +70,6 @@ class InputBoundaryNode:
               'output_semantics': {'processed_payload': ['Result of project-specific '
                                                          'processing.']}},
  'base_libs': [],
- 'capabilities': [],
  'tags': ['business']})
 class ProcessPayloadNode:
 
@@ -99,7 +96,6 @@ class ProcessPayloadNode:
                                                         'workflow.']},
               'output_semantics': {'response': ['Generic response returned to the caller.']}},
  'base_libs': [],
- 'capabilities': [],
  'tags': ['boundary']})
 class OutputBoundaryNode:
 
@@ -120,7 +116,6 @@ class OutputBoundaryNode:
               'input_semantics': {},
               'output_semantics': {}},
  'base_libs': [],
- 'capabilities': [],
  'tags': ['boundary']})
 class EndNode:
 

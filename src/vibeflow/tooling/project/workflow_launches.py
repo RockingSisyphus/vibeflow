@@ -14,7 +14,7 @@ def graph_launches(graph, catalogs, *, root, global_config=None, effective_param
             if node.status == STATUS_PLANNED:
                 continue
             descriptor = catalogs.nodes.get(node.definition_id)
-            if not any(req.id == "vibeflow.workflow" and "call" in req.operations for req in getattr(descriptor, "capabilities", ())):
+            if not any(item["operation"] == "call" for item in getattr(descriptor, "workflow_operations", ())):
                 continue
             params = (effective_params or {}).get((*subject.call_path, node.id), workflow_node_params(node, descriptor, subject))
             launches.append({"workflow":workflow_reference(params.get("workflow"), root=root.id),

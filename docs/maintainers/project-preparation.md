@@ -10,15 +10,13 @@
 
 `resource_facts.py` 收集解析后的依赖和 Plugin 包事实，不作政策判定；共享 Rule 支持层不读取文件系统。项目包由项目规则检查，root 包由所属 root 规则检查。单 workflow 运行/构建仍执行项目规则，但通过 usage_complete 标识局部清单，默认共享数量检查只在完整项目审查时执行。
 
-Python AOT 的 `tooling/application/python/build_inputs.py` 统一投影实际 Node、Plugin 声明/运行期工厂、声明依赖和源码闭包，本地文件与外部实现包收集共用该输入。可用集合中的未引用实现不会因此加载或打包，不再整目录复制 Python 源码。依赖资源声明的 implementation_files、包内数据和显式 include 继续保留，保留源码与附属文件的项目相对路径；部署产物不依赖原工作区，不在运行时扫描或编译。Bundle 固定描述和绑定索引与其生命周期一致，Runtime 保持自己的 Node、参数、Capability 和插件实例。暖调用与源码移除的回归分别由 aot_preparation 沙箱和 test_aot_deployment.py 验证。
-
 项目架构复用准备事实记录资源的 used_by_workflows，关系为声明、依赖或整包选择，路径相对项目目录，statuses 表达 implemented/planned。它说明声明引用，不是实际执行轨迹。缺失占位不计作真实采用；Plugin 的内部实现不作为独立共享资源统计。used_by_roots 继续按不同 root 去重。
 
 质量检查使用统一准备结果与规则引擎。显式规则列表替换默认，空列表取消该层可选检查；不保留旧 CLI 参数转换和独立扫描组装入口。纯测量、依赖算法和源码效果 Rule 仍可通过自己的事实接口测试。
 
 长期验收入口见[开发与验证](development.md)。退役资料直接删除、版本压缩包不覆盖；目录与产物规则见[目录职责](directory-layout.md)。统一错误处理、取消和资源收尾仍按[待实施计划](../design/workflow-error-handling-plan.md)另行设计，现有浏览器包装层收尾在替代机制可用前保留。
 
-政策覆盖与真实执行回归见 `tests/tooling/test_governance_policy_boundaries.py`；资源闭包见 `tests/tooling/test_project_dependency_scope.py`。
+政策覆盖与真实执行回归见 `tests/e2e/test_governance.py`；资源闭包见 `tests/e2e/test_governance.py`。
 
 ## 资源使用结果与调用链
 

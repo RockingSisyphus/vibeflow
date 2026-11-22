@@ -23,7 +23,7 @@ Runtime 负责节点、Hook、dispose、锁和观察的真实完成；Coordinato
 
 Python 同步子调用的登记和回收交给协作组件所属循环，目标计算保持在调用线程。同进程和 HTTP 宿主按语言共用错误报告函数，保留原因链、清理错误与错误组。Python 运行期和 HTTP 客户端复用独立于 Core、Target 的私有 cleanup 等待函数，取消不会代替实际完成。
 
-构建产物的描述来自已准备的 WorkflowPlan 与调用声明；加载时不重新扫描工程。官方 invoke_sync/call/kill 与消息预期引用沿原有关联提取链展示。规则说明声明的能力和目标，不证明任意间接业务调用。
+构建产物的描述来自已准备的 WorkflowPlan 与调用声明；加载时不重新扫描工程。官方 invoke_sync/call/kill 与消息预期引用沿原有关联提取链展示。workflow_operations 说明声明的操作和目标，不证明任意间接业务调用。
 
 ## 执行中的成本、目标与路线复核
 
@@ -47,7 +47,7 @@ Python 同步子调用的登记和回收交给协作组件所属循环，目标�
 | 沙箱与规则 | Python 102/102；JS 集成 50/50、0 跳过；规则对照 1115/1115、0 差异；规则缺口与适配回归通过 |
 | 真实浏览器 | 已打包 AOT 在实际 Chromium 运行；同步返回、消息往返、停止/关闭等待 finally 清理、协作期间零网络请求通过；官方 InvokeSync 关联与命名入口跳转通过 |
 | AOT 与分发 | 搬迁并移除原工程后的 Python bundle、Node AOT、wheel 隔离安装，以及两种发行候选装配与脱离源码运行通过 |
-| 迁移 | 启动清单 v2、Workflow ABI v11、共享 AOT v5；旧格式明确拒绝并要求重建；跨语言进程协作继续通过 |
+| 当时格式 | 启动清单 v2、Workflow ABI v11、共享 AOT v5；旧格式明确拒绝并要求重建；跨语言进程协作继续通过 |
 | 收尾 | 全量末尾仓库检查通过，清理检查为 0 个目标；最终仅补写本验收记录并再次进行静态检查 |
 
 本次最终完整门禁约 25 分钟。后续维护的主要验证成本仍是跨语言、源码/AOT、原生异步与真实宿主的一致性；本轮没有引入浏览器页面业务适配层。上述结果不代表 Windows 平台、ERA 酒馆生产、长期高频运行或刷新恢复验收。
@@ -74,11 +74,11 @@ Python 同步子调用的登记和回收交给协作组件所属循环，目标�
 
 按项目维护 skill 检查了 Core 合同、协作状态归属、Python 同步与原生异步执行、生命周期、源码准备与资源使用、AOT 绑定、架构资料路径、迁移拒绝路径和分发资源。检查沿实际入口追踪，没有仅根据名称将仍有用途的机制判为退役。现有分层与显式绑定合同继续适用；本次没有增加浏览器业务适配或改变实例生命周期。
 
-发现并复现一处缺陷：Python 异步图的普通同步节点在框架工作线程执行，官方 Send 模板通过 HTTP Client 的 `operations()` 绑定调用 `send()` 时，直接在该线程创建 asyncio Task，报 `RuntimeError: no running event loop`。既有 HTTP 用例在协程节点内发送，未覆盖这个组合。
+发现并复现一处缺陷：Python 异步图的普通同步节点在框架工作线程执行，官方 Send 模板通过 HTTP 客户端的会话调用发送操作 时，直接在该线程创建 asyncio Task，报 `RuntimeError: no running event loop`。既有 HTTP 用例在协程节点内发送，未覆盖这个组合。
 
 将同进程 Coordinator 已有的即时操作线程转交逻辑收拢到 `coordination/operations.py`，HTTP Client 共用该实现。消息交接在宿主事件循环完成，Send 仍立即返回，实际 HTTP 交付仍由 flush/finish 等待；同步嵌套计算继续在调用线程执行。使用手册同步说明了操作绑定与底层 Client 的调用边界。
 
-新增[正式 AOT 的 HTTP 协作回归](../../tests/coordination/test_http_sdk.py)，复用三 workflow 数学沙箱：A 通过 HTTP 调用并收发消息，服务端绑定实际 B/C 产物，B 在同进程同步调用 C。删除原工程后，在 plan/block/compiled 三种 profile 中分别运行五组并发输入，检查公式、中间值、实例身份和可重复读取的终态。没有增加另一套数学节点或协作协议。
+新增[正式 AOT 的 HTTP 协作回归](../../tests/e2e/test_cooperation_http.py)，复用三 workflow 数学沙箱：A 通过 HTTP 调用并收发消息，服务端绑定实际 B/C 产物，B 在同进程同步调用 C。删除原工程后，在 plan/block/compiled 三种 profile 中分别运行五组并发输入，检查公式、中间值、实例身份和可重复读取的终态。没有增加另一套数学节点或协作协议。
 
 | 本次复核验证范围 | 结果 |
 |---|---|
@@ -98,7 +98,6 @@ Python 同步子调用的登记和回收交给协作组件所属循环，目标�
 
 跨 workflow 右键跳转优先选择目标自己的预览记录，与左侧列表切换一致；各 workflow 的位置、展开与阅读状态独立保留。Wait 的默认形状统一为其他官方协作操作使用的缺口矩形，保留其颜色及作者显式样式覆盖。
 
-按用户确认，仅调整共享规则 `WORKFLOW.CALL.UNOBSERVED`：Wait 和 CallAndWait 不再豁免缺少 Kill 的警告；保留 warning 级别及 `allow_background: true`。规则仍只确认直接数据关联的 Kill 声明，不证明所有异常路径都执行清理。本次没有增加自动停止、异常分支或新的运行时收尾合同。
 
 三个 workflow 数学沙箱增加显式停止分支：五组正常公式与一组停止场景在同一作用域并发，核对 18 个独立 A/B/C 身份。A 在 B 第二轮等待就绪后调用官方 Kill；Kill 返回后立即以零超时读取清理确认，要求 B 的真实异步 `finally` 已完成、终态为 cancelled 且没有数值输出。其他五组答案及四个错误公式对照保持原判据。A 的正常第二轮放入同实例 Nodeset，隔离官方 Wait 与 Kill 固定的同名输出键；B 的 Nodeset 也继续保持 B 身份，没有增加第四个 workflow 或另一套执行器。
 

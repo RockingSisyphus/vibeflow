@@ -2,14 +2,14 @@
 import {WorkflowClient, errorRecord} from "./workflow_client.mjs";
 
 export async function runConnected(run, {url,id=null,workflow=null,initial={},entry,
-    capabilities={},...options}={}) {
+    ...options}={}) {
   const controller=new AbortController();
   const client=await WorkflowClient.open(url,{id,workflow,onStop:()=>controller.abort("workflow stop requested")});
   try {
     const outputs=await run({...initial,...client.inputs},{...options,
       entry:client.entry??entry,signal:controller.signal,
       workflowInstanceId:client.id,
-      capabilities:{...capabilities,"vibeflow.workflow":client.operations()}});
+      workflowSession:client.session()});
     await client.finish({outputs});
     return outputs;
   } catch(error) {

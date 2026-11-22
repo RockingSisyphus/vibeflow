@@ -16,8 +16,7 @@ export function defineRule<T extends RuleOptions>(options: T): Resource & Readon
 export function defineRuleset(options: Options & {id: string; workflow_default?: boolean; graph_scope?: "current_graph" | "effective_subtree"; calls?: readonly RuleCall[]; relations?: readonly RuleRelation[]; entrypoints?: Readonly<Record<string, readonly string[]>>}): Resource;
 export function defineDataSchema(options: Options): Resource;
 export function defineBaseLib<T extends BaseLibOptions>(options: T): Resource & Readonly<Pick<T, "implementation">>;
-export function defineCapability(options: Options): Resource;
 export function defineNodeType(options: Options & {id: string; display_name?: string; description?: string}): Resource;
 export function defineResource(options: Options & {kind: string}): Resource;
 export interface PluginOptions extends Options {id: string; resources: readonly Resource[]; config_schema?: Readonly<Record<string, Json>>; config_defaults?: Readonly<Record<string, Json>>; compiler?: Source | ((context: any) => any); runtime?: Source | ((context: any) => any); targets?: readonly ("node" | "browser")[]; declaration_rulesets?: readonly (string | {rule_id: string; params?: Readonly<Record<string, Json>>})[]; priority?: number; display_name?: string; description?: string; version?: string}
-export function definePlugin<T extends PluginOptions>(options: T): Readonly<T & {abi: "vibeflow.plugin.v4"}>;
+export function definePlugin<T extends PluginOptions>(options: T): Readonly<T & {abi: "vibeflow.plugin.v5"}>;

@@ -52,16 +52,16 @@ points are the only boundary it may dispatch through. Coordination is a separate
 stdlib/Core layer; only its thin `__main__` may delegate to the neutral command
 entry. Its protocol, clients and service cannot import Targets or Tooling.
 
-The checker's own tests use only `unittest`. The runner also prevents test
-bytecode from being written into the source tree:
+The checker's behavior is tested through its real CLI in isolated repositories.
+Use the shared acceptance runner, which keeps bytecode and outputs outside the checkout:
 
 ```bash
-python repo_check/test.py
+python tools/run_tests.py -- tests/e2e/test_repository_checker.py tests/e2e/test_developer_tools.py
 ```
 
 ## 目录用途与边界
 
-仅用于：VibeFlow 仓库自身的独立质检工具及其测试；不属于产品 Rule，不进入 wheel 或发行包。
+仅用于：VibeFlow 仓库自身的独立质检工具；其 CLI 行为测试归 tests/e2e；不属于产品 Rule，不进入 wheel 或发行包。
 
 - 新文件按上述用途归属；新增子目录同时写明职责，不能作为临时收纳箱。
 - 一次运行的日志、缓存、依赖安装和候选构建放在仓库外临时工作区，用完清理。

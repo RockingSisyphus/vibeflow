@@ -4,7 +4,7 @@ from vibeflow.targets.javascript.resources import read_text
 
 
 def _runtime_source() -> str:
-    names = ("runtime_helpers.mjs", "capability_helpers.mjs", "plugin_helpers.mjs",
+    names = ("runtime_helpers.mjs", "workflow_session.mjs", "plugin_helpers.mjs",
              "root_helpers.mjs", "status_helpers.mjs", "execution_helpers.mjs")
     return "\n".join(read_text(name) for name in names)
 
@@ -57,3 +57,5 @@ __all__ = [
     "DECLARATION_PREAMBLE",
     "RUNTIME_SOURCE",
 ]
+
+WORKFLOW_CONTEXT_DECLARATION = read_text("workflow_contracts.d.ts")

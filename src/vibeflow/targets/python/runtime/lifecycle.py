@@ -116,36 +116,8 @@ class NodeRunContext:
         loop = asyncio.get_running_loop() if runtime.graph.entry_mode == 'async' else None
         self.signal = CancellationSignal(async_loop=loop)
         self.workflow = runtime.workflow
-        allowed = {}
-        descriptor = runtime.registry.descriptor(frame.definition_id)
-        from .contracts import capability_descriptors
-        declarations = {item.id: item for item in capability_descriptors(runtime.registry)}
-        for requirement in descriptor.capabilities:
-            supplied = runtime._capabilities.get(requirement.id)
-            if not isinstance(supplied, Mapping):
-                raise NodeContractError(
-                    "VF_CAPABILITY_MISSING",
-                    f"capability '{requirement.id}' was not supplied",
-                )
-            operations = requirement.operations or tuple(supplied)
-            policy = frame.capability_policy.get("capabilities", {})
-            if requirement.id in policy:
-                operations = tuple(name for name in operations if name in policy[requirement.id])
-            if any(not callable(supplied.get(operation)) for operation in operations):
-                raise NodeContractError(
-                    "VF_CAPABILITY_MISSING",
-                    f"capability '{requirement.id}' is missing a declared operation",
-                )
-            bound = {}
-            for operation in operations:
-                callback = supplied[operation]
-                if callable(getattr(callback, 'with_signal', None)):
-                    callback = callback.with_signal(self.signal)
-                declaration = declarations.get(requirement.id)
-                contract = declaration.operations.get(operation) if declaration else None
-                bound[operation] = _operation(callback, contract.completion if contract else None)
-            allowed[requirement.id] = MappingProxyType(bound)
-        self.capabilities = MappingProxyType(allowed)
+        from .workflow_session import NodeWorkflow
+        self.workflow = NodeWorkflow(runtime.workflow, runtime._workflow_session, self.signal)
         self._runtime, self._frame = runtime, frame
         self._unsubscribe = runtime._signal.subscribe(self.signal.request_stop)
 
@@ -183,17 +155,3 @@ class NodeRunContext:
         self._runtime._record_runtime_event(
             kind, self._frame.id, self._frame.definition_id, details=details
         )
-
-
-def _operation(callback, completion):
-    if completion == 'suspend':
-        async def invoke(*args, **kwargs):
-            from .completion import suspended
-            return await suspended(callback(*args, **kwargs))
-        return invoke
-    if completion == 'immediate':
-        def invoke(*args, **kwargs):
-            from .completion import immediate
-            return immediate(callback(*args, **kwargs))
-        return invoke
-    return callback

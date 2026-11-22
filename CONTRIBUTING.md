@@ -19,8 +19,6 @@ tooling → targets/python ──────┐
 - Tooling owns file loading, CLI orchestration and presentation. Language analysis belongs to its Target; language-neutral decisions belong to Core.
 - `pipeline.edges` defines executable control flow. `requires` and `provides` define data contracts.
 - Planned resources remain non-runnable and visible in architecture output.
-- Generated JavaScript modules have no import-time business side effects. Invocation state, traces, tasks, cancellation and Capability wrappers are isolated per call or host instance.
-- General framework invariants belong in Core. Project-specific behavior belongs in a Node, base_lib, Capability or Target-owned Plugin. Policy, Compiler and Runtime Plugins use the current public Plugin ABI. Initialization, receive and cleanup behavior belongs in explicit workflow Nodes; hosts provide Capability APIs. Host Extension is retired.
 
 Stable import families are:
 
@@ -68,10 +66,6 @@ entrypoints also supervise their complete process trees. For a custom batch use
 The state records termination signals, timeouts, child exit status and cleanup;
 SIGTERM is an interrupted run, never a successful test result. This prevents new
 orphan accumulation but cannot reap old zombies already owned by another PID.
-Rule observation workers checkpoint each row to `*.partial.jsonl`; only a fully
-completed group publishes its final JSON. Failed/interrupted groups also retain
-`*.error.json`, and output paths must be unique.
-
 ## Validation
 
 Run the full project gate before opening a pull request:
@@ -80,12 +74,12 @@ Run the full project gate before opening a pull request:
 python tools/verify_project.py --full
 ```
 
-It runs the independent repository self-check, tests for every layer, both integration Sandboxes, Python/JavaScript conformance, Node/browser AOT profiles, wheel isolation and a temporary distribution smoke test.
+It runs the independent repository self-check, one end-to-end acceptance batch covering Python/JavaScript behavior, Node/browser AOT hosts, wheel/sdist installation and both temporary distribution profiles.
 
 For direct pytest use, run the isolated repository entrypoint instead of invoking pytest from the checkout root:
 
 ```bash
-python tools/run_tests.py -- tests/core/test_result_scope.py
+python tools/run_tests.py -- tests/e2e/test_execution.py
 python tools/run_tests.py
 ```
 
@@ -104,21 +98,13 @@ python repo_check/run.py --profile all
 
 The `repo_check/` project is self-contained, does not import VibeFlow and is not included in the wheel. `python -m vibeflow quality-check` is a different tool: it checks user projects through Tooling file scanning, Target fact extraction and shared Target quality evaluation.
 
-The runnable suites are organized by Target:
-
-```bash
-PYTHONPATH=src python sandbox/python/integration/run_all.py
-PYTHONPATH=src python sandbox/javascript/minimal/run_e2e.py --skip-browser
-PYTHONPATH=src python sandbox/javascript/integration/run_all.py --skip-browser
-```
-
-Release acceptance must also run the JavaScript integration Sandbox with its real browser dependency; `tools/verify_project.py --full` handles the complete setup.
+All maintained tests live in `tests/e2e`, grouped by user capability. `sandbox` holds real input projects, without a second runner. Use actual CLI/SDK/application entry points and natural outputs; do not add mocks, internal IR/context construction, hidden browser APIs or cache counters. See [testing conventions](docs/maintainers/development.md) and the [coverage matrix](sandbox/TEST_COVERAGE.md). Required browser/toolchain dependencies are prepared by the shared runner; missing environments are failures.
 
 ## Generated files and distribution
 
 ### Repository layout
 
-Follow the [directory responsibilities](docs/maintainers/directory-layout.md) and the README in the directory being changed. Every new manually maintained subdirectory needs a short README explaining its purpose and where generated output belongs. Keep the root for project entry points and metadata; place development documents in `docs`, user manuals in `distribution/docs`, implementation regressions in `tests`, and real usage projects in `sandbox`.
+Follow the [directory responsibilities](docs/maintainers/directory-layout.md) and the README in the directory being changed. Every new manually maintained subdirectory needs a short README explaining its purpose and where generated output belongs. Keep the root for project entry points and metadata; place development documents in `docs`, user manuals in `distribution/docs`, user-behavior tests in `tests/e2e`, and real usage projects in `sandbox`.
 
 Put temporary builds, installed dependencies and run output in disposable workspaces outside the checkout, then clean them up. Delete obsolete unused inputs rather than creating another archive. `archive` is for historical formal releases, `dist` for the latest formal releases, and `references` for external projects. Their generated or third-party subtrees keep their own layout.
 

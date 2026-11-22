@@ -2,10 +2,23 @@
   "type_key": "addition.port_body",
   "display_name": "Port addition",
   "description": "Receive a pair, add, send",
-  "requires": [],
+  "requires": [
+    {
+      "type": "app.session",
+      "cardinality": "exactly_one",
+      "display_name": "Application session"
+    }
+  ],
   "provides": [],
   "pipeline": {
-    "inputs": [],
+    "inputs": [
+      {
+        "key": "app.session",
+        "type": "app.session",
+        "display_name": "Application session",
+        "required": true
+      }
+    ],
     "nodes": [
       {
         "id": "start",
@@ -48,11 +61,17 @@
         "definition_id": "addition.boundary",
         "display_name": "end",
         "description": "end"
+      },
+      {
+        "id": "start_application",
+        "definition_id": "app.input.nodeset_types_port_body_jsonc",
+        "display_name": "Application input",
+        "description": "Supplies the application instance to this entry."
       }
     ],
     "edges": [
       {
-        "from": "start",
+        "from": "start_application",
         "to": "receive"
       },
       {
@@ -70,6 +89,16 @@
       {
         "from": "send",
         "to": "end"
+      },
+      [
+        "start",
+        "start_application"
+      ],
+      {
+        "from": "start_application",
+        "to": "send",
+        "schedule": false,
+        "transfer": true
       }
     ],
     "outputs": []

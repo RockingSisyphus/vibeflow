@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Run VibeFlow pytest suites in an isolated, disposable work directory.
 
-Tests are allowed to exercise the real runtime.  Some programmatic Runtime
-calls intentionally use the public default ``runs/vibeflow`` location, so the
-test process must never use the repository as its working directory.  This
-entrypoint also prevents user-site packages and ambient pytest plugins from
-affecting repository verification.
+Pytest parses its arguments in the repository; the workdir plugin moves test
+collection and execution into isolated directories. This preserves native path
+and selector semantics while keeping default runtime outputs out of the
+checkout. User-site packages and ambient pytest plugins are disabled.
 """
 
 from __future__ import annotations
 
 import argparse
+import ast
 import os
 from pathlib import Path
 import shutil
@@ -28,7 +28,7 @@ else:
 
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON = sys.executable
-DEFAULT_TEST_PATHS = (ROOT / "tests",)
+DEFAULT_TEST_PATHS = (ROOT / "tests/e2e",)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -56,7 +56,12 @@ def _environment(*, toolchain_root: Path) -> dict[str, str]:
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     environment["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
     environment["VIBEFLOW_TEST_TOOLCHAIN_ROOT"] = str(toolchain_root)
+    environment.setdefault("VIBEFLOW_BROWSER_RUNTIME_ROOT", str(toolchain_root))
     environment.setdefault("npm_config_cache", str(toolchain_root.parent / "npm-cache"))
+    environment.setdefault("PUPPETEER_CACHE_DIR", str(toolchain_root.parent / "browser-cache"))
+    if environment.get("PUPPETEER_EXECUTABLE_PATH"):
+        environment.setdefault("PUPPETEER_SKIP_DOWNLOAD", "true")
+    environment.setdefault("PIP_CACHE_DIR", str(toolchain_root.parent / "pip-cache"))
     environment.pop("PYTEST_ADDOPTS", None)
     environment.pop("PYTEST_PLUGINS", None)
     return environment
@@ -66,33 +71,56 @@ def _prepare_toolchain(scratch: Path, *, environment: dict[str, str]) -> Path:
     toolchain_root = scratch / "javascript-toolchain"
     toolchain_root.mkdir(parents=True, exist_ok=True)
     for name in ("package.json", "package-lock.json"):
-        shutil.copy2(ROOT / "sandbox/javascript/minimal/project" / name, toolchain_root / name)
+        shutil.copy2(ROOT / "tests/e2e/runtime" / name, toolchain_root / name)
     # Resolve Windows' npm.cmd shim before CreateProcess searches for an executable.
     subprocess.run((shutil.which("npm") or "npm", "ci"), cwd=toolchain_root, env=environment, check=True)
     return toolchain_root
 
 
-def _resolve_paths(arguments: list[str]) -> list[str]:
-    if not arguments:
-        return [str(path) for path in DEFAULT_TEST_PATHS]
-    resolved: list[str] = []
-    for argument in arguments:
-        candidate = Path(argument)
-        repository_candidate = ROOT / candidate
-        if not argument.startswith("-") and not candidate.is_absolute() and repository_candidate.exists():
-            resolved.append(str(repository_candidate.resolve()))
-        else:
-            resolved.append(argument)
-    return resolved
+def _runtime_requirements(arguments: list[str]) -> set[str]:
+    """Dependency preparation follows selected test fixtures, not product imports."""
+    if any(value in {"--collect-only", "--co", "--help", "-h", "--version"} for value in arguments):
+        return set()
+    # These paths are only dependency-preparation hints. Pytest itself parses
+    # targets and option values; this driver must never rewrite selectors.
+    candidates = [ROOT / value.split("::")[0] for value in arguments if not value.startswith("-")]
+    selected = []
+    for path in candidates:
+        try:
+            if path.exists():
+                selected.append(path)
+        except OSError:
+            # An option value may not be a valid filesystem path. Pytest owns
+            # argument validation; these optional hints must not reject it.
+            continue
+    if not selected:
+        selected = list(DEFAULT_TEST_PATHS)
+    files = {file for path in selected for file in (path.rglob("test_*.py") if path.is_dir() else (path,))}
+    return {argument.arg
+               for path in files if path.suffix == ".py"
+               for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))) if isinstance(node, ast.arguments)
+               for argument in (*node.posonlyargs, *node.args, *node.kwonlyargs)
+               if argument.arg in {"toolchain", "browser_runtime"}}
 
 
 def run_tests(scratch: Path, pytest_args: list[str], *, workers: int = DEFAULT_WORKERS) -> int:
     scratch.mkdir(parents=True, exist_ok=True)
     bootstrap_environment = _environment(toolchain_root=scratch / "javascript-toolchain")
-    toolchain_root = _prepare_toolchain(scratch, environment=bootstrap_environment)
+    # Respect the caller's temporary root. Nesting it under --scratch can exceed
+    # Unix socket path limits used by real browser processes.
+    temporary = Path(tempfile.gettempdir())
+    bootstrap_environment.update(TMPDIR=str(temporary), TMP=str(temporary), TEMP=str(temporary))
+    prepared = os.environ.get("VIBEFLOW_TEST_TOOLCHAIN_ROOT")
+    toolchain_root = Path(prepared) if prepared else scratch / "javascript-toolchain"
+    requirements = _runtime_requirements(pytest_args)
+    if "browser_runtime" not in requirements:
+        bootstrap_environment.setdefault("PUPPETEER_SKIP_DOWNLOAD", "true")
+    if requirements and not prepared:
+        toolchain_root = _prepare_toolchain(scratch, environment=bootstrap_environment)
     work_root = scratch / "work"
-    work_root.mkdir()
+    work_root.mkdir(exist_ok=True)
     environment = _environment(toolchain_root=toolchain_root)
+    environment.update(TMPDIR=str(temporary), TMP=str(temporary), TEMP=str(temporary))
     environment[WORKER_ENVIRONMENT] = str(workers)
     environment["VIBEFLOW_PYTEST_WORK_ROOT"] = str(work_root)
     parallel = workers > 1 and not any(value in {"--collect-only", "--co", "--help", "-h", "--version"} for value in pytest_args)
@@ -106,12 +134,12 @@ def run_tests(scratch: Path, pytest_args: list[str], *, workers: int = DEFAULT_W
         "-p", "pytest_workdirs",
         "--basetemp", str(scratch / "pytest-tmp"),
         *(("-p", "xdist.plugin", "-n", str(workers), "--dist", "loadfile") if parallel else ()),
-        *_resolve_paths(pytest_args),
+        *pytest_args,
     )
     print("$ " + " ".join(command), flush=True)
     return subprocess.run(
         command,
-        cwd=work_root,
+        cwd=ROOT,
         env=environment,
         check=False,
     ).returncode

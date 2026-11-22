@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import Any, Mapping
 
 from vibeflow.targets.javascript.frontend.emission_protocol import EmissionWorkflow
@@ -70,7 +69,8 @@ def declarations(workflow: EmissionWorkflow) -> str:
         output_lines.append(
             f"  readonly {json.dumps(item.alias)}{optional}: {value_type};"
         )
-    capability_lines = _capability_declarations(workflow)
+    from .templates import WORKFLOW_CONTEXT_DECLARATION
+    session_lines = [WORKFLOW_CONTEXT_DECLARATION]
     contracts = ["export interface WorkflowInputs {", *input_lines, "}", "",
                  "export interface WorkflowOutputs {", *output_lines, "}"]
     named = getattr(workflow, "named_entry_contracts", ())
@@ -98,7 +98,7 @@ def declarations(workflow: EmissionWorkflow) -> str:
             "",
             *contracts,
             "",
-            *capability_lines,
+            *session_lines,
             "",
             "export interface WorkflowRunOptions {",
             "  readonly workflowInstanceId?: string;",
@@ -106,15 +106,15 @@ def declarations(workflow: EmissionWorkflow) -> str:
             "  readonly signal?: VibeFlowAbortSignal;",
             '  readonly trace?: WorkflowTraceMode;',
             "  readonly onTrace?: (event: WorkflowTraceEvent) => void;",
-            "  readonly capabilities?: WorkflowCapabilities;",
+            "  readonly workflowSession?: WorkflowSession;",
             "  readonly statusIntervalMs?: number;",
             "  readonly statusFile?: string;",
             "  readonly runDir?: string;",
             "  readonly onStatus?: (status: WorkflowRunStatus) => void;",
             "}",
             "",
-            "export const VIBEFLOW_WORKFLOW_ABI: \"vibeflow.workflow.v11\";",
-            "export const VIBEFLOW_PLUGIN_ABI: \"vibeflow.plugin.v4\";",
+            "export const VIBEFLOW_WORKFLOW_ABI: \"vibeflow.workflow.v12\";",
+            "export const VIBEFLOW_PLUGIN_ABI: \"vibeflow.plugin.v5\";",
             _entry_declaration(workflow),
     ]
 
@@ -153,76 +153,6 @@ def _entry_declaration(workflow: EmissionWorkflow) -> str:
 
 
 
-def _capability_declarations(workflow: EmissionWorkflow) -> list[str]:
-    descriptors: dict[str, Any] = {}
-    required: dict[str, set[str]] = {}
-
-    def visit(plan: EmissionWorkflow) -> None:
-        for descriptor in plan.capabilities:
-            descriptors.setdefault(descriptor.id, descriptor)
-        for node in plan.nodes:
-            for requirement in node.capabilities:
-                required.setdefault(
-                    requirement.id,
-                    set(),
-                ).update(requirement.operations)
-            if node.subplan is not None:
-                visit(node.subplan)
-
-    visit(workflow)
-    lines = ["export interface WorkflowCapabilities {"]
-    for capability_id in sorted(required):
-        interface_name = _typescript_name("Capability", capability_id)
-        lines.append(
-            f"  readonly {json.dumps(capability_id)}: {interface_name};"
-        )
-    lines.append("}")
-    for capability_id in sorted(required):
-        descriptor = descriptors.get(capability_id)
-        operations = required[capability_id] or set(
-            descriptor.operations if descriptor else ()
-        )
-        interface_name = _typescript_name("Capability", capability_id)
-        lines.extend(["", f"export interface {interface_name} {{"])
-        for operation_name in sorted(operations):
-            operation = (
-                descriptor.operations.get(operation_name)
-                if descriptor
-                else None
-            )
-            input_type = schema_to_typescript(
-                workflow.schemas.get(operation.input_type)
-                if operation and operation.input_type
-                else None
-            )
-            output_type = schema_to_typescript(
-                workflow.schemas.get(operation.output_type)
-                if operation and operation.output_type
-                else None
-            )
-            return_type = (
-                f"Promise<{output_type}>"
-                if operation and operation.completion == "suspend"
-                else output_type
-            )
-            lines.append(
-                f"  readonly {json.dumps(operation_name)}: "
-                f"(input: {input_type}, context: "
-                "{ readonly signal?: VibeFlowAbortSignal }) "
-                f"=> {return_type};"
-            )
-        lines.append("}")
-    return lines
-
-
-def _typescript_name(prefix: str, value: str) -> str:
-    parts = re.findall(r"[A-Za-z0-9]+", value)
-    suffix = "".join(
-        part[:1].upper() + part[1:] for part in parts
-    ) or "Anonymous"
-    if suffix[0].isdigit():
-        suffix = f"_{suffix}"
-    return f"{prefix}{suffix}"
 
 
 def schema_to_typescript(schema: Mapping[str, Any] | None) -> str:

@@ -25,7 +25,7 @@ window.VFShapes=(()=>{
   function measure(facts,architecture={}) {
     const info=VFModel.nodeInfo(facts,architecture),external=Boolean(info.definitionInfo.external||facts.external||facts.info?.external);
     const presentation=facts.presentation?.values?facts.presentation:facts.effective_presentation||{},values={...presentation.values},sources={...presentation.sources};
-    const actions=(facts.preview_operations||[]).filter(a=>a.capability==="vibeflow.workflow"),operation=VFModel.workflowOperation(actions);
+    const actions=(facts.preview_operations||[]),operation=VFModel.workflowOperation(actions);
     const primary=actions.filter(a=>a.operation!=="wait");
     const titles=[...new Map((primary.length?primary:actions).map(a=>[a.operation,VFModel.operationTitle(a)])).values()];
     const requested=values.shape||"rect",canonical=requested,shape=supported.has(canonical)?canonical:"rect";

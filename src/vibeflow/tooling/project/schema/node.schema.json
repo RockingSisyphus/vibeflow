@@ -74,12 +74,6 @@
         "minLength": 1
       }
     },
-    "capabilities": {
-      "type": "array",
-      "items": {
-        "type": "object"
-      }
-    },
     "rulesets": {
       "type": "array",
       "items": {
@@ -120,6 +114,31 @@
     "node_type": {
       "type": "string",
       "minLength": 1
+    },
+    "workflow_operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "operation"
+        ],
+        "properties": {
+          "operation": {
+            "enum": [
+              "invoke_sync",
+              "call",
+              "wait",
+              "send",
+              "receive",
+              "kill"
+            ]
+          },
+          "wait": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false,

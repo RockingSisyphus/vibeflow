@@ -72,7 +72,7 @@ export class Coordinator {
     const item = this.register(ref);
     try {
       const result = runner(portable(request.inputs || {}), {entry, workflowInstanceId: item.id,
-        capabilities: {'vibeflow.workflow': this.operations(item.id)}});
+        workflowSession: this.session(item.id)});
       if (pending(result)) fail('VF_COMPLETION_MISMATCH', 'synchronous target returned pending work');
       return portable(result);
     } catch (error) {
@@ -87,7 +87,7 @@ export class Coordinator {
       try {
         item.controller.signal.throwIfAborted();
         const result = runner(portable(inputs), {entry, workflowInstanceId: item.id, signal: item.controller.signal,
-          capabilities: {'vibeflow.workflow': this.operations(item.id)}});
+          workflowSession: this.session(item.id)});
         if (descriptor.entry_mode === 'sync' && pending(result)) fail('VF_COMPLETION_MISMATCH', 'sync target returned pending work');
         item.outputs = portable(await result);
         item.state = 'succeeded';
@@ -158,7 +158,7 @@ export class Coordinator {
     }
     return this.poll('wait', item.id, request, context);
   }
-  operations(identifier) {
+  session(identifier) {
     return Object.freeze({invoke_sync: request => this.invoke_sync(request, identifier),
       call: (request, context) => this.call(identifier, request, context), send: request => this.send(identifier, request),
       receive: (request, context) => this.poll('receive', identifier, request, context),

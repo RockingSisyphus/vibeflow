@@ -33,7 +33,7 @@ PLUGIN_ERROR_CODES = {
         "VF_AOT_PLUGIN_PLANNED_DEPENDENCY"
     ),
 }
-PLUGIN_ABI_VERSION = "vibeflow.plugin.v4"
+PLUGIN_ABI_VERSION = "vibeflow.plugin.v5"
 
 
 class JavascriptPluginError(ValueError):

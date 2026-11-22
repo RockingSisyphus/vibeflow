@@ -1,0 +1,239 @@
+[
+  {
+    "subject": "node",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import write\ndef caller(value):\n    return write(value)\nclass Task:\n    def run_pure(self, inputs, params):\n        caller(1)\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: write",
+        "files": {
+          "helper.py": "def write(value):\n    return value\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import write\ndef caller(value):\n    return write(value)\nclass Task:\n    def run_pure(self, inputs, params):\n        caller(1)\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: write",
+        "files": {
+          "helper.py": "def write(value):\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import read\ndef caller(value):\n    return read(value)\nclass Task:\n    def run_pure(self, inputs, params):\n        caller(1)\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: read",
+        "files": {
+          "helper.py": "def read(value):\n    return value\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import read\ndef caller(value):\n    return read(value)\nclass Task:\n    def run_pure(self, inputs, params):\n        caller(1)\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: read",
+        "files": {
+          "helper.py": "def read(value):\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import close\ndef caller(value):\n    return close(value)\nclass Task:\n    def run_pure(self, inputs, params):\n        caller(1)\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close(value):\n    return value\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import close\ndef caller(value):\n    return close(value)\nclass Task:\n    def run_pure(self, inputs, params):\n        caller(1)\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close(value):\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import identity\ndef caller(value):\n    return identity(value)\nclass Task:\n    def run_pure(self, inputs, params):\n        caller(1)\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: identity",
+        "files": {
+          "helper.py": "def identity(value):\n    return value\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import identity\ndef caller(value):\n    return identity(value)\nclass Task:\n    def run_pure(self, inputs, params):\n        caller(1)\n        return {}\n",
+        "denied": false,
+        "contains": "banned call: identity",
+        "files": {
+          "helper.py": "def identity(value):\n    return open('never-open').read()\n"
+        }
+      }
+    ]
+  },
+  {
+    "subject": "base_lib",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import write\ndef caller(value):\n    return write(value)\n",
+        "denied": false,
+        "contains": "banned call: write",
+        "files": {
+          "helper.py": "def write(value):\n    return value\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import write\ndef caller(value):\n    return write(value)\n",
+        "denied": false,
+        "contains": "banned call: write",
+        "files": {
+          "helper.py": "def write(value):\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import read\ndef caller(value):\n    return read(value)\n",
+        "denied": false,
+        "contains": "banned call: read",
+        "files": {
+          "helper.py": "def read(value):\n    return value\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import read\ndef caller(value):\n    return read(value)\n",
+        "denied": false,
+        "contains": "banned call: read",
+        "files": {
+          "helper.py": "def read(value):\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import close\ndef caller(value):\n    return close(value)\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close(value):\n    return value\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import close\ndef caller(value):\n    return close(value)\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close(value):\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import identity\ndef caller(value):\n    return identity(value)\n",
+        "denied": false,
+        "contains": "banned call: identity",
+        "files": {
+          "helper.py": "def identity(value):\n    return value\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import identity\ndef caller(value):\n    return identity(value)\n",
+        "denied": false,
+        "contains": "banned call: identity",
+        "files": {
+          "helper.py": "def identity(value):\n    return open('never-open').read()\n"
+        }
+      }
+    ]
+  },
+  {
+    "subject": "plugin",
+    "scope": "none",
+    "policy": {},
+    "cases": [
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import write\ndef caller(value):\n    return write(value)\n",
+        "denied": false,
+        "contains": "banned call: write",
+        "files": {
+          "helper.py": "def write(value):\n    return value\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import write\ndef caller(value):\n    return write(value)\n",
+        "denied": false,
+        "contains": "banned call: write",
+        "files": {
+          "helper.py": "def write(value):\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import read\ndef caller(value):\n    return read(value)\n",
+        "denied": false,
+        "contains": "banned call: read",
+        "files": {
+          "helper.py": "def read(value):\n    return value\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import read\ndef caller(value):\n    return read(value)\n",
+        "denied": false,
+        "contains": "banned call: read",
+        "files": {
+          "helper.py": "def read(value):\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import close\ndef caller(value):\n    return close(value)\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close(value):\n    return value\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import close\ndef caller(value):\n    return close(value)\n",
+        "denied": false,
+        "contains": "banned call: close",
+        "files": {
+          "helper.py": "def close(value):\n    return open('never-open').read()\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import identity\ndef caller(value):\n    return identity(value)\n",
+        "denied": false,
+        "contains": "banned call: identity",
+        "files": {
+          "helper.py": "def identity(value):\n    return value\n"
+        }
+      },
+      {
+        "name": "resolved_helper_names",
+        "source": "from base_lib.helper import identity\ndef caller(value):\n    return identity(value)\n",
+        "denied": false,
+        "contains": "banned call: identity",
+        "files": {
+          "helper.py": "def identity(value):\n    return open('never-open').read()\n"
+        }
+      }
+    ]
+  }
+]

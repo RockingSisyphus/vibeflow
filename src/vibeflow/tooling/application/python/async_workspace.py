@@ -3,7 +3,7 @@ from __future__ import annotations
 from .workspace_service import Any, CheckedRunError, CheckedRunResult, HealthReport, Mapping, Path, WorkspaceConfig, _environment_or_report, _final_compilation, _prepare_workspace_graph, _python_check_scope, _validate_prepared_workspace_graph, _workspace_runtime_options, observed_checked_run, replace, source_paths, summarize_mapping, validate_run_id
 
 @observed_checked_run
-async def run_workspace_checked_async(config_path: str | Path, *, workspace: WorkspaceConfig, initial: Mapping[str, Any] | None=None, run_root: str | Path | None=None, run_id: str | None=None, runtime_options: object | None=None, delegate_cli: bool=False, capabilities: Mapping[str, object] | None=None, workflow_instance_id: str | None=None, _prepared_run_dir: Path | None=None, preview_root: str | Path | None=None, entry: str | None=None, signal=None) -> CheckedRunResult:
+async def run_workspace_checked_async(config_path: str | Path, *, workspace: WorkspaceConfig, initial: Mapping[str, Any] | None=None, run_root: str | Path | None=None, run_id: str | None=None, runtime_options: object | None=None, delegate_cli: bool=False, workflow_session: object | None=None, workflow_instance_id: str | None=None, _prepared_run_dir: Path | None=None, preview_root: str | Path | None=None, entry: str | None=None, signal=None) -> CheckedRunResult:
     from vibeflow.tooling.application.python.run_directory import prepare_run_dir as _prepare_run_dir
     from vibeflow.tooling.application.python.execution import _execute_runtime_async, _new_run_id, _summarize_run_result, _write_json, _write_refused_artifacts
     from vibeflow.tooling.application.python.preflight import _refuse_on_health_failure, _refuse_on_planned_run, _write_preflight_artifacts
@@ -46,8 +46,8 @@ async def run_workspace_checked_async(config_path: str | Path, *, workspace: Wor
         _write_preflight_artifacts(run_dir, graph, compiled, health, registry=env.registry, resources=resources, prepared=presentation)
         _refuse_on_health_failure(health, run_dir, actual_run_id)
         execute_kwargs = {'delegate_cli': True} if delegate_cli else {}
-        if capabilities is not None:
-            execute_kwargs['capabilities'] = capabilities
+        if workflow_session is not None:
+            execute_kwargs['workflow_session'] = workflow_session
         if workflow_instance_id is not None:
             execute_kwargs['workflow_instance_id'] = workflow_instance_id
         from vibeflow.tooling.application.python.project.lifecycle import lifecycle_registry, checked_runtime_plugins

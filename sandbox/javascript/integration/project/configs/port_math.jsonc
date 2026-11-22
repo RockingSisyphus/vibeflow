@@ -41,11 +41,17 @@
         "definition_id": "sandbox.terminal",
         "display_name": "End",
         "description": "Explicit end after sending a host value."
+      },
+      {
+        "id": "receive_start_application",
+        "definition_id": "app.input.port_math_jsonc",
+        "display_name": "Application input",
+        "description": "Supplies the application instance to this entry."
       }
     ],
     "edges": [
       [
-        "receive_start",
+        "receive_start_application",
         "receive"
       ],
       {
@@ -59,7 +65,17 @@
       [
         "send",
         "send_end"
-      ]
+      ],
+      [
+        "receive_start",
+        "receive_start_application"
+      ],
+      {
+        "from": "receive_start_application",
+        "to": "send",
+        "schedule": false,
+        "transfer": true
+      }
     ],
     "outputs": [
       {
@@ -67,6 +83,14 @@
         "cardinality": "exactly_one",
         "display_name": "Calculated result",
         "as": "result"
+      }
+    ],
+    "inputs": [
+      {
+        "key": "app_session",
+        "type": "app.session",
+        "display_name": "Application session",
+        "required": true
       }
     ]
   },

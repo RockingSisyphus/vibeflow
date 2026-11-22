@@ -46,8 +46,6 @@ Python Runtime 与 JavaScript/TypeScript AOT 使用同一公共输入契约。�
 
 ## 执行模式
 
-`pipeline.entry_mode` 为 `sync` 或 `async`，缺省为 `sync`，命名入口共用整图模式。同步入口直接返回普通输出；需要挂起的 Node、Capability 或运行生命周期使用异步模式，并通过 Target 的异步入口调用。
-
 同步图在准备阶段拒绝已知挂起实现，运行时也拒绝与声明不符的 Promise、coroutine 或 Future。Node 的 completion 声明应与实际实现一致。
 
 ## 控制与数据
