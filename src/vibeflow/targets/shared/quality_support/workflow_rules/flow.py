@@ -26,7 +26,7 @@ def _flowchart_health_facts(
     owner: str = "pipeline",
     entry_starts: set[str] | None = None,
 ) -> None:
-    active_nodes = [node for node in graph.nodes if _node_participates_in_flow(graph, node)]
+    active_nodes = [node for node in graph.nodes if node_participates_in_flow(graph, node)]
     if not active_nodes:
         return
     active_names = {node.id for node in active_nodes}
@@ -86,7 +86,7 @@ def _flow_maps(compiled, active_names: set[str]) -> tuple[dict[str, list[str]], 
     return incoming, outgoing, outgoing_edges, incoming_edges
 
 
-def _node_participates_in_flow(graph, node) -> bool:
+def node_participates_in_flow(graph, node) -> bool:
     if node.status != STATUS_PLANNED:
         return True
     nodeset = graph.nodeset_types.get(node.definition_id)

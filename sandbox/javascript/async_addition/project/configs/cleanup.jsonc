@@ -1,0 +1,49 @@
+{
+  "plugins": [
+    {"source": {"kind": "file", "ref": "plugins/addition/plugin.ts", "export": "plugin"}}
+  ],
+  "pipeline": {
+    "entry_mode": "async",
+    "entries": {"cleanup": {"start": "cleanup_start"}},
+    "inputs": [
+      {"key": "app_session", "type": "app.session", "display_name": "Application session", "required": true}
+    ],
+    "nodes": [
+      {
+        "id": "cleanup_start",
+        "definition_id": "addition.boundary",
+        "display_name": "Cleanup entry",
+        "description": "Start standalone cleanup."
+      },
+      {
+        "id": "cleanup_start_application",
+        "definition_id": "app.input.stream_jsonc",
+        "display_name": "Application input",
+        "description": "Supplies the application session to close."
+      },
+      {
+        "id": "close",
+        "definition_id": "addition.session.close",
+        "display_name": "Close port API",
+        "description": "Close the author-owned port API."
+      },
+      {
+        "id": "cleanup_end",
+        "definition_id": "addition.boundary",
+        "display_name": "Cleanup completed",
+        "description": "Finish standalone cleanup.",
+        "similar_to": {
+          "node": "cleanup_start",
+          "relationship": "copy",
+          "reason": "Empty terminal boundary"
+        }
+      }
+    ],
+    "edges": [
+      ["cleanup_start", "cleanup_start_application"],
+      ["cleanup_start_application", "close"],
+      ["close", "cleanup_end"]
+    ],
+    "outputs": []
+  }
+}

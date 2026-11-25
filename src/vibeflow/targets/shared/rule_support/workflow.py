@@ -3,9 +3,11 @@ from dataclasses import replace
 
 from vibeflow.core.findings import HealthFinding
 from vibeflow.core.rules import RuleRecord, RuleResult
+from vibeflow.targets.shared.quality_support.workflow_rules.connectivity import check_connectivity
 from vibeflow.targets.shared.rule_support.graph import _flow, _join, _nodesets, _duplicates, _planned
 
 ANALYSIS = "vibeflow.graph_analysis.v1"
+WORKFLOW_TOPICS = ("flow", "connectivity", "join", "nodeset_types", "duplicates", "planned", "review")
 
 
 def graph_contexts(context, inputs):
@@ -64,13 +66,14 @@ def _nodeset_analysis(context, graphs):
 
 
 def topic(name):
-    checker = {"flow": _flow, "join": _join, "nodeset_types": _nodesets, "duplicates": _duplicates, "planned": _planned}[name]
+    checker = {"flow": _flow, "connectivity": check_connectivity, "join": _join,
+               "nodeset_types": _nodesets, "duplicates": _duplicates, "planned": _planned}[name]
     def check(context, inputs, params):
         findings, events, unavailable = [], [], False
         for local in graph_contexts(context, inputs):
             if name == "duplicates" and not {"fingerprints", "node_metrics"} <= local.facts.keys():
                 continue
-            if name in {"flow", "join"} and local.facts.get("compiled") is None:
+            if name in {"flow", "connectivity", "join"} and local.facts.get("compiled") is None:
                 unavailable = True
                 continue
             # Nesting/width uses the analysis of responsible graphs; boundary

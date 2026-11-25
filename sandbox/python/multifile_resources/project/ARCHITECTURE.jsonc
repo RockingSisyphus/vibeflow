@@ -754,6 +754,11 @@
       },
       {
         "kind": "rule",
+        "id": "vibeflow.workflow.connectivity",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
         "id": "vibeflow.workflow.duplicates",
         "reason": "builtin"
       },

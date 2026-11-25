@@ -61,36 +61,7 @@
         "description": "Open the author-owned port API"
       },
       {
-        "id": "cleanup_start",
-        "definition_id": "addition.boundary",
-        "display_name": "cleanup_start",
-        "description": "Cleanup entry"
-      },
-      {
-        "id": "close",
-        "definition_id": "addition.session.close",
-        "display_name": "close",
-        "description": "Close the author-owned port API"
-      },
-      {
-        "id": "cleanup_end",
-        "definition_id": "addition.boundary",
-        "display_name": "cleanup_end",
-        "description": "Cleanup completed",
-        "similar_to": {
-          "node": "cleanup_start",
-          "relationship": "copy",
-          "reason": "Empty terminal boundary"
-        }
-      },
-      {
         "id": "start_application",
-        "definition_id": "app.input.stream_jsonc",
-        "display_name": "Application input",
-        "description": "Supplies the application instance to this entry."
-      },
-      {
-        "id": "cleanup_start_application",
         "definition_id": "app.input.stream_jsonc",
         "display_name": "Application input",
         "description": "Supplies the application instance to this entry."
@@ -105,14 +76,6 @@
         "from": "open",
         "to": "loop"
       },
-      {
-        "from": "cleanup_start_application",
-        "to": "close"
-      },
-      {
-        "from": "close",
-        "to": "cleanup_end"
-      },
       [
         "start",
         "start_application"
@@ -122,20 +85,13 @@
         "to": "loop",
         "schedule": false,
         "transfer": true
-      },
-      [
-        "cleanup_start",
-        "cleanup_start_application"
-      ]
+      }
     ],
     "outputs": [],
     "entry_mode": "async",
     "entries": {
       "stream": {
         "start": "start"
-      },
-      "cleanup": {
-        "start": "cleanup_start"
       }
     },
     "default_entry": "stream"

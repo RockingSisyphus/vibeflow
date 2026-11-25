@@ -18,6 +18,8 @@
 
 单入口自动选择；多个入口没有默认值时必须指定名称。未声明命名入口的配置保持原行为。
 
+内置 `vibeflow.workflow` 规则集要求每张调度图弱连通。忽略调度边方向后，参与流程的节点应在同一个连通分量内。`review` 和 `build` 检查完整图，发现独立分量时报告 `GRAPH.FLOW.DISCONNECTED`，列出各分量的节点及命名入口。仅传数据的边不参与这项检查。彼此独立的流程应分别声明为 workflow。
+
 ```bash
 python -m vibeflow run --config configs/main.jsonc --entry gui --input input.json
 python -m vibeflow delegate-cli --workspace vibeflow_config.jsonc --config configs/main.jsonc --entry cli -- --help

@@ -48,7 +48,7 @@
         "id": "close",
         "definition_id": "sandbox.window_close",
         "display_name": "Close window listener",
-        "description": "Release the listener after normal completion."
+        "description": "Release the listener after normal completion of either entry."
       },
       {
         "id": "end",
@@ -73,18 +73,6 @@
         "definition_id": "sandbox.permanent_port_body",
         "display_name": "Process one message",
         "description": "Receive, calculate and send one message through the reusable NodesetType."
-      },
-      {
-        "id": "once_close",
-        "definition_id": "sandbox.window_close",
-        "display_name": "Close listener",
-        "description": "Normal completion explicitly releases the listener."
-      },
-      {
-        "id": "once_end",
-        "definition_id": "sandbox.terminal",
-        "display_name": "One message complete",
-        "description": "Finish the finite entry."
       },
       {
         "id": "start_application",
@@ -126,11 +114,7 @@
       ],
       [
         "once_process",
-        "once_close"
-      ],
-      [
-        "once_close",
-        "once_end"
+        "close"
       ],
       [
         "start",
@@ -160,7 +144,7 @@
       },
       {
         "from": "once_start_application",
-        "to": "once_close",
+        "to": "close",
         "schedule": false,
         "transfer": true
       }

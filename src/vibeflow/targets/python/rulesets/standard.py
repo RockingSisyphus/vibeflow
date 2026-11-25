@@ -1,5 +1,6 @@
 """python default Rule combinations and phase entrypoints."""
 from vibeflow.core.rules import RuleCall, RuleRelation, RulesetDescriptor
+from vibeflow.targets.shared.rule_support.workflow import WORKFLOW_TOPICS
 
 
 def standard_rulesets():
@@ -18,15 +19,14 @@ def standard_rulesets():
         review_calls = ("effects", "maintainability") if name == "base_lib" else ("effects", "architecture", "inputs", "interface", "async", "maintainability")
         rulesets.append(RulesetDescriptor("vibeflow." + name, calls=calls,
                         entrypoints={"static": review_calls, "run": review_calls, "import": ("imports",)}))
-    topics = ("flow", "join", "nodeset_types", "duplicates", "planned", "review")
     rulesets.append(RulesetDescriptor("vibeflow.workflow",
         calls=(RuleCall("analysis", rule_id="vibeflow.workflow.analysis"),
-               *(RuleCall(name, rule_id="vibeflow.workflow." + name) for name in topics),
+               *(RuleCall(name, rule_id="vibeflow.workflow." + name) for name in WORKFLOW_TOPICS),
                RuleCall("summary", rule_id="vibeflow.workflow")),
-        relations=(*(RuleRelation(name, "analysis", "requires", {"analysis": "graphs"}) for name in topics),
+        relations=(*(RuleRelation(name, "analysis", "requires", {"analysis": "graphs"}) for name in WORKFLOW_TOPICS),
                    RuleRelation("summary", "planned", "requires", {"events": "events"}),
                    RuleRelation("summary", "review", "requires", {"review": "review"}),
-                   *(RuleRelation("summary", name, "requires") for name in topics if name not in {"planned", "review"})),
+                   *(RuleRelation("summary", name, "requires") for name in WORKFLOW_TOPICS if name not in {"planned", "review"})),
         entrypoints={"static": ("summary",), "run": ("summary",)},
         workflow_default=True, graph_scope="effective_subtree"))
     for name, scope in ([("plugin", "none")]):

@@ -1,11 +1,11 @@
 """python Workflow analysis and review Rule definitions."""
 from vibeflow.core.rules import RuleDescriptor
-from vibeflow.targets.shared.rule_support.workflow import ANALYSIS, analysis, summary, review, nodeset_types, topic
+from vibeflow.targets.shared.rule_support.workflow import ANALYSIS, WORKFLOW_TOPICS, analysis, summary, review, nodeset_types, topic
 
 
 def workflow_plan_resources():
     rules = [RuleDescriptor("vibeflow.workflow.analysis", outputs={"graphs": ANALYSIS}, level="graph")]
-    for name in ("flow", "join", "nodeset_types", "duplicates", "planned", "review"):
+    for name in WORKFLOW_TOPICS:
         outputs = {"events": "vibeflow.planned_events.v1"} if name == "planned" else ({"review": "vibeflow.workflow_review.v1"} if name == "review" else {})
         schema = {"nodeset_max_depth": {"type": "integer", "minimum": 1}, "nodeset_warn_width": {"type": "integer"}} if name == "nodeset_types" else {}
         defaults = {"nodeset_max_depth": 4, "nodeset_warn_width": 10} if name == "nodeset_types" else {}
@@ -22,5 +22,5 @@ def workflow_plan_resources():
 def workflow_plan_handlers():
     return {"vibeflow.workflow.analysis": analysis, "vibeflow.workflow": summary,
         "vibeflow.workflow.review": review,
-        **{"vibeflow.workflow." + name: topic(name) for name in ("flow", "join", "duplicates", "planned")},
+        **{"vibeflow.workflow." + name: topic(name) for name in WORKFLOW_TOPICS if name not in {"review", "nodeset_types"}},
         "vibeflow.workflow.nodeset_types": nodeset_types}

@@ -83,7 +83,7 @@ B 可以检查 S 在父图中的输入输出和外部连接，内部节点与连
 
 同范围分析 Rule 输出 Records，消费者以 `requires/bindings` 显式绑定具名输入。提供者先执行，消费者不读取可变全局状态、不猜测其他任务已完成。完成且满足契约的 Records 可以伴随诊断；失败、不可用或缺失所需输出时，依赖消费者不能假造空输入继续检查。
 
-内置 `vibeflow.workflow` 保留用户可见综合能力，采用整体范围的明确 analysis、flow、join、nodeset_types、duplicates、planned、review 和 summary 计划。叶检查消费各图分析 Records，保留 `planned_events`、`workflow_review` 及实际归属。handler 不私下递归其他检查。不要为共享分析新增第二个执行状态机或跨范围结果分发系统。
+内置 `vibeflow.workflow` 保留用户可见综合能力，采用整体范围的明确 analysis、flow、connectivity、join、nodeset_types、duplicates、planned、review 和 summary 计划。叶检查消费各图分析 Records，保留 `planned_events`、`workflow_review` 及实际归属。handler 不私下递归其他检查。不要为共享分析新增第二个执行状态机或跨范围结果分发系统。
 
 import、static、run 是独立阶段。import 阶段没有伪造编译资料；固定 Plugin 入口及直接导入可能已经初始化，延迟实现则在有效 import 检查之后绑定。首次运行不能重新执行已被调用选择替代的类型规则。独立 Node 查询没有当前调用时才使用类型默认。空规则列表不能绕过原生语法、符号绑定、ABI 或编译错误。
 

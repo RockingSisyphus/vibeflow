@@ -900,6 +900,11 @@
       },
       {
         "kind": "rule",
+        "id": "vibeflow.workflow.connectivity",
+        "reason": "builtin"
+      },
+      {
+        "kind": "rule",
         "id": "vibeflow.workflow.duplicates",
         "reason": "builtin"
       },
@@ -2497,6 +2502,16 @@
                 "replace_rule": ""
               },
               {
+                "source": "connectivity",
+                "target": "analysis",
+                "kind": "requires",
+                "bindings": {
+                  "analysis": "graphs"
+                },
+                "params": {},
+                "replace_rule": ""
+              },
+              {
                 "source": "join",
                 "target": "analysis",
                 "kind": "requires",
@@ -2576,6 +2591,14 @@
               },
               {
                 "source": "summary",
+                "target": "connectivity",
+                "kind": "requires",
+                "bindings": {},
+                "params": {},
+                "replace_rule": ""
+              },
+              {
+                "source": "summary",
                 "target": "join",
                 "kind": "requires",
                 "bindings": {},
@@ -2640,6 +2663,7 @@
             "graph_scope": "effective_subtree",
             "order": [
               "analysis",
+              "connectivity",
               "duplicates",
               "flow",
               "join",
@@ -2656,6 +2680,25 @@
                 "params": {},
                 "dependencies": [],
                 "inputs": {},
+                "origins": [
+                  "vibeflow.workflow"
+                ],
+                "parameter_sources": {}
+              },
+              {
+                "id": "connectivity",
+                "rule_id": "vibeflow.workflow.connectivity",
+                "original_rule_id": "vibeflow.workflow.connectivity",
+                "params": {},
+                "dependencies": [
+                  "analysis"
+                ],
+                "inputs": {
+                  "analysis": [
+                    "analysis",
+                    "graphs"
+                  ]
+                },
                 "origins": [
                   "vibeflow.workflow"
                 ],
@@ -2787,6 +2830,7 @@
                 "original_rule_id": "vibeflow.workflow",
                 "params": {},
                 "dependencies": [
+                  "connectivity",
                   "duplicates",
                   "flow",
                   "join",
@@ -2813,6 +2857,16 @@
             "relations": [
               {
                 "source": "flow",
+                "target": "analysis",
+                "kind": "requires",
+                "bindings": {
+                  "analysis": "graphs"
+                },
+                "params": {},
+                "replace_rule": ""
+              },
+              {
+                "source": "connectivity",
                 "target": "analysis",
                 "kind": "requires",
                 "bindings": {
@@ -2901,6 +2955,14 @@
               },
               {
                 "source": "summary",
+                "target": "connectivity",
+                "kind": "requires",
+                "bindings": {},
+                "params": {},
+                "replace_rule": ""
+              },
+              {
+                "source": "summary",
                 "target": "join",
                 "kind": "requires",
                 "bindings": {},
@@ -2945,6 +3007,11 @@
                   }
                 }
               },
+              "findings": []
+            },
+            "connectivity": {
+              "state": "completed",
+              "records": {},
               "findings": []
             },
             "duplicates": {
@@ -3009,6 +3076,7 @@
           "findings": [],
           "executed": [
             "analysis",
+            "connectivity",
             "duplicates",
             "flow",
             "join",
@@ -6024,6 +6092,46 @@
         },
         {
           "kind": "rule",
+          "id": "vibeflow.workflow.connectivity",
+          "descriptor": {
+            "kind": "rule",
+            "id": "vibeflow.workflow.connectivity",
+            "display_name": "",
+            "description": "",
+            "implementations": [
+              {
+                "language": "python",
+                "source": {
+                  "kind": "file",
+                  "ref": "@kernel/targets/shared/rule_support/workflow.py",
+                  "export": "topic.<locals>.check"
+                }
+              }
+            ],
+            "inputs": {
+              "analysis": "vibeflow.graph_analysis.v1"
+            },
+            "outputs": {},
+            "params_schema": {},
+            "params_defaults": {},
+            "handler": "",
+            "scope": "call",
+            "level": "graph"
+          },
+          "origin": {
+            "owner": {
+              "kind": "plugin",
+              "id": "vibeflow.core",
+              "root_id": "",
+              "path": ""
+            },
+            "path": "@kernel/targets/javascript/rules/graph/workflow.py",
+            "line": 6,
+            "symbol": "workflow_plan_resources"
+          }
+        },
+        {
+          "kind": "rule",
           "id": "vibeflow.workflow.duplicates",
           "descriptor": {
             "kind": "rule",
@@ -6349,7 +6457,7 @@
               "path": ""
             },
             "path": "@kernel/targets/javascript/rulesets/standard.py",
-            "line": 5,
+            "line": 6,
             "symbol": "standard_rulesets"
           }
         },
@@ -6429,7 +6537,7 @@
               "path": ""
             },
             "path": "@kernel/targets/javascript/rulesets/standard.py",
-            "line": 5,
+            "line": 6,
             "symbol": "standard_rulesets"
           }
         },
@@ -6509,7 +6617,7 @@
               "path": ""
             },
             "path": "@kernel/targets/javascript/rulesets/standard.py",
-            "line": 5,
+            "line": 6,
             "symbol": "standard_rulesets"
           }
         },
@@ -6589,7 +6697,7 @@
               "path": ""
             },
             "path": "@kernel/targets/javascript/rulesets/standard.py",
-            "line": 5,
+            "line": 6,
             "symbol": "standard_rulesets"
           }
         },
@@ -6669,7 +6777,7 @@
               "path": ""
             },
             "path": "@kernel/targets/javascript/rulesets/standard.py",
-            "line": 5,
+            "line": 6,
             "symbol": "standard_rulesets"
           }
         },
@@ -6747,7 +6855,7 @@
               "path": ""
             },
             "path": "@kernel/targets/javascript/rulesets/standard.py",
-            "line": 5,
+            "line": 6,
             "symbol": "standard_rulesets"
           }
         },
@@ -6794,7 +6902,7 @@
               "path": ""
             },
             "path": "@kernel/targets/javascript/rulesets/standard.py",
-            "line": 5,
+            "line": 6,
             "symbol": "standard_rulesets"
           }
         },
@@ -6874,7 +6982,7 @@
               "path": ""
             },
             "path": "@kernel/targets/javascript/rulesets/standard.py",
-            "line": 5,
+            "line": 6,
             "symbol": "standard_rulesets"
           }
         },
@@ -7011,7 +7119,7 @@
               "path": ""
             },
             "path": "@kernel/targets/javascript/rulesets/standard.py",
-            "line": 5,
+            "line": 6,
             "symbol": "standard_rulesets"
           }
         },
@@ -7349,6 +7457,11 @@
                 "rule_id": "vibeflow.workflow.flow"
               },
               {
+                "id": "connectivity",
+                "params": {},
+                "rule_id": "vibeflow.workflow.connectivity"
+              },
+              {
                 "id": "join",
                 "params": {},
                 "rule_id": "vibeflow.workflow.join"
@@ -7382,6 +7495,16 @@
             "relations": [
               {
                 "source": "flow",
+                "target": "analysis",
+                "kind": "requires",
+                "bindings": {
+                  "analysis": "graphs"
+                },
+                "params": {},
+                "replace_rule": ""
+              },
+              {
+                "source": "connectivity",
                 "target": "analysis",
                 "kind": "requires",
                 "bindings": {
@@ -7470,6 +7593,14 @@
               },
               {
                 "source": "summary",
+                "target": "connectivity",
+                "kind": "requires",
+                "bindings": {},
+                "params": {},
+                "replace_rule": ""
+              },
+              {
+                "source": "summary",
                 "target": "join",
                 "kind": "requires",
                 "bindings": {},
@@ -7514,7 +7645,7 @@
               "path": ""
             },
             "path": "@kernel/targets/javascript/rulesets/standard.py",
-            "line": 5,
+            "line": 6,
             "symbol": "standard_rulesets"
           }
         },

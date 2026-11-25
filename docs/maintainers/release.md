@@ -1,12 +1,28 @@
 # 发行与文档装配
 
-当前本地分发版本为 1.5.2，由原版本 1.5.1 增加 0.0.1。Workflow ABI v12、Plugin ABI v5、共享 AOT v6、预览快照 v5；Rule ABI v3、HTTP 通信协议和协作启动清单 v2 保持不变。最新源码行为与真实 CI 验收见[测试覆盖](../../sandbox/TEST_COVERAGE.md)；本节另记本地分发包的构建与解压验证，不代表 GitHub 发布。
+当前本地分发版本为 1.5.4。版本使用 Workflow ABI v12、Plugin ABI v5、Python AOT v7、JavaScript AOT v6、预览快照 v5、Rule ABI v3 和协作启动清单 v2。本页记录本地分发包的构建与解压验证。 [源码测试覆盖](../../sandbox/TEST_COVERAGE.md)
 
 1.3.5 修复 JavaScript 核心 SDK 解压到 workspace 内时被误认成业务资源的问题：Target 按既有资源清单识别准确文件，在形成业务引用与插件源码闭包时排除核心内部依赖；原始分析保留，用户贡献声明及共享 Rule 政策不变。1.3.4 统一资源使用 Rule 与 `vibeflow.resource_use.v1` 结果：独立 BaseLib（包括间接依赖）必须显式声明，Plugin 贡献资源整包引入并禁止重复声明，贡献代码实际路径必须位于所属 Plugin 目录。Python、JavaScript 的验证、构建、运行准备和展示共同消费规则结果；旧选择器及重复许可检查已删除。Python AOT 按实际引用收集实现，未引用的可用库不随包加载或复制。预览最新快照覆盖各注册 root 当前仍存在的 workflow，继续隐藏 Plugin 贡献资源。1.3.3 的 global_state 环境变量能力保留。
 
 包含已退役通用宿主接口的旧发行物已在新包验收后清除，历史源码通过 Git 恢复。其他归档不受影响。两个 profile 使用下述工具构建；正式发布需验证解压运行、wheel、sdist 与完整门禁，禁止同名覆盖既有 ZIP。
 
-## 1.5.2 本地构建
+## 1.5.4 本地构建
+
+内置 `vibeflow.workflow` 默认检查调度图的弱连通性。多个命名入口可以共用下游。若完整调度图含多个连通分量，报告 `GRAPH.FLOW.DISCONNECTED` 并列出各分量的节点和命名入口。详见[命名入口文档](../../distribution/docs/user/workflow-coordination.md#一个图的多个入口)。
+
+2026-11-25，使用 `distribution/build.py --profile all` 构建两个 profile，仓库自检为零错误、零警告。两份最终 ZIP 分别通过本机 Linux 解压验证、随包内核校验、Python 和 JavaScript 最小项目审查及构建，并在两种语言的分离入口用例中返回新诊断。移除解压工作区后，Python `plan`、`block`、`compiled` 和 Node 模块均返回预期业务输出。两个 profile 的内核字节一致。
+
+两个 1.5.4 ZIP 与 `SHA256SUMS-1.5.4.txt` 位于 `dist/`。两个 1.5.3 原始 ZIP 与校验清单位于 `archive/`，已核对校验值。
+
+## 1.5.3 历史构建
+
+JavaScript AOT 每个模块生成一份私有只读 schema 目录，供工作流和命名入口的校验共用。Python AOT v7 保存一份基础检查报告与各入口的 delegated CLI 额外诊断。旧版 Python AOT 包可用自带的 `run.py` 继续运行。使用新版 `load_bundle()` 时，将工作流重新构建到新目录。
+
+2026-11-22，使用 `distribution/build.py --profile all` 构建两个 profile，仓库自检为零错误、零警告。分别解压最终 ZIP 并通过随包内核校验，构建 Python v7 与 JavaScript v6 AOT。移除解压工作区后，Python 的 `plan`、`block`、`compiled` 和 Node 模块均返回最小项目配置声明的响应。两个 profile 使用字节相同的内核。
+
+1.5.2 的原始 ZIP 和校验索引随 1.5.3 构建转存到 `archive/`。
+
+## 1.5.2 历史构建
 
 使用当前工作树的最新源码、用户手册和 profile 原稿，通过 `distribution/build.py --profile all` 重新生成 collaborative 与 autonomous 两种分发包。版本号来自 pyproject.toml；包内发行身份、首页与 ZIP 文件名由构建器统一生成。构建在专用临时源码副本中执行，完成后将正式产物放入 dist；原 1.5.1 ZIP 与校验索引继续保留在 archive。
 
@@ -19,7 +35,7 @@
 | `vibeflow-distribution-1.5.2.zip` | `98b78156d2ab9a48224765a946927d8ebb78dcf41ac08b855e7222086f616547` |
 | `vibeflow-distribution-autonomous-1.5.2.zip` | `9a9de4c49fc3b5aab08d550ed11670fe589e88f49b8651930e60dbdd7b564f9b` |
 
-双包、两个生成目录及 `SHA256SUMS-1.5.2.txt` 保存在 dist。包内发行身份、首页、源码版本及中英文首页均同步为 1.5.2。本轮验收覆盖本机 Linux 的最终分发包，未重跑全量 CI 或 wheel/sdist；此前源码行为与平台验收见测试覆盖记录。未提交、推送、创建标签或发布到 GitHub。
+两个 1.5.2 ZIP 和 `SHA256SUMS-1.5.2.txt` 由 1.5.3 接续构建时转入 archive。1.5.2 验收覆盖本机 Linux 的最终分发包。此前源码行为与平台验收见测试覆盖记录。
 
 ## 1.5.1 历史构建内容
 

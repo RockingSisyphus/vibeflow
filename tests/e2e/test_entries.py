@@ -5,7 +5,7 @@ import sys
 import pytest
 
 from .host_projects import javascript_project
-from .support import ROOT, cli, command, workspace, write
+from .support import ROOT, cli, command, findings, workspace, write
 
 
 PYTHON='''from vibeflow.targets.python.sdk import node
@@ -45,9 +45,10 @@ plugin=Plugin(id="entries",resources=[data_schema(type_key=key,schema={"type":ki
         workspace_path=root / "vibeflow_config.jsonc";plugin="plugins/example/plugin.py"
     else:
         app=root / "app"
-        workspace_path,_=javascript_project(app,JAVASCRIPT,'''import {definePlugin,defineDataSchema} from "@vibeflow/plugin";
+        workspace_path, starter_config=javascript_project(app,JAVASCRIPT,'''import {definePlugin,defineDataSchema} from "@vibeflow/plugin";
 export const plugin=definePlugin({id:"entries",resources:[["number","number"],["string","string"],["seed","number"]].map(([type_key,type])=>defineDataSchema({type_key,schema:{type}}))});
 ''');plugin="plugins/demo/plugin.ts"
+        starter_config.unlink()
     nodes=[{"id":name,"definition_id":"entry."+("boundary" if name in {"cli_start","gui_start","end"} else name),
         "display_name":name,"description":"Named entry "+name,**({"join_policy":"all"} if name=="core" else {})}
         for name in ("cli_start","gui_start","cli","gui","core","end")]
@@ -56,7 +57,7 @@ export const plugin=definePlugin({id:"entries",resources:[["number","number"],["
         for name,key,kind in (("cli","text","string"),("gui","value","number"))}
     if language.startswith("python-delegate"):
         entries["gui"]["inputs"][0]["key"] = "cli.argv"
-    config=write(app / "configs/main.jsonc",{"plugins":[{"source":{"kind":"file","ref":plugin}}],"rulesets":[],"pipeline":{
+    config=write(app / "configs/main.jsonc",{"plugins":[{"source":{"kind":"file","ref":plugin}}],"pipeline":{
         "nodes":nodes,"edges":[[a,b] for a,b in (("cli_start","cli"),("gui_start","gui"),("cli","core"),("gui","core"),("core","end"))],
         "entries":entries,"entry_mode":"async" if language.endswith("-async") else "sync"}})
     args=["build","--workspace",workspace_path,"--config",config,"--out-dir",root / "bundle"]
@@ -81,6 +82,45 @@ def test_named_entry_runs_only_its_selected_path(entry_project,tmp_path,name,ini
     assert output=={name+"_answer":expected}
     assert "entered "+name.upper() in result.stdout
     assert "entered "+("GUI" if name=="cli" else "CLI") not in result.stdout
+
+
+@pytest.mark.parametrize("entry_project", ["python", "javascript"], indirect=True)
+def test_default_rules_reject_disconnected_named_entries(entry_project, tmp_path):
+    language, root, config, _ = entry_project
+    value = json.loads(config.read_text(encoding="utf-8"))
+    pipeline = value["pipeline"]
+    for node in list(pipeline["nodes"]):
+        if node["id"] in {"core", "end"}:
+            pipeline["nodes"].append({**node, "id": "gui_" + node["id"]})
+    pipeline["edges"].remove(["gui", "core"])
+    pipeline["edges"].extend([
+        ["gui", "gui_core"], ["gui_core", "gui_end"],
+        {"from": "cli", "to": "gui_core", "schedule": False, "transfer": True},
+    ])
+    disconnected = write(config.with_name("disconnected.jsonc"), value)
+    project_config = config.parent.parent / "vibeflow_project.jsonc"
+    project = json.loads(project_config.read_text(encoding="utf-8"))
+    project["architecture"] = {"documents": [{
+        "workflow": "configs/disconnected.jsonc", "document": "DISCONNECTED_ARCHITECTURE.jsonc",
+    }]}
+    write(project_config, project)
+    options = ["--workspace", root / "vibeflow_config.jsonc", "--config", disconnected]
+    reviewed = cli(root, "review", *options, success=False)
+    assert reviewed.returncode == 1, reviewed.stdout + reviewed.stderr
+    errors = [item for item in findings(reviewed) if item["severity"] == "error"]
+    assert {item["code"] for item in errors} == {"GRAPH.FLOW.DISCONNECTED"}, errors
+    components = {tuple(group["entries"]): set(group["nodes"])
+                  for group in errors[0]["details"]["components"]}
+    assert components == {("cli",): {"cli_start", "cli", "core", "end"},
+                          ("gui",): {"gui_start", "gui", "gui_core", "gui_end"}}
+
+    target = tmp_path / "disconnected-bundle"
+    build = ["build", *options, "--out-dir", target]
+    if language == "javascript":
+        build += ["--target", "node", "--profile", "esm-module"]
+    rejected = cli(root, *build, success=False)
+    assert rejected.returncode == 1 and "GRAPH.FLOW.DISCONNECTED" in rejected.stdout + rejected.stderr
+    assert not target.exists()
 
 
 @pytest.mark.parametrize("entry_project",["python","javascript","javascript-async"],indirect=True)

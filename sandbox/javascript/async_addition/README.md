@@ -3,6 +3,8 @@
 
 真实异步 Node 与 BaseLib，经正式 CLI 构建后交由正常应用宿主调用，检查独立数值预期。
 
+持续处理使用 `project/configs/stream.jsonc` 的 `stream` 入口。宿主要单独关闭应用会话时，构建并调用 `project/configs/cleanup.jsonc` 的 `cleanup` 入口。
+
 本目录保存真实使用工程、配置与独立预期；驱动和断言按功能统一在 tests/e2e，不保留单独总包或探针。测试复制输入至仓库外工作区后进行修改、构建和运行。
 
 功能域回归入口：
