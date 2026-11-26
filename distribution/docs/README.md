@@ -6,7 +6,7 @@
 | --- | --- |
 | 了解 VibeFlow 的模型和能力 | [项目概览](overview.md) |
 | 优先了解项目、root 与 workflow 的架构 | [架构阅读与维护](user/architecture.md) |
-| 运行发行包中的示例项目 | [快速开始](user/quickstart.md) |
+| 验证本地环境并生成审核图 | [运行发行包自带示例](user/quickstart.md) |
 | 组织 root、目录、共享资源与治理配置 | [项目治理](user/project-governance.md) |
 | 编写调用、公共契约与控制／数据连边 | [Workflow 与 Config](user/workflow-and-config.md) |
 | 编写 Python 实现、异步生命周期与 AOT 部署 | [Python 开发](user/python-development.md) |

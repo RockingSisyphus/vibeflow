@@ -17,4 +17,4 @@ terminal start → input I/O → process / nodeset → output I/O → terminal e
 
 两种开发 profile 共用内核、项目模板与执行契约。collaborative 在实现前安排人类审阅；autonomous 在任务授权内自动完成开发闭环。发行包只携带所选 profile 的协议。
 
-首次使用见[快速开始](user/quickstart.md)，完整导航见[用户手册](README.md)。
+解压后可以先[运行发行包自带示例](user/quickstart.md)。完整导航见[用户手册](README.md)。

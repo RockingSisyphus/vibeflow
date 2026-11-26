@@ -35,4 +35,4 @@ This is the VibeFlow review diagram for the math demo in the video. The workflow
 
 ## Documentation
 
-[User guide](distribution/docs/README.md) · [Quickstart](distribution/docs/user/quickstart.md) · [Reading and maintaining architecture](distribution/docs/user/architecture.md) · [Offline preview](distribution/docs/user/local-preview.md) · [Design and maintenance](docs/README.md)
+[User guide](distribution/docs/README.md)

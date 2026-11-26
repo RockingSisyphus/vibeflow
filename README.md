@@ -35,4 +35,4 @@ Agent 可以调整工作流和资源声明中的名称、说明，再用 `review
 
 ## 文档
 
-[用户手册](distribution/docs/README.md) · [快速开始](distribution/docs/user/quickstart.md) · [架构阅读与维护](distribution/docs/user/architecture.md) · [本地预览](distribution/docs/user/local-preview.md) · [设计与维护](docs/README.md)
+[用户手册](distribution/docs/README.md)

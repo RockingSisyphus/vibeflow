@@ -8,7 +8,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 
 ## 发行资源中的用户文档
 
-用户手册的唯一原稿在 [distribution/docs](../distribution/docs/README.md)，随发行构建进入包内的 kernel/docs。这里维护当前内核设计、开发流程和待执行任务。
+用户手册的唯一原稿在 [distribution/docs](../distribution/docs/README.md)，随发行构建进入包内的 kernel/docs。这里维护当前内核设计、开发流程和待执行任务。可先[运行发行包自带示例](../distribution/docs/user/quickstart.md)。
 
 
 ## 系统设计

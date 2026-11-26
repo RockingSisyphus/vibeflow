@@ -21,7 +21,7 @@
 | --- | --- |
 | 了解模型与能力 | [项目概览](kernel/docs/overview.md) |
 | 优先了解项目、root 与 workflow 的架构 | [架构阅读与维护](kernel/docs/user/architecture.md) |
-| 首次运行项目 | [快速开始](kernel/docs/user/quickstart.md) |
+| 验证发行环境与生成示例审核图 | [运行发行包自带示例](kernel/docs/user/quickstart.md) |
 | 组织项目、root 与共享资源 | [项目治理](kernel/docs/user/project-governance.md) |
 | 编写 workflow、输入输出和连边 | [Workflow 与 Config](kernel/docs/user/workflow-and-config.md) |
 | 开发 Python Node、BaseLib 或部署 AOT | [Python 开发](kernel/docs/user/python-development.md) |
