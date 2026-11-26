@@ -2,6 +2,8 @@
 
 [English](README.en.md)
 
+宣传视频：【vibeCoding得到的成果难以维护？如何让许愿式编程真正如你所愿？】 https://www.bilibili.com/video/BV1v71EzkEQd/?share_source=copy_web&vd_source=23fde6815e08fcaf6ba8974942ecc11f
+
 **把实现交给 AI，把项目的架构掌握在自己手里。**
 
 VibeFlow 是一个面向 AI 协作开发的编程框架，支持 Python 和 JavaScript / TypeScript。它把业务逻辑组织为可复用的节点（Node）和子流程（Nodeset），用工作流声明执行顺序和数据如何传递。审核图与执行计划来自同一份工作流。框架会检查流程结构和输入输出契约，也能按项目选用的规则自动检查代码质量。
