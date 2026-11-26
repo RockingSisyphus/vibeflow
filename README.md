@@ -27,9 +27,11 @@ Agent 可以调整工作流和资源声明中的名称、说明，再用 `review
 
 ## 宣传片里的工作流
 
-下图来自宣传片里的数学计算演示。输入先进入预处理 Nodeset，再按结果的正负选择分支。点击图片可查看完整流程。 [数学示例源码](sandbox/python/comprehensive_math/)
+这是宣传片里数学示例的 VibeFlow 审核图。输入先进入预处理 Nodeset，再按结果的正负选择分支。在线预览中可以缩放画布、查看节点详情，也可以右键展开「预处理输入」或「累计三轮」。
 
-[![VibeFlow 数学工作流的节点和数据流，截自宣传片](.github/workflow-demo.png)](.github/workflow-demo-full.png)
+[**打开交互审核图**](https://rockingsisyphus.github.io/vibeflow/) · [数学示例源码](sandbox/python/comprehensive_math/)
+
+![VibeFlow 生成的综合数学工作流审核图](.github/workflow-demo-full.png)
 
 ## 文档
 
