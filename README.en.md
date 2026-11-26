@@ -2,64 +2,35 @@
 
 [中文](README.md)
 
-VibeFlow structures AI-assisted programs as explicit workflows that can be executed, checked, and rendered as architecture views. Business logic lives in small Nodes, Config declares control flow, port contracts declare data flow, and Core validates the structure before execution or build.
+**Let AI write the code. Keep the architecture in your hands.**
 
-```text
-terminal start → input I/O → process / nodeset → output I/O → terminal end
-```
+VibeFlow is a framework for building software with AI in Python and JavaScript / TypeScript. It organizes business logic into reusable Nodes and subworkflows called Nodesets. Workflows describe what runs and how data moves between steps. The review diagram and execution plan come from the same workflow. The framework checks workflow structure and input and output contracts, and can automatically apply the code quality rules your project selects.
 
+Read the diagram to understand how your program works, then tell your agent exactly which step to change and what you expect it to do.
 
-## Main features
+## Get started
 
-- Python Runtime, relocatable Python AOT packages, and JavaScript/TypeScript AOT;
-- Python and JS/TS plugin SDKs for code-defined Nodes, Rules, Rulesets, and other resources explicitly selected by each workflow;
-- composable Rules and Rulesets, plus Nodes, Nodesets, Loops, and explicit effect boundaries;
-- explicit multi-file implementations, source ownership, per-file reviews, and default presentation for Nodes, BaseLibs, Plugins, and Hosts;
-- deterministic Architecture JSONC and offline HTML previews with history, expandable calls and resource views; optional Mermaid text exports;
-- config, contract, reachability, control-flow, quality, build, and execution-evidence checks;
-- collaborative and autonomous development protocols over the same Core and machine rules.
+1. Download the latest `vibeflow-distribution-<version>.zip` from [GitHub Releases](https://github.com/RockingSisyphus/vibeflow/releases/latest). Extract it into your project’s development directory and keep the package layout intact. This package is for development with human review. For unattended development, choose the ZIP with `autonomous` in its name.
+2. Open your project directory in your coding agent. Ask it to read the extracted `AGENTS.md`, then give it your task.
+   - **Migrate an existing project** — “Follow the `AGENTS.md` in the VibeFlow package. Migrate this project to VibeFlow and preserve its existing behavior. Verify the main flows and generate architecture previews for its workflows.”
+   - **Start a new project** — “Follow the `AGENTS.md` in the VibeFlow package and build the project described below. Verify the main flows and generate architecture previews for the workflows.”
 
-VibeFlow reviews engineering structure, source health, and selected domain constraints. Project tests and production-environment acceptance verify business results and external behavior.
+## Explore your project in the browser
 
-## Getting started
+Once your agent generates the previews, open **`vibeflow-preview.html`** from the extracted package in your browser. It works offline. Choose a workflow in the project directory and follow the arrows to see how data moves, branches, and comes back together. Right-click to expand a Nodeset or jump to a linked workflow.
 
-Download and extract one release package:
+If part of the diagram is hard to read, tell your agent exactly where you got lost.
 
-- `vibeflow-distribution-<version>.zip` for human-reviewed collaboration;
-- `vibeflow-distribution-autonomous-<version>.zip` for unattended development.
+> In Order Processing, I can’t tell which step checks stock and which step deducts it. Clarify the relevant node and connection descriptions, update the architecture documents, and regenerate the HTML preview.
 
-The root `AGENTS.md` routes AI agents to task-specific documentation. Human readers can start at `kernel/docs/README.md`. Both packages include minimal `python_project/` and `javascript_project/` roots.
+Your agent can update names and descriptions in the workflow and resource declarations, then run `review` to regenerate the architecture documents and preview. Refresh the list in your browser to see the new snapshot.
 
-Python smoke run:
+## The workflow from the promo video
 
-```bash
-python run.py validate --config python_project/configs/main.jsonc
-python run.py run --config python_project/configs/main.jsonc --input python_project/probe_input.json
-```
+This math demo preprocesses the input in a Nodeset, then chooses a branch based on the sign of the result. Click the image for the full workflow. [Math demo source](sandbox/python/comprehensive_math/)
 
-JavaScript smoke run:
-
-```bash
-npm ci --prefix javascript_project
-python run.py build --config javascript_project/configs/main.jsonc --target node --profile esm-module --out-dir javascript_project/build/node
-node javascript_project/scripts/workflow_execution_probe.mjs
-```
+[![Nodes and data flow from the VibeFlow math demo in the promo video](.github/workflow-demo.png)](.github/workflow-demo-full.png)
 
 ## Documentation
 
-- [Project overview](distribution/docs/overview.md)
-- [User development guides](docs/README.md#使用者开发)
-- [Offline previews and history](distribution/docs/user/local-preview.md)
-- [Multi-file resources and presentation](distribution/docs/user/multifile-resources.md)
-- [System design](docs/README.md#系统设计)
-- [Kernel maintenance](docs/README.md#内核维护)
-
-Run the complete source-repository gate with:
-
-```bash
-python tools/verify_project.py --full
-```
-
-Distribution version `1.5.4` uses Workflow ABI `vibeflow.workflow.v12`, Plugin ABI `vibeflow.plugin.v5`, Python AOT format `vibeflow.aot-build.v7`, JavaScript AOT format `vibeflow.aot-build.v6`, and workflow launch manifest v2.
-Python supports native asynchronous nodes. Python and JavaScript support synchronous workflow calls and asynchronous in-process collaboration. Node and browsers share the same JS coordinator. Migrate older launch configurations and rebuild older Python AOT artifacts before loading them with the new Python framework. Preview snapshots use v5. Planned calls remain visible in review. [Distribution build instructions](docs/maintainers/release.md)
-Both profiles include the offline HTML viewer, workflow history, and project/root navigation. Named entries and independent workflow coordination are supported. Project/root governance checks shared-resource boundaries. Python AOT carries declared support files of permitted cross-root dependencies. [Coordination guide](distribution/docs/user/workflow-coordination.md) · [Project governance](distribution/docs/user/project-governance.md)
+[User guide](distribution/docs/README.md) · [Quickstart](distribution/docs/user/quickstart.md) · [Reading and maintaining architecture](distribution/docs/user/architecture.md) · [Offline preview](distribution/docs/user/local-preview.md) · [Design and maintenance](docs/README.md)

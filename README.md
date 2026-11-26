@@ -2,85 +2,35 @@
 
 [English](README.en.md)
 
-VibeFlow 把 AI 参与开发的程序组织成可执行、可检查、可生成架构视图的显式流程图。业务逻辑位于小型 Node 中，Config 声明控制流，端口契约声明数据流，Core 在运行或构建前验证结构。
+**把实现交给 AI，把项目的架构掌握在自己手里。**
 
-```text
-terminal start → input I/O → process / nodeset → output I/O → terminal end
-```
+VibeFlow 是一个面向 AI 协作开发的编程框架，支持 Python 和 JavaScript / TypeScript。它把业务逻辑组织为可复用的节点（Node）和子流程（Nodeset），用工作流声明执行顺序和数据如何传递。审核图与执行计划来自同一份工作流。框架会检查流程结构和输入输出契约，也能按项目选用的规则自动检查代码质量。
 
-
-## 主要能力
-
-- Python Runtime、Python 目录 AOT 与 JavaScript/TypeScript AOT；
-- Python 和 JS/TS 插件 SDK，以代码声明 Node、Rule、Ruleset 等资源，由 workflow 显式选择；
-- 可组合的 Rule/Ruleset，以及 Node、Nodeset、Loop 与显式副作用边界；
-- Node、BaseLib 和 Plugin 的多文件实现、源码归属、逐文件审查和默认图形样式；
-- 确定性 Architecture JSONC、Mermaid 文本，以及[离线 HTML 预览与历史时间线](distribution/docs/user/local-preview.md)；
-- 配置、契约、可达性、控制流、质量、构建与执行证据检查；
-- collaborative 与 autonomous 两种开发协议，共享同一 Core 和机器规则。
-
-VibeFlow 检查工程结构、源码健康度和所选领域约束；项目测试与真实环境验收验证业务结果及外部接口行为。
+你可以先看图理解程序如何工作，再告诉 Agent 哪个环节需要改、期望它怎么做。
 
 ## 开始使用
 
-从 GitHub Release 下载所需发行包并解压：
+1. 从 [GitHub Releases](https://github.com/RockingSisyphus/vibeflow/releases/latest) 下载最新版 `vibeflow-distribution-<版本>.zip`，解压到你自己的项目开发目录，保留包内的目录结构。这个包适合边开发边审核。需要无人值守开发时，选带 `autonomous` 的 ZIP。
+2. 在编码 Agent 中打开你的项目目录，让它读取解压后的 `AGENTS.md`，然后直接交给它任务。
+   - **迁移已有项目**　“请按 VibeFlow 发行包里的 `AGENTS.md`，把这个项目迁移为 VibeFlow 项目，保留现有业务行为。完成后验证主要流程，并生成各工作流的架构预览。”
+   - **开发新项目**　“请按 VibeFlow 发行包里的 `AGENTS.md`，用 VibeFlow 实现我下面给出的需求。完成后验证主要流程，并生成各工作流的架构预览。”
 
-- `vibeflow-distribution-<version>.zip`：人机协同审核；
-- `vibeflow-distribution-autonomous-<version>.zip`：无人值守开发。
+## 在浏览器里读懂项目
 
-打开解压目录后，AI 从根 `AGENTS.md` 获得任务阅读路径；人类从 `kernel/docs/README.md` 进入使用者手册。两个包都包含最小的 `python_project/` 和 `javascript_project/`。
+让 Agent 生成预览后，双击发行包根目录的 **`vibeflow-preview.html`**。它可以离线打开。在「项目目录」里选择工作流，沿箭头看数据经过哪些节点，在哪里分支、汇合。右键可以展开 Nodeset 或跳转到关联的工作流。
 
-Python 最短验证：
+如果图读起来费劲，可以直接告诉 Agent 哪一段难懂。
 
-```bash
-python run.py validate --config python_project/configs/main.jsonc
-python run.py run --config python_project/configs/main.jsonc --input python_project/probe_input.json
-```
+> 「订单处理」里看不出哪一步校验库存、哪一步扣减库存。请把相关节点和连线的说明写清楚，更新架构文档并重新生成 HTML 预览。
 
-JavaScript 最短验证：
+Agent 可以调整工作流和资源声明中的名称、说明，再用 `review` 更新生成的架构文档和预览。回到浏览器刷新列表，就能查看新快照。
 
-```bash
-npm ci --prefix javascript_project
-python run.py build --config javascript_project/configs/main.jsonc --target node --profile esm-module --out-dir javascript_project/build/node
-node javascript_project/scripts/workflow_execution_probe.mjs
-```
+## 宣传片里的工作流
+
+下图来自宣传片里的数学计算演示。输入先进入预处理 Nodeset，再按结果的正负选择分支。点击图片可查看完整流程。 [数学示例源码](sandbox/python/comprehensive_math/)
+
+[![VibeFlow 数学工作流的节点和数据流，截自宣传片](.github/workflow-demo.png)](.github/workflow-demo-full.png)
 
 ## 文档
 
-- [项目概览](distribution/docs/overview.md)
-- [使用者开发文档](docs/README.md#使用者开发)
-- [多文件资源与展示](distribution/docs/user/multifile-resources.md)
-- [系统设计](docs/README.md#系统设计)
-- [内核维护](docs/README.md#内核维护)
-
-源码仓库完整门禁：
-
-```bash
-python tools/verify_project.py --full
-```
-
-当前分发版本为 `1.5.4`。采用 Workflow ABI `vibeflow.workflow.v12`、Python AOT `vibeflow.aot-build.v7`、JavaScript AOT `vibeflow.aot-build.v6`、协作启动清单 v2 和预览快照 v5。Python 支持原生异步节点；Python、JS 支持官方同步跨 workflow 调用及同进程异步协作，浏览器复用通用 JS 组件。旧启动配置需要迁移。使用新版 Python 加载器时，在新目录重建旧版 Python AOT 包。项目至少注册一个独立子目录 root，业务 Node 与 NodeType 分离，Plugin 贡献整包管理，project/root 治理独立配置。Host Extension 已退役，由普通节点显式管理关键生命周期。默认审核交付离线 HTML 快照。 [发行说明](docs/maintainers/release.md) · [workflow 协作](distribution/docs/user/workflow-coordination.md) · [项目治理](distribution/docs/user/project-governance.md) · [项目准备规范](docs/maintainers/project-preparation.md)
-
-质量检查只覆盖当前实际选择的 Rule；不证明业务正确、代码安全、算法确定性或全部无副作用。有限 Python 输入写入规则独立于效果政策，详见[产品检查边界](distribution/docs/user/product-check-boundaries.md)。
-
-## 仓库目录用途
-
-根目录仅保存项目入口、许可证和构建 / Git 元数据。开发文档归 docs，用户文档原稿与发行资源归 distribution；临时脚本和执行产物不能堆在根目录。
-
-| 目录 | 用途 |
-| --- | --- |
-| [src](src/README.md) | 产品各模块的核心源码与运行资源 |
-| [tests](tests/README.md) | 非沙盒的功能、代码和集成回归 |
-| [sandbox](sandbox/README.md) | Python / JavaScript 真实使用项目，加载工作区 src |
-| [repo_check](repo_check/README.md) | 独立的仓库内部质检工具 |
-| [tools](tools/README.md) | 开发、验证、清理和辅助工具 |
-| [distribution](distribution/README.md) | 发行构建器、模板、提示词和用户文档原稿 |
-| [dist](dist/README.md) | 最新正式发行目录、ZIP 和校验清单 |
-| [archive](archive/README.md) | 被替换的历史正式发行包 |
-| [docs](docs/README.md) | 设计、维护、历史结论和正文附件 |
-| [references](references/README.md) | 外来参考项目 |
-| [.github](.github/DIRECTORY.md) | GitHub CI 与协作模板 |
-
-新建自行维护的子目录时同步写明职责。过时且不再使用的文件直接删除；运行产物在仓库外临时工作区使用并及时清理。详细规则见[仓库目录职责](docs/maintainers/directory-layout.md)。
-
-[命名入口与独立 Workflow 通信](distribution/docs/user/workflow-coordination.md) 已纳入当前分发包，功能与迁移说明见用户手册，实施与验收见[维护记录](distribution/docs/user/workflow-coordination.md)。旧版本 ZIP 保留其原有 ABI 信息。
+[用户手册](distribution/docs/README.md) · [快速开始](distribution/docs/user/quickstart.md) · [架构阅读与维护](distribution/docs/user/architecture.md) · [本地预览](distribution/docs/user/local-preview.md) · [设计与维护](docs/README.md)
