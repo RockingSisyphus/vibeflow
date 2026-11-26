@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VibeFlow 本地预览</title>
+<link rel="stylesheet" href="vibeflow-preview/assets/viewer.css">
+<link rel="stylesheet" href="vibeflow-preview/assets/fontawesome.css">
+<link rel="stylesheet" href="vibeflow-preview/assets/solid.css">
+<link rel="stylesheet" href="vibeflow-preview/assets/regular.css">
+<link rel="stylesheet" href="vibeflow-preview/assets/brands.css">
+<script id="viewer-config" defer src="vibeflow-preview.config.js"></script>
+<script defer src="vibeflow-preview/assets/model.js"></script>
+<script defer src="vibeflow-preview/assets/inspector.js"></script>
+<script defer src="vibeflow-preview/assets/shapes.js"></script>
+<script defer src="vibeflow-preview/assets/layout.js"></script>
+<script defer src="vibeflow-preview/assets/elk.bundled.js"></script>
+<script defer src="vibeflow-preview/assets/views.js"></script>
+<script defer src="vibeflow-preview/assets/overview.js"></script>
+<script defer src="vibeflow-preview/assets/viewer.js"></script>
+</head><body>
+<header><strong>VibeFlow</strong><span id="identity">本地预览</span><button id="refresh">刷新列表</button><span id="notice" role="status"></span></header>
+<details id="project-overview"><summary>项目结构与 workflow 总览</summary><div id="project-content">运行 preview --workspace 更新项目总览。</div></details>
+<main><aside id="history"><div class="section-label">浏览 workflow <span id="count"></span></div>
+<select id="navigation" aria-label="浏览方式"><option value="history">历史记录</option><option value="project">项目目录 · 最新快照</option></select>
+<div id="project-note" hidden></div>
+<div id="filters"><select id="category" aria-label="操作类别"><option value="">全部操作</option><option value="review">审查</option><option value="build">构建</option><option value="run">运行</option></select>
+<select id="workflow" aria-label="workflow 筛选"><option value="">全部 workflow</option></select>
+<select id="target" aria-label="Target"><option value="">全部 Target</option><option>python</option><option>javascript</option></select>
+<select id="status" aria-label="状态"><option value="">全部状态</option></select></div><div id="records"></div></aside>
+<section id="workspace"><nav id="tabs" aria-label="视图"></nav>
+<div id="toolbar">
+<select id="entry" aria-label="workflow 入口"><option value="">全部入口</option></select>
+<button id="minus" aria-label="缩小">−</button><input id="zoom" aria-label="缩放百分比" value="100%"><button id="plus" aria-label="放大">+</button>
+<button id="actual">100%</button><button id="fit">适应画布</button><button id="collapse">收起全部</button>
+<form id="search-form"><input id="search" placeholder="节点 ID、调用路径或类型" aria-label="搜索节点"><button>定位</button></form></div>
+<div id="viewport" tabindex="0" aria-label="图画布"><svg id="canvas" xmlns="http://www.w3.org/2000/svg"><g id="scene"></g></svg><div id="legend" aria-label="连边图例"><span class="legend-flow">正常流程</span><span class="legend-parallel">并发分发 / 汇合</span><span class="legend-data">仅传递数据</span></div><div id="empty">尚无预览记录。运行 review、build 或 Python 源码工作流后，点击“刷新历史”。</div></div>
+<footer><span id="dimensions"></span><span>左键拖动画布 · 滚轮缩放 · 右键展开子图 / 跳转 workflow</span></footer></section>
+<aside id="inspector"><div class="section-label">所选对象</div><div id="details">选择节点查看调用、契约、样式及来源。</div></aside></main>
+<div id="context-menu" role="menu" hidden><button id="toggle" role="menuitem">展开</button><button id="locate" role="menuitem">定位节点</button><div id="context-targets"></div></div>
+</body></html>
