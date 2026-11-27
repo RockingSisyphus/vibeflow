@@ -1,6 +1,6 @@
 # Plugin 与宿主 API
 
-Plugin 是一个原子资源包，贡献 NodeType、Rule、Ruleset、DataSchema、私有 BaseLib 及可选 compiler/runtime 扩展。业务 Node 在所属 `nodes/` 中独立声明，不放入 Plugin 的 `resources`。
+Plugin 是一个原子资源包，贡献 NodeType、Rule、Ruleset、DataSchema、私有 BaseLib 及可选 compiler/runtime 扩展。默认项目治理要求业务 Node 在所属 `nodes/` 中独立声明，Plugin 贡献 NodeType。自定义治理的例外见[项目治理](project-governance.md#plugin-的默认整包规则)。NodeType 提供规则和外观默认值。调用契约、实现和调度相关声明由实际业务 Node 提供。
 
 ## 声明与选择
 
@@ -51,7 +51,7 @@ Plugin 的安装只使规则可被选择。Ruleset 的 `workflow_default` 可加
 
 `inspect-resources` 与 `review-rules` 读取声明和选择，不调用业务 `run_pure/run`、检查函数或生命周期工厂。
 
-Plugin 可提供 compiler/runtime 工厂，每个适用操作创建独立实例，并在结束或失败时释放。它们用于编译、观察等框架扩展。Python 工厂接收只读上下文，包括 `context["config"]`；JS 工厂使用 `context.config`。不要在模块初始化时创建运行实例。
+Plugin 可提供 compiler/runtime 工厂，每个适用操作创建独立实例，并在结束或失败时释放。它们用于受支持的编译与运行生命周期扩展。扩展仍受对应 ABI、校验和编译契约约束。Python 工厂接收只读上下文，包括 `context["config"]`；JS 工厂使用 `context.config`。不要在模块初始化时创建运行实例。
 
 ```python
 # 仍位于 Plugin 包内

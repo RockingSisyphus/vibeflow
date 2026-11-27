@@ -142,8 +142,7 @@ def run_workspace_checked(
             _refuse_on_health_failure(health, run_dir, actual_run_id)
         compilation = prepared.compilation
         graph, compiled = compilation.workflow.graph, compilation.compiled_graph
-        from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
-        presentation = prepare_python_presentation(graph, registry=env.registry, resources=resources, compilation=compilation)
+        presentation = prepared.presentation_for(env.registry)
         _refuse_on_planned_run(graph, health, run_dir, actual_run_id, registry=env.registry, resources=resources,
                               runtime_options=effective_runtime_options, compiled=compiled, prepared=presentation, entry=entry)
         _write_preflight_artifacts(run_dir, graph, compiled, health, registry=env.registry, resources=resources, prepared=presentation)
@@ -208,10 +207,7 @@ def _load_workspace_graph_for_presentation(path, *, workspace, validate_health, 
             return None, None, None, PythonResources(), health, health, None
         presentation = None
         if health.status not in {"FAIL", "ERROR"}:
-            from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
-
-            presentation = prepare_python_presentation(prepared.graph, registry=env.registry,
-                resources=resources, compilation=prepared.compilation)
+            presentation = prepared.presentation_for(env.registry)
             graph, compiled = presentation.graph, presentation.compiled
         return graph, compiled, env.registry, resources, None, health, presentation
 
@@ -282,20 +278,14 @@ def _validate_prepared_workspace_graph(
         selected, _ = project_entry(graph, compiled, entry)
         report = validate_delegate_cli_graph_contract(selected, report)
     prepared.health = report
+    prepared.presentation = None
     if report.status in {"FAIL", "ERROR"} or not check_architecture_document:
         return report
-    from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
-    presentation = prepare_python_presentation(graph, registry=env.registry, resources=resources,
-        compilation=compilation)
     prepared.health = _validate_registered_architecture_document(
         report,
         document_path=document.path,
-        graph=graph,
-        compiled=compiled,
-        registry=env.registry,
-        resources=resources,
         workspace=workspace,
-        prepared=presentation,
+        prepare_presentation=lambda: prepared.presentation_for(env.registry),
     )
     return prepared.health
 

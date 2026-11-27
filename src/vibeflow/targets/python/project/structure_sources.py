@@ -20,7 +20,14 @@ def python_import_scopes(scopes, root, parse_cache):
         except SyntaxError:
             continue  # The ordinary parser reports the actual syntax diagnostic.
         files.append(PythonSourceFile(str(path), relative.removesuffix(".py").replace("/", "."), text, _tree=tree))
-    context = build_python_source_context((), files)
+    # Binding and symbol references depend on this exact source set. The
+    # governance Rules still run against the current graph and owner records.
+    key = ("python_import_context", tuple(files))
+    context = parse_cache.get(key) if parse_cache is not None else None
+    if context is None:
+        context = build_python_source_context((), files)
+        if parse_cache is not None:
+            parse_cache[key] = context
     return tuple({**scope, "owners": [_owner_imports(owner, root, context) for owner in scope["owners"]]}
                  for scope in scopes)
 

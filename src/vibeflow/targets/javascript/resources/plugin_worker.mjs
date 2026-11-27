@@ -4,8 +4,8 @@ import { format } from "node:util";
 import path from "node:path";
 import process from "node:process";
 import readline from "node:readline";
-import { pathToFileURL } from "node:url";
 
+import {loadTypeScript} from "./toolchain_typescript.mjs";
 import {sdkPlugin} from "./sdk_loader.mjs";
 
 const PLUGIN_ABI = "vibeflow.plugin.v5";
@@ -63,13 +63,7 @@ function ruleJsonValue(value, pathName = "result", active = new Set()) {
 }
 async function localTools(packageRoot) {
   const require = createRequire(path.join(packageRoot, "package.json"));
-  const version = require("typescript");
-  let ts = version;
-  if (typeof version.createSourceFile !== "function") {
-    const [ast, api] = await Promise.all([import(pathToFileURL(require.resolve("typescript/unstable/ast")).href), import(pathToFileURL(require.resolve("typescript/unstable/sync")).href)]);
-    ts = {...ast, ...api};
-  }
-  return { ts, esbuild: require("esbuild") };
+  return {ts: await loadTypeScript(require), esbuild: require("esbuild")};
 }
 function sourceService(ts, packageRoot, facts) {
   const provided = new Map();
@@ -86,15 +80,11 @@ function sourceService(ts, packageRoot, facts) {
     const cached = cache.get(absolute);
     if (cached?.text === text) return cached;
     if(cached){for(const snapshot of snapshots.splice(0))snapshot.dispose();api?.close();api=null;cache.clear();}
-    let tree;
-    if (typeof ts.createSourceFile === "function") tree = ts.createSourceFile(absolute, text, ts.ScriptTarget.Latest, true);
-    else {
-      if (!api) api = new ts.API({cwd: packageRoot, fs: {readFile: name => provided.get(path.resolve(name)), fileExists: name => provided.has(path.resolve(name)) ? true : undefined}});
-      const snapshot = api.updateSnapshot({openFiles: [absolute]});
-      snapshots.push(snapshot);
-      tree = snapshot.getDefaultProjectForFile(absolute)?.program.getSourceFile(absolute);
-      if (!tree) failure("RULE.SOURCE.UNAVAILABLE", `TypeScript did not parse ${absolute}`);
-    }
+    if (!api) api = new ts.API({cwd: packageRoot, fs: {readFile: name => provided.get(path.resolve(name)), fileExists: name => provided.has(path.resolve(name)) ? true : undefined}});
+    const snapshot = api.updateSnapshot({openFiles: [absolute]});
+    snapshots.push(snapshot);
+    const tree = snapshot.getDefaultProjectForFile(absolute)?.program.getSourceFile(absolute);
+    if (!tree) failure("RULE.SOURCE.UNAVAILABLE", `TypeScript did not parse ${absolute}`);
     const result = { text, tree };
     cache.set(absolute, result);
     return result;

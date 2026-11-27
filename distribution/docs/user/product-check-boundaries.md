@@ -29,4 +29,4 @@ JS 的 eval、Function、Date、performance、Math 动态成员与随机数使�
 
 ## 工具链
 
-工具链检查实际解析到的 Node、TypeScript、esbuild 版本及兼容要求。项目可以使用 npm、Yarn 或 pnpm 安装依赖；锁文件及安装可重复性由项目的包管理流程维护。构建资料记录真实工具版本。
+JS/TS 分析使用项目实际解析到的 TypeScript 7（`>=7 <8`）。构建还需要项目可解析的 esbuild。项目可以使用 npm、Yarn 或 pnpm 安装依赖；锁文件及安装可重复性由项目的包管理流程维护。构建资料记录真实工具版本。

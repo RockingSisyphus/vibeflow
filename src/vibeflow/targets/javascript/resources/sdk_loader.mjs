@@ -4,8 +4,8 @@ import {fileURLToPath} from "node:url";
 const runtime = fileURLToPath(new URL("./sdk.mjs", import.meta.url));
 export const sdkTypes = fileURLToPath(new URL("./sdk.d.ts", import.meta.url));
 
-function runtimeDeclarations(ts, tree, program, project, requested) {
-  const checker = project?.checker || program?.getTypeChecker?.();
+function runtimeDeclarations(ts, tree, project, requested) {
+  const checker = project?.checker;
   if (!checker) throw new Error(`source binding unavailable for ${tree.fileName}`);
   const selected = new Set(), pending = [], imports = new Map(), replacements = new Map();
   const names = new Set(requested.map(item => item.export.split(".")[0]));
@@ -105,21 +105,14 @@ export function sdkPlugin(ts, {runtimeBindings = []} = {}) {
       if (!text.includes("@vibeflow/plugin")) return;
       let api, snapshot, tree;
       try {
-        let program, project;
         const selected = runtimeBindings.filter(item => item.module === args.path);
-        if (ts.createSourceFile && !selected.length) tree = ts.createSourceFile(args.path, text, ts.ScriptTarget.Latest, true);
-        else {
-          if (ts.API) {
-            api = new ts.API({cwd: build.initialOptions.absWorkingDir});
-            snapshot = api.updateSnapshot({openFiles: [args.path]});
-            project = snapshot.getDefaultProjectForFile(args.path);
-            program = project?.program;
-          } else program = ts.createProgram([args.path], {allowJs:true, module:ts.ModuleKind.ESNext});
-          tree = program?.getSourceFile(args.path);
-        }
+        api = new ts.API({cwd: build.initialOptions.absWorkingDir});
+        snapshot = api.updateSnapshot({openFiles: [args.path]});
+        const project = snapshot.getDefaultProjectForFile(args.path);
+        tree = project?.program?.getSourceFile(args.path);
         if (!tree) throw new Error(`cannot analyze SDK declarations in ${args.path}`);
         if (selected.length) {
-          const contents = runtimeDeclarations(ts, tree, program, project, selected);
+          const contents = runtimeDeclarations(ts, tree, project, selected);
           return {contents, loader: /\.[cm]?ts$/.test(args.path) ? "ts" : "js"};
         }
         const names = new Set(), namespaces = new Set(), edits = [], exports = new Map();

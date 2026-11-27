@@ -12,7 +12,7 @@ from vibeflow.core.rules import models as rule_models
 from vibeflow.core.rules.selection import models as selection_models
 
 
-PYTHON_AOT_FORMAT = "vibeflow.aot-build.v7"
+PYTHON_AOT_FORMAT = "vibeflow.aot-build.v8"
 
 
 _RECORDS = {value.__module__ + '.' + value.__name__: value
@@ -20,7 +20,7 @@ _RECORDS = {value.__module__ + '.' + value.__name__: value
     for value in vars(module).values() if isinstance(value, type) and is_dataclass(value)}
 
 
-def encode_snapshot(value, *, relocate=lambda value: value):
+def encode_snapshot(value, *, types, relocate=lambda value: value):
     records, identities = [], {}
 
     def encode(item):
@@ -33,7 +33,7 @@ def encode_snapshot(value, *, relocate=lambda value: value):
                 raise TypeError(f'unsupported Python AOT record: {name}')
             index = len(records)
             identities[identity] = index
-            record = {'type': name, 'fields': {}}
+            record = {'type': types.setdefault(name, len(types)), 'fields': {}}
             records.append(record)
             record['fields'] = {field.name: encode(
                 relocate(getattr(item, field.name)) if field.name in {'project_root','root_path','source_path'}
@@ -53,11 +53,11 @@ def encode_snapshot(value, *, relocate=lambda value: value):
     return {'root': root, 'records': records}
 
 
-def decode_snapshot(value, *, relocate=lambda value: value):
+def decode_snapshot(value, *, types, relocate=lambda value: value):
     records = value['records']
     # GraphConfig definition tables may refer back to their containing graph.
     # Allocate the finite native records first, then restore these references.
-    instances = [_RECORDS[record['type']].__new__(_RECORDS[record['type']]) for record in records]
+    instances = [_RECORDS[types[record['type']]].__new__(_RECORDS[types[record['type']]]) for record in records]
 
     def decode(item):
         if isinstance(item, list):

@@ -48,3 +48,27 @@ def test_javascript_sdk_literal_source_paths_build_and_execute(tmp_path,toolchai
     result=command("node",ROOT / "tests/e2e/applications/javascript_run.mjs",json.loads(built.stdout)["entry"],request,cwd=tmp_path)
     output=json.loads(next(line[7:] for line in result.stdout.splitlines() if line.startswith("RESULT ")))["output"]
     assert output=={"greeting":"Hello, Ada! (2026-01-02T03:04:05Z)"}
+
+
+@pytest.mark.parametrize("language", ["python", "javascript"])
+def test_aot_replace_preserves_a_modified_output(tmp_path, toolchain, language):
+    work = example(tmp_path / "source", language + "/minimal", toolchain if language == "javascript" else None)
+    config = "greeting.jsonc" if language == "javascript" else "config_with_imports.jsonc"
+    target = tmp_path / "bundle"
+    args = ["build", "--workspace", work / "vibeflow_config.jsonc",
+            "--config", work / "project/configs" / config, "--out-dir", target]
+    if language == "javascript":
+        args += ["--target", "node", "--profile", "single-esm"]
+    original = json.loads(cli(work, *args).stdout)
+    if sys.platform.startswith("linux"):
+        cli(work, *args, "--replace")
+    else:
+        rejected = cli(work, *args, "--replace", success=False)
+        assert rejected.returncode == 1 and "cannot atomically exchange" in rejected.stdout
+
+    entry = Path(original["entry"])
+    modified = entry.read_text(encoding="utf-8") + "\n"
+    write(entry, modified)
+    rejected = cli(work, *args, "--replace", success=False)
+    assert rejected.returncode == 1 and "refusing to replace a modified AOT file" in rejected.stdout
+    assert entry.read_text(encoding="utf-8") == modified

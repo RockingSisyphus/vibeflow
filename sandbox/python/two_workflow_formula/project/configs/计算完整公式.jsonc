@@ -1,0 +1,39 @@
+{
+  "plugins": [{"source": {"kind": "file", "ref": "plugins/formula/plugin.py"}}],
+  "nodeset_imports": [{"path": "nodeset_types/平方与差距.jsonc"}],
+  "pipeline": {
+    "inputs": [
+      {"key": "x", "type": "formula.x", "display_name": "第一个整数 x", "required": true},
+      {"key": "y", "type": "formula.y", "display_name": "第二个整数 y", "required": true}
+    ],
+    "nodes": [
+      {"id": "start", "definition_id": "formula.boundary", "display_name": "开始计算公式", "description": "接收整数 x 和 y，分三路计算三项结果。"},
+      {"id": "sum", "definition_id": "formula.sum", "display_name": "求两数之和", "description": "计算 s = x + y，为调用另一流程准备输入。"},
+      {"id": "difference", "definition_id": "formula.difference", "display_name": "求两数之差", "description": "计算 x − y，差值留在主流程。"},
+      {"id": "double", "definition_id": "formula.double", "display_name": "把差值乘以 2", "description": "算出公式的差值项 2 × (x − y)。"},
+      {
+        "id": "product_call", "definition_id": "formula.invoke_product", "display_name": "交给另一流程计算乘积",
+        "description": "把 s 交给「计算相邻整数乘积」，等它返回 s × (s + 1)。",
+        "config": {"workflow": {"root": "formula", "path": "configs/计算相邻整数乘积.jsonc"}}
+      },
+      {"id": "score", "definition_id": "formula.square_gap", "display_name": "计算平方与差距项", "description": "展开这个 Nodeset，可以看到平方、求差、取绝对值和合并。"},
+      {"id": "add_terms", "definition_id": "formula.combine", "display_name": "三项相加得到结果", "description": "等跨流程的乘积项、本地差值项和 Nodeset 的结果都算完，再相加。", "join_policy": "all"},
+      {
+        "id": "end", "definition_id": "formula.boundary", "display_name": "返回公式计算结果", "description": "输出三项明细和最终结果。",
+        "similar_to": {"node": "start", "relationship": "copy", "reason": "两个节点都只标记流程边界。"}
+      }
+    ],
+    "edges": [
+      ["start", "sum"],
+      ["start", "difference"],
+      ["start", "score"],
+      ["sum", "product_call"],
+      ["difference", "double"],
+      ["product_call", "add_terms"],
+      ["double", "add_terms"],
+      ["score", "add_terms"],
+      ["add_terms", "end"]
+    ],
+    "outputs": [{"type": "formula.result", "as": "result", "display_name": "公式计算结果", "cardinality": "exactly_one"}]
+  }
+}

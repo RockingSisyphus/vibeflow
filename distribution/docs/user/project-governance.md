@@ -138,7 +138,8 @@ root 对应默认集合为 `vibeflow.root.default`。没有配置文件或省略
 | --- | --- |
 | `vibeflow.project.structure` | root 为独立项目子目录、不重叠、配置位于所属 root |
 | `vibeflow.project.dependencies` | 共享代码不能反向依赖 root 私有代码 |
-| `vibeflow.project.packages` / `vibeflow.root.packages` | Plugin 目录、贡献及支持文件的包归属、业务 Node 分离；root 规则还检查 Plugin 私有子图 |
+| `vibeflow.project.packages` / `vibeflow.root.packages` | 文件 Plugin 的目录及业务 Node 分离。root 版本另检查 Plugin 私有子图的独立导入 |
+| `vibeflow.project.plugin_ownership` / `vibeflow.root.plugin_ownership` | Plugin 的贡献、实现、支撑文件和相关项目自有源码的实际包归属 |
 | `vibeflow.root.resources` | 资源位置、跨 root 源码/子图/实现文件/构建 include 依赖 |
 | `vibeflow.root.nodesets` | 导入子图与消费方使用相同 Target |
 

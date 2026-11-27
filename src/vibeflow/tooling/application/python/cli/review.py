@@ -211,12 +211,8 @@ class _ReviewRunner:
             validation = _validate_registered_architecture_document(
                 self.health,
                 document_path=self.config_path,
-                graph=self.graph,
-                compiled=self.compiled,
-                registry=self.registry,
-                resources=self.resources,
                 workspace=self.workspace,
-                prepared=self.presentation,
+                prepare_presentation=lambda: self.presentation,
             )
         except Exception as exc:
             finding = _review_finding(

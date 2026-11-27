@@ -1,0 +1,10 @@
+{
+  "project_target": "python",
+  "architecture": {
+    "documents": [
+      {"workflow": "configs/计算完整公式.jsonc", "document": "FORMULA_ARCHITECTURE.jsonc"},
+      {"workflow": "configs/计算相邻整数乘积.jsonc", "document": "PRODUCT_ARCHITECTURE.jsonc"},
+      {"workflow": "configs/独立计算平方与差距.jsonc", "document": "SQUARE_GAP_ARCHITECTURE.jsonc"}
+    ]
+  }
+}

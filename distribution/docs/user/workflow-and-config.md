@@ -50,7 +50,7 @@ Python Runtime 与 JavaScript/TypeScript AOT 使用同一公共输入契约。�
 
 ## 控制与数据
 
-`pipeline.edges` 是控制流的唯一来源。数组 edge 同时调度目标并传递匹配的 envelope：
+`pipeline.edges` 是控制流的唯一来源。数组形式省略显式角色，默认传递匹配的 envelope。Core 根据有效图推断调度角色。例如普通相邻调用之间的边会调度下游：
 
 ```jsonc
 ["parse", "validate"]
@@ -62,6 +62,8 @@ Python Runtime 与 JavaScript/TypeScript AOT 使用同一公共输入契约。�
 {"from": "metadata", "to": "save", "schedule": false}
 {"from": "trigger", "to": "save", "transfer": false}
 ```
+
+省略 `schedule` 时，如果普通无条件边的两端已有间接路径，Core 会把这条捷径推断为只传数据的旁路。需要固定角色时显式写 `schedule`。
 
 `schedule: false` 只传数据，`transfer: false` 只调度；两者不能同时为 `false`。同步并行分支需要等待全部分支时，在汇合调用写 `join_policy: "all"`。互斥 decision 分支通常使用默认 safe-OR 合流。
 

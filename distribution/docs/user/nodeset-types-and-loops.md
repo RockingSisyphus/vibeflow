@@ -35,23 +35,28 @@ NodesetType 定义可复用子图，Nodeset 是对它的一次调用。Loop 重�
 
 Nodeset 内部的 `pipeline.inputs` 同样显式声明 `required`。这里原始文本是必填输入，所以使用 `true`；可选输入使用 `false`，公共输入的完整规则见 [Workflow 与 Config](workflow-and-config.md#最小-pipeline)。
 
-在 workflow 中选择提供 `example.*` Node 的代码插件，再导入并调用 Nodeset：
+示例中的 `example.*` 业务 Node 在 root 的 `nodes/` 中声明。若业务 Node 引用了自定义 NodeType，再按需在 workflow 中选择提供该类型的 Plugin。把定义保存为 `configs/nodeset_types/prepare_text.jsonc`，在同一 root 的 `configs/main.jsonc` 中导入。未指定 `root` 的导入路径相对当前配置文件。
 
 ```jsonc
 {
-  "plugins": [{"source": {"kind": "file", "ref": "plugins/text.py"}}],
   "nodeset_imports": [{"path": "nodeset_types/prepare_text.jsonc"}],
   "pipeline": {
     "inputs": [
       {"key": "raw_text", "type": "text.raw", "display_name": "Raw text", "required": true}
     ],
     "nodes": [
+      {"id": "start", "definition_id": "example.start", "display_name": "Start request", "description": "Starts this request."},
       {
         "id": "prepare",
         "definition_id": "example.prepare_text",
         "display_name": "Prepare request text",
         "description": "Runs reusable text preparation for this request."
-      }
+      },
+      {"id": "end", "definition_id": "example.end", "display_name": "End request", "description": "Ends after the prepared text is available."}
+    ],
+    "edges": [["start", "prepare"], ["prepare", "end"]],
+    "outputs": [
+      {"type": "text.prepared", "cardinality": "exactly_one", "display_name": "Prepared text"}
     ]
   }
 }

@@ -11,8 +11,6 @@ from typing import Any, Mapping
 
 
 NODE_MINIMUM = (22, 12, 0)
-TYPESCRIPT_MINIMUM = (7, 0, 0)
-TYPESCRIPT_MAXIMUM = (8, 0, 0)
 ESBUILD_MINIMUM = (0, 28, 0)
 ESBUILD_MAXIMUM = (0, 29, 0)
 
@@ -356,17 +354,11 @@ def _driver_result(payload, returncode):
 
 def _validate_versions(info: ToolchainInfo) -> None:
     node = _version_tuple(info.node, subject="Node.js")
-    typescript = _version_tuple(info.typescript, subject="TypeScript")
     esbuild = _version_tuple(info.esbuild, subject="esbuild")
     if node < NODE_MINIMUM:
         raise AotToolchainError(
             "VF_TOOLCHAIN_VERSION",
             f"Node.js >=22.12 is required, found {info.node}",
-        )
-    if not TYPESCRIPT_MINIMUM <= typescript < TYPESCRIPT_MAXIMUM:
-        raise AotToolchainError(
-            "VF_TOOLCHAIN_VERSION",
-            f"TypeScript >=7 <8 is required, found {info.typescript}",
         )
     if not ESBUILD_MINIMUM <= esbuild < ESBUILD_MAXIMUM:
         raise AotToolchainError(
@@ -377,16 +369,10 @@ def _validate_versions(info: ToolchainInfo) -> None:
 
 def _validate_audit_versions(info: AuditToolchainInfo) -> None:
     node = _version_tuple(info.node, subject="Node.js")
-    typescript = _version_tuple(info.typescript, subject="TypeScript")
     if node < NODE_MINIMUM:
         raise AotToolchainError(
             "VF_TOOLCHAIN_VERSION",
             f"Node.js >=22.12 is required, found {info.node}",
-        )
-    if not TYPESCRIPT_MINIMUM <= typescript < TYPESCRIPT_MAXIMUM:
-        raise AotToolchainError(
-            "VF_TOOLCHAIN_VERSION",
-            f"TypeScript >=7 <8 is required, found {info.typescript}",
         )
 
 

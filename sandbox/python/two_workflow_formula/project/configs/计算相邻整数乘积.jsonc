@@ -1,0 +1,21 @@
+{
+  "plugins": [{"source": {"kind": "file", "ref": "plugins/formula/plugin.py"}}],
+  "pipeline": {
+    "inputs": [{"key": "sum", "type": "formula.sum", "display_name": "主流程传入的整数 s", "required": true}],
+    "nodes": [
+      {"id": "start", "definition_id": "formula.boundary", "display_name": "收到主流程的整数 s", "description": "本流程只需要 s，一个整数就能开始计算。"},
+      {"id": "add_one", "definition_id": "formula.add_one", "display_name": "把 s 加 1", "description": "得到下一个整数 s + 1，保留原来的 s。"},
+      {"id": "multiply", "definition_id": "formula.multiply", "display_name": "相邻两数相乘", "description": "把 s 与 s + 1 相乘，得到乘积项。"},
+      {
+        "id": "end", "definition_id": "formula.boundary", "display_name": "把乘积交回主流程", "description": "只返回乘积，完整公式由主流程计算。",
+        "similar_to": {"node": "start", "relationship": "copy", "reason": "两个节点都只标记流程边界。"}
+      }
+    ],
+    "edges": [
+      ["start", "add_one"],
+      ["add_one", "multiply"],
+      ["multiply", "end"]
+    ],
+    "outputs": [{"type": "formula.product", "as": "product", "display_name": "相邻整数乘积", "cardinality": "exactly_one"}]
+  }
+}

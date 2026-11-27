@@ -11,6 +11,22 @@ from vibeflow.core.rules.selection import selection_data
 from vibeflow.core.planned import effective_planned_behavior
 from vibeflow.tooling.presentation.node_presentation import resolve_presentation
 
+
+def _architecture_rule_checks(rule_report):
+    report = rule_report.to_dict()
+    # The architecture describes decisions and findings. Source measurements
+    # are available from quality-check and need not be repeated for every call.
+    for executions in report["subjects"].values():
+        for execution in executions:
+            for result in execution["results"].values():
+                records = result.get("records", {})
+                result["records"] = {
+                    key: record for key, record in records.items()
+                    if record.get("type_id") != "vibeflow.node_metrics.v1"
+                }
+    return report
+
+
 def build_architecture_facts(
     graph: GraphConfig,
     *,
@@ -70,7 +86,7 @@ def build_architecture_facts(
     from vibeflow.core.rules.planning import selection_report
     payload["rule_selections"] = selection_report(graph, catalogs)
     if rule_report is not None:
-        payload["rule_checks"] = rule_report.to_dict()
+        payload["rule_checks"] = _architecture_rule_checks(rule_report)
     if project_root is not None:
         from vibeflow.tooling.architecture.resources import resource_architecture
         from vibeflow.tooling.presentation.portable_paths import portable_paths

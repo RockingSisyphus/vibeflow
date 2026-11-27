@@ -7,11 +7,13 @@
 | Workflow ABI | `vibeflow.workflow.v12` |
 | Plugin ABI | `vibeflow.plugin.v5` |
 | Rule ABI | `vibeflow.rule.v3` |
-| AOT manifest | JavaScript `vibeflow.aot-build.v6`，Python `vibeflow.aot-build.v7` |
+| AOT manifest | JavaScript `vibeflow.aot-build.v6`，Python `vibeflow.aot-build.v8` |
 | Workflow 启动清单 | `vibeflow.workflow-launches.v2` |
 | 预览快照 | v5 |
 
 旧计划、manifest、启动清单和预览格式通过重新生成升级；当前工具读取当前格式。业务输出、日志、trace 和发布归档按原用途保留。
+
+JS/TS 项目升级时，按现有包管理流程把项目解析到的 TypeScript 升至 7，并更新对应锁文件。
 
 ## 项目与资源
 
@@ -32,7 +34,7 @@
 
 ## 输入与宿主边界
 
-端口与宿主接入代码见[Workflow 协同](workflow-coordination.md)。
+旧 Host Extension 与通用宿主注入接口已退役。把业务端口收发、DOM、应用队列和关键生命周期移入普通 Node。应用可将活对象作为运行输入传入，同进程或进程间的独立 Workflow 协作使用专用 `context.workflow` 接口。端口与宿主接入代码见[Workflow 协同](workflow-coordination.md)。
 
 ## 并发与异步
 

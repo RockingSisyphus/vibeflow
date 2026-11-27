@@ -5,30 +5,31 @@
 ## 分层
 
 ```text
-Tooling → targets/python ──────┐
-        → targets/javascript ─┴→ Block Compiler → Core
-        → coordination ────────────────────────→ Core
+Tooling → Python Target / JavaScript Target（按命令分派）
+Tooling → Block Compiler / Core / Target 共用支持 / Coordination
+Python Target / JavaScript Target → Block Compiler / Core / Target 共用支持
+Block Compiler / Target 共用支持 / Coordination → Core
 ```
 
 - **Core**：语言无关模型、契约、有效图、图算法、finding，以及 Rule/Ruleset 的选择、组合、参数覆盖、类型化资料和执行计划；不定义具体内置规则或质量判断。
 - **Target 共用支持**：跨语言复用的纯检查算法、事实模型、政策、Records 与装配辅助；不贡献资源声明，也不依赖具体语言 Target。
-- **Block Compiler**：把已验证 workflow 编译为公共 `WorkflowPlan` / `BlockPlan`。
+- **Block Compiler**：把 Core 已编译的有效图转换为公共 `WorkflowPlan` / `BlockPlan`，并提供可移植计划的编解码。应用层和 Target 都可以调用它。
 - **Python Target**：Python 插件 SDK、按 workflow 装配的内部 NodeRegistry、直接与延迟绑定、源码服务、Rule handler、执行帧、Runtime 与目录 AOT。
 - **JavaScript Target**：JS/TS 插件 SDK、worker 中的声明与函数绑定、源码服务、Rule ABI、BindingPlan、AOT emitter 与工具链协议。
 - **Coordination**：本机协议、客户端、邮箱、启动握手和实例状态；不解释业务图，不建立运行组，也不托管子进程清理。Target 宿主适配接入各自执行器，命令与配置编排留在 Tooling。
 - **Tooling**：workspace 与 workflow 文件、选中插件装配、CLI、架构展示和 Target-specific Application 编排。独立 `tooling/architecture` 从准备事实统一组装 workflow、Nodeset、资源关系和项目索引，不承担源码发现、规则执行、编译或启动。
 
-Core 接收可移植声明、源码定位与事实；Target 持有 callable、worker 对象及工具链配置。依赖沿图中方向流动，内部 NodeRegistry 为 Python 实现绑定服务；业务 Node 与独立 BaseLib 从标准目录发现，Plugin 整包贡献类型、规则及私有支持资源。
+Core 接收可移植声明、源码定位与事实，将 Config 和资源契约解析为有效图。Python 的调度器和 JavaScript 的生成模块执行各自的语言绑定与业务实现。Target 可依赖 Coordination，Python 的宿主适配使用它，JavaScript 的 Node 与浏览器运行使用 JS 协调组件。Python 内部 NodeRegistry 服务于本次装配，JavaScript 通过声明加载、导出身份和 BindingPlan 绑定。业务 Node 与独立 BaseLib 从标准目录发现，Plugin 整包贡献类型、规则、数据 schema 及私有支持资源。
 
 内置与外部贡献经过同一校验、冻结、来源记录和冲突处理，一次合并为 Catalog。默认资源不会由 Core evaluator 或 Target adapter 再次注入。绑定保留 canonical Descriptor，只补充实际路径、导出对象、配置和实例，不转换为旧 Registry metadata。实现由贡献来源及实现身份解析，内置 ID 没有执行优先权。
 
 ## 唯一有效图
 
-Core 在拓扑分析前解析调用契约：
+Core 在拓扑分析前解析调用契约。NodeType 提供局部 Ruleset 与外观默认值，业务 Node 独立声明契约、实现、流程类别与 completion。调用点配置该次执行，展示样式独立于调度。
 
 - implemented Node 从唯一权威的 NodeDescriptor 继承，Registry 只绑定实现，不读取实现类内的元数据；
 - Nodeset 调用从 NodesetType 定义继承；
-- planned 与系统调用使用 Config 契约。
+- planned 与系统调用使用 Config 契约。显式环路、边角色和 Target 能力等编译约束，以及运行时输入输出契约，独立于可选择的 Rule。
 
 编译结果携带有效图和编译拓扑。Runtime、AOT、review、Architecture 和静态检查消费同一份有效事实，避免调用点与类型登记形成两套真相。
 
@@ -44,11 +45,11 @@ Python 和 JavaScript Target 使用相同 Core 语义，但分别声明可执行
 
 公开规则模型位于 `vibeflow.core.rules`。`selection/static` 与 `selection/dynamic` 只读选择来源，`selection/resolve.py` 统一默认、继承与完整替代，`planning.py` 统一调用路径、范围与接管边界；Targets 负责语言事实与绑定。内置及所选 Plugin 的 `workflow_default` Ruleset 贡献根默认，不向 Config 递归注入规则。
 
-各 Target 的 `rules/graph/` 和 `rules/node/` 分别保存图检查、节点源码检查的声明与实现，`rulesets/` 保存组合与默认，`resources/` 保存公开 SDK 和语言运行资源。`quality/` 负责事实、上下文、检查组织与报告。语言差异直接写在各自定义中；内置 Plugin 装配不再修改另一语言的组合。根目录 `repo_check/` 是独立仓库自检工具，不属于产品资源。
+各 Target 的 `rules/` 保存图、源码及项目治理等内置规则的声明与适配，`rulesets/` 保存组合与默认。两端共用的图检查、事实模型、政策及效果记录处理在 `targets/shared/`。用户可通过插件贡献规则。Core 执行规则计划，各 Target 准备源码分析和语言执行上下文，Tooling 负责项目资源与清单。`quality/` 负责事实、上下文、检查组织与报告。语言差异直接写在各自定义中；内置 Plugin 装配不再修改另一语言的组合。根目录 `repo_check/` 是独立仓库自检工具，不属于产品资源。
 
 NodeType 提供局部默认，业务 Node 可以显式替换，调用 Config 缺省使用默认、非空完整替代、`[]` 取消当前调用的局部选择。Workflow 缺省使用静态默认；NodesetType 缺省继承，显式选择接管内部。Node 局部与所属图规则共同生效。父图保留子调用外部契约，内部由子选择负责。
 
-图 Rule 的背景资料与负责范围分开：`current_graph` 逐图检查，`effective_subtree` 在范围入口执行一次，显式子选择停止遍历。每个完整 Ruleset 依赖计划只有一种图范围，Records 只在显式同范围依赖中传递。范围规划先避免重叠，再由统一执行器复用等价 source 计算。
+图 Rule 的背景资料与负责范围分开：`current_graph` 逐图检查，`effective_subtree` 在范围入口执行一次，显式子选择停止遍历。每个完整图级 Ruleset 依赖计划只有一种图范围，Records 在显式同范围依赖中传递。范围规划先避免重叠，再由统一执行器复用等价 source 计算。
 
 Node 公开上下文只含当前声明、调用、实现/继承实现及实际 helper 闭包，不含其他 Node、全图或 Catalog。源码、AST、引用和归属遵守同一符号边界，保留真实位置。Target 内部继续分析真实模块初始化和资源归属；原生解析、绑定、编译错误独立于规则选择。
 
@@ -56,7 +57,7 @@ Rule ABI 为 `vibeflow.rule.v3`，入口是 `check(context, inputs, params)`；P
 
 ## 插件装配与多文件源码
 
-Tooling 先读取原始 workflow 的插件选择；Target 加载受信插件入口及其直接导入，取得固定资源和实现绑定。`ContributionBuilder` 校验并冻结为 `PluginContributions`，内置资源与选中贡献合并为本次 Catalog，再解析工作流引用。加载和声明错误是装配根因；后续阶段在资源集合有效后进行。不同 workflow 的 Catalog、配置和生命周期实例相互隔离。
+公开 Plugin SDK 分别由 Python 和 JavaScript Target 提供，Core 定义可移植贡献模型、合并和校验。编译与运行扩展通过受支持的生命周期入口接入。Tooling 先读取原始 workflow 的插件选择；Target 加载受信插件入口及其直接导入，取得固定资源和实现绑定。`ContributionBuilder` 校验并冻结为 `PluginContributions`，内置资源与选中贡献合并为本次 Catalog，再解析工作流引用。加载和声明错误是装配根因；后续阶段在资源集合有效后进行。不同 workflow 的 Catalog、配置和生命周期实例相互隔离。
 
 可执行资源将 `implementation_files` 归一化为 ImplementationDescriptor 的显式源码引用，SDK 路径相对声明模块。Target 保存声明、入口、支撑文件、独立库、符号及真实导入边，并区分引用关系和所有权。业务 Node 与生命周期 Plugin 用 base_libs 引用库；Plugin 私有库及支持代码必须留在自身包内。
 
@@ -68,11 +69,11 @@ Architecture 从真实 Config、NodesetType、业务资源及编译事实确定�
 
 NodeType、业务 Node、BaseLib 与 Plugin 共用展示解析，按 native → resource → status → use 合并并记录逐字段来源。资源选择覆盖颜色，声明指定形状与图标；执行身份、效果约束和状态标记独立保存。
 
-两端在 Tooling 的 Target 展示适配器中将已检查、编译的结果组装为完整架构事实；共享 presentation 序列化 Architecture、保存 v5 快照及历史索引。review、build 与 Python 源码运行默认导出数据并安装浏览工具，不启动 Mermaid。AOT 执行不检查源码或生成报告。
+两端在 Tooling 的语言适配器中把已准备的事实交给共享的 `tooling/architecture` 组装；共享 presentation 序列化 Architecture、保存 v5 快照及历史索引。review、build 与 Python 源码运行默认导出数据并安装浏览工具，不启动 Mermaid。AOT 执行不检查源码或生成报告。
 
 HTML 唯一源码位于 tools/workflow-viewer，通过配置的 dataRoot 按需加载本地注册脚本，自主绘制可变形状卡片及连线；流程、BaseLib、Plugin 和 workflow 关联分别投影已有事实。网页不解析业务配置，形状和颜色保留公共样式词汇；Mermaid 方言及格式化仅用于文本导出。详见[本地预览维护说明](../maintainers/local-preview.md)。
 
-用户项目图形 从实际 Workflow 调用与配置资源选择生成。Plugin、BaseLib 使用各自资源分区展示本次使用的资源；Node 位于业务调用处。公开图形层不接收 Catalog 定义图、源码文件依赖图或规则实现图作为业务架构。
+用户项目图形从实际 Workflow 调用与配置资源选择生成。Plugin、BaseLib 使用各自资源分区展示本次使用的资源；Node 位于业务调用处。公开图形层不接收 Catalog 定义图、源码文件依赖图或规则实现图作为业务架构。
 
 Architecture JSONC 的 implementation_graph 保存当前项目的资源、源码角色、归属、真实导入、库依赖、插件贡献和有效规则。这些资料用于源码审核、来源查询与架构新鲜度校验，不直接投影为业务流程图。Core/Target 内部开发信息与用户项目展示边界独立；统一 SDK 注册不会改变图形读者或展示层级。
 
@@ -89,11 +90,11 @@ Architecture JSONC 的 implementation_graph 保存当前项目的资源、源码
 
 `core.graph_calls` 统一实际调用身份、子图、Loop、配置继承。Rule 在相同身份之上补充未调用定义的审查范围；它们不会成为执行调用。Block Compiler 生成可序列化及读取的 WorkflowPlan/BlockPlan，实际并发执行由 Target 的通用图调度器持有。ABI v12 不携带旧 async/result_key 并发字段。
 
-Python 将准备与装配分开：静态阶段保存共同计划及有限的原生图/编译记录，运行阶段绑定类、独立参数容器、活对象和现有 PipelineRuntime。源码与目录 bundle 共用装配函数。生成块在调用时读取追踪和 Hook 选项，不为各 profile 复制编译逻辑。无法生成块的结构保留原动态调度。
+Python 将准备与装配分开。构建保存共同计划、有限的原生图和编译记录以及已选定的块记录。源码与目录 bundle 共用装配函数及块包装函数。调用时绑定节点实例、独立参数容器和活对象，按现有执行选项进入同一个图调度器。
 
-Python 的文件收集、快照编解码、加载 API 与 CLI 属于 Tooling。源码、wheel 和 ZIP 发行通过同一构建入口读取框架资源。两种 Target 共用暂存、原子发布和清单结构，Python 使用 v7 格式，JavaScript 使用 v6 格式。Python 快照保存一份检查报告和各入口的 delegated CLI 额外问题，加载后按选定入口合成运行报告。加载只解析格式、ABI 和运行所需字段。
+Python 的文件收集、快照编解码、加载 API 与 CLI 属于 Tooling。源码、wheel 和 ZIP 发行通过同一构建入口读取框架资源。两种 Target 共用 `targets/shared/aot.py` 与 `aot_publish.py` 的清单结构、暂存和原子发布。JavaScript 发射和打包由 JS Target 的 `frontend/`、`build/` 承担，项目层的准备与调用由 JS Tooling 编排。Python 使用 v8 格式，JavaScript 使用 v6 格式。Python 快照共用原生记录类型表，保存一份基础检查报告和各入口的 delegated CLI 额外问题。加载时按选定入口合成运行报告。
 
-每个 JavaScript 工作流模块在初始化时构造并深冻结一份私有 schema 目录。根工作流、命名入口和子工作流通过根运行上下文读取它，端口自身的 schema 优先。节点各自构造配置参数。
+JavaScript 构建期绑定 Node import，并生成块定义、命名入口、路由与调用表。模块共享同步和异步执行函数、重复静态数据与私有 schema 目录。端口自身的 schema 优先。等价块定义可由多处调用复用，参数按调用点装配，路径和调度状态随每次调用创建。
 
 命名入口和目标的纯解析位于 `core/workflows`，入口范围与调用授权写入公共计划。授权由显式 Rule Record 折叠，不由 `flow_kind` 或外观产生；Python 上下文与 JS 生成模块执行同一有效权限。端口收发改为普通 SDK Node，执行器和计划不再保留原生 IO 分支。
 

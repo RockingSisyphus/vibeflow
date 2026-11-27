@@ -89,3 +89,34 @@ def test_invalid_collector_and_disconnected_worker_are_rejected_before_build(tmp
         if language=="javascript":args += ["--target","node","--profile","single-esm"]
         rejected=cli(work,*args,success=False)
         assert rejected.returncode==1 and code in rejected.stdout and not target.exists(),rejected.stdout
+
+
+@pytest.mark.parametrize("mode", ["sync", "async"])
+def test_javascript_all_join_requires_new_completion_from_every_predecessor(tmp_path, toolchain, mode):
+    work = example(tmp_path / "source", "javascript/graph_concurrency", toolchain)
+    names = ("start", "first", "second", "once", "delay1", "delay2", "delay3", "trigger", "join", "end")
+    nodes = [
+        {"id": name, "definition_id": "native.terminal" if name in {"start", "end"} else "native.noop",
+         "display_name": name, "description": "Control-flow node"}
+        for name in names
+    ]
+    next(node for node in nodes if node["id"] == "trigger")["join_policy"] = "any_active"
+    next(node for node in nodes if node["id"] == "join")["join_policy"] = "all"
+    edges = [
+        ["start", "first"], ["start", "second"], ["start", "once"], ["first", "trigger"],
+        ["second", "delay1"], ["delay1", "delay2"], ["delay2", "delay3"], ["delay3", "trigger"],
+        ["once", "join"], ["trigger", "join"], ["join", "end"],
+    ]
+    config = write(work / "project/configs/repeated-activation.jsonc", {
+        "rulesets": ["vibeflow.workflow"], "pipeline": {"entry_mode": mode, "nodes": nodes, "edges": edges},
+    })
+    result = cli(work, "build", "--workspace", work / "vibeflow_config.jsonc", "--config", config,
+                 "--out-dir", tmp_path / "bundle", "--target", "browser", "--profile", "single-esm")
+    request = write(tmp_path / "request.json", {"mode": mode, "observe_business": True, "options": {"trace": "full"}})
+    shutil.rmtree(work)
+    ran = command("node", ROOT / "tests/e2e/applications/javascript_run.mjs", json.loads(result.stdout)["entry"],
+                  request, cwd=tmp_path)
+    report = json.loads(next(line[7:] for line in ran.stdout.splitlines() if line.startswith("RESULT ")))
+    started = [event["nodeId"] for event in report["events"] if event["kind"] == "node_start"]
+    assert started.count("trigger") == 2, started
+    assert started.count("join") == started.count("end") == 1, started

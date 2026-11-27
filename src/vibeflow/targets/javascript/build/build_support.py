@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -8,10 +7,6 @@ from vibeflow.targets.javascript.frontend.emitter import EmittedWorkflow
 from vibeflow.targets.javascript.frontend.errors import AotBuildError
 from vibeflow.targets.javascript.frontend.contracts import PROFILES, TARGETS
 from vibeflow.targets.javascript.frontend.emission_protocol import EmissionWorkflow
-from vibeflow.targets.shared.aot_publish import (
-    AotPublishError,
-    validate_owned_build_directory,
-)
 from vibeflow.targets.javascript.build.toolchain import DriverBuildResult
 
 
@@ -260,23 +255,6 @@ def _plain_json_value(value: Any) -> Any:
     return value
 
 
-def validate_existing_target(out_dir: Path, *, replace: bool) -> None:
-    if not os.path.lexists(out_dir):
-        return
-    if not replace:
-        raise AotBuildError(
-            "VF_BUILD_EXISTS",
-            f"output directory already exists: {out_dir}",
-        )
-    try:
-        validate_owned_build_directory(
-            out_dir,
-            manifest_format=BUILD_MANIFEST_FORMAT,
-        )
-    except AotPublishError as exc:
-        raise AotBuildError(exc.code, str(exc)) from exc
-
-
 __all__ = [
     "BUILD_MANIFEST_FORMAT",
     "SOURCEMAP_MODES",
@@ -286,7 +264,6 @@ __all__ = [
     "entry_name",
     "resolve_under_project",
     "resolved_implementations",
-    "validate_existing_target",
     "validate_modes",
     "validate_profile_output",
     "web_inputs",

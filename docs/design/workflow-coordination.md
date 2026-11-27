@@ -1,6 +1,8 @@
 # Workflow 协作与 Python 原生异步
 
-本轮将协作声明、实例管理和语言执行分开。Core 保存可移植事实，独立 Coordination 层管理 Python 实例，各 Target 执行已有公共计划。浏览器复用 JS 同进程组件。
+协作声明、实例管理和语言执行各有独立职责。Core 保存可移植事实，独立 Coordination 层管理 Python 实例，各 Target 执行已有公共计划。浏览器复用 JS 同进程组件。
+
+下图表示运行时的调用与绑定关系。源码的依赖方向见[系统架构](system-architecture.md)。
 
 ```mermaid
 flowchart TD
@@ -17,7 +19,7 @@ flowchart TD
 
 Core 不持有实例、线程或 Promise。Python Coordination 不导入 Target；绑定是描述与执行回调。Python Target 的 workflow_host 将 Runtime 转成该执行接口。HTTP 服务持有显式事件循环，路由将请求提交给同一个 Coordinator；进程启动、回收和注册前失败由 ProcessLauncher 处理。启动器退出不能代替 workflow 终态。
 
-Python scheduler 的就绪、输入、汇合、路由与额度状态只有一份。同步入口在当前调用内执行；原生异步入口在事件循环执行协程，为普通节点持有线程，并等待实际退出。Nodeset、Loop 与生成块使用同一调度状态。异步执行锁等待通过事件循环 Future 被唤醒；协程不阻塞等待 Condition。
+Python scheduler 的就绪、输入、汇合、路由与额度状态只有一份。同步入口在当前调用内执行；原生异步入口在事件循环执行协程，为普通节点持有线程，并等待实际退出。Nodeset、Loop 与已绑定的块使用同一套调度机制。异步执行锁等待通过事件循环 Future 被唤醒；协程不阻塞等待 Condition。
 
 Runtime 负责节点、Hook、dispose、锁和观察的真实完成；Coordinator 只在执行回调结束后写终态。停止请求和取消等待都不是终态。同步子调用不留下长期记录；异步终态由宿主显式释放。独立 Call 的执行上下文不会继承调用方的观察者或锁租约；同步嵌套保留锁重入，但观察与实例身份独立。
 

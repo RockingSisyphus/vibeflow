@@ -1,0 +1,22 @@
+{
+  "plugins": [{"source": {"kind": "file", "ref": "plugins/formula/plugin.py"}}],
+  "nodeset_imports": [{"path": "nodeset_types/平方与差距.jsonc"}],
+  "pipeline": {
+    "inputs": [
+      {"key": "x", "type": "formula.x", "display_name": "第一个整数 x", "required": true},
+      {"key": "y", "type": "formula.y", "display_name": "第二个整数 y", "required": true}
+    ],
+    "nodes": [
+      {"id": "start", "definition_id": "formula.boundary", "display_name": "接收一对整数", "description": "从自己的入口接收整数 x 和 y。"},
+      {"id": "score", "definition_id": "formula.square_gap", "display_name": "复用「平方与差距」", "description": "直接使用同一 Nodeset，仅计算 x² + y² + |x − y|。"},
+      {
+        "id": "end", "definition_id": "formula.boundary", "display_name": "输出独立计算结果", "description": "把 Nodeset 的结果直接作为此 Workflow 的结果返回。",
+        "similar_to": {"node": "start", "relationship": "copy", "reason": "两个节点都只标记流程边界。"}
+      }
+    ],
+    "edges": [["start", "score"], ["score", "end"]],
+    "outputs": [
+      {"type": "formula.square_gap", "as": "square_gap", "display_name": "平方与差距项", "cardinality": "exactly_one"}
+    ]
+  }
+}

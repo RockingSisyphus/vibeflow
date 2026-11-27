@@ -46,6 +46,8 @@ AI 开始项目开发时，应优先阅读已有架构资料，先了解项目�
 | `resources`、实现来源与 `implementation_graph` | 定位 Node、BaseLib、Plugin 的入口、支撑源码及依赖 |
 | `rule_selections`、`rule_checks`、`workflow_operations` | 查看所选规则、检查结果和workflow 协作操作 |
 
+JavaScript 的 Architecture 保留每次规则执行的状态、发现与业务记录。源码度量的原始记录使用 `quality-check --json` 查看。
+
 检查字段按本次操作的实际输出读取。按来源记录中的 root 与路径定位文件；同一业务定义在不同调用位置可以使用不同参数和规则。源码引用描述实现位置，planned 状态与运行记录分别说明规划和执行情况。
 
 ## 在 root 中登记 workflow 文档

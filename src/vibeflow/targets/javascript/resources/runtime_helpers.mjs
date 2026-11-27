@@ -446,7 +446,7 @@ function nodeContext(node, state, execution) {
   });
 }
 
-function invokeStaticImplementationSync(implementation, node, inputs, state) {
+function invokeStaticImplementationSync(implementation, node, params, inputs, state) {
   if (typeof implementation !== "function") {
     throw vfError(
       "VF_INTERNAL",
@@ -457,7 +457,7 @@ function invokeStaticImplementationSync(implementation, node, inputs, state) {
   }
   const execution = new NodeExecution(state.root.signal);
   try {
-    const outputs = implementation(inputs, node.params, nodeContext(node, state, execution));
+    const outputs = implementation(inputs, params, nodeContext(node, state, execution));
     throwIfAborted(state.root.signal, state.workflow, nodePath(state, node.id));
     return validateNodeOutputs(node, outputs, state);
   } catch (cause) {
@@ -479,7 +479,7 @@ function invokeStaticImplementationSync(implementation, node, inputs, state) {
   }
 }
 
-async function invokeStaticImplementationAsync(implementation, node, inputs, state) {
+async function invokeStaticImplementationAsync(implementation, node, params, inputs, state) {
   if (typeof implementation !== "function") {
     throw vfError(
       "VF_INTERNAL",
@@ -493,7 +493,7 @@ async function invokeStaticImplementationAsync(implementation, node, inputs, sta
   try {
     const outputs = await awaitWithAbort(
       Promise.resolve().then(() =>
-        implementation(inputs, node.params, nodeContext(node, state, execution))
+        implementation(inputs, params, nodeContext(node, state, execution))
       ),
       state.root.signal,
       state.workflow,
@@ -675,13 +675,4 @@ function deepFreeze(value) {
   if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) deepFreeze(child);
   return Object.freeze(value);
-}
-
-function consumeStaticActivation(node, state) {
-  if (node.join_policy === 'all') {
-    for (const route of state.workflow.routes) {
-      if (route.schedule && route.target === node.id)
-        state.activeEdges.delete(`${route.source}\0${route.target}`);
-    }
-  }
 }

@@ -3,10 +3,11 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 
-from vibeflow.targets.shared.aot_publish import atomic_publish_directory, validate_owned_build_directory
+from vibeflow.targets.shared.aot_publish import AotPublishError, atomic_publish_directory
 
 BUILD_MANIFEST_FORMAT = 'vibeflow.aot-build.v6'
 
@@ -33,10 +34,8 @@ def artifact_manifest(staging, *, workflow, project_target, entry, plan_sha256, 
 @contextmanager
 def staged_build(out_dir, *, replace=False, manifest_format=BUILD_MANIFEST_FORMAT):
     output = Path(out_dir).expanduser().absolute()
-    if output.exists():
-        if not replace:
-            raise FileExistsError(f'output directory already exists: {output}')
-        validate_owned_build_directory(output, manifest_format=manifest_format)
+    if not replace and os.path.lexists(output):
+        raise AotPublishError("VF_BUILD_EXISTS", f"output directory already exists: {output}")
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.' + output.name + '.aot-', dir=output.parent) as temporary:
         staging = Path(temporary) / 'dist'

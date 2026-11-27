@@ -8,7 +8,7 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 
 ## 发行资源中的用户文档
 
-用户手册的唯一原稿在 [distribution/docs](../distribution/docs/README.md)，随发行构建进入包内的 kernel/docs。这里维护当前内核设计、开发流程和待执行任务。可先[运行发行包自带示例](../distribution/docs/user/quickstart.md)。
+用户手册的唯一原稿在 [distribution/docs](../distribution/docs/README.md)，随发行构建进入包内的 kernel/docs。这里维护当前内核设计、开发流程和待执行任务。可先[运行发行包自带示例](../distribution/docs/user/quickstart.md)，理解现有项目可从[架构阅读与维护](../distribution/docs/user/architecture.md)进入。
 
 
 ## 系统设计
@@ -42,8 +42,6 @@ VibeFlow 文档按读者和用途分层。使用者文档是发行包的规范�
 - [Python 检查会话与展示资料](maintainers/python-check-sessions.md)
 - [JS/TS 检查会话与释放](maintainers/javascript-check-sessions.md)
 - [发行与文档装配](maintainers/release.md)
-- [1.4.5 本地验证记录](maintainers/release-1.4.5-validation.md)
-- [1.5.0 本地验收记录](maintainers/release-1.5.0-validation.md)
 - [目录职责与产物约定](maintainers/directory-layout.md)
 
 

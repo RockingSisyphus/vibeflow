@@ -4,8 +4,8 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { pathToFileURL } from "node:url";
 
+import {loadTypeScript} from "./toolchain_typescript.mjs";
 import {sdkPlugin, sdkTypes} from "./sdk_loader.mjs";
 import {AnalysisSession,analysisProgram} from "./analysis_program.mjs";
 import {ownershipImportStatements} from "./source_ownership.mjs";
@@ -28,18 +28,17 @@ function visitChildren(ts, node, visitor) {
   else node.forEachChild(visitor);
 }
 
-function isKind(ts, node, legacyName, nativeName, syntaxName) {
-  const predicate = ts[legacyName] || ts[nativeName];
+function isKind(ts, node, nativeName, syntaxName) {
+  const predicate = ts[nativeName];
   if (typeof predicate === "function") return predicate(node);
   return node?.kind === ts.SyntaxKind[syntaxName];
 }
 
 function isStringLiteralLike(ts, node) {
-  return isKind(ts, node, "isStringLiteralLike", "isStringLiteral", "StringLiteral")
+  return isKind(ts, node, "isStringLiteral", "StringLiteral")
     || isKind(
       ts,
       node,
-      "isNoSubstitutionTemplateLiteral",
       "isNoSubstitutionTemplateLiteral",
       "NoSubstitutionTemplateLiteral",
     );
@@ -51,24 +50,9 @@ async function packageTools(packageRoot, { requireEsbuild = true } = {}) {
   let typescript;
   let esbuild = null;
   try {
-    const version = require("typescript");
-    if (typeof version.createProgram === "function") {
-      typescript = version;
-    } else {
-      const astPath = require.resolve("typescript/unstable/ast");
-      const apiPath = require.resolve("typescript/unstable/sync");
-      const [ast, api] = await Promise.all([
-        import(pathToFileURL(astPath).href),
-        import(pathToFileURL(apiPath).href),
-      ]);
-      typescript = {
-        ...ast,
-        ...api,
-        version: String(version.version || ""),
-        __native: true,
-      };
-    }
+    typescript = await loadTypeScript(require);
   } catch (cause) {
+    if (cause?.code === "VF_TOOLCHAIN_VERSION") throw cause;
     fail("VF_TOOLCHAIN_MISSING", "project-local package 'typescript' cannot be resolved", {
       packageRoot,
       cause: String(cause),
@@ -496,7 +480,6 @@ function unwrapExpression(ts, node) {
     || isKind(
       ts,
       current,
-      "isTypeAssertionExpression",
       "isTypeAssertion",
       "TypeAssertionExpression",
     )
@@ -570,7 +553,6 @@ function isImportSafeClass(ts, node) {
     return !isKind(
       ts,
       member,
-      "isPropertyDeclaration",
       "isPropertyDeclaration",
       "PropertyDeclaration",
     );
@@ -681,10 +663,10 @@ function importDeclarationHasRuntimeBindings(ts, statement) {
   if (clause.name) return true;
   const bindings = clause.namedBindings;
   if (!bindings) return false;
-  if (isKind(ts, bindings, "isNamespaceImport", "isNamespaceImport", "NamespaceImport")) {
+  if (isKind(ts, bindings, "isNamespaceImport", "NamespaceImport")) {
     return true;
   }
-  if (isKind(ts, bindings, "isNamedImports", "isNamedImports", "NamedImports")) {
+  if (isKind(ts, bindings, "isNamedImports", "NamedImports")) {
     return bindings.elements.length > 0;
   }
   return false;
@@ -1459,7 +1441,6 @@ function auditModuleRegExpState(ts, sourceFile, policy, ruleParams = {}) {
         ts,
         node,
         "isConstructorDeclaration",
-        "isConstructorDeclaration",
         "Constructor",
       );
   }
@@ -1779,7 +1760,6 @@ function auditModuleStateWrites(ts, sourceFile, checker, project, policy, rulePa
       ts,
       node,
       "isDeleteExpression",
-      "isDeleteExpression",
       "DeleteExpression",
     )) {
       if (writesBuiltinPrototype(node.expression)) {
@@ -2042,12 +2022,12 @@ function identifierIsReference(ts, node) {
       || (ts.isMethodDeclaration(parent) && parent.name === node)
       || (ts.isPropertyDeclaration(parent) && parent.name === node)
       || (ts.isVariableDeclaration(parent) && parent.name === node)
-      || (isKind(ts, parent, "isParameter", "isParameterDeclaration", "Parameter") && parent.name === node)
+      || (isKind(ts, parent, "isParameterDeclaration", "Parameter") && parent.name === node)
       || ts.isImportSpecifier(parent)
       || ts.isExportSpecifier(parent)
       || ts.isBindingElement(parent)
-      || isKind(ts, parent, "isPropertySignature", "isPropertySignatureDeclaration", "PropertySignature")
-      || isKind(ts, parent, "isMethodSignature", "isMethodSignatureDeclaration", "MethodSignature")
+      || isKind(ts, parent, "isPropertySignatureDeclaration", "PropertySignature")
+      || isKind(ts, parent, "isMethodSignatureDeclaration", "MethodSignature")
       || (ts.isTypeQueryNode && ts.isTypeQueryNode(parent))
       || ts.isTypeReferenceNode(parent)) return false;
   return true;
@@ -2171,9 +2151,7 @@ function qualityPublicApiCount(ts, sourceFile) {
 }
 
 function qualitySyntaxDiagnostics(ts, program, sourceFile) {
-  const diagnostics = ts.__native
-    ? program.getSyntacticDiagnostics(sourceFile.fileName)
-    : program.getSyntacticDiagnostics(sourceFile);
+  const diagnostics = program.getSyntacticDiagnostics(sourceFile.fileName);
   return diagnostics.map((item) => {
     const data = diagnosticText(ts, item);
     const offset = item.start ?? item.pos ?? item.range?.start ?? 0;
@@ -2399,8 +2377,11 @@ async function auditContracts(ts, request, extraFiles = [], checkDiagnostics = t
   const {program,checker,project,sourceFiles}=state;
   try {
     const diagnostics=checkDiagnostics?sourceFiles.filter(item=>contractFiles.has(path.resolve(item.fileName)))
-      .flatMap(item=>ts.__native?[...program.getSyntacticDiagnostics(item.fileName),...program.getBindDiagnostics(item.fileName),...program.getSemanticDiagnostics(item.fileName)]
-        :ts.getPreEmitDiagnostics(program,item)).map(item=>diagnosticText(ts,item)):[];
+      .flatMap(item => [
+        ...program.getSyntacticDiagnostics(item.fileName),
+        ...program.getBindDiagnostics(item.fileName),
+        ...program.getSemanticDiagnostics(item.fileName),
+      ]).map(item => diagnosticText(ts, item)) : [];
     if (qualityOnly) {
       return collectQualityFacts(ts, program, checker, project, sourceFiles, request);
     }

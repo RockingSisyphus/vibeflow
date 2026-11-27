@@ -19,7 +19,6 @@ from vibeflow.targets.javascript.build.build_support import (
     driver_import_policy as _driver_import_policy,
     entry_name as _entry_name,
     resolve_under_project as _resolve_under_project,
-    validate_existing_target as _validate_existing_target,
     validate_modes as _validate_modes,
     validate_profile_output as _validate_profile_output,
     web_inputs as _web_inputs,
@@ -94,7 +93,6 @@ def build_aot(request: BuildRequest) -> BuildResult:
             "VF_BUILD_PATH",
             "out_dir must name a dedicated build directory",
         )
-    _validate_existing_target(out_dir, replace=request.replace)
     emitted = emit_workflow_module(
         request.plan, javascript_bindings=request.javascript_bindings,
         workflow_reference=request.workflow_reference, workflow_launches=request.workflow_launches,

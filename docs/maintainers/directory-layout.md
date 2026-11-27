@@ -6,14 +6,14 @@
 | .github | GitHub Actions、Issue 和 Pull Request 模板，以及仓库首页展示图 |
 | src/vibeflow | Core、BlockCompiler、Python/JavaScript Target、Target 共用支持、Coordination 与 Tooling 的核心源码及运行资源 |
 | distribution | 构建器、profile 配置、提示词、项目模板、最小项目和 distribution/docs 用户文档原稿 |
-| dist | 版本明确的发行 ZIP 和校验清单；展开目录只用于当前构建/验证，用完清理 |
+| dist | 最新正式 collaborative / autonomous 发行目录、对应的版本化 ZIP 和校验清单；候选与验收副本放在仓库外 |
 | archive | 被替换的历史发行 ZIP；同版本不同构建可保存在 history 下 |
 | sandbox/python、sandbox/javascript | 公开 SDK/CLI 与真实宿主环境中的使用项目，直接加载工作区 src |
 | tests/e2e | 按功能组织的用户行为端到端测试、真实输入和薄驱动；统一入口负责调度 |
 | repo_check | 独立仓库质检 CLI，不进入产品发行包；其行为测试归 tests/e2e |
 | references | 外来参考项目，不作为生成产物仓库 |
 | tools | 开发、验证、清理和辅助工具，以及独立只读 workflow-viewer 源码；浏览工具由发行构建显式打包 |
-| docs | 当前设计、维护说明及待执行计划；图片及长期阅读工作簿等正文资源放在 assets |
+| docs | 当前设计、维护说明及待执行计划 |
 
 ## Rule 与 Node 的源码边界
 
@@ -21,9 +21,9 @@ Core 的 `core/rules/` 负责公共 Rule/Ruleset 模型、资源选择、范围�
 
 Python 和 JavaScript Target 分别维护 `rules/`、`rulesets/`；Python SDK 代码位于 `sdk/`，JavaScript SDK 与运行脚本位于 `resources/`：
 
-- `rules/graph/` 定义和实现图级检查；`rules/node/` 定义和实现节点源码检查；`rules/source_quality.py` 提供 Target 源码检查声明；project/root 治理声明及其公共算法归 shared/rule_support/governance.py。
+- `rules/graph/` 定义和实现图级检查；`rules/node/` 定义和实现节点源码检查；`rules/source_quality.py` 提供 Target 源码检查声明；project/root 治理声明及其公共算法归 `targets/shared/rule_support/`。
 - `rulesets/` 定义组合、依赖、阶段入口、Workflow 默认；各 Target 自己表达支持范围，不在装配时修改另一语言的 Ruleset。
-- `sdk/` 与 `resources/` 按语言保存公开 SDK 及运行支持；NodeType 定义外观和默认规则，业务 Node 从 project/root 的 nodes/ 发现，Plugin 不能贡献业务 Node。
+- `sdk/` 与 `resources/` 按语言保存公开 SDK 及运行支持；NodeType 定义外观和默认规则，业务 Node 默认从 project/root 的 nodes/ 发现。业务 Node 与 Plugin 分离由默认 packages Rule 约束。
 - Target 的 `quality/` 提供事实、上下文、执行组织和报告，具体规则判断归 `rules/`。
 - `targets/shared/quality_support/` 和 `rule_support/` 提供共用算法、事实数据、Record 契约与装配辅助，包含共用纯算法与 project/root 治理声明，不依赖具体 Target。
 

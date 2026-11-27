@@ -16,7 +16,7 @@
 
 长期验收入口见[开发与验证](development.md)。退役资料直接删除、版本压缩包不覆盖；目录与产物规则见[目录职责](directory-layout.md)。统一错误处理、取消和资源收尾仍按[待实施计划](../design/workflow-error-handling-plan.md)另行设计，现有浏览器包装层收尾在替代机制可用前保留。
 
-政策覆盖与真实执行回归见 `tests/e2e/test_governance.py`；资源闭包见 `tests/e2e/test_governance.py`。
+治理和资源闭包的端到端回归见 `tests/e2e/test_governance.py` 与 `tests/e2e/test_resources.py`。
 
 ## 资源使用结果与调用链
 

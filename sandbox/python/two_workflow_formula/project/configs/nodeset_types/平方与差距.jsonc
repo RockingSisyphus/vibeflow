@@ -1,0 +1,38 @@
+{
+  "type_key": "formula.square_gap",
+  "display_name": "平方与差距",
+  "description": "将两数的平方和与差的绝对值相加，得到 x² + y² + |x − y|。",
+  "requires": [
+    {"type": "formula.x", "cardinality": "exactly_one", "display_name": "第一个整数 x"},
+    {"type": "formula.y", "cardinality": "exactly_one", "display_name": "第二个整数 y"}
+  ],
+  "provides": [{"key": "square_gap", "type": "formula.square_gap", "display_name": "平方与差距项"}],
+  "pipeline": {
+    "inputs": [
+      {"key": "x", "type": "formula.x", "display_name": "第一个整数 x", "required": true},
+      {"key": "y", "type": "formula.y", "display_name": "第二个整数 y", "required": true}
+    ],
+    "nodes": [
+      {"id": "start", "definition_id": "formula.boundary", "display_name": "开始计算两部分", "description": "用同一对整数，分别求平方和与两数间距。"},
+      {"id": "sum_squares", "definition_id": "formula.sum_squares", "display_name": "求两数的平方和", "description": "分别平方，再相加，得到 x² + y²。"},
+      {"id": "difference", "definition_id": "formula.difference", "display_name": "求两数之差", "description": "计算 x − y，保留正负号，供下一步取绝对值。"},
+      {"id": "absolute_gap", "definition_id": "formula.absolute_gap", "display_name": "取差值的绝对值", "description": "去掉差值的正负号，得到两数的距离 |x − y|。"},
+      {"id": "combine", "definition_id": "formula.combine_square_gap", "display_name": "合并平方和与差距", "description": "等两路都算完，把平方和与两数的距离相加。", "join_policy": "all"},
+      {
+        "id": "end", "definition_id": "formula.boundary", "display_name": "返回平方与差距项", "description": "对外只提供两部分相加后的整数。",
+        "similar_to": {"node": "start", "relationship": "copy", "reason": "两个节点都只标记 Nodeset 的边界。"}
+      }
+    ],
+    "edges": [
+      ["start", "sum_squares"],
+      ["start", "difference"],
+      ["difference", "absolute_gap"],
+      ["sum_squares", "combine"],
+      ["absolute_gap", "combine"],
+      ["combine", "end"]
+    ],
+    "outputs": [
+      {"type": "formula.square_gap", "as": "square_gap", "cardinality": "exactly_one", "display_name": "平方与差距项"}
+    ]
+  }
+}

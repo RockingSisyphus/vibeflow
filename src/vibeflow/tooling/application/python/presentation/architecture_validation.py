@@ -9,19 +9,11 @@ def _validate_registered_architecture_document(
     report: HealthReport,
     *,
     document_path: Path,
-    graph: object,
-    compiled: object,
-    registry: object,
-    resources: object,
     workspace: object,
-    prepared=None,
+    prepare_presentation,
 ) -> HealthReport:
     """Validate the generated document registered for one workflow, if any."""
-
-    from vibeflow.tooling.application.python.presentation.architecture_document import (
-        build_architecture_document,
-        render_architecture_payload,
-    )
+    from vibeflow.tooling.application.python.presentation.architecture_document import render_architecture_payload
 
     root = workspace.root_for_path(document_path)
     if root is None:
@@ -37,13 +29,7 @@ def _validate_registered_architecture_document(
     )
     if spec is None:
         return report
-    expected_payload = build_architecture_document(
-        graph,
-        compiled=compiled,
-        registry=registry,
-        resources=resources,
-        prepared=prepared,
-    )
+    expected_payload = prepare_presentation().architecture()
     expected_text = render_architecture_payload(expected_payload)
     finding = check_architecture_document(
         spec.document_path,

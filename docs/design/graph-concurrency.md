@@ -10,9 +10,9 @@ Workflow ABI v12 的 Block 种类限定为 workflow、nodeset、loop。解码器
 
 ## Target 调度
 
-Python 的 [scheduler.py](../../src/vibeflow/targets/python/runtime/scheduler.py) 是唯一图协调器：共享一份就绪、输入、汇合和分发状态。sync 在当前调用内执行；async 由事件循环运行协程，并为普通同步节点持有线程。结果仅在实际执行和清理结束后交付。节点执行时继承 contextvars，锁租约覆盖正在运行的工作。plan、block、compiled 入口共用这个协调器；生成的块只调用公共块包装函数。
+Python 的 [scheduler.py](../../src/vibeflow/targets/python/runtime/scheduler.py) 是唯一图协调器：共享一份就绪、输入、汇合和分发状态。sync 在当前调用内执行；async 由事件循环运行协程，并为普通同步节点持有线程。结果仅在实际执行和清理结束后交付。节点执行时继承 contextvars，锁租约覆盖正在运行的工作。plan、block、compiled 入口共用这个协调器；块记录绑定到公共块包装函数。
 
-JavaScript 的 [codegen_scheduler.py](../../src/vibeflow/targets/javascript/frontend/codegen_scheduler.py) 发射事件循环调度。running Map 保存已启动调用，失败后向共享 AbortController 发出停止请求，并等待剩余调用结束。同步入口保持同步 ABI，不创建 Worker。
+JavaScript 的 [AOT 生成器](../../src/vibeflow/targets/javascript/frontend/codegen_generator.py) 提前编译路由和汇合条件，[共享调度器](../../src/vibeflow/targets/javascript/resources/static_scheduler.mjs) 执行这些表。running Map 保存已启动调用，失败后向共享 AbortController 发出停止请求，并等待剩余调用结束。同步入口保持同步 ABI，不创建 Worker。
 
 普通调度边激活与数据传输分别处理；all 交付保留每个 envelope，按节点声明顺序排序。每轮消费 all 的入边完成信号，避免下一轮复用旧信号。
 

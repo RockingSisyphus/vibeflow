@@ -144,15 +144,13 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
                 item['factory_path'] = relative(_implementation_path(source.kind,source.ref,owner.path,registry.source_roots))
             plugins.append(item)
 
-        blocks, source_functions = {}, []
+        blocks = {}
         def save_blocks(plan,block_id):
-            records = []
-            for block in plan.blocks:
-                function = 'block_' + str(len(source_functions))
-                original = {'graph':'compiled_block','loop':'compiled_loop_block','nodeset':'compiled_nodeset_block'}[block.kind]
-                source_functions.append(block.source.replace('def ' + original + '(', 'def ' + function + '(',1))
-                records.append(dict(name=block.name,entry=block.entry,exits=block.exits,nodes=block.nodes,kind=block.kind,function=function,path=block.path,source=block.source))
-            blocks[block_id] = records
+            blocks[block_id] = [
+                dict(name=block.name,entry=block.entry,exits=block.exits,nodes=block.nodes,
+                     kind=block.kind,path=block.path)
+                for block in plan.blocks
+            ]
             common = prepared.workflow.block(block_id)
             for call in common.nodes:
                 frame = plan.frames[call.id]
@@ -165,10 +163,15 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
             name: [finding.to_dict() for finding in delegate_cli_contract_findings(
                 project_entry(compilation.workflow.graph, compilation.compiled_graph, name)[0])]
             for name in compilation.workflow.graph.entries}
+        snapshot_types = {}
         data = dict(workflow_reference={"root":workspace.root_for_path(config).id, "path":config.relative_to(workspace.root_for_path(config).path).as_posix()}, resource_use=checked.resources.resource_use.to_dict(),
             delegate_findings=[finding.to_dict() for finding in delegate_findings], delegate_findings_by_entry=delegate_entries,
-            workflow=prepared.workflow.to_dict(),graphs=encode_snapshot(prepared.graphs,relocate=relocate),
-            compiled=encode_snapshot(prepared.compiled),globals=encode_snapshot(prepared.globals),overrides=encode_snapshot(prepared.overrides),
+            workflow=prepared.workflow.to_dict(),
+            graphs=encode_snapshot(prepared.graphs, types=snapshot_types, relocate=relocate),
+            compiled=encode_snapshot(prepared.compiled, types=snapshot_types),
+            globals=encode_snapshot(prepared.globals, types=snapshot_types),
+            overrides=encode_snapshot(prepared.overrides, types=snapshot_types),
+            snapshot_types=list(snapshot_types),
             source_roots=list(dict.fromkeys([*destinations.values(),*(destination for _,destination in dependency_roots)])),
             source_import_roots={relative(root):[relative(path) for path in namespace.roots]
                                  for root,namespace in registry.source_namespaces.items()},
@@ -178,12 +181,10 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
         files = python_bundle_files(workspace, environment.registry, config, inputs,
             out_dir=Path(request.out_dir).resolve(), include=request.include)
         files = tuple(sorted({*files,*(Path(graph.source_path) for graph in prepared.graphs.values() if graph.source_path)}))
-        from vibeflow.tooling.application.python.presentation.prepared import prepare_python_presentation
         from vibeflow.tooling.presentation.preview.diagnostics import incidental_preview, preview_operation
         from vibeflow.tooling.application.python.presentation.preview import python_preview
         def publish_build_preview():
-            presentation = prepare_python_presentation(compilation.workflow.graph, registry=environment.registry,
-                resources=checked.resources, compilation=compilation)
+            presentation = checked.presentation_for(environment.registry)
             return python_preview(presentation, config=config, workspace=workspace,
                 preview_root=request.preview_root, category="build", status="building", check_status=health.status)
         preview_record = incidental_preview(publish_build_preview)
@@ -202,9 +203,7 @@ def build_python_aot(request: PythonBuildRequest) -> PythonBuildResult:
                 target = staging / relative(source)
                 target.parent.mkdir(parents=True,exist_ok=True)
                 shutil.copy2(source,target)
-            (staging/'python-workflow.json').write_text(json.dumps(data,ensure_ascii=False,sort_keys=True,allow_nan=False)+'\n',encoding='utf-8')
-            imports = 'from vibeflow.targets.python.runtime.block_compiler import CompiledBlockResult\n'
-            (staging/'generated_blocks.py').write_text(imports+'\n\n'.join(source_functions)+'\n',encoding='utf-8')
+            (staging/'python-workflow.json').write_text(json.dumps(data,ensure_ascii=False,sort_keys=True,separators=(",", ":"),allow_nan=False)+'\n',encoding='utf-8')
             (staging/'run.py').write_text("from pathlib import Path\nimport sys\nsys.dont_write_bytecode = True\nROOT = Path(__file__).resolve().parent\nsys.path.insert(0, str(ROOT / '_framework'))\nfrom vibeflow.tooling.application.python.bundle_cli import main\nif __name__ == '__main__':\n    raise SystemExit(main(ROOT))\n",encoding='utf-8')
             manifest = artifact_manifest(staging,workflow=prepared.workflow,project_target='python',entry='run.py',
                 plan_sha256=hashlib.sha256(prepared.workflow.to_json().encode()).hexdigest(),

@@ -100,7 +100,7 @@ python -m vibeflow build --workspace vibeflow_config.jsonc --config python_proje
 python python_project/build/aot/run.py run --input python_project/probe_input.json --runtime-profile train
 ```
 
-所属项目选择 Python target，默认 profile 为 `python-package`。输出目录包含匹配的 VibeFlow 框架、共同计划、Python 绑定、预生成块代码和项目实现。整目录可移到另一台机器；目标环境提供 Python 3.11+ 及业务依赖，例如 PyTorch、CUDA。运行使用产物中已准备的计划与实现，无需原 workspace。不适合块执行的图继续使用已准备结构动态调度。
+所属项目选择 Python target，默认 profile 为 `python-package`。输出目录包含匹配的 VibeFlow 框架、共同计划、Python 绑定、预编译块记录和项目实现。整目录可移到另一台机器；目标环境提供 Python 3.11+ 及业务依赖，例如 PyTorch、CUDA。运行使用产物中已准备的计划与实现，无需原 workspace。不适合块执行的图继续使用已准备结构动态调度。
 
 Node、插件及支撑代码按原包路径保留，包内资源随包收集。根目录数据、动态导入所需文件可用重复的 `--include assets --include extra_module.py` 添加，路径相对 workflow 所属 root。外部数据和 checkpoint 由调用者提供。框架拥有的定位会重定位；业务配置中的普通路径字符串不改写，相对路径继续以调用者工作目录为准。
 
@@ -120,7 +120,7 @@ python candidate-bundle/run.py delegate-cli -- --help
 
 构建元数据的共同头保存工作流、ABI、入口和文件，`target_metadata` 保存该语言的 profile、工具链与绑定定位。
 
-Python AOT 使用 `vibeflow.aot-build.v7`。旧包可用自带的 `run.py` 或配套框架继续运行。通过新版框架的 `load_bundle()` 使用工作流时，请将旧包重新构建到新目录。`--replace` 用于同格式的完整构建目录。
+Python AOT 使用 `vibeflow.aot-build.v8`。原生快照共用类型表，块记录由配套框架绑定到共享执行函数。v7 及更早的包可用自带的 `run.py` 或配套框架继续运行。通过新版框架的 `load_bundle()` 使用工作流时，请将旧包重新构建到新目录。`--replace` 用于同格式的完整构建目录。
 
 ## 原生异步入口与生命周期
 

@@ -18,6 +18,7 @@ python tools/verify_project.py --full --workers 4
 | Python 部署 | test_deployment.py、test_execution.py；正常 build→删除源码→搬移运行 | Nodeset、plan/block/compiled、独立预期与错误传播 | 私有 AOT 编译调用、手拼部署描述 |
 | JS/TS 构建 | test_javascript.py、test_entries.py、test_resources.py | CLI 构建、原生 Node 应用、TypeScript 正反类型检查、字面文件路径 | 发射器快照、模块加载改写 |
 | 协作与取消 | test_cooperation*.py、test_session_behaviors.py；真实产物/HTTP/子进程/浏览器按钮 | 并发公式、独立实例、消息、可重复终态、取消/超时/清理及错误对照 | 假描述、替代 runner、私有取消状态 |
+| 中文整数公式 | test_two_workflow_formula.py；三张图的审核与构建、计算应用 | 同步调用返回乘积、三项汇合、复用求差节点与 Nodeset、单独部署独立流程、正负与零值输入 | |
 | 运行观察 | test_observation.py、test_concurrency.py、test_execution.py、test_javascript.py；CLI、实际宿主与页面 | 自然状态/日志、三档 trace 的公开输出、业务开始和清理收据、容量/增量补位、断图拒绝 | 内部活动 frame、缓存和调度计数器 |
 | 展示架构 | test_preview.py、test_layout.py、test_web_app.py；正常 review→真实 Chromium | 可见资源/计划状态、折叠、详情、顺序、历史、缩放、消息交互 | 合成页面、VFLayout/VFModel 调用、控件脚本赋值与隐藏 getter |
 | 交付物 | test_delivery.py；wheel/sdist 安装及两 profile 解压搬移 | 脱离仓库构建/执行、正常审查刷新、独立 AOT 运行 | 重复 smoke 壳、内部包内容模型替代安装 |

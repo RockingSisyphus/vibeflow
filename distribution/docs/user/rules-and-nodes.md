@@ -26,7 +26,7 @@ Workflow 顶层 `rulesets` 省略时使用内置及所选 Plugin 的图级默认
 | --- | --- |
 | `vibeflow.process` | 纯处理 |
 | `vibeflow.io` | 终端输入输出 |
-| `vibeflow.document` / `vibeflow.data_store` | 文件、网络、数据库等 Python I/O |
+| `vibeflow.document` / `vibeflow.data_store` / `vibeflow.python_io` | 两个 Target 当前都映射到 `python_io` 效果范围，按各自语言的规则识别文件、网络或宿主操作 |
 | `vibeflow.global_state` | 有限效果检查识别的共享／模块状态操作 |
 
 ## Python 进程环境变量
@@ -70,7 +70,7 @@ checks = ruleset(id="example.project", calls=[{"id": "count", "rule_id": "exampl
 plugin = Plugin(id="conventions", resources=[count, checks])
 ```
 
-Ruleset 把 Rule 调用组织为有明确 ID 的检查图。`requires` 关系把提供方的类型化 Record 绑定到消费方输入；`includes` 组合集合；`overrides` 在明确目标上替换参数或实现。消费方不能把缺失、类型不匹配或不可用的 Record 当作有效数据。报告保存计划、调用、执行状态与 Record，业务 workflow 不消费这些审查结果来调度。
+Ruleset 把 Rule 调用组织为有明确 ID 的检查图。`requires` 关系把提供方的类型化 Record 绑定到消费方输入；`includes` 组合集合；`overrides` 在明确目标上替换参数或实现。消费方不能把缺失、类型不匹配或不可用的 Record 当作有效数据。报告保存计划、调用、执行状态与 Record。工作流调度沿编译后的边执行。有些框架定义的 Record 也会在准备阶段用于确定资源许可或协作权限，例如资源使用结果和 Workflow 操作授权。
 
 Python 返回 `RuleResult` / `RuleRecord`，JS 返回等价 JSON 对象。Rule 运行在对应语言宿主中，规则语言可以与业务 Target 不同；源码事实由各 Target 提供。
 

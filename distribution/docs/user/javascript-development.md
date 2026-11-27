@@ -1,5 +1,7 @@
 # JavaScript/TypeScript 资源与 AOT
 
+各 AOT 交付 profile 共用同一套生成逻辑。产物复用重复的静态契约和调度代码，构建时确定工作流、路由以及 Node 的 ESM 绑定。
+
 ## 业务 Node 与类型
 
 `nodes/text.ts`：
@@ -39,6 +41,8 @@ workflow 显式启用：
 ```
 
 ## SDK 解析与运行协议
+
+JS/TS 分析要求项目能解析 TypeScript 7（`>=7 <8`）。构建还需要项目可解析的 esbuild。发行样例的 `npm ci` 会按随包锁文件安装这些依赖。
 
 发行包和 wheel 包含 SDK 运行文件及类型声明。VibeFlow worker、分析器和构建器统一解析 `@vibeflow/plugin`。发行模板的 `tsconfig.json` 将 TypeScript 的 `paths["@vibeflow/plugin"]` 指向 `../kernel/javascript/sdk.d.ts`。这些文件由内核的同一 SDK 复制生成，受到发行清单保护。wheel 用户可以通过 `importlib.resources.files("vibeflow.targets.javascript.resources")` 定位同一文件。无需另装一个同名 npm SDK。
 

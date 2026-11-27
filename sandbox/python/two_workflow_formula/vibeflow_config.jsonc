@@ -1,0 +1,4 @@
+{
+  "purpose": "用两个工作流分工完成同一个数学函数。",
+  "roots": [{"id": "formula", "path": "project"}]
+}

@@ -1,18 +1,39 @@
 # 发行与文档装配
 
-当前本地分发版本为 1.5.4。版本使用 Workflow ABI v12、Plugin ABI v5、Python AOT v7、JavaScript AOT v6、预览快照 v5、Rule ABI v3 和协作启动清单 v2。本页记录本地分发包的构建与解压验证。 [源码测试覆盖](../../sandbox/TEST_COVERAGE.md)
+当前本地分发版本为 1.5.6。版本使用 Workflow ABI v12、Plugin ABI v5、Python AOT v8、JavaScript AOT v6、预览快照 v5、Rule ABI v3 和协作启动清单 v2。本页记录本地分发包的构建与解压验证。 [源码测试覆盖](../../sandbox/TEST_COVERAGE.md)
 
 1.3.5 修复 JavaScript 核心 SDK 解压到 workspace 内时被误认成业务资源的问题：Target 按既有资源清单识别准确文件，在形成业务引用与插件源码闭包时排除核心内部依赖；原始分析保留，用户贡献声明及共享 Rule 政策不变。1.3.4 统一资源使用 Rule 与 `vibeflow.resource_use.v1` 结果：独立 BaseLib（包括间接依赖）必须显式声明，Plugin 贡献资源整包引入并禁止重复声明，贡献代码实际路径必须位于所属 Plugin 目录。Python、JavaScript 的验证、构建、运行准备和展示共同消费规则结果；旧选择器及重复许可检查已删除。Python AOT 按实际引用收集实现，未引用的可用库不随包加载或复制。预览最新快照覆盖各注册 root 当前仍存在的 workflow，继续隐藏 Plugin 贡献资源。1.3.3 的 global_state 环境变量能力保留。
 
 包含已退役通用宿主接口的旧发行物已在新包验收后清除，历史源码通过 Git 恢复。其他归档不受影响。两个 profile 使用下述工具构建；正式发布需验证解压运行、wheel、sdist 与完整门禁，禁止同名覆盖既有 ZIP。
 
-## 1.5.4 本地构建
+## 1.5.6 本地构建
+
+JS AOT 的 `all` 汇合执行时消费本轮的入边信号。JavaScript 工具链统一使用 TypeScript 7 原生分析入口。现有 AOT 目录通过 `--replace` 重建时，在原子替换前完成一次完整核验。
+
+本版包含两端的构建提速。JS 在单次命令内复用 TypeScript 后端，Python 复用相同源码的符号分析和架构展示快照。
+
+2026-11-25，本机运行 `python tools/verify_project.py --full --workers 8`，五个阶段全部通过。691 项端到端测试与 2 个子测试通过，涵盖真实 Chromium、wheel/sdist 安装和候选分发包的独立运行。使用 `distribution/build.py --profile all` 构建最终双包，分别解压并验证内核、重命名项目根、执行 Python 和 JavaScript 审查及构建。移除解压工作区后，Python v8 与 JavaScript v6 AOT 均独立运行成功。两个 profile 的内核字节一致。
+
+| 本地包 | 字节数 |
+| --- | ---: |
+| `vibeflow-distribution-1.5.6.zip` | 2,462,253 |
+| `vibeflow-distribution-autonomous-1.5.6.zip` | 2,461,786 |
+
+两份 ZIP 与 `SHA256SUMS-1.5.6.txt` 保存在 `dist/`，校验通过。
+
+## 1.5.5 历史构建
+
+JavaScript 与 Python 的 AOT 均默认生成精简产物。JavaScript 在模块内共享静态数据与调度代码。Python v8 共享快照类型表与块包装函数。构建命令沿用现有用法。使用新版 `load_bundle()` 加载旧版本的工作流时，请在新目录重建。 [AOT 体积与性能测量](../goal-decisions.md#默认-aot-实测)
+
+2026-11-25，使用 `distribution/build.py --profile all` 构建两个 profile，仓库自检为零错误、零警告。两个最终 ZIP 分别通过内核校验、项目根重命名、Python 与 JavaScript 审查和 AOT 构建，以及移除解压工作区后的独立运行。Python 产物使用 v8，JavaScript 使用 v6，两个 profile 的内核逐字节一致。两个 ZIP 与 `SHA256SUMS-1.5.5.txt` 随 1.5.6 构建转存至 `archive/`，原始 ZIP 校验通过。
+
+## 1.5.4 历史构建
 
 内置 `vibeflow.workflow` 默认检查调度图的弱连通性。多个命名入口可以共用下游。若完整调度图含多个连通分量，报告 `GRAPH.FLOW.DISCONNECTED` 并列出各分量的节点和命名入口。详见[命名入口文档](../../distribution/docs/user/workflow-coordination.md#一个图的多个入口)。
 
 2026-11-25，使用 `distribution/build.py --profile all` 构建两个 profile，仓库自检为零错误、零警告。两份最终 ZIP 分别通过本机 Linux 解压验证、随包内核校验、Python 和 JavaScript 最小项目审查及构建，并在两种语言的分离入口用例中返回新诊断。移除解压工作区后，Python `plan`、`block`、`compiled` 和 Node 模块均返回预期业务输出。两个 profile 的内核字节一致。
 
-两个 1.5.4 ZIP 与 `SHA256SUMS-1.5.4.txt` 位于 `dist/`。两个 1.5.3 原始 ZIP 与校验清单位于 `archive/`，已核对校验值。
+两个 1.5.4 ZIP 与 `SHA256SUMS-1.5.4.txt` 随 1.5.5 构建转存至 `archive/`，原始 ZIP 校验通过。两个 1.5.3 ZIP 与校验清单也位于 `archive/`。
 
 ## 1.5.3 历史构建
 
@@ -60,13 +81,13 @@ README、AGENTS 和项目治理指南明确区分目录位置、root ID 与发�
 
 Node 通过固定的 `context.workflow` 方法使用协作会话，运行输入分别为 Python `workflow_session` 和 JavaScript `workflowSession`。`workflow_operations` 只声明流程事实，供启动清单与架构展示读取。应用直接管理 DOM、监听和队列，活实例可通过普通运行输入传递。
 
-Loop 的 `max_iterations: null` 支持持续运行，省略时默认 1000；取消等待与停止清理行为保持有效。旧 ABI 和 AOT 通过既有版本检查拒绝，需重新构建。分发构建、完整门禁及清理结果见 [1.5.0 本地验收记录](release-1.5.0-validation.md)。
+Loop 的 `max_iterations: null` 支持持续运行，省略时默认 1000；取消等待与停止清理行为保持有效。旧 ABI 和 AOT 通过既有版本检查拒绝，需重新构建。当时的本地验收历史可从 Git 追溯。
 
 ## 1.4.5 构建内容
 
 审核出口统一为 Architecture 和离线 HTML，结果 JSON 写到标准输出。保留 Mermaid 文本导出；旧静态附件与字符流程图的生成链、命令、依赖和查看器模式彻底移除。浏览器验收使用独立测试依赖，不随分发包交付。旧 review 输出参数明确拒绝，帮助文案与实际参数同步。
 
-验证范围和首轮失败后的修复记录见[1.4.5 验证记录](release-1.4.5-validation.md)。本机验证不代表远端 CI 或其他平台验收。
+当时的验证范围限于 Linux 本机，可从 Git 追溯首轮失败、修复和复验。
 
 ## 1.4.4 构建内容
 

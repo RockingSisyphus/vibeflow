@@ -5,7 +5,6 @@ from copy import deepcopy
 from dataclasses import replace
 import json
 from pathlib import Path
-from uuid import uuid4
 from threading import RLock
 
 from vibeflow.block_compiler import workflow_plan_from_dict, WORKFLOW_ABI_VERSION, map_plan_sources
@@ -16,7 +15,7 @@ from vibeflow.core.workflows.entries import choose_entry
 from vibeflow.targets.python.project.registry import NodeRegistry, load_node_implementation
 from vibeflow.targets.python.project.plugins import PluginRegistry, create_lifecycle_plugin
 from vibeflow.targets.python.runtime.preparation import PreparedPythonWorkflow, bind_python_workflow
-from vibeflow.targets.python.sdk.loading import load_plugin, source_paths, load_source_module
+from vibeflow.targets.python.sdk.loading import load_plugin, source_paths
 from vibeflow.targets.python.sdk.source_namespace import source_namespace
 from vibeflow.tooling.application.python.bundle_snapshot import PYTHON_AOT_FORMAT, decode_snapshot
 from vibeflow.tooling.application.python.delegate_contract import apply_delegate_cli_findings
@@ -34,10 +33,11 @@ class PythonBundle:
         relocate = lambda value: str(self.path / value[len('@bundle/'):]) if isinstance(value,str) and value.startswith('@bundle/') else value
         self.workflow = map_plan_sources(workflow_plan_from_dict(self.data['workflow']),
             lambda source:replace(source,ref=relocate(source.ref)))
+        types = self.data['snapshot_types']
         self.prepared = PreparedPythonWorkflow(self.workflow,
-            decode_snapshot(self.data['graphs'], relocate=relocate),
-            decode_snapshot(self.data['compiled'], relocate=relocate),
-            decode_snapshot(self.data['globals']), decode_snapshot(self.data['overrides']))
+            decode_snapshot(self.data['graphs'], types=types, relocate=relocate),
+            decode_snapshot(self.data['compiled'], types=types, relocate=relocate),
+            decode_snapshot(self.data['globals'], types=types), decode_snapshot(self.data['overrides'], types=types))
         self.roots = tuple(self.path / value for value in self.data['source_roots'])
         # Fixed, relocated declarations belong to the bundle, not each Runtime.
         self._node_records = tuple(self._prepare_node(record) for record in self.data['nodes'])
@@ -49,7 +49,6 @@ class PythonBundle:
         for root, visible in self.data["source_import_roots"].items():
             source_namespace(self.path / root, namespaces=self._source_namespaces,
                 source_roots=tuple(self.path / value for value in visible))
-        self.generated = load_source_module(self.path / 'generated_blocks.py', '_vibeflow_aot_blocks_' + uuid4().hex)
 
     @property
     def workflow_descriptor(self):
@@ -119,13 +118,11 @@ class PythonBundle:
         return result
 
     def _blocks(self, plan, block_id):
-        from vibeflow.targets.python.runtime.block_compiler import PythonCompiledBlock
-        return tuple(PythonCompiledBlock(name=item['name'], entry=plan.order[0] if item['kind'] == 'graph' else item['entry'],
+        from vibeflow.targets.python.runtime.block_compiler import bind_compiled_block
+        return tuple(bind_compiled_block(plan, kind=item['kind'], name=item['name'],
+            entry=plan.order[0] if item['kind'] == 'graph' else item['entry'],
             exits=tuple(n for n in item['exits'] if n in plan.frames),
-            nodes=tuple(n for n in item['nodes'] if n in plan.frames),
-            edge_routes={node:tuple(plan.frames[node].outgoing) if item['kind'] == 'graph' else () for node in item['nodes'] if node in plan.frames},
-            callable=getattr(self.generated, item['function']), source=item['source'], path=tuple(item['path']),
-            supports_full_trace=True, supports_node_hooks=True, kind=item['kind'])
+            nodes=tuple(n for n in item['nodes'] if n in plan.frames), path=tuple(item['path']))
             for item in self.data['blocks'].get(block_id, ()) if item['kind'] == 'graph' or item['entry'] in plan.frames)
 
     def create_runtime(self, *, runtime_options=None, workflow_session=None, run_dir=None,

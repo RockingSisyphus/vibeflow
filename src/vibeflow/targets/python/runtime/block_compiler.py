@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from functools import partial
 from typing import TYPE_CHECKING, Callable, Mapping, Protocol
 
 from vibeflow.core.compiler import explicit_flow_cycles
@@ -46,9 +47,9 @@ def compile_blocks(plan: "ExecutionPlan", runtime_options: object | None = None)
     for name in plan.order:
         frame = plan.frames[name]
         if frame.is_loop and _loop_block_compilable(frame):
-            blocks.append(_compile_loop_block(frame))
+            blocks.append(_compile_composite_block(plan, frame, "loop"))
         elif frame.is_nodeset and _nodeset_block_compilable(frame):
-            blocks.append(_compile_nodeset_block(frame))
+            blocks.append(_compile_composite_block(plan, frame, "nodeset"))
     if _graph_block_compilable(plan):
         blocks.append(_compile_generated_graph_block(plan))
     return tuple(blocks)
@@ -84,85 +85,59 @@ def explain_block_compilation(plan: "ExecutionPlan") -> tuple[dict[str, object],
 
 
 def _compile_generated_graph_block(plan: "ExecutionPlan") -> CompiledBlock:
-    block_name = f"graph:{plan.order[0]}"
     nodes = tuple(plan.order)
-    source = _generated_graph_block_source(block_name, nodes)
-    if plan.graph.entry_mode == "async":
-        source = source.replace("def compiled_block", "async def compiled_block").replace("run_graph_block", "run_graph_block_async").replace("return run_graph_block_async(", "return await run_graph_block_async(")
-    namespace = {}
-    exec(source, namespace)
-    compiled_block = namespace["compiled_block"]
+    return bind_compiled_block(plan, kind="graph", name=f"graph:{nodes[0]}",
+                               entry=nodes[0], exits=nodes[-1:], nodes=nodes)
 
+
+def _compile_composite_block(plan: "ExecutionPlan", frame: "NodeFrame", kind: str) -> CompiledBlock:
+    nodes = (frame.id,)
+    return bind_compiled_block(plan, kind=kind, name=f"{kind}:{frame.id}",
+                               entry=frame.id, exits=nodes, nodes=nodes, path=nodes)
+
+
+def _call_graph_block(runtime, state):
+    order = runtime._plan.order
+    return run_graph_block(runtime, state, "graph:" + order[0], order)
+
+
+async def _call_graph_block_async(runtime, state):
+    order = runtime._plan.order
+    return await run_graph_block_async(runtime, state, "graph:" + order[0], order)
+
+
+def _call_composite_block(node_id, method, runtime, inputs):
+    return CompiledBlockResult(node_id, getattr(runtime, method)(node_id, inputs))
+
+
+async def _call_composite_block_async(node_id, method, runtime, inputs):
+    return CompiledBlockResult(node_id, await getattr(runtime, method)(node_id, inputs))
+
+
+def bind_compiled_block(plan, *, kind, name, entry, exits, nodes, path=()):
+    asynchronous = plan.graph.entry_mode == "async"
+    if kind == "graph":
+        callable_block = _call_graph_block_async if asynchronous else _call_graph_block
+        source = _generated_graph_block_source(name, nodes)
+        if asynchronous:
+            source = source.replace("def compiled_block", "async def compiled_block").replace(
+                "run_graph_block", "run_graph_block_async").replace("return run_graph_block_async(", "return await run_graph_block_async(")
+        edge_routes = {node: tuple(plan.frames[node].outgoing) for node in nodes}
+    else:
+        frame = plan.frames[entry]
+        source = _loop_block_source(frame) if kind == "loop" else _nodeset_block_source(frame)
+        method = f"_execute_{kind}_block"
+        if asynchronous:
+            callable_block = partial(_call_composite_block_async, entry, method + "_async")
+            source = source.replace(f"def compiled_{kind}_block", f"async def compiled_{kind}_block").replace(
+                f"runtime.{method}(", f"await runtime.{method}_async(")
+        else:
+            callable_block = partial(_call_composite_block, entry, method)
+        edge_routes = {node: () for node in nodes}
     return CompiledBlock(
-        name=block_name,
-        entry=nodes[0],
-        exits=(nodes[-1],),
-        nodes=nodes,
-        edge_routes={node: tuple(plan.frames[node].outgoing) for node in nodes},
-        callable=compiled_block,
-        source=source,
-        supports_full_trace=True,
-        supports_node_hooks=True,
-        kind="graph",
-        mode="generated",
-    )
-
-
-def _compile_loop_block(frame: "NodeFrame") -> CompiledBlock:
-    block_name = f"loop:{frame.id}"
-
-    def compiled_loop_block(runtime: "PipelineRuntime", inputs: object) -> CompiledBlockResult:
-        outputs = runtime._execute_loop_block(frame.id, inputs)
-        return CompiledBlockResult(last_node=frame.id, outputs=outputs)
-
-    source = _loop_block_source(frame)
-    if frame.subplan.graph.entry_mode == "async":
-        source = source.replace("def compiled_loop_block", "async def compiled_loop_block").replace("runtime._execute_loop_block(", "await runtime._execute_loop_block_async(")
-        namespace = {"CompiledBlockResult": CompiledBlockResult}
-        exec(source, namespace)
-        compiled_loop_block = namespace["compiled_loop_block"]
-    return CompiledBlock(
-        name=block_name,
-        entry=frame.id,
-        exits=(frame.id,),
-        nodes=(frame.id,),
-        edge_routes={frame.id: ()},
-        callable=compiled_loop_block,
-        source=source,
-        supports_full_trace=True,
-        supports_node_hooks=True,
-        kind="loop",
-        mode="generated",
-        path=(frame.id,),
-    )
-
-
-def _compile_nodeset_block(frame: "NodeFrame") -> CompiledBlock:
-    block_name = f"nodeset:{frame.id}"
-
-    def compiled_nodeset_block(runtime: "PipelineRuntime", inputs: object) -> CompiledBlockResult:
-        outputs = runtime._execute_nodeset_block(frame.id, inputs)
-        return CompiledBlockResult(last_node=frame.id, outputs=outputs)
-
-    source = _nodeset_block_source(frame)
-    if frame.subplan.graph.entry_mode == "async":
-        source = source.replace("def compiled_nodeset_block", "async def compiled_nodeset_block").replace("runtime._execute_nodeset_block(", "await runtime._execute_nodeset_block_async(")
-        namespace = {"CompiledBlockResult": CompiledBlockResult}
-        exec(source, namespace)
-        compiled_nodeset_block = namespace["compiled_nodeset_block"]
-    return CompiledBlock(
-        name=block_name,
-        entry=frame.id,
-        exits=(frame.id,),
-        nodes=(frame.id,),
-        edge_routes={frame.id: ()},
-        callable=compiled_nodeset_block,
-        source=source,
-        supports_full_trace=True,
-        supports_node_hooks=True,
-        kind="nodeset",
-        mode="generated",
-        path=(frame.id,),
+        name=name, entry=entry, exits=exits, nodes=nodes, edge_routes=edge_routes,
+        callable=callable_block, source=source, supports_full_trace=True,
+        supports_node_hooks=True, kind=kind, path=path,
     )
 
 

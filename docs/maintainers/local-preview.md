@@ -4,7 +4,7 @@
 
 ## 数据与职责
 
-- Python `PreparedPythonPresentation.architecture()` 缓存同次准备的事实；其 Target-owned 构建入口为 `build_architecture_facts`。JavaScript 的同名公共入口位于 application/javascript/presentation/architecture，由审查和构建共用；规则报告、实现关系和来源归一化在此组装，不通过私有审查函数或拼接审查结果对象导出。
+- Python `PreparedPythonPresentation.architecture()` 缓存同次准备的事实；其 Python 适配入口是 `tooling/application/python/presentation/architecture_document.py` 中的 `build_architecture_facts`。JavaScript 的同名公共入口位于 application/javascript/presentation/architecture，由审查和构建共用；规则报告、实现关系和来源归一化在此组装，不通过私有审查函数或拼接审查结果对象导出。
 - Python 资源选择在检查边界保存为不可变事实；后续配置被修改或移除，不改变本次导出。原有 compiled_graph.json 序列化收拢到不依赖 Mermaid 的 compiled_document，消费者直接从 compiled_document 导入。
 - 准备阶段同时记录是否具有配置来源；纯内存构图保持原有正文边界，已经准备好的真实项目则不因配置后来被移除而丢失资源实现事实。
 - 独立 `tooling/architecture` 统一公共 workflow/Nodeset 组装、项目索引、实现关系、JSONC 文档及检查。Target 适配器只提供声明、来源和已准备图访问；`node_presentation` 保留有效样式规则。有效连边来自编译结果，网页不推导执行顺序。

@@ -5,7 +5,7 @@ from vibeflow.targets.javascript.resources import read_text
 
 def _runtime_source() -> str:
     names = ("runtime_helpers.mjs", "workflow_session.mjs", "plugin_helpers.mjs",
-             "root_helpers.mjs", "status_helpers.mjs", "execution_helpers.mjs")
+             "root_helpers.mjs", "status_helpers.mjs", "execution_helpers.mjs", "static_scheduler.mjs", "static_composites.mjs")
     return "\n".join(read_text(name) for name in names)
 
 

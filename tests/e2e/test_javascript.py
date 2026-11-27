@@ -86,6 +86,53 @@ def test_conditional_routes_and_unknown_status_control(tmp_path,toolchain,mode,v
         else:assert payload["output"]=={"result":43},payload
 
 
+@pytest.mark.parametrize("mode", ["sync", "async"])
+def test_repeated_nodeset_calls_keep_parameter_and_trace_paths(tmp_path, toolchain, mode):
+    source = example(tmp_path / "source", "javascript/workflow_math", toolchain)
+    path = source / "project/configs/nested_override.jsonc"
+    config = json.loads(path.read_text(encoding="utf-8"))
+    config["nodeset_imports"] = config["nodeset_imports"][:1]
+    workflow = config["pipeline"]
+    start, nodeset, end = workflow["nodes"]
+    def call(name, scale, offset):
+        return {**nodeset, "id": name, "definition_id": "sandbox.affine_inner",
+                "node_configs": {"math": {"scale": scale, "offset": offset}}}
+    branches = [("first", 3, 4), ("second", 7, 2)]
+    workflow["entry_mode"] = mode
+    workflow["entries"] = {}
+    workflow["nodes"] = [{**end, "join_policy": "all"}]
+    workflow["edges"] = []
+    for name, scale, offset in branches:
+        start_id = f"{name}_start"
+        workflow["entries"][name] = {"start": start_id}
+        workflow["nodes"].extend([{**start, "id": start_id}, call(name, scale, offset)])
+        workflow["edges"].extend([[start_id, name], [name, end["id"]]])
+    workflow["outputs"] = [{"type": "sandbox.math.result", "cardinality": "exactly_one",
+                            "display_name": "Result", "as": "result"}]
+    write(path, config)
+    target = tmp_path / "bundle"
+    cli(source, "build", "--workspace", source / "vibeflow_config.jsonc", "--config", path,
+        "--target", "node", "--profile", "single-esm", "--out-dir", target)
+    shutil.rmtree(source)
+    app = write(tmp_path / "app.mjs", """
+import * as workflow from './bundle/index.js';
+const run = workflow.runWorkflowAsync ?? workflow.runWorkflow;
+const outputs = await Promise.all(['first', 'second'].map(async entry => {
+  const paths = [];
+  const result = await run({x: 5}, {entry, trace: 'full', onTrace(event) {
+    if (event.kind === 'node_start' && event.nodeId === 'math') paths.push(event.nodePath);
+  }});
+  return {result, paths};
+}));
+console.log(JSON.stringify(outputs));
+""")
+    result = command("node", app, cwd=tmp_path)
+    assert json.loads(result.stdout) == [
+        {"result": {"result": 19}, "paths": ["first.math"]},
+        {"result": {"result": 37}, "paths": ["second.math"]},
+    ]
+
+
 def test_typescript_app_supplies_live_clock(tmp_path,toolchain):
     source=example(tmp_path / "source","javascript/minimal",toolchain)
     target=tmp_path / "bundle"
